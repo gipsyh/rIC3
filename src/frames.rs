@@ -132,7 +132,7 @@ impl Ic3 {
         let lemma = Lemma::new(cube);
         if frame == 0 {
             assert!(self.frames.len() == 1);
-            self.solvers[0].add_lemma(&!&lemma.cube);
+            self.solvers[0].add_clause(&!&lemma.cube);
             self.frames[0].push(lemma);
             return;
         }
@@ -159,7 +159,7 @@ impl Ic3 {
         self.frames[frame].push(lemma);
         let begin = begin.unwrap_or(1);
         for i in begin..=frame {
-            self.solvers[i].add_lemma(&clause);
+            self.solvers[i].add_clause(&clause);
         }
         self.frames.early = self.frames.early.min(begin);
     }

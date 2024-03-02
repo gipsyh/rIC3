@@ -1,7 +1,7 @@
 use aig::Aig;
-use logic_form::{Clause, Cnf, Cube, Lit, Var, VarMap};
-use minisat::SimpSolver;
-use std::collections::{HashMap, HashSet};
+use logic_form::{Clause, Cnf, Cube, Lit, Var};
+use minisat::{SimpSolver, Solver};
+use std::collections::HashMap;
 
 pub struct Model {
     pub inputs: Vec<Var>,
@@ -12,87 +12,23 @@ pub struct Model {
     pub init_map: HashMap<Var, bool>,
     pub constraints: Vec<Lit>,
     pub trans: Cnf,
-    pub num_var: usize,
+    num_var: usize,
     next_map: HashMap<Var, Var>,
     previous_map: HashMap<Var, Var>,
-    pub dependence: VarMap<Vec<Var>>,
 }
 
 impl Model {
-    fn compress_deps_rec(
-        v: Var,
-        deps: &mut VarMap<Vec<Var>>,
-        domain: &HashSet<Var>,
-        compressed: &mut HashSet<Var>,
-    ) {
-        if compressed.contains(&v) {
-            return;
-        }
-        for d in 0..deps[v].len() {
-            Self::compress_deps_rec(deps[v][d], deps, domain, compressed);
-        }
-        let mut dep = HashSet::new();
-        for d in deps[v].iter() {
-            if domain.contains(d) {
-                dep.insert(*d);
-                continue;
-            }
-            for dd in deps[*d].iter() {
-                dep.insert(*dd);
-            }
-        }
-        deps[v] = dep.into_iter().collect();
-        deps[v].sort();
-        compressed.insert(v);
-    }
-
-    fn compress_deps(mut deps: VarMap<Vec<Var>>, cnf: &Cnf) -> VarMap<Vec<Var>> {
-        let mut domain = HashSet::new();
-        for cls in cnf.iter() {
-            for l in cls.iter() {
-                domain.insert(l.var());
-            }
-        }
-        let mut compressed: HashSet<Var> = HashSet::new();
-        for v in 0..deps.len() {
-            let v = Var::new(v);
-            Self::compress_deps_rec(v, &mut deps, &domain, &mut compressed)
-        }
-        for v in 0..deps.len() {
-            let v = Var::new(v);
-            if !domain.contains(&v) {
-                deps[v].clear();
-            }
-        }
-        deps
-    }
-
     pub fn from_aig(aig: &Aig) -> Self {
         let mut simp_solver = SimpSolver::new();
         let false_lit: Lit = simp_solver.new_var().into();
-        let mut dependence = VarMap::new();
-        dependence.push(vec![]);
         simp_solver.add_clause(&[!false_lit]);
         for node in aig.nodes.iter().skip(1) {
             assert_eq!(Var::new(node.node_id()), simp_solver.new_var());
-            let mut dep = Vec::new();
-            if node.is_and() {
-                dep.push(node.fanin0().to_lit().var());
-                dep.push(node.fanin1().to_lit().var());
-            }
-            dependence.push(dep);
         }
         let inputs: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
         let mut latchs: Vec<Var> = aig.latchs.iter().map(|x| Var::new(x.input)).collect();
         latchs.push(simp_solver.new_var());
-        dependence.push(vec![]);
-        let primes: Vec<Var> = latchs
-            .iter()
-            .map(|_| {
-                dependence.push(vec![]);
-                simp_solver.new_var()
-            })
-            .collect();
+        let primes: Vec<Var> = latchs.iter().map(|_| simp_solver.new_var()).collect();
         let bad_var_lit = latchs.last().unwrap().lit();
         let bad_var_prime_lit = primes.last().unwrap().lit();
         let mut init = aig.latch_init_cube().to_cube();
@@ -126,7 +62,6 @@ impl Model {
         let bad_lit = aig_bad.to_lit();
         trans.push(Clause::from([!bad_lit, bad_var_prime_lit]));
         trans.push(Clause::from([bad_lit, !bad_var_prime_lit]));
-        dependence[bad_var_prime_lit].push(bad_lit.var());
         let bad = Cube::from([bad_var_prime_lit]);
         for tran in trans.iter() {
             simp_solver.add_clause(tran);
@@ -136,7 +71,6 @@ impl Model {
             let p = p.lit();
             simp_solver.add_clause(&Clause::from([l, !p]));
             simp_solver.add_clause(&Clause::from([!l, p]));
-            dependence[p].push(l.var())
         }
         for c in constraints.iter() {
             simp_solver.add_clause(&Clause::from([*c]));
@@ -150,7 +84,6 @@ impl Model {
             next_map.insert(*l, *p);
             previous_map.insert(*p, *l);
         }
-        dependence = Self::compress_deps(dependence, &trans);
         Self {
             inputs,
             latchs,
@@ -163,7 +96,6 @@ impl Model {
             num_var,
             next_map,
             previous_map,
-            dependence,
         }
     }
 
@@ -196,7 +128,7 @@ impl Model {
         true
     }
 
-    pub fn load_trans(&self, solver: &mut gipsat::Solver) {
+    pub fn load_trans(&self, solver: &mut Solver) {
         while solver.num_var() < self.num_var {
             solver.new_var();
         }

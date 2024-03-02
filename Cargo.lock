@@ -59,17 +59,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitfield-struct"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a26b8cea8bb6a81b75a84603b9e096f05fa86db057904ef29be1deee900532bd"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,16 +156,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gipsat"
-version = "0.1.0"
-dependencies = [
- "bitfield-struct",
- "clap",
- "giputils",
- "logic-form",
-]
-
-[[package]]
 name = "gipsyh-aiger"
 version = "0.4.0"
 
@@ -197,7 +176,6 @@ dependencies = [
  "aig",
  "clap",
  "ctrlc",
- "gipsat",
  "giputils",
  "logic-form",
  "minisat",

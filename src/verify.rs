@@ -1,12 +1,12 @@
 use crate::{frames::Lemma, solver::Ic3Solver, Ic3};
-use gipsat::SatResult;
+use minisat::SatResult;
 use std::ops::Deref;
 
 impl Ic3 {
     fn verify_invariant(&mut self, invariants: &[Lemma]) -> bool {
         let mut solver = Ic3Solver::new(&self.args, &self.model, 1);
         for lemma in invariants {
-            solver.add_lemma(&!lemma.deref());
+            solver.add_clause(&!lemma.deref());
         }
         if let SatResult::Sat(_) = solver.solve(&self.model.bad) {
             return false;

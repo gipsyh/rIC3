@@ -25,7 +25,7 @@ impl Ic3 {
             if self.model.cube_subsume_init(&cube) {
                 return DownResult::IncludeInit;
             }
-            match self.blocked_with_ordered(frame, &cube, false, true) {
+            match self.blocked_with_ordered(frame, &cube, false) {
                 BlockResult::Yes(blocked) => {
                     return DownResult::Success(self.blocked_conflict(&blocked))
                 }
@@ -37,14 +37,14 @@ impl Ic3 {
                     let model = self.unblocked_model(&unblocked);
                     if ctgs < 3 && frame > 1 && !self.model.cube_subsume_init(&model) {
                         if let BlockResult::Yes(blocked) =
-                            self.blocked_with_ordered(frame - 1, &model, false, true)
+                            self.blocked_with_ordered(frame - 1, &model, false)
                         {
                             ctgs += 1;
                             let conflict = self.blocked_conflict(&blocked);
                             let conflict = self.mic(frame - 1, conflict, level - 1);
                             let mut i = frame;
                             while i <= self.depth() {
-                                if let BlockResult::No(_) = self.blocked(i, &conflict, true) {
+                                if let BlockResult::No(_) = self.blocked(i, &conflict) {
                                     break;
                                 }
                                 i += 1;
@@ -92,15 +92,7 @@ impl Ic3 {
     }
 
     pub fn mic(&mut self, frame: usize, mut cube: Cube, level: usize) -> Cube {
-        assert!(level == 0);
         let start = Instant::now();
-        self.solvers[frame - 1].solver.set_domain(
-            self.model
-                .cube_next(&cube)
-                .iter()
-                .copied()
-                .chain(cube.iter().copied()),
-        );
         self.statistic.avg_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         self.activity.sort_by_activity(&mut cube, true);
@@ -117,13 +109,6 @@ impl Ic3 {
                 DownResult::Success(new_cube) => {
                     self.statistic.mic_drop.success();
                     (cube, i) = self.handle_down_success(frame, cube, i, new_cube);
-                    self.solvers[frame - 1].solver.set_sub_domain(
-                        self.model
-                            .cube_next(&cube)
-                            .iter()
-                            .copied()
-                            .chain(cube.iter().copied()),
-                    );
                 }
                 _ => {
                     self.statistic.mic_drop.fail();
@@ -132,7 +117,6 @@ impl Ic3 {
                 }
             }
         }
-        self.solvers[frame - 1].solver.unset_domain();
         self.activity.bump_cube_activity(&cube);
         self.statistic.overall_mic_time += start.elapsed();
         cube

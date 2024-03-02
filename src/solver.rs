@@ -1,34 +1,51 @@
+use super::Frames;
 use crate::{model::Model, Args, Ic3};
-use gipsat::{SatResult, Solver};
-use logic_form::{Clause, Cube, Lit, Var};
-use std::{mem::take, time::Instant};
+use logic_form::{Clause, Cube, Lit};
+use minisat::{SatResult, Solver};
+use std::{mem::take, ops::Deref, time::Instant};
 
 pub struct Ic3Solver {
-    pub solver: Solver,
+    solver: Solver,
+    num_act: usize,
+    frame: usize,
     temporary: Vec<Cube>,
 }
 
 impl Ic3Solver {
     pub fn new(args: &Args, model: &Model, frame: usize) -> Self {
-        let mut solver = Solver::new(&format!("frame{frame}"));
-        if let Some(_) = args.random {
-            // solver.set_random_seed(seed as f64);
-            // solver.set_rnd_init_act(trsue);
-            todo!()
-        }
+        let mut solver = Solver::new();
         let false_lit: Lit = solver.new_var().into();
-        solver.add_clause_direct(&[!false_lit]);
-        while solver.num_var() < model.num_var {
-            solver.new_var();
-        }
-        solver.set_ts(model.num_var, &model.trans, &model.dependence);
+        solver.add_clause(&[!false_lit]);
+        model.load_trans(&mut solver);
         Self {
             solver,
+            frame,
+            num_act: 0,
             temporary: Vec::new(),
         }
     }
 
-    pub fn add_lemma(&mut self, clause: &Clause) {
+    pub fn reset(&mut self, args: &Args, model: &Model, frames: &Frames) {
+        let temporary = take(&mut self.temporary);
+        *self = Self::new(args, model, self.frame);
+        for t in temporary {
+            self.solver.add_clause(&!&t);
+            self.temporary.push(t);
+        }
+        let frames_slice = if self.frame == 0 {
+            &frames[0..1]
+        } else {
+            &frames[self.frame..]
+        };
+        for dnf in frames_slice.iter() {
+            for cube in dnf {
+                self.add_clause(&!cube.deref());
+            }
+        }
+        self.simplify()
+    }
+
+    pub fn add_clause(&mut self, clause: &Clause) {
         let mut cube = !clause;
         cube.sort_by_key(|x| x.var());
         let temporary = take(&mut self.temporary);
@@ -37,17 +54,11 @@ impl Ic3Solver {
                 self.temporary.push(t);
             }
         }
-        self.solver.add_lemma(clause);
+        self.solver.add_clause(clause);
     }
 
     pub fn simplify(&mut self) {
-        // self.solver.simplify()
-    }
-
-    #[allow(unused)]
-    pub fn set_polarity(&mut self, var: Var, pol: Option<bool>) {
-        // self.solver.set_polarity(var, pol)
-        todo!()
+        self.solver.simplify()
     }
 
     #[allow(unused)]
@@ -57,17 +68,21 @@ impl Ic3Solver {
 }
 
 impl Ic3 {
-    pub fn blocked(&mut self, frame: usize, cube: &Cube, domain: bool) -> BlockResult {
-        assert!(!self.model.cube_subsume_init(cube));
+    fn blocked_inner(&mut self, frame: usize, cube: &Cube) -> BlockResult {
         self.statistic.num_sat_inductive += 1;
         let solver_idx = frame - 1;
         let solver = &mut self.solvers[solver_idx].solver;
         let start = Instant::now();
-        let assumption = self.model.cube_next(cube);
-        let constrain = !cube;
+        let mut assumption = self.model.cube_next(cube);
+        let act = solver.new_var().into();
+        assumption.push(act);
+        let mut tmp_cls = !cube;
+        tmp_cls.push(!act);
+        solver.add_clause(&tmp_cls);
         let sat_start = Instant::now();
-        let res = solver.solve_with_constrain(&assumption, constrain, domain);
+        let res = solver.solve(&assumption);
         self.statistic.avg_sat_call_time += sat_start.elapsed();
+        let act = !assumption.pop().unwrap();
         let res = match res {
             SatResult::Sat(_) => BlockResult::No(BlockResultNo {
                 solver_idx,
@@ -79,8 +94,20 @@ impl Ic3 {
                 assumption,
             }),
         };
+        solver.release_var(act);
         self.statistic.sat_inductive_time += start.elapsed();
         res
+    }
+
+    pub fn blocked(&mut self, frame: usize, cube: &Cube) -> BlockResult {
+        assert!(!self.model.cube_subsume_init(cube));
+        let solver = &mut self.solvers[frame - 1];
+        solver.num_act += 1;
+        if solver.num_act > 1000 {
+            self.statistic.num_solver_restart += 1;
+            solver.reset(&self.args, &self.model, &self.frames);
+        }
+        self.blocked_inner(frame, cube)
     }
 
     pub fn blocked_with_ordered(
@@ -88,11 +115,10 @@ impl Ic3 {
         frame: usize,
         cube: &Cube,
         ascending: bool,
-        domain: bool,
     ) -> BlockResult {
         let mut ordered_cube = cube.clone();
         self.activity.sort_by_activity(&mut ordered_cube, ascending);
-        self.blocked(frame, &ordered_cube, domain)
+        self.blocked(frame, &ordered_cube)
     }
 }
 
@@ -162,12 +188,7 @@ pub struct Lift {
 
 impl Lift {
     pub fn new(args: &Args, model: &Model) -> Self {
-        let mut solver = Solver::new("lift");
-        if let Some(seed) = args.random {
-            // solver.set_random_seed(seed as f64);
-            // solver.set_rnd_init_act(true);
-            todo!()
-        }
+        let mut solver = Solver::new();
         let false_lit: Lit = solver.new_var().into();
         solver.add_clause(&[!false_lit]);
         model.load_trans(&mut solver);
@@ -176,7 +197,7 @@ impl Lift {
 }
 
 impl Ic3 {
-    pub fn minimal_predecessor(&mut self, successor: &Cube, model: gipsat::Model) -> Cube {
+    pub fn minimal_predecessor(&mut self, successor: &Cube, model: minisat::Model) -> Cube {
         let start = Instant::now();
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {
@@ -210,7 +231,7 @@ impl Ic3 {
             SatResult::Sat(_) => panic!(),
             SatResult::Unsat(conflict) => latchs.into_iter().filter(|l| conflict.has(*l)).collect(),
         };
-        self.lift.solver.add_clause(&[!act]);
+        self.lift.solver.release_var(!act);
         self.statistic.minimal_predecessor_time += start.elapsed();
         res
     }
