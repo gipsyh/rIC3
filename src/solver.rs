@@ -42,7 +42,6 @@ impl Ic3Solver {
                 self.add_clause(&!cube.deref());
             }
         }
-        self.simplify()
     }
 
     pub fn add_clause(&mut self, clause: &Clause) {
@@ -55,10 +54,6 @@ impl Ic3Solver {
             }
         }
         self.solver.add_clause(clause);
-    }
-
-    pub fn simplify(&mut self) {
-        self.solver.simplify()
     }
 
     #[allow(unused)]

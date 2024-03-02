@@ -115,7 +115,6 @@ impl Ic3 {
                     BlockResult::No(_) => {}
                 }
             }
-            self.solvers[frame_idx + 1].simplify();
             if self.frames[frame_idx].is_empty() {
                 return true;
             }
