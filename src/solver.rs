@@ -68,38 +68,44 @@ impl Ic3Solver {
 }
 
 impl Ic3 {
-    fn blocked_inner(&mut self, frame: usize, cube: &Cube) -> BlockResult {
+    fn blocked_inner(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
         self.statistic.num_sat_inductive += 1;
         let solver_idx = frame - 1;
         let solver = &mut self.solvers[solver_idx].solver;
         let start = Instant::now();
         let mut assumption = self.model.cube_next(cube);
-        let act = solver.new_var().into();
-        assumption.push(act);
-        let mut tmp_cls = !cube;
-        tmp_cls.push(!act);
-        solver.add_clause(&tmp_cls);
         let sat_start = Instant::now();
-        let res = solver.solve(&assumption);
+        let res = if strengthen {
+            let act = solver.new_var().into();
+            assumption.push(act);
+            let mut tmp_cls = !cube;
+            tmp_cls.push(!act);
+            solver.add_clause(&tmp_cls);
+            let res = matches!(solver.solve(&assumption), SatResult::Sat(_));
+            let act = !assumption.pop().unwrap();
+            solver.release_var(act);
+            res
+        } else {
+            matches!(solver.solve(&assumption), SatResult::Sat(_))
+        };
         self.statistic.avg_sat_call_time += sat_start.elapsed();
-        let act = !assumption.pop().unwrap();
-        let res = match res {
-            SatResult::Sat(_) => BlockResult::No(BlockResultNo {
+        let res = if res {
+            BlockResult::No(BlockResultNo {
                 solver_idx,
                 assumption,
-            }),
-            SatResult::Unsat(_) => BlockResult::Yes(BlockResultYes {
+            })
+        } else {
+            BlockResult::Yes(BlockResultYes {
                 solver_idx,
                 cube: cube.clone(),
                 assumption,
-            }),
+            })
         };
-        solver.release_var(act);
         self.statistic.sat_inductive_time += start.elapsed();
         res
     }
 
-    pub fn blocked(&mut self, frame: usize, cube: &Cube) -> BlockResult {
+    pub fn blocked(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
         assert!(!self.model.cube_subsume_init(cube));
         let solver = &mut self.solvers[frame - 1];
         solver.num_act += 1;
@@ -107,7 +113,7 @@ impl Ic3 {
             self.statistic.num_solver_restart += 1;
             solver.reset(&self.args, &self.model, &self.frames);
         }
-        self.blocked_inner(frame, cube)
+        self.blocked_inner(frame, cube, strengthen)
     }
 
     pub fn blocked_with_ordered(
@@ -115,10 +121,11 @@ impl Ic3 {
         frame: usize,
         cube: &Cube,
         ascending: bool,
+        strengthen: bool,
     ) -> BlockResult {
         let mut ordered_cube = cube.clone();
         self.activity.sort_by_activity(&mut ordered_cube, ascending);
-        self.blocked(frame, &ordered_cube)
+        self.blocked(frame, &ordered_cube, strengthen)
     }
 }
 

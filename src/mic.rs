@@ -25,7 +25,7 @@ impl Ic3 {
             if self.model.cube_subsume_init(&cube) {
                 return DownResult::IncludeInit;
             }
-            match self.blocked_with_ordered(frame, &cube, false) {
+            match self.blocked_with_ordered(frame, &cube, false, true) {
                 BlockResult::Yes(blocked) => {
                     return DownResult::Success(self.blocked_conflict(&blocked))
                 }
@@ -37,14 +37,14 @@ impl Ic3 {
                     let model = self.unblocked_model(&unblocked);
                     if ctgs < 3 && frame > 1 && !self.model.cube_subsume_init(&model) {
                         if let BlockResult::Yes(blocked) =
-                            self.blocked_with_ordered(frame - 1, &model, false)
+                            self.blocked_with_ordered(frame - 1, &model, false, true)
                         {
                             ctgs += 1;
                             let conflict = self.blocked_conflict(&blocked);
                             let conflict = self.mic(frame - 1, conflict, level - 1);
                             let mut i = frame;
                             while i <= self.depth() {
-                                if let BlockResult::No(_) = self.blocked(i, &conflict) {
+                                if let BlockResult::No(_) = self.blocked(i, &conflict, true) {
                                     break;
                                 }
                                 i += 1;
