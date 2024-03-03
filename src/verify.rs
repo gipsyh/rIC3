@@ -1,5 +1,5 @@
 use crate::{frames::Lemma, solver::Ic3Solver, Ic3};
-use cadical::SatResult;
+use satif::SatResult;
 use std::ops::Deref;
 
 impl Ic3 {

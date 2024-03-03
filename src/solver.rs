@@ -1,11 +1,14 @@
 use super::Frames;
 use crate::{model::Model, Ic3};
-use cadical::{SatResult, Solver};
+use cadical::{Sat, Unsat};
 use logic_form::{Clause, Cube, Lit};
+use satif::{SatResult, Satif, SatifSat, SatifUnsat};
 use std::{mem::take, ops::Deref, time::Instant};
 
+pub type SatSolver = cadical::Solver;
+
 pub struct Ic3Solver {
-    solver: Box<Solver>,
+    solver: Box<SatSolver>,
     num_act: usize,
     frame: usize,
     temporary: Vec<Cube>,
@@ -13,7 +16,7 @@ pub struct Ic3Solver {
 
 impl Ic3Solver {
     pub fn new(model: &Model, frame: usize) -> Self {
-        let mut solver = Box::new(Solver::new());
+        let mut solver = Box::new(SatSolver::new());
         let false_lit: Lit = solver.new_var().into();
         solver.add_clause(&[!false_lit]);
         model.load_trans(&mut solver);
@@ -57,7 +60,7 @@ impl Ic3Solver {
     }
 
     #[allow(unused)]
-    pub fn solve<'a>(&'a mut self, assumptions: &[Lit]) -> SatResult<'a> {
+    pub fn solve(&mut self, assumptions: &[Lit]) -> SatResult<Sat, Unsat> {
         self.solver.solve(assumptions)
     }
 }
@@ -142,7 +145,7 @@ pub enum BlockResult {
 
 #[derive(Debug)]
 pub struct BlockResultYes {
-    solver: *mut Solver,
+    solver: *mut SatSolver,
     cube: Cube,
     assumption: Cube,
     act: Option<Lit>,
@@ -159,7 +162,7 @@ impl Drop for BlockResultYes {
 
 #[derive(Debug)]
 pub struct BlockResultNo {
-    solver: *mut Solver,
+    solver: *mut SatSolver,
     assumption: Cube,
     act: Option<Lit>,
 }
@@ -220,13 +223,13 @@ impl Ic3 {
 }
 
 pub struct Lift {
-    solver: Solver,
+    solver: SatSolver,
     num_act: usize,
 }
 
 impl Lift {
     pub fn new(model: &Model) -> Self {
-        let mut solver = Solver::new();
+        let mut solver = SatSolver::new();
         let false_lit: Lit = solver.new_var().into();
         solver.add_clause(&[!false_lit]);
         model.load_trans(&mut solver);
@@ -235,7 +238,7 @@ impl Lift {
 }
 
 impl Ic3 {
-    pub fn minimal_predecessor(&mut self, successor: &Cube, model: cadical::Model) -> Cube {
+    pub fn minimal_predecessor(&mut self, successor: &Cube, model: Sat) -> Cube {
         let start = Instant::now();
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {

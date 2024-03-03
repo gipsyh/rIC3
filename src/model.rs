@@ -1,7 +1,8 @@
 use aig::Aig;
+use cadical::Solver;
 use logic_form::{Clause, Cnf, Cube, Lit, Var};
 use minisat::SimpSolver;
-use cadical::Solver;
+use satif::Satif;
 use std::collections::HashMap;
 
 pub struct Model {
