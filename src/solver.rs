@@ -80,8 +80,9 @@ impl Ic3 {
             let mut tmp_cls = !cube;
             tmp_cls.push(!act);
             solver.add_clause(&tmp_cls);
+            let res = solver.solve(&assumption);
             let act = !assumption.pop().unwrap();
-            let res = match solver.solve(&assumption) {
+            match res {
                 SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
                     sat,
                     solver: solver.as_mut(),
@@ -95,8 +96,7 @@ impl Ic3 {
                     assumption,
                     act: Some(act),
                 }),
-            };
-            res
+            }
         } else {
             match solver.solve(&assumption) {
                 SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
