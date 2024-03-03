@@ -1,10 +1,9 @@
+use crate::solver::SatSolver;
 use aig::Aig;
 use logic_form::{Clause, Cnf, Cube, Lit, Var};
 use minisat::SimpSolver;
 use satif::Satif;
 use std::collections::HashMap;
-
-use crate::solver::SatSolver;
 
 pub struct Model {
     pub inputs: Vec<Var>,
