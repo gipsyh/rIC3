@@ -45,15 +45,15 @@ impl Ic3 {
     fn new_frame(&mut self) {
         self.frames.new_frame();
         self.solvers
-            .push(Ic3Solver::new(&self.args, &self.model, self.solvers.len()));
+            .push(Ic3Solver::new(&self.model, self.solvers.len()));
     }
 
     fn generalize(&mut self, frame: usize, cube: Cube) -> (usize, Cube) {
-        let level = if self.args.ctg { 1 } else { 0 };
+        // let level = if self.args.ctg { 1 } else { 0 };
         let mut cube = self.mic(frame, cube, 0);
         for i in frame + 1..=self.depth() {
             match self.blocked(i, &cube, true) {
-                BlockResult::Yes(block) => cube = self.blocked_conflict(&block),
+                BlockResult::Yes(block) => cube = self.blocked_conflict(block),
                 BlockResult::No(_) => return (i, cube),
             }
         }
@@ -61,7 +61,7 @@ impl Ic3 {
     }
 
     fn handle_blocked(&mut self, po: ProofObligation, blocked: BlockResultYes) {
-        let conflict = self.blocked_conflict(&blocked);
+        let conflict = self.blocked_conflict(blocked);
         let (frame, core) = self.generalize(po.frame, conflict);
         self.statistic.avg_po_cube_len += po.lemma.len();
         self.add_obligation(ProofObligation::new(frame, po.lemma, po.depth));
@@ -86,7 +86,7 @@ impl Ic3 {
                     self.handle_blocked(po, blocked);
                 }
                 BlockResult::No(unblocked) => {
-                    let model = self.unblocked_model(&unblocked);
+                    let model = self.unblocked_model(unblocked);
                     self.add_obligation(ProofObligation::new(
                         po.frame - 1,
                         Lemma::new(model),
@@ -109,7 +109,7 @@ impl Ic3 {
                 }
                 match self.blocked(frame_idx + 1, &cube, false) {
                     BlockResult::Yes(blocked) => {
-                        let conflict = self.blocked_conflict(&blocked);
+                        let conflict = self.blocked_conflict(blocked);
                         self.add_cube(frame_idx + 1, conflict);
                     }
                     BlockResult::No(_) => {}
@@ -128,7 +128,7 @@ impl Ic3 {
     pub fn new(args: Args) -> Self {
         let aig = Aig::from_file(args.model.as_ref().unwrap()).unwrap();
         let model = Model::from_aig(&aig);
-        let lift = Lift::new(&args, &model);
+        let lift = Lift::new(&model);
         let statistic = Statistic::new(args.model.as_ref().unwrap());
         let activity = Activity::new(&model.latchs);
         let mut res = Self {
