@@ -1,11 +1,12 @@
 use super::Frames;
 use crate::{model::Model, Ic3};
-use cadical::{Sat, Unsat};
 use logic_form::{Clause, Cube, Lit};
 use satif::{SatResult, Satif, SatifSat, SatifUnsat};
 use std::{mem::take, ops::Deref, time::Instant};
 
-pub type SatSolver = cadical::Solver;
+pub type SatSolver = minisat::Solver;
+pub type Sat = minisat::Sat;
+pub type Unsat = minisat::Unsat;
 
 pub struct Ic3Solver {
     solver: Box<SatSolver>,

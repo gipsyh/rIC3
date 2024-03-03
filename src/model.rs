@@ -1,9 +1,10 @@
 use aig::Aig;
-use cadical::Solver;
 use logic_form::{Clause, Cnf, Cube, Lit, Var};
 use minisat::SimpSolver;
 use satif::Satif;
 use std::collections::HashMap;
+
+use crate::solver::SatSolver;
 
 pub struct Model {
     pub inputs: Vec<Var>,
@@ -130,7 +131,7 @@ impl Model {
         true
     }
 
-    pub fn load_trans(&self, solver: &mut Solver) {
+    pub fn load_trans(&self, solver: &mut SatSolver) {
         while solver.num_var() < self.num_var {
             solver.new_var();
         }
