@@ -17,3 +17,4 @@ serde = { version = "1.0.189", features = ["derive"] }
 ctrlc = { version = "3.4.1", features = ["termination"] }
 giputils = { path = "../giputils" }
 satif = { path = "../satif" }
+cryptominisat ={ path = "../cryptominisat-rs" }

@@ -5,8 +5,8 @@ use satif::{SatResult, Satif, SatifSat, SatifUnsat};
 use std::{mem::take, ops::Deref, time::Instant};
 
 pub type SatSolver = minisat::Solver;
-pub type Sat = minisat::Sat;
-pub type Unsat = minisat::Unsat;
+type Sat = minisat::Sat;
+type Unsat = minisat::Unsat;
 
 pub struct Ic3Solver {
     solver: Box<SatSolver>,
@@ -82,12 +82,14 @@ impl Ic3 {
             solver.add_clause(&tmp_cls);
             let act = !assumption.pop().unwrap();
             let res = match solver.solve(&assumption) {
-                SatResult::Sat(_) => BlockResult::No(BlockResultNo {
+                SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
+                    sat,
                     solver: solver.as_mut(),
                     assumption,
                     act: Some(act),
                 }),
-                SatResult::Unsat(_) => BlockResult::Yes(BlockResultYes {
+                SatResult::Unsat(unsat) => BlockResult::Yes(BlockResultYes {
+                    unsat,
                     solver: solver.as_mut(),
                     cube: cube.clone(),
                     assumption,
@@ -97,12 +99,14 @@ impl Ic3 {
             res
         } else {
             match solver.solve(&assumption) {
-                SatResult::Sat(_) => BlockResult::No(BlockResultNo {
+                SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
+                    sat,
                     solver: solver.as_mut(),
                     assumption,
                     act: None,
                 }),
-                SatResult::Unsat(_) => BlockResult::Yes(BlockResultYes {
+                SatResult::Unsat(unsat) => BlockResult::Yes(BlockResultYes {
+                    unsat,
                     solver: solver.as_mut(),
                     cube: cube.clone(),
                     assumption,
@@ -144,8 +148,8 @@ pub enum BlockResult {
     No(BlockResultNo),
 }
 
-#[derive(Debug)]
 pub struct BlockResultYes {
+    unsat: Unsat,
     solver: *mut SatSolver,
     cube: Cube,
     assumption: Cube,
@@ -161,8 +165,8 @@ impl Drop for BlockResultYes {
     }
 }
 
-#[derive(Debug)]
 pub struct BlockResultNo {
+    sat: Sat,
     solver: *mut SatSolver,
     assumption: Cube,
     act: Option<Lit>,
@@ -170,8 +174,7 @@ pub struct BlockResultNo {
 
 impl BlockResultNo {
     pub fn lit_value(&self, lit: Lit) -> Option<bool> {
-        let solver = unsafe { &mut *self.solver };
-        unsafe { solver.get_model() }.lit_value(lit)
+        self.sat.lit_value(lit)
     }
 }
 
@@ -186,11 +189,9 @@ impl Drop for BlockResultNo {
 
 impl Ic3 {
     pub fn blocked_conflict(&mut self, block: BlockResultYes) -> Cube {
-        let solver = unsafe { &mut *block.solver };
-        let conflict = unsafe { solver.get_conflict() };
         let mut ans = Cube::new();
         for i in 0..block.cube.len() {
-            if conflict.has(block.assumption[i]) {
+            if block.unsat.has(block.assumption[i]) {
                 ans.push(block.cube[i]);
             }
         }
@@ -207,7 +208,7 @@ impl Ic3 {
                 })
                 .unwrap();
             for i in 0..block.cube.len() {
-                if conflict.has(block.assumption[i]) || block.cube[i] == new {
+                if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
                     ans.push(block.cube[i]);
                 }
             }
@@ -217,9 +218,7 @@ impl Ic3 {
     }
 
     pub fn unblocked_model(&mut self, unblock: BlockResultNo) -> Cube {
-        let solver = unsafe { &mut *unblock.solver };
-        let model = unsafe { solver.get_model() };
-        self.minimal_predecessor(&unblock.assumption, model)
+        self.minimal_predecessor(unblock)
     }
 }
 
@@ -239,7 +238,7 @@ impl Lift {
 }
 
 impl Ic3 {
-    pub fn minimal_predecessor(&mut self, successor: &Cube, model: Sat) -> Cube {
+    pub fn minimal_predecessor(&mut self, unblock: BlockResultNo) -> Cube {
         let start = Instant::now();
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {
@@ -247,12 +246,12 @@ impl Ic3 {
         }
         let act: Lit = self.lift.solver.new_var().into();
         let mut assumption = Cube::from([act]);
-        let mut cls = !successor;
+        let mut cls = !&unblock.assumption;
         cls.push(!act);
         self.lift.solver.add_clause(&cls);
         for input in self.model.inputs.iter() {
             let lit = input.lit();
-            match model.lit_value(lit) {
+            match unblock.sat.lit_value(lit) {
                 Some(true) => assumption.push(lit),
                 Some(false) => assumption.push(!lit),
                 None => (),
@@ -261,7 +260,7 @@ impl Ic3 {
         let mut latchs = Cube::new();
         for latch in self.model.latchs.iter() {
             let lit = latch.lit();
-            match model.lit_value(lit) {
+            match unblock.sat.lit_value(lit) {
                 Some(true) => latchs.push(lit),
                 Some(false) => latchs.push(!lit),
                 None => (),

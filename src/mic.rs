@@ -3,7 +3,6 @@ use crate::solver::BlockResultNo;
 use logic_form::{Cube, Lit};
 use std::{collections::HashSet, time::Instant};
 
-#[derive(Debug)]
 enum DownResult {
     Success(Cube),
     Fail(BlockResultNo),
