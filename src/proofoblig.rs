@@ -1,5 +1,5 @@
-use crate::frames::Lemma;
 use crate::Ic3;
+use logic_form::Lemma;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 

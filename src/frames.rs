@@ -1,5 +1,5 @@
 use crate::Ic3;
-use logic_form::{Cube, Lit};
+use logic_form::{Cube, Lemma, Lit};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -7,62 +7,6 @@ use std::{
     mem::take,
     ops::{Deref, DerefMut},
 };
-
-#[derive(Debug, Serialize, Default, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Lemma {
-    cube: Cube,
-    sign: u64,
-}
-
-impl Deref for Lemma {
-    type Target = Cube;
-
-    fn deref(&self) -> &Self::Target {
-        &self.cube
-    }
-}
-
-impl DerefMut for Lemma {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.cube
-    }
-}
-
-impl Lemma {
-    pub fn new(mut cube: Cube) -> Self {
-        cube.sort();
-        let mut sign = 0;
-        for l in cube.iter() {
-            sign |= 1 << (Into::<u32>::into(*l) % 63);
-        }
-        Self { cube, sign }
-    }
-
-    pub fn subsume(&self, other: &Lemma) -> bool {
-        if self.cube.len() > other.cube.len() {
-            return false;
-        }
-        if self.sign & other.sign != self.sign {
-            return false;
-        }
-        self.cube.ordered_subsume(&other.cube)
-    }
-
-    pub fn subsume_set(&self, other: &Lemma, other_lits: &HashSet<Lit>) -> bool {
-        if self.cube.len() > other.cube.len() {
-            return false;
-        }
-        if self.sign & other.sign != self.sign {
-            return false;
-        }
-        for l in self.iter() {
-            if !other_lits.contains(l) {
-                return false;
-            }
-        }
-        true
-    }
-}
 
 #[derive(Debug, Serialize, Default, Deserialize)]
 pub struct Frames {
@@ -132,14 +76,14 @@ impl Ic3 {
         let lemma = Lemma::new(cube);
         if frame == 0 {
             assert!(self.frames.len() == 1);
-            self.solvers[0].add_clause(&!&lemma.cube);
+            self.solvers[0].add_clause(&!lemma.cube());
             self.frames[0].push(lemma);
             return;
         }
         if self.frames.trivial_contained(frame, &lemma) {
             return;
         }
-        assert!(!self.model.cube_subsume_init(&lemma.cube));
+        assert!(!self.model.cube_subsume_init(lemma.cube()));
         let mut begin = None;
         for i in (1..=frame).rev() {
             let cubes = take(&mut self.frames[i]);
@@ -155,7 +99,7 @@ impl Ic3 {
                 break;
             }
         }
-        let clause = !&lemma.cube;
+        let clause = !lemma.cube();
         self.frames[frame].push(lemma);
         let begin = begin.unwrap_or(1);
         for i in begin..=frame {

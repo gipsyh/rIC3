@@ -1,11 +1,10 @@
 use super::{solver::BlockResult, Ic3};
-use crate::solver::BlockResultNo;
 use logic_form::{Cube, Lit};
 use std::{collections::HashSet, time::Instant};
 
 enum DownResult {
     Success(Cube),
-    Fail(BlockResultNo),
+    Fail,
     IncludeInit,
 }
 
@@ -28,9 +27,9 @@ impl Ic3 {
                 BlockResult::Yes(blocked) => {
                     return DownResult::Success(self.blocked_conflict(blocked))
                 }
-                BlockResult::No(unblocked) => {
+                BlockResult::No(_) => {
                     if level == 0 {
-                        return DownResult::Fail(unblocked);
+                        return DownResult::Fail;
                     }
                     todo!();
                     //     let model = self.unblocked_model(unblocked);
