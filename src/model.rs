@@ -16,6 +16,7 @@ pub struct Model {
     pub trans: Cnf,
     num_var: usize,
     next_map: LitMap<Lit>,
+    pub max_latch: Var,
 }
 
 impl Model {
@@ -27,14 +28,10 @@ impl Model {
             assert_eq!(Var::new(node.node_id()), simp_solver.new_var());
         }
         let inputs: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
-        let mut latchs: Vec<Var> = aig.latchs.iter().map(|x| Var::new(x.input)).collect();
-        latchs.push(simp_solver.new_var());
-        let mut primes: Vec<Lit> = aig.latchs.iter().map(|l| l.next.to_lit()).collect();
-        primes.push(simp_solver.new_var().lit());
-        let bad_var_lit = latchs.last().unwrap().lit();
-        let bad_var_prime_lit = *primes.last().unwrap();
-        let mut init = aig.latch_init_cube().to_cube();
-        init.push(!bad_var_lit);
+        let latchs: Vec<Var> = aig.latchs.iter().map(|x| Var::new(x.input)).collect();
+        let max_latch = *latchs.iter().max().unwrap();
+        let primes: Vec<Lit> = aig.latchs.iter().map(|l| l.next.to_lit()).collect();
+        let init = aig.latch_init_cube().to_cube();
         let mut init_map = HashMap::new();
         for l in init.iter() {
             init_map.insert(l.var(), l.polarity());
@@ -60,11 +57,10 @@ impl Model {
             logic.push(*c);
         }
         logic.push(aig_bad);
-        let mut trans = aig.get_cnf(&logic);
+        let trans = aig.get_cnf(&logic);
         let bad_lit = aig_bad.to_lit();
-        trans.push(Clause::from([!bad_lit, bad_var_prime_lit]));
-        trans.push(Clause::from([bad_lit, !bad_var_prime_lit]));
-        let bad = Cube::from([bad_var_lit]);
+        let bad = Cube::from([bad_lit]);
+        simp_solver.set_frozen(bad_lit.var(), true);
         for tran in trans.iter() {
             simp_solver.add_clause(tran);
         }
@@ -92,6 +88,7 @@ impl Model {
             trans,
             num_var,
             next_map,
+            max_latch,
         }
     }
 

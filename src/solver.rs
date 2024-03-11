@@ -141,6 +141,20 @@ impl Ic3 {
         self.activity.sort_by_activity(&mut ordered_cube, ascending);
         self.blocked(frame, &ordered_cube, strengthen)
     }
+
+    pub fn get_bad(&mut self) -> Option<Cube> {
+        let solver = self.solvers.last_mut().unwrap();
+        let res = match solver.solver.solve(&self.model.bad) {
+            SatResult::Sat(sat) => Some(BlockResultNo {
+                sat,
+                assumption: self.model.bad.clone(),
+                solver: solver.solver.as_mut(),
+                act: None,
+            }),
+            SatResult::Unsat(_) => None,
+        };
+        res.map(|res| self.unblocked_model(res))
+    }
 }
 
 pub enum BlockResult {

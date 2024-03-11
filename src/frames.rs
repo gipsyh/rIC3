@@ -1,17 +1,16 @@
 use crate::Ic3;
-use logic_form::{Cube, Lemma, Lit};
-use serde::{Deserialize, Serialize};
+use logic_form::{Cube, Lemma, LitSet};
 use std::{
-    collections::HashSet,
     fmt::{self, Debug, Display},
     mem::take,
     ops::{Deref, DerefMut},
 };
 
-#[derive(Debug, Serialize, Default, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Frames {
     frames: Vec<Vec<Lemma>>,
     early: usize,
+    lit_set: LitSet,
 }
 
 impl Frames {
@@ -19,26 +18,12 @@ impl Frames {
         Self {
             frames: Vec::new(),
             early: 1,
+            lit_set: Default::default(),
         }
     }
 
     pub fn new_frame(&mut self) {
         self.frames.push(Vec::new());
-    }
-
-    pub fn trivial_contained(&self, frame: usize, lemma: &Lemma) -> bool {
-        let mut lit_set: HashSet<Lit> = HashSet::with_capacity(lemma.len());
-        for l in lemma.iter() {
-            lit_set.insert(*l);
-        }
-        for i in frame..self.frames.len() {
-            for l in self.frames[i].iter() {
-                if l.subsume_set(lemma, &lit_set) {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     pub fn early(&self) -> usize {
@@ -72,6 +57,23 @@ impl DerefMut for Frames {
 }
 
 impl Ic3 {
+    pub fn trivial_contained(&mut self, frame: usize, lemma: &Lemma) -> bool {
+        self.frames.lit_set.reserve(self.model.max_latch);
+        for l in lemma.iter() {
+            self.frames.lit_set.insert(*l);
+        }
+        for i in frame..self.frames.len() {
+            for l in self.frames[i].iter() {
+                if l.subsume_set(lemma, &self.frames.lit_set) {
+                    self.frames.lit_set.clear();
+                    return true;
+                }
+            }
+        }
+        self.frames.lit_set.clear();
+        false
+    }
+
     pub fn add_cube(&mut self, frame: usize, cube: Cube) {
         let lemma = Lemma::new(cube);
         if frame == 0 {
@@ -80,7 +82,7 @@ impl Ic3 {
             self.frames[0].push(lemma);
             return;
         }
-        if self.frames.trivial_contained(frame, &lemma) {
+        if self.trivial_contained(frame, &lemma) {
             return;
         }
         assert!(!self.model.cube_subsume_init(lemma.cube()));
