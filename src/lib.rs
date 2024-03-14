@@ -35,7 +35,7 @@ pub struct Ic3 {
 }
 
 impl Ic3 {
-    pub fn depth(&self) -> usize {
+    pub fn level(&self) -> usize {
         self.solvers.len() - 1
     }
 
@@ -48,13 +48,22 @@ impl Ic3 {
     fn generalize(&mut self, frame: usize, cube: Cube) -> (usize, Cube) {
         // let level = if self.args.ctg { 1 } else { 0 };
         let mut cube = self.mic(frame, cube, 0);
-        for i in frame + 1..=self.depth() {
+        for i in frame + 1..=self.level() {
+            self.statistic.qpush_num += 1;
+            self.statistic.qpush_avg_cube_len += cube.len();
+            let qpush_start = self.statistic.time.start();
             match self.blocked(i, &cube, true) {
-                BlockResult::Yes(block) => cube = self.blocked_conflict(block),
-                BlockResult::No(_) => return (i, cube),
+                BlockResult::Yes(block) => {
+                    self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
+                    cube = self.blocked_conflict(block)
+                }
+                BlockResult::No(_) => {
+                    self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
+                    return (i, cube);
+                }
             }
         }
-        (self.depth() + 1, cube)
+        (self.level() + 1, cube)
     }
 
     fn handle_blocked(&mut self, po: ProofObligation, blocked: BlockResultYes) {
@@ -66,7 +75,7 @@ impl Ic3 {
     }
 
     fn block(&mut self) -> bool {
-        while let Some(po) = self.obligations.pop(self.depth()) {
+        while let Some(po) = self.obligations.pop(self.level()) {
             if po.frame == 0 {
                 return false;
             }
@@ -78,11 +87,16 @@ impl Ic3 {
                 self.add_obligation(ProofObligation::new(po.frame + 1, po.lemma, po.depth));
                 continue;
             }
+            self.statistic.qrelind_num += 1;
+            self.statistic.qrelind_avg_cube_len += po.lemma.len();
+            let qrelind_start = self.statistic.time.start();
             match self.blocked_with_ordered(po.frame, &po.lemma, false, true) {
                 BlockResult::Yes(blocked) => {
+                    self.statistic.qrelind_avg_time += self.statistic.time.stop(qrelind_start);
                     self.handle_blocked(po, blocked);
                 }
                 BlockResult::No(unblocked) => {
+                    self.statistic.qrelind_avg_time += self.statistic.time.stop(qrelind_start);
                     let model = self.unblocked_model(unblocked);
                     self.add_obligation(ProofObligation::new(
                         po.frame - 1,
@@ -97,19 +111,25 @@ impl Ic3 {
     }
 
     fn propagate(&mut self) -> bool {
-        for frame_idx in self.frames.early()..self.depth() {
+        for frame_idx in self.frames.early()..self.level() {
             self.frames[frame_idx].sort_by_key(|x| x.len());
             let frame = self.frames[frame_idx].clone();
             for cube in frame {
                 if !self.frames[frame_idx].contains(&cube) {
                     continue;
                 }
+                self.statistic.qpush_num += 1;
+                self.statistic.qpush_avg_cube_len += cube.len();
+                let qpush_start = self.statistic.time.start();
                 match self.blocked(frame_idx + 1, &cube, false) {
                     BlockResult::Yes(blocked) => {
+                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
                         let conflict = self.blocked_conflict(blocked);
                         self.add_cube(frame_idx + 1, conflict);
                     }
-                    BlockResult::No(_) => {}
+                    BlockResult::No(_) => {
+                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
+                    }
                 }
             }
             if self.frames[frame_idx].is_empty() {
@@ -154,9 +174,13 @@ impl Ic3 {
                     self.statistic();
                     return false;
                 }
+                self.statistic.qtarget_num += 1;
+                let qtarget_start = self.statistic.time.start();
                 if let Some(bad) = self.get_bad() {
-                    self.add_obligation(ProofObligation::new(self.depth(), Lemma::new(bad), 0))
+                    self.statistic.qtarget_avg_time += self.statistic.time.stop(qtarget_start);
+                    self.add_obligation(ProofObligation::new(self.level(), Lemma::new(bad), 0))
                 } else {
+                    self.statistic.qtarget_avg_time += self.statistic.time.stop(qtarget_start);
                     break;
                 }
             }
@@ -166,7 +190,7 @@ impl Ic3 {
                     "[{}:{}] frame: {}, time: {:?}",
                     file!(),
                     line!(),
-                    self.depth(),
+                    self.level(),
                     blocked_time,
                 );
             }

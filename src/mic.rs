@@ -23,11 +23,16 @@ impl Ic3 {
             if self.model.cube_subsume_init(&cube) {
                 return DownResult::IncludeInit;
             }
+            self.statistic.qgen_num += 1;
+            self.statistic.qgen_avg_cube_len += cube.len();
+            let qgen_start = self.statistic.time.start();
             match self.blocked_with_ordered(frame, &cube, false, true) {
                 BlockResult::Yes(blocked) => {
-                    return DownResult::Success(self.blocked_conflict(blocked))
+                    self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
+                    return DownResult::Success(self.blocked_conflict(blocked));
                 }
                 BlockResult::No(_) => {
+                    self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
                     if level == 0 {
                         return DownResult::Fail;
                     }

@@ -115,8 +115,7 @@ impl Display for Frames {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for i in 1..self.frames.len() {
             f.write_fmt(format_args_nl!("frame {}", i))?;
-            let mut frame = self.frames[i].clone();
-            frame.sort();
+            let frame = self.frames[i].clone();
             for c in frame.iter() {
                 f.write_fmt(format_args_nl!("{:?}", c))?;
             }
