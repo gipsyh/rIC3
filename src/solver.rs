@@ -144,6 +144,8 @@ impl Ic3 {
 
     pub fn get_bad(&mut self) -> Option<Cube> {
         let solver = self.solvers.last_mut().unwrap();
+        self.statistic.qtarget_num += 1;
+        let qtarget_start = self.statistic.time.start();
         let res = match solver.solver.solve(&self.model.bad) {
             SatResult::Sat(sat) => Some(BlockResultNo {
                 sat,
@@ -153,6 +155,7 @@ impl Ic3 {
             }),
             SatResult::Unsat(_) => None,
         };
+        self.statistic.qtarget_avg_time += self.statistic.time.stop(qtarget_start);
         res.map(|res| self.unblocked_model(res))
     }
 }
@@ -232,7 +235,11 @@ impl Ic3 {
     }
 
     pub fn unblocked_model(&mut self, unblock: BlockResultNo) -> Cube {
-        self.minimal_predecessor(unblock)
+        self.statistic.qlift_num += 1;
+        let qlift_start = self.statistic.time.start();
+        let res = self.minimal_predecessor(unblock);
+        self.statistic.qlift_avg_time += self.statistic.time.stop(qlift_start);
+        res
     }
 }
 

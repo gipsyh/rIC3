@@ -1,4 +1,4 @@
-use crate::Ic3;
+use crate::{model::Model, Ic3};
 use giputils::statistic::{Average, AverageDuration, Case, RunningTime, SuccessRate};
 use std::{fmt::Debug, time::Duration};
 
@@ -6,6 +6,9 @@ use std::{fmt::Debug, time::Duration};
 #[derive(Debug, Default)]
 pub struct Statistic {
     case: Case,
+    pub num_input: usize,
+    pub num_latch: usize,
+    pub num_nodes: usize,
     pub time: RunningTime,
 
     pub avg_sat_call_time: AverageDuration,
@@ -34,6 +37,9 @@ pub struct Statistic {
     pub qtarget_num: usize,
     pub qtarget_avg_time: AverageDuration,
 
+    pub qlift_num: usize,
+    pub qlift_avg_time: AverageDuration,
+
     pub minimal_predecessor_time: Duration,
 
     pub overall_mic_time: Duration,
@@ -42,11 +48,14 @@ pub struct Statistic {
 }
 
 impl Statistic {
-    pub fn new(mut case: &str) -> Self {
+    pub fn new(mut case: &str, model: &Model) -> Self {
         if let Some((_, c)) = case.rsplit_once('/') {
             case = c;
         }
         Self {
+            num_input: model.inputs.len(),
+            num_latch: model.latchs.len(),
+            num_nodes: model.num_var,
             case: Case::new(case),
             ..Default::default()
         }

@@ -146,7 +146,7 @@ impl Ic3 {
         let aig = Aig::from_file(args.model.as_ref().unwrap()).unwrap();
         let model = Model::from_aig(&aig);
         let lift = Lift::new(&model);
-        let statistic = Statistic::new(args.model.as_ref().unwrap());
+        let statistic = Statistic::new(args.model.as_ref().unwrap(), &model);
         let activity = Activity::new(&model.latchs);
         let mut res = Self {
             args,
@@ -174,13 +174,9 @@ impl Ic3 {
                     self.statistic();
                     return false;
                 }
-                self.statistic.qtarget_num += 1;
-                let qtarget_start = self.statistic.time.start();
                 if let Some(bad) = self.get_bad() {
-                    self.statistic.qtarget_avg_time += self.statistic.time.stop(qtarget_start);
                     self.add_obligation(ProofObligation::new(self.level(), Lemma::new(bad), 0))
                 } else {
-                    self.statistic.qtarget_avg_time += self.statistic.time.stop(qtarget_start);
                     break;
                 }
             }

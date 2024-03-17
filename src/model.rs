@@ -14,7 +14,7 @@ pub struct Model {
     pub init_map: HashMap<Var, bool>,
     pub constraints: Vec<Lit>,
     pub trans: Cnf,
-    num_var: usize,
+    pub num_var: usize,
     next_map: LitMap<Lit>,
     pub max_latch: Var,
 }
