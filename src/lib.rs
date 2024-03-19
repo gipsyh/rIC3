@@ -87,16 +87,16 @@ impl Ic3 {
                 self.add_obligation(ProofObligation::new(po.frame + 1, po.lemma, po.depth));
                 continue;
             }
-            self.statistic.qrelind_num += 1;
-            self.statistic.qrelind_avg_cube_len += po.lemma.len();
+            self.statistic.qblock_num += 1;
+            self.statistic.qblock_avg_cube_len += po.lemma.len();
             let qrelind_start = self.statistic.time.start();
             match self.blocked_with_ordered(po.frame, &po.lemma, false, true) {
                 BlockResult::Yes(blocked) => {
-                    self.statistic.qrelind_avg_time += self.statistic.time.stop(qrelind_start);
+                    self.statistic.qblock_avg_time += self.statistic.time.stop(qrelind_start);
                     self.handle_blocked(po, blocked);
                 }
                 BlockResult::No(unblocked) => {
-                    self.statistic.qrelind_avg_time += self.statistic.time.stop(qrelind_start);
+                    self.statistic.qblock_avg_time += self.statistic.time.stop(qrelind_start);
                     let model = self.unblocked_model(unblocked);
                     self.add_obligation(ProofObligation::new(
                         po.frame - 1,

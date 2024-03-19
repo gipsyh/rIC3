@@ -26,9 +26,9 @@ pub struct Statistic {
     pub qgen_avg_time: AverageDuration,
     pub qgen_avg_cube_len: Average,
 
-    pub qrelind_num: usize,
-    pub qrelind_avg_time: AverageDuration,
-    pub qrelind_avg_cube_len: Average,
+    pub qblock_num: usize,
+    pub qblock_avg_time: AverageDuration,
+    pub qblock_avg_cube_len: Average,
 
     pub qpush_num: usize,
     pub qpush_avg_time: AverageDuration,
