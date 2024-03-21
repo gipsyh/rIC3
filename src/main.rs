@@ -1,5 +1,5 @@
 use clap::Parser;
-use ic3::{Args, Ic3};
+use rIC3::{Args, Ic3};
 
 fn main() {
     let mut args = Args::parse();

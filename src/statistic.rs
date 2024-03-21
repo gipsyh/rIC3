@@ -34,8 +34,8 @@ pub struct Statistic {
     pub qpush_avg_time: AverageDuration,
     pub qpush_avg_cube_len: Average,
 
-    pub qtarget_num: usize,
-    pub qtarget_avg_time: AverageDuration,
+    pub qbad_num: usize,
+    pub qbad_avg_time: AverageDuration,
 
     pub qlift_num: usize,
     pub qlift_avg_time: AverageDuration,
