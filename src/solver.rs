@@ -206,32 +206,33 @@ impl Drop for BlockResultNo {
 
 impl Ic3 {
     pub fn blocked_conflict(&mut self, block: BlockResultYes) -> Cube {
-        let mut ans = Cube::new();
-        for i in 0..block.cube.len() {
-            if block.unsat.has(block.assumption[i]) {
-                ans.push(block.cube[i]);
-            }
-        }
-        if self.model.cube_subsume_init(&ans) {
-            ans = Cube::new();
-            let new = *block
-                .cube
-                .iter()
-                .find(|l| {
-                    self.model
-                        .init_map
-                        .get(&l.var())
-                        .is_some_and(|i| *i != l.polarity())
-                })
-                .unwrap();
-            for i in 0..block.cube.len() {
-                if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
-                    ans.push(block.cube[i]);
-                }
-            }
-            assert!(!self.model.cube_subsume_init(&ans));
-        }
-        ans
+        // let mut ans = Cube::new();
+        // for i in 0..block.cube.len() {
+        //     if block.unsat.has(block.assumption[i]) {
+        //         ans.push(block.cube[i]);
+        //     }
+        // }
+        // if self.model.cube_subsume_init(&ans) {
+        //     ans = Cube::new();
+        //     let new = *block
+        //         .cube
+        //         .iter()
+        //         .find(|l| {
+        //             self.model
+        //                 .init_map
+        //                 .get(&l.var())
+        //                 .is_some_and(|i| *i != l.polarity())
+        //         })
+        //         .unwrap();
+        //     for i in 0..block.cube.len() {
+        //         if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
+        //             ans.push(block.cube[i]);
+        //         }
+        //     }
+        //     assert!(!self.model.cube_subsume_init(&ans));
+        // }
+        // ans
+        todo!()
     }
 
     pub fn unblocked_model(&mut self, unblock: BlockResultNo) -> Cube {

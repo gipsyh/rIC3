@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 aig = { path = "../aig-rs" }
 minisat = { path = "../minisat-rs" }
-cadical = { path = "../cadical-rs" }
 logic-form = { path = "../logic-form" }
 clap = { version = "4.3.0", features = ["derive"] }
 rand = "0.8.5"
@@ -17,4 +16,3 @@ serde = { version = "1.0.189", features = ["derive"] }
 ctrlc = { version = "3.4.1", features = ["termination"] }
 giputils = { path = "../giputils" }
 satif = { path = "../satif" }
-cryptominisat ={ path = "../cryptominisat-rs" }
