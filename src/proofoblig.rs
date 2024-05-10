@@ -1,4 +1,4 @@
-use crate::Ic3;
+use crate::IC3;
 use logic_form::Lemma;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -74,7 +74,7 @@ impl ProofObligationQueue {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn add_obligation(&mut self, po: ProofObligation) {
         self.statistic.avg_po_cube_len += po.lemma.len();
         self.obligations.add(po)

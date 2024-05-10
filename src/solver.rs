@@ -1,8 +1,9 @@
 use super::Frames;
-use crate::{model::Model, Ic3};
+use crate::IC3;
 use logic_form::{Clause, Cube, Lit};
 use satif::{SatResult, Satif, SatifSat, SatifUnsat};
 use std::{mem::take, ops::Deref, time::Instant};
+use transys::Transys;
 
 pub type SatSolver = minisat::Solver;
 type Sat = minisat::Sat;
@@ -16,11 +17,16 @@ pub struct Ic3Solver {
 }
 
 impl Ic3Solver {
-    pub fn new(model: &Model, frame: usize) -> Self {
+    pub fn new(model: &Transys, frame: usize) -> Self {
         let mut solver = Box::new(SatSolver::new());
         let false_lit: Lit = solver.new_var().into();
         solver.add_clause(&[!false_lit]);
-        model.load_trans(&mut solver);
+        while solver.num_var() < model.num_var {
+            solver.new_var();
+        }
+        for cls in model.trans.iter() {
+            solver.add_clause(cls)
+        }
         Self {
             solver,
             frame,
@@ -29,7 +35,7 @@ impl Ic3Solver {
         }
     }
 
-    pub fn reset(&mut self, model: &Model, frames: &Frames) {
+    pub fn reset(&mut self, model: &Transys, frames: &Frames) {
         let temporary = take(&mut self.temporary);
         *self = Self::new(model, self.frame);
         for t in temporary {
@@ -66,7 +72,7 @@ impl Ic3Solver {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     fn blocked_inner(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
         self.statistic.num_sat_inductive += 1;
         let solver_idx = frame - 1;
@@ -204,35 +210,34 @@ impl Drop for BlockResultNo {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn blocked_conflict(&mut self, block: BlockResultYes) -> Cube {
-        // let mut ans = Cube::new();
-        // for i in 0..block.cube.len() {
-        //     if block.unsat.has(block.assumption[i]) {
-        //         ans.push(block.cube[i]);
-        //     }
-        // }
-        // if self.model.cube_subsume_init(&ans) {
-        //     ans = Cube::new();
-        //     let new = *block
-        //         .cube
-        //         .iter()
-        //         .find(|l| {
-        //             self.model
-        //                 .init_map
-        //                 .get(&l.var())
-        //                 .is_some_and(|i| *i != l.polarity())
-        //         })
-        //         .unwrap();
-        //     for i in 0..block.cube.len() {
-        //         if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
-        //             ans.push(block.cube[i]);
-        //         }
-        //     }
-        //     assert!(!self.model.cube_subsume_init(&ans));
-        // }
-        // ans
-        todo!()
+        let mut ans = Cube::new();
+        for i in 0..block.cube.len() {
+            if block.unsat.has(block.assumption[i]) {
+                ans.push(block.cube[i]);
+            }
+        }
+        if self.model.cube_subsume_init(&ans) {
+            ans = Cube::new();
+            let new = *block
+                .cube
+                .iter()
+                .find(|l| {
+                    self.model
+                        .init_map
+                        .get(&l.var())
+                        .is_some_and(|i| *i != l.polarity())
+                })
+                .unwrap();
+            for i in 0..block.cube.len() {
+                if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
+                    ans.push(block.cube[i]);
+                }
+            }
+            assert!(!self.model.cube_subsume_init(&ans));
+        }
+        ans
     }
 
     pub fn unblocked_model(&mut self, unblock: BlockResultNo) -> Cube {
@@ -250,16 +255,21 @@ pub struct Lift {
 }
 
 impl Lift {
-    pub fn new(model: &Model) -> Self {
+    pub fn new(model: &Transys) -> Self {
         let mut solver = SatSolver::new();
         let false_lit: Lit = solver.new_var().into();
         solver.add_clause(&[!false_lit]);
-        model.load_trans(&mut solver);
+        while solver.num_var() < model.num_var {
+            solver.new_var();
+        }
+        for cls in model.trans.iter() {
+            solver.add_clause(cls)
+        }
         Self { solver, num_act: 0 }
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn minimal_predecessor(&mut self, unblock: BlockResultNo) -> Cube {
         let start = Instant::now();
         self.lift.num_act += 1;

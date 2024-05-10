@@ -1,4 +1,4 @@
-use super::{solver::BlockResult, Ic3};
+use super::{solver::BlockResult, IC3};
 use logic_form::{Cube, Lit};
 use std::{collections::HashSet, time::Instant};
 
@@ -8,7 +8,7 @@ enum DownResult {
     IncludeInit,
 }
 
-impl Ic3 {
+impl IC3 {
     fn ctg_down(
         &mut self,
         frame: usize,

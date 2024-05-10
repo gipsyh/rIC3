@@ -4,7 +4,6 @@ mod activity;
 mod command;
 mod frames;
 mod mic;
-mod model;
 mod proofoblig;
 mod solver;
 mod statistic;
@@ -17,15 +16,15 @@ use aig::Aig;
 pub use command::Args;
 use frames::Frames;
 use logic_form::{Cube, Lemma};
-use model::Model;
 use solver::{BlockResult, BlockResultYes, Ic3Solver, Lift};
 use std::panic::{self, AssertUnwindSafe};
 use std::process::exit;
 use std::time::Instant;
+use transys::Transys;
 
-pub struct Ic3 {
+pub struct IC3 {
     args: Args,
-    model: Model,
+    model: Transys,
     solvers: Vec<Ic3Solver>,
     frames: Frames,
     activity: Activity,
@@ -34,7 +33,7 @@ pub struct Ic3 {
     statistic: Statistic,
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn level(&self) -> usize {
         self.solvers.len() - 1
     }
@@ -141,10 +140,10 @@ impl Ic3 {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn new(args: Args) -> Self {
         let aig = Aig::from_file(args.model.as_ref().unwrap()).unwrap();
-        let model = Model::from_aig(&aig);
+        let model = Transys::from_aig(&aig);
         let lift = Lift::new(&model);
         let statistic = Statistic::new(args.model.as_ref().unwrap(), &model);
         let activity = Activity::new(&model.latchs);
@@ -206,9 +205,9 @@ impl Ic3 {
     }
 
     pub fn check_with_int_hanlder(&mut self) -> bool {
-        let ic3 = self as *mut Ic3 as usize;
+        let ic3 = self as *mut IC3 as usize;
         ctrlc::set_handler(move || {
-            let ic3 = unsafe { &mut *(ic3 as *mut Ic3) };
+            let ic3 = unsafe { &mut *(ic3 as *mut IC3) };
             ic3.statistic();
             exit(130);
         })

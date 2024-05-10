@@ -1,6 +1,7 @@
-use crate::{model::Model, Ic3};
+use crate::IC3;
 use giputils::statistic::{Average, AverageDuration, Case, RunningTime, SuccessRate};
 use std::{fmt::Debug, time::Duration};
+use transys::Transys;
 
 #[allow(unused)]
 #[derive(Debug, Default)]
@@ -48,7 +49,7 @@ pub struct Statistic {
 }
 
 impl Statistic {
-    pub fn new(mut case: &str, model: &Model) -> Self {
+    pub fn new(mut case: &str, model: &Transys) -> Self {
         if let Some((_, c)) = case.rsplit_once('/') {
             case = c;
         }
@@ -62,7 +63,7 @@ impl Statistic {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn statistic(&self) {
         self.obligations.statistic();
         self.frames.statistic();

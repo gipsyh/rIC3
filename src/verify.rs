@@ -1,9 +1,9 @@
-use crate::{solver::Ic3Solver, Ic3};
+use crate::{solver::Ic3Solver, IC3};
 use logic_form::Lemma;
 use satif::SatResult;
 use std::ops::Deref;
 
-impl Ic3 {
+impl IC3 {
     fn verify_invariant(&mut self, invariants: &[Lemma]) -> bool {
         let mut solver = Ic3Solver::new(&self.model, 1);
         for lemma in invariants {

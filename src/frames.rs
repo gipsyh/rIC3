@@ -1,4 +1,4 @@
-use crate::Ic3;
+use crate::IC3;
 use logic_form::{Cube, Lemma, LitSet};
 use std::{
     fmt::{self, Debug, Display},
@@ -56,7 +56,7 @@ impl DerefMut for Frames {
     }
 }
 
-impl Ic3 {
+impl IC3 {
     pub fn trivial_contained(&mut self, frame: usize, lemma: &Lemma) -> bool {
         self.frames.lit_set.reserve(self.model.max_latch);
         for l in lemma.iter() {

@@ -1,5 +1,5 @@
 use clap::Parser;
-use rIC3::{Args, Ic3};
+use rIC3::{Args, IC3};
 
 fn main() {
     let mut args = Args::parse();
@@ -8,6 +8,6 @@ fn main() {
         args.model = Some(aig.to_string());
     }
 
-    let mut ic3 = Ic3::new(args);
+    let mut ic3 = IC3::new(args);
     println!("result: {}", ic3.check_with_int_hanlder());
 }
