@@ -29,6 +29,14 @@ pub struct Statistic {
     pub num_auxiliary_var: usize,
 
     pub test: SuccessRate,
+    pub a: usize,
+    pub b: usize,
+    pub c: usize,
+    pub omic: Duration,
+    pub pmic: Duration,
+    pub opro: Duration,
+    pub ppro: Duration,
+    pub ttime: Duration,
 }
 
 impl Statistic {

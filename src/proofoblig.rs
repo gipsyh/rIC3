@@ -133,6 +133,9 @@ impl Debug for ProofObligation {
     }
 }
 
+unsafe impl Sync for ProofObligation {}
+unsafe impl Send for ProofObligation {}
+
 #[derive(Default, Debug)]
 pub struct ProofObligationQueue {
     obligations: BTreeSet<ProofObligation>,

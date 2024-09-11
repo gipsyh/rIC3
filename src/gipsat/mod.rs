@@ -19,7 +19,13 @@ use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 use search::Value;
 use simplify::Simplify;
 use statistic::SolverStatistic;
-use std::{collections::HashSet, rc::Rc, time::Instant};
+use std::{
+    collections::HashSet,
+    ops::{Deref, DerefMut, Index, IndexMut},
+    rc::Rc,
+    slice,
+    time::Instant,
+};
 use utils::Lbool;
 use vsids::Vsids;
 
@@ -427,6 +433,82 @@ impl Solver {
     }
 }
 
+pub struct Solvers {
+    solvers: Vec<Solver>,
+}
+
+impl Deref for Solvers {
+    type Target = Solver;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.solvers[0]
+    }
+}
+
+impl DerefMut for Solvers {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.solvers[0]
+    }
+}
+
+impl Index<usize> for Solvers {
+    type Output = Solver;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.solvers[index]
+    }
+}
+
+impl IndexMut<usize> for Solvers {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.solvers[index]
+    }
+}
+
+impl Solvers {
+    #[inline]
+    pub fn new<F>(f: F, num: usize) -> Self
+    where
+        F: Fn() -> Solver,
+    {
+        let mut solvers = Vec::new();
+        for _ in 0..num {
+            solvers.push(f());
+        }
+        Self { solvers }
+    }
+
+    #[inline]
+    pub fn new_var_for_all(&mut self) -> Var {
+        let v = self.solvers[0].new_var();
+        for s in self.solvers[1..].iter_mut() {
+            assert!(s.new_var() == v);
+        }
+        v
+    }
+
+    #[inline]
+    pub fn add_lemma_for_all(&mut self, lemma: &[Lit]) {
+        for s in self.solvers.iter_mut() {
+            s.add_lemma(lemma);
+        }
+    }
+
+    #[inline]
+    pub fn iter(&self) -> slice::Iter<'_, Solver> {
+        self.solvers.iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, Solver> {
+        self.solvers.iter_mut()
+    }
+}
+
 impl IC3 {
     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
         self.statistic.num_get_bad += 1;
@@ -578,7 +660,7 @@ impl IC3 {
         let ts = unsafe { Rc::get_mut_unchecked(&mut self.ts) };
         let var = ts.new_var();
         for s in self.solvers.iter_mut() {
-            assert!(var == s.new_var());
+            assert!(var == s.new_var_for_all());
         }
         assert!(var == self.lift.new_var());
         var
@@ -607,13 +689,19 @@ impl IC3 {
         ts.add_latch(state, next, init, trans.clone(), dep.clone());
         let tmp_lit_set = unsafe { Rc::get_mut_unchecked(&mut self.frame.tmp_lit_set) };
         tmp_lit_set.reserve(ts.max_latch);
-        for s in self.solvers.iter_mut().chain(Some(&mut self.lift)) {
+        let handle_s = |s: &mut Solver| {
             s.reset();
             for cls in trans.iter() {
                 s.add_clause_inner(cls, ClauseKind::Trans);
             }
             s.add_domain(state, true);
+        };
+        for s in self.solvers.iter_mut() {
+            for s in s.iter_mut() {
+                handle_s(s);
+            }
         }
+        handle_s(&mut self.lift);
         if !self.solvers[0].value.v(state.lit()).is_none() {
             if self.solvers[0].value.v(state.lit()).is_true() {
                 ts.init.push(state.lit());

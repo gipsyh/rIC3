@@ -51,6 +51,10 @@ pub struct Options {
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,
+
+    /// test
+    #[arg(short, long, default_value_t = false)]
+    pub test: bool,
 }
 
 #[derive(Copy, Clone, ValueEnum, Debug)]
@@ -100,6 +104,10 @@ pub struct IC3Options {
     /// ic3 with abstract constrains
     #[arg(long = "ic3-abs-cst", default_value_t = false)]
     pub abs_cst: bool,
+
+    /// ic3 parallelism
+    #[arg(long = "ic3-parallelism", default_value_t = 1)]
+    pub parallelism: usize,
 }
 
 #[derive(Args, Clone, Debug)]

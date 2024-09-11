@@ -11,6 +11,7 @@ pub mod imc;
 pub mod kind;
 mod mic;
 pub mod options;
+mod parallel;
 pub mod portfolio;
 mod proofoblig;
 mod statistic;
@@ -24,9 +25,11 @@ use activity::Activity;
 use aig::{Aig, AigEdge};
 use frame::{Frame, Frames};
 use gipsat::statistic::SolverStatistic;
-use gipsat::Solver;
+use gipsat::{Solver, Solvers};
+use giputils::grc::Garc;
 use logic_form::{Clause, Cube, Lemma, Lit, Var};
 use options::Options;
+use parallel::Worker;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
@@ -52,7 +55,7 @@ pub struct IC3 {
     options: Options,
     ts: Rc<Transys>,
     frame: Frames,
-    solvers: Vec<Solver>,
+    solvers: Vec<Solvers>,
     lift: Solver,
     obligations: ProofObligationQueue,
     activity: Activity,
@@ -63,6 +66,7 @@ pub struct IC3 {
 
     auxiliary_var: Vec<Var>,
     xor_var: HashMap<(Lit, Lit), Lit>,
+    workers: Vec<Garc<Worker>>,
 }
 
 impl IC3 {
@@ -72,16 +76,20 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
-        let mut solver = Solver::new(
-            self.options.clone(),
-            Some(self.frame.len()),
-            &self.ts,
-            &self.frame,
-        );
-        for v in self.auxiliary_var.iter() {
-            solver.add_domain(*v, true);
-        }
-        self.solvers.push(solver);
+        let new_solver = || {
+            let mut solver = Solver::new(
+                self.options.clone(),
+                Some(self.frame.len()),
+                &self.ts,
+                &self.frame,
+            );
+            for v in self.auxiliary_var.iter() {
+                solver.add_domain(*v, true);
+            }
+            solver
+        };
+        self.solvers
+            .push(Solvers::new(new_solver, self.options.ic3.parallelism));
         self.frame.push(Frame::new());
         if self.level() == 0 {
             for init in self.ts.init.clone() {
@@ -128,7 +136,11 @@ impl IC3 {
         }
         let mut mic = self.solvers[po.frame - 1].inductive_core();
         let level = if self.options.ic3.ctg { 1 } else { 0 };
-        mic = self.mic(po.frame, mic, level, &[]);
+        mic = if self.options.ic3.parallelism == 1 {
+            self.mic(po.frame, mic, level, &[])
+        } else {
+            self.parallel_mic(po.frame, mic)
+        };
         let (frame, mic) = self.push_lemma(po.frame, mic);
         self.statistic.avg_po_cube_len += po.lemma.len();
         po.frame = frame;
@@ -344,6 +356,7 @@ impl IC3 {
             auxiliary_var: Vec::new(),
             xor_var: HashMap::new(),
             bmc_solver: None,
+            workers: Default::default(),
         };
         res.extend();
         res
@@ -352,6 +365,7 @@ impl IC3 {
 
 impl Engine for IC3 {
     fn check(&mut self) -> Option<bool> {
+        self.create_workers();
         loop {
             let start = Instant::now();
             loop {
@@ -390,7 +404,11 @@ impl Engine for IC3 {
             self.statistic.overall_block_time += blocked_time;
             self.extend();
             let start = Instant::now();
-            let propagate = self.propagate();
+            let propagate = if self.options.ic3.parallelism > 1 {
+                self.parallel_propagate()
+            } else {
+                self.propagate()
+            };
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
                 self.statistic();
@@ -479,7 +497,9 @@ impl Engine for IC3 {
             println!();
             let mut statistic = SolverStatistic::default();
             for s in self.solvers.iter() {
+                // for s in s.iter() {
                 statistic += s.statistic;
+                // }
             }
             println!("{:#?}", statistic);
             println!("{:#?}", self.statistic);
