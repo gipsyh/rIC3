@@ -9,14 +9,13 @@ pub type SatSolver = satif_minisat::Solver;
 
 pub struct DeepSolver {
     solver: Box<SatSolver>,
-    num_act: usize,
 }
 
 impl DeepSolver {
     pub fn new(ts: &Transys) -> Self {
         let mut solver = Box::new(SatSolver::new());
         ts.load_trans(solver.as_mut(), true);
-        Self { solver, num_act: 0 }
+        Self { solver }
     }
 }
 

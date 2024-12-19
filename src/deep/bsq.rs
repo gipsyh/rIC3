@@ -150,7 +150,13 @@ impl BadStateQueue {
     }
 
     pub fn pop(&mut self) -> Option<BadState> {
-        self.obligations.pop_last()
+        match self.obligations.pop_last() {
+            Some(b) => {
+                self.num[b.depth] -= 1;
+                Some(b)
+            }
+            None => None,
+        }
     }
 
     pub fn remove(&mut self, po: &BadState) -> bool {
