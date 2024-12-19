@@ -45,66 +45,6 @@ impl Deep {
     }
 }
 
-// impl IC3 {
-//     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
-//         let solver = self.solvers.last_mut().unwrap();
-//         let res = if solver.solver.solve(&self.ts.bad) {
-//             Some(BlockResultNo {
-//                 assumption: self.ts.bad.clone(),
-//                 solver: solver.solver.as_mut(),
-//                 act: None,
-//             })
-//         } else {
-//             None
-//         };
-//         res.map(|res| self.get_predecessor(res))
-//     }
-// }
-
-// pub enum BlockResult {
-//     Yes(BlockResultYes),
-//     No(BlockResultNo),
-// }
-
-// pub struct BlockResultYes {
-//     solver: *mut SatSolver,
-//     cube: Cube,
-//     assumption: Cube,
-//     act: Option<Lit>,
-// }
-
-// impl Drop for BlockResultYes {
-//     fn drop(&mut self) {
-//         if let Some(act) = self.act {
-//             let solver = unsafe { &mut *self.solver };
-//             solver.add_clause(&[act]);
-//         }
-//     }
-// }
-
-// pub struct BlockResultNo {
-//     solver: *mut SatSolver,
-//     assumption: Cube,
-//     act: Option<Lit>,
-// }
-
-// impl BlockResultNo {
-//     #[inline]
-//     pub fn lit_value(&self, lit: Lit) -> Option<bool> {
-//         let solver = unsafe { &mut *self.solver };
-//         solver.sat_value(lit)
-//     }
-// }
-
-// impl Drop for BlockResultNo {
-//     fn drop(&mut self) {
-//         if let Some(act) = self.act {
-//             let solver = unsafe { &mut *self.solver };
-//             solver.add_clause(&[act]);
-//         }
-//     }
-// }
-
 impl Deep {
     pub fn unsat_core(&mut self, cube: &Cube) -> Cube {
         let next = self.ts.cube_next(&cube);
