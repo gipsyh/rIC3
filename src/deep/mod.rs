@@ -4,17 +4,18 @@ mod solver;
 use crate::{options::Options, transys::Transys, verify::witness_encode, Engine};
 use bsq::{BadState, BadStateQueue};
 use logic_form::{Cube, Lemma};
+use rand::{rngs::StdRng, SeedableRng};
 use satif::Satif;
 use solver::{DeepSolver, Lift};
 use std::rc::Rc;
 
 pub struct Deep {
     ts: Rc<Transys>,
-    bs: Vec<Cube>,
     bsq: BadStateQueue,
     solver: DeepSolver,
     lift: Lift,
     options: Options,
+    rng: StdRng,
 }
 
 impl Deep {
@@ -24,10 +25,10 @@ impl Deep {
         let lift = Lift::new(&ts);
         Self {
             ts,
-            bs: Vec::new(),
             bsq: BadStateQueue::new(),
             solver,
             lift,
+            rng: StdRng::seed_from_u64(options.rseed),
             options,
         }
     }
@@ -39,7 +40,6 @@ impl Deep {
         depth: usize,
         next: Option<BadState>,
     ) -> Option<()> {
-        self.bs.push(bad.clone());
         let cls = !&bad;
         self.solver.add_clause(&cls);
         let bad = Lemma::new(bad);
@@ -59,10 +59,15 @@ impl Deep {
         while let Some(bad) = self.bsq.pop() {
             let bp = self.ts.cube_next(&bad.lemma);
             dbg!(bad.depth);
+            // self.bsq.statistic();
             if self.solver.solve(&bp) {
-                let (nb, input) = self.get_predecessor(&bp);
+                let (nb, input) = self.get_predecessor(&bp, true);
                 self.add_bad(nb, input, bad.depth + 1, Some(bad.clone()))?;
                 self.bsq.add(bad);
+            } else {
+                let core = self.unsat_core(&bad.lemma);
+                dbg!(bad.lemma.len() - core.len());
+                self.solver.add_clause(&!core);
             }
         }
         Some(())

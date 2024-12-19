@@ -1,6 +1,7 @@
 use super::Deep;
 use crate::transys::Transys;
 use logic_form::{Cube, Lit};
+use rand::seq::SliceRandom;
 use satif::Satif;
 use std::ops::{Deref, DerefMut};
 
@@ -38,7 +39,7 @@ impl DerefMut for DeepSolver {
 impl Deep {
     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
         if self.solver.solve(&self.ts.bad) {
-            Some(self.get_predecessor(&self.ts.bad.clone()))
+            Some(self.get_predecessor(&self.ts.bad.clone(), true))
         } else {
             None
         }
@@ -105,32 +106,31 @@ impl Deep {
 //     }
 // }
 
-// impl IC3 {
-//     pub fn inductive_core(&mut self, block: BlockResultYes) -> Cube {
-//         let mut ans = Cube::new();
-//         let solver = unsafe { &mut *block.solver };
-//         for i in 0..block.cube.len() {
-//             if solver.unsat_has(block.assumption[i]) {
-//                 ans.push(block.cube[i]);
-//             }
-//         }
-//         if self.ts.cube_subsume_init(&ans) {
-//             ans = Cube::new();
-//             let new = *block
-//                 .cube
-//                 .iter()
-//                 .find(|l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
-//                 .unwrap();
-//             for i in 0..block.cube.len() {
-//                 if solver.unsat_has(block.assumption[i]) || block.cube[i] == new {
-//                     ans.push(block.cube[i]);
-//                 }
-//             }
-//             assert!(!self.ts.cube_subsume_init(&ans));
-//         }
-//         ans
-//     }
-// }
+impl Deep {
+    pub fn unsat_core(&mut self, cube: &Cube) -> Cube {
+        let next = self.ts.cube_next(&cube);
+        let mut ans = Cube::new();
+        for i in 0..cube.len() {
+            if self.solver.unsat_has(next[i]) {
+                ans.push(cube[i]);
+            }
+        }
+        if self.ts.cube_subsume_init(&ans) {
+            ans = Cube::new();
+            let new = *cube
+                .iter()
+                .find(|l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
+                .unwrap();
+            for i in 0..cube.len() {
+                if self.solver.unsat_has(next[i]) || cube[i] == new {
+                    ans.push(cube[i]);
+                }
+            }
+            assert!(!self.ts.cube_subsume_init(&ans));
+        }
+        ans
+    }
+}
 
 pub struct Lift {
     solver: SatSolver,
@@ -143,10 +143,30 @@ impl Lift {
         ts.load_trans(&mut solver, false);
         Self { solver, num_act: 0 }
     }
+
+    fn minimal_predecessor(
+        &mut self,
+        inputs: &[Lit],
+        latchs: &[Lit],
+        constrain: Lit,
+    ) -> Option<Cube> {
+        let mut assump = Cube::from_iter(inputs.iter().chain(latchs.iter()).copied());
+        assump.push(constrain);
+        if self.solver.solve(&assump) {
+            return None;
+        }
+        Some(
+            latchs
+                .iter()
+                .filter(|l| self.solver.unsat_has(**l))
+                .copied()
+                .collect(),
+        )
+    }
 }
 
 impl Deep {
-    pub fn get_predecessor(&mut self, assump: &Cube) -> (Cube, Cube) {
+    pub fn get_predecessor(&mut self, assump: &Cube, strengthen: bool) -> (Cube, Cube) {
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {
             self.lift = Lift::new(&self.ts)
@@ -175,17 +195,21 @@ impl Deep {
                 None => (),
             }
         }
-        // self.activity.sort_by_activity(&mut latchs, false);
-        assumption.extend_from_slice(&latchs);
-        let res: Cube = if self.lift.solver.solve(&assumption) {
-            panic!()
-        } else {
-            latchs
-                .into_iter()
-                .filter(|l| self.lift.solver.unsat_has(*l))
-                .collect()
-        };
+        for _ in 0.. {
+            if latchs.is_empty() {
+                break;
+            }
+            latchs.shuffle(&mut self.rng);
+            let olen = latchs.len();
+            latchs = self
+                .lift
+                .minimal_predecessor(&inputs, &latchs, act)
+                .unwrap();
+            if latchs.len() == olen || !strengthen {
+                break;
+            }
+        }
         self.lift.solver.add_clause(&[!act]);
-        (res, inputs)
+        (latchs, inputs)
     }
 }
