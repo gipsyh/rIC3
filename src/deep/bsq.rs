@@ -164,6 +164,7 @@ impl BadStateQueue {
         self.obligations.iter()
     }
 
+    #[allow(unused)]
     pub fn statistic(&self) {
         println!("{:?}", self.num);
     }

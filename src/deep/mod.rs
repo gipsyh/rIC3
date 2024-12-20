@@ -83,8 +83,7 @@ impl Deep {
         self.bad_solver.constrain = Default::default();
         let res = self
             .bad_solver
-            .solve_with_domain(&self.unroll.bad, vec![], false, false)
-            .unwrap();
+            .solve_with_domain(&self.unroll.bad, vec![], false);
         if res {
             Some(self.bad_lift.get_pred(&mut self.bad_solver, true))
         } else {
@@ -94,7 +93,7 @@ impl Deep {
 
     pub fn search(&mut self) -> Option<()> {
         while let Some(bad) = self.bsq.pop() {
-            if !self.solver.inductive(&bad.lemma, false, false).unwrap() {
+            if !self.solver.inductive(&bad.lemma, false) {
                 let (nb, input) = self.lift.get_pred(&mut self.solver, true);
                 self.add_bad(nb, input, bad.depth + 1, Some(bad.clone()))?;
                 self.bsq.add(bad);
@@ -102,7 +101,7 @@ impl Deep {
                 let mut core = self.solver.inductive_core();
                 loop {
                     core.shuffle(&mut self.rng);
-                    assert!(self.solver.inductive(&core, true, false).unwrap());
+                    assert!(self.solver.inductive(&core, true));
                     let nc = self.solver.inductive_core();
                     if nc.len() == core.len() {
                         break;
