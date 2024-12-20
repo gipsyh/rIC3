@@ -3,6 +3,7 @@
 
 mod activity;
 pub mod bmc;
+pub mod deep;
 mod frame;
 pub mod frontend;
 mod gipsat;
