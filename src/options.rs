@@ -68,6 +68,8 @@ pub enum Engine {
     Kind,
     /// bmc
     BMC,
+    /// Deep
+    Deep,
     /// portfolio
     Portfolio,
 }

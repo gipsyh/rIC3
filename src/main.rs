@@ -6,6 +6,7 @@ use clap::Parser;
 use rIC3::{
     bmc::BMC,
     check_certifaiger, check_witness,
+    deep::Deep,
     frontend::aig::aig_preprocess,
     ic3::IC3,
     kind::Kind,
@@ -63,13 +64,15 @@ fn main() {
         if options.preprocess.sec {
             panic!("sec not support");
         }
-        let assert_constrain = matches!(options.engine, options::Engine::IC3);
+        let assert_constrain =
+            matches!(options.engine, options::Engine::IC3 | options::Engine::Deep);
         let keep_dep = assert_constrain;
         ts = ts.simplify(&[], keep_dep, !assert_constrain);
         let mut engine: Box<dyn Engine> = match options.engine {
             options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, pre_lemmas)),
             options::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
             options::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
+            options::Engine::Deep => Box::new(Deep::new(options.clone(), ts)),
             _ => unreachable!(),
         };
         if options.interrupt_statistic {

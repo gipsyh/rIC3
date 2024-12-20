@@ -2,6 +2,7 @@
 #![feature(assert_matches, get_mut_unchecked, format_args_nl)]
 
 pub mod bmc;
+pub mod deep;
 pub mod frontend;
 mod gipsat;
 pub mod ic3;
