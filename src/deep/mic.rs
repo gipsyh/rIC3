@@ -23,9 +23,7 @@ impl Deep {
         while i < cube.len() {
             let mut cand = cube.clone();
             cand.remove(i);
-            if !self.ts.cube_subsume_init(&cand)
-                && self.solver.inductive(&cand, true, false).unwrap()
-            {
+            if !self.ts.cube_subsume_init(&cand) && self.solver.inductive(&cand, true) {
                 (cube, i) = handle_drop_success(cube, i, self.solver.inductive_core());
             } else {
                 i += 1;
