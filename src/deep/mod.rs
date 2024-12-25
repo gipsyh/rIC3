@@ -5,17 +5,16 @@ use crate::{
     gipsat,
     options::Options,
     transys::{unroll::TransysUnroll, Transys},
-    verify::witness_encode,
-    Engine,
+    witness_encode, Engine,
 };
 use bsq::{BadState, BadStateQueue};
+use giputils::grc::Grc;
 use logic_form::{Cube, Lemma};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::rc::Rc;
 
 pub struct Deep {
-    ts: Rc<Transys>,
-    unroll: Rc<Transys>,
+    ts: Grc<Transys>,
+    unroll: Grc<Transys>,
     bsq: BadStateQueue,
     solver: gipsat::Solver,
     bad_solver: gipsat::Solver,
@@ -27,14 +26,14 @@ pub struct Deep {
 
 impl Deep {
     pub fn new(options: Options, ts: Transys) -> Self {
-        let ts = Rc::new(ts);
+        let ts = Grc::new(ts);
         let mut unroll = TransysUnroll::new(&ts);
         unroll.unroll();
-        let unroll = Rc::new(unroll.compile());
+        let unroll = Grc::new(unroll.compile());
         let mut solver = gipsat::Solver::new(options.clone(), Some(0), &ts);
         let mut bad_solver = gipsat::Solver::new(options.clone(), Some(0), &unroll);
-        solver.add_lemma(&[!ts.bad[0]]);
-        bad_solver.add_lemma(&[!ts.bad[0]]);
+        solver.add_lemma(&[!ts.bad]);
+        bad_solver.add_lemma(&[!ts.bad]);
         let lift = gipsat::Solver::new(options.clone(), None, &ts);
         let bad_lift = gipsat::Solver::new(options.clone(), None, &unroll);
         let rng = StdRng::seed_from_u64(options.rseed);
@@ -79,11 +78,11 @@ impl Deep {
     }
 
     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
-        self.bad_solver.assump = self.unroll.bad.clone();
+        self.bad_solver.assump = self.unroll.bad.cube();
         self.bad_solver.constrain = Default::default();
         let res = self
             .bad_solver
-            .solve_with_domain(&self.unroll.bad, vec![], false);
+            .solve_with_domain(&self.unroll.bad.cube(), vec![], false);
         if res {
             Some(self.bad_lift.get_pred(&mut self.bad_solver, true))
         } else {
