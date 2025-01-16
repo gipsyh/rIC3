@@ -38,11 +38,6 @@ pub struct Statistic {
     pub qbad_num: usize,
     pub qbad_avg_time: AverageDuration,
 
-    pub qlift_num: usize,
-    pub qlift_avg_time: AverageDuration,
-
-    pub minimal_predecessor_time: Duration,
-
     pub overall_mic_time: Duration,
     pub overall_block_time: Duration,
     pub overall_propagate_time: Duration,
@@ -56,7 +51,7 @@ impl Statistic {
         Self {
             num_input: model.inputs.len(),
             num_latch: model.latchs.len(),
-            num_nodes: model.max_var.into(), 
+            num_nodes: model.max_var.into(),
             case: Case::new(case),
             ..Default::default()
         }

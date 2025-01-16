@@ -92,13 +92,19 @@ impl IC3 {
             if self.options.verbose > 1 {
                 self.frame.statistic();
             }
+
+            self.statistic.qblock_num += 1;
+            self.statistic.qblock_avg_cube_len += po.lemma.len();
+            let qblock_start = self.statistic.time.start();
             match self.blocked_with_ordered(po.frame, &po.lemma, false, true) {
                 BlockResult::Yes(blocked) => {
+                    self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
                     if self.generalize(po, blocked) {
                         return None;
                     }
                 }
                 BlockResult::No(unblocked) => {
+                    self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
                     let (model, inputs) = self.get_predecessor(unblocked);
                     self.add_obligation(ProofObligation::new(
                         po.frame - 1,
@@ -153,12 +159,18 @@ impl IC3 {
                 if self.frame[frame_idx].iter().all(|l| l.ne(&lemma)) {
                     continue;
                 }
+                self.statistic.qpush_num += 1;
+                self.statistic.qpush_avg_cube_len += lemma.len();
+                let qpush_start = self.statistic.time.start();
                 match self.blocked(frame_idx + 1, &lemma, false) {
                     BlockResult::Yes(blocked) => {
+                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
                         let conflict = self.inductive_core(blocked);
                         self.add_lemma(frame_idx + 1, conflict, true, lemma.po);
                     }
-                    BlockResult::No(_) => {}
+                    BlockResult::No(_) => {
+                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
+                    }
                 }
             }
             if self.frame[frame_idx].is_empty() {

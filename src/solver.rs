@@ -118,6 +118,8 @@ impl IC3 {
 
     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
         let solver = self.solvers.last_mut().unwrap();
+        self.statistic.qbad_num += 1;
+        let qbad_start = self.statistic.time.start();
         let res = if solver.solver.solve(&[self.ts.bad]) {
             Some(BlockResultNo {
                 assumption: Cube::from([self.ts.bad]),
@@ -127,6 +129,7 @@ impl IC3 {
         } else {
             None
         };
+        self.statistic.qbad_avg_time += self.statistic.time.stop(qbad_start);
         res.map(|res| self.get_predecessor(res))
     }
 }
