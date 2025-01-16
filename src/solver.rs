@@ -1,139 +1,107 @@
-use super::Frames;
-use crate::IC3;
+use super::{Frames, IC3};
 use logic_form::{Clause, Cube, Lit};
-use satif::{SatResult, Satif, SatifSat, SatifUnsat};
-use std::{mem::take, ops::Deref, time::Instant};
+use satif::Satif;
+use std::{ops::Deref, rc::Rc};
 use transys::Transys;
 
-pub type SatSolver = minisat::Solver;
-type Sat = minisat::Sat;
-type Unsat = minisat::Unsat;
+pub type SatSolver = satif_minisat::Solver;
 
 pub struct Ic3Solver {
     solver: Box<SatSolver>,
+    ts: Rc<Transys>,
     num_act: usize,
     frame: usize,
-    temporary: Vec<Cube>,
 }
 
 impl Ic3Solver {
-    pub fn new(model: &Transys, frame: usize) -> Self {
+    pub fn new(ts: &Rc<Transys>, frame: usize) -> Self {
+        let ts = ts.clone();
         let mut solver = Box::new(SatSolver::new());
-        let false_lit: Lit = solver.new_var().into();
-        solver.add_clause(&[!false_lit]);
-        while solver.num_var() < model.num_var {
-            solver.new_var();
-        }
-        for cls in model.trans.iter() {
-            solver.add_clause(cls)
-        }
+        ts.load_trans(solver.as_mut(), true);
         Self {
             solver,
+            ts,
             frame,
             num_act: 0,
-            temporary: Vec::new(),
         }
     }
 
-    pub fn reset(&mut self, model: &Transys, frames: &Frames) {
-        let temporary = take(&mut self.temporary);
-        *self = Self::new(model, self.frame);
-        for t in temporary {
-            self.solver.add_clause(&!&t);
-            self.temporary.push(t);
-        }
+    pub fn reset(&mut self, frames: &Frames) {
+        *self = Self::new(&self.ts, self.frame);
         let frames_slice = if self.frame == 0 {
             &frames[0..1]
         } else {
             &frames[self.frame..]
         };
         for dnf in frames_slice.iter() {
-            for cube in dnf {
-                self.add_clause(&!cube.deref());
+            for cube in dnf.iter() {
+                self.add_clause(&!cube.deref().deref().clone());
             }
         }
     }
 
     pub fn add_clause(&mut self, clause: &Clause) {
-        let mut cube = !clause;
-        cube.sort_by_key(|x| x.var());
-        let temporary = take(&mut self.temporary);
-        for t in temporary {
-            if !cube.ordered_subsume(&t) {
-                self.temporary.push(t);
-            }
-        }
         self.solver.add_clause(clause);
     }
 
     #[allow(unused)]
-    pub fn solve(&mut self, assumptions: &[Lit]) -> SatResult<Sat, Unsat> {
+    pub fn solve(&mut self, assumptions: &[Lit]) -> bool {
         self.solver.solve(assumptions)
+    }
+
+    fn inductive(&mut self, cube: &Cube, strengthen: bool) -> BlockResult {
+        let mut assumption = self.ts.cube_next(cube);
+        let res = if strengthen {
+            let act = self.solver.new_var().into();
+            assumption.push(act);
+            let mut tmp_cls = !cube;
+            tmp_cls.push(!act);
+            self.solver.add_clause(&tmp_cls);
+            let res = self.solver.solve(&assumption);
+            let act = !assumption.pop().unwrap();
+            if res {
+                BlockResult::No(BlockResultNo {
+                    solver: self.solver.as_mut(),
+                    assumption,
+                    act: Some(act),
+                })
+            } else {
+                BlockResult::Yes(BlockResultYes {
+                    solver: self.solver.as_mut(),
+                    cube: cube.clone(),
+                    assumption,
+                    act: Some(act),
+                })
+            }
+        } else {
+            if self.solver.solve(&assumption) {
+                BlockResult::No(BlockResultNo {
+                    solver: self.solver.as_mut(),
+                    assumption,
+                    act: None,
+                })
+            } else {
+                BlockResult::Yes(BlockResultYes {
+                    solver: self.solver.as_mut(),
+                    cube: cube.clone(),
+                    assumption,
+                    act: None,
+                })
+            }
+        };
+        res
     }
 }
 
 impl IC3 {
-    fn blocked_inner(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
-        self.statistic.num_sat_inductive += 1;
-        let solver_idx = frame - 1;
-        let solver = &mut self.solvers[solver_idx].solver;
-        let start = Instant::now();
-        let mut assumption = self.model.cube_next(cube);
-        let sat_start = Instant::now();
-        let res = if strengthen {
-            let act = solver.new_var().into();
-            assumption.push(act);
-            let mut tmp_cls = !cube;
-            tmp_cls.push(!act);
-            solver.add_clause(&tmp_cls);
-            let res = solver.solve(&assumption);
-            let act = !assumption.pop().unwrap();
-            match res {
-                SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
-                    sat,
-                    solver: solver.as_mut(),
-                    assumption,
-                    act: Some(act),
-                }),
-                SatResult::Unsat(unsat) => BlockResult::Yes(BlockResultYes {
-                    unsat,
-                    solver: solver.as_mut(),
-                    cube: cube.clone(),
-                    assumption,
-                    act: Some(act),
-                }),
-            }
-        } else {
-            match solver.solve(&assumption) {
-                SatResult::Sat(sat) => BlockResult::No(BlockResultNo {
-                    sat,
-                    solver: solver.as_mut(),
-                    assumption,
-                    act: None,
-                }),
-                SatResult::Unsat(unsat) => BlockResult::Yes(BlockResultYes {
-                    unsat,
-                    solver: solver.as_mut(),
-                    cube: cube.clone(),
-                    assumption,
-                    act: None,
-                }),
-            }
-        };
-        self.statistic.avg_sat_call_time += sat_start.elapsed();
-        self.statistic.sat_inductive_time += start.elapsed();
-        res
-    }
-
     pub fn blocked(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
-        assert!(!self.model.cube_subsume_init(cube));
+        assert!(!self.ts.cube_subsume_init(cube));
         let solver = &mut self.solvers[frame - 1];
         solver.num_act += 1;
         if solver.num_act > 1000 {
-            self.statistic.num_solver_restart += 1;
-            solver.reset(&self.model, &self.frames);
+            solver.reset(&self.frame);
         }
-        self.blocked_inner(frame, cube, strengthen)
+        self.solvers[frame - 1].inductive(cube, strengthen)
     }
 
     pub fn blocked_with_ordered(
@@ -148,21 +116,18 @@ impl IC3 {
         self.blocked(frame, &ordered_cube, strengthen)
     }
 
-    pub fn get_bad(&mut self) -> Option<Cube> {
+    pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
         let solver = self.solvers.last_mut().unwrap();
-        self.statistic.qbad_num += 1;
-        let qtarget_start = self.statistic.time.start();
-        let res = match solver.solver.solve(&self.model.bad) {
-            SatResult::Sat(sat) => Some(BlockResultNo {
-                sat,
-                assumption: self.model.bad.clone(),
+        let res = if solver.solver.solve(&[self.ts.bad]) {
+            Some(BlockResultNo {
+                assumption: Cube::from([self.ts.bad]),
                 solver: solver.solver.as_mut(),
                 act: None,
-            }),
-            SatResult::Unsat(_) => None,
+            })
+        } else {
+            None
         };
-        self.statistic.qbad_avg_time += self.statistic.time.stop(qtarget_start);
-        res.map(|res| self.unblocked_model(res))
+        res.map(|res| self.get_predecessor(res))
     }
 }
 
@@ -172,7 +137,6 @@ pub enum BlockResult {
 }
 
 pub struct BlockResultYes {
-    unsat: Unsat,
     solver: *mut SatSolver,
     cube: Cube,
     assumption: Cube,
@@ -189,15 +153,16 @@ impl Drop for BlockResultYes {
 }
 
 pub struct BlockResultNo {
-    sat: Sat,
     solver: *mut SatSolver,
     assumption: Cube,
     act: Option<Lit>,
 }
 
 impl BlockResultNo {
+    #[inline]
     pub fn lit_value(&self, lit: Lit) -> Option<bool> {
-        self.sat.lit_value(lit)
+        let solver = unsafe { &mut *self.solver };
+        solver.sat_value(lit)
     }
 }
 
@@ -211,41 +176,29 @@ impl Drop for BlockResultNo {
 }
 
 impl IC3 {
-    pub fn blocked_conflict(&mut self, block: BlockResultYes) -> Cube {
+    pub fn inductive_core(&mut self, block: BlockResultYes) -> Cube {
         let mut ans = Cube::new();
+        let solver = unsafe { &mut *block.solver };
         for i in 0..block.cube.len() {
-            if block.unsat.has(block.assumption[i]) {
+            if solver.unsat_has(block.assumption[i]) {
                 ans.push(block.cube[i]);
             }
         }
-        if self.model.cube_subsume_init(&ans) {
+        if self.ts.cube_subsume_init(&ans) {
             ans = Cube::new();
             let new = *block
                 .cube
                 .iter()
-                .find(|l| {
-                    self.model
-                        .init_map
-                        .get(&l.var())
-                        .is_some_and(|i| *i != l.polarity())
-                })
+                .find(|l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
                 .unwrap();
             for i in 0..block.cube.len() {
-                if block.unsat.has(block.assumption[i]) || block.cube[i] == new {
+                if solver.unsat_has(block.assumption[i]) || block.cube[i] == new {
                     ans.push(block.cube[i]);
                 }
             }
-            assert!(!self.model.cube_subsume_init(&ans));
+            assert!(!self.ts.cube_subsume_init(&ans));
         }
         ans
-    }
-
-    pub fn unblocked_model(&mut self, unblock: BlockResultNo) -> Cube {
-        self.statistic.qlift_num += 1;
-        let qlift_start = self.statistic.time.start();
-        let res = self.minimal_predecessor(unblock);
-        self.statistic.qlift_avg_time += self.statistic.time.stop(qlift_start);
-        res
     }
 }
 
@@ -255,44 +208,39 @@ pub struct Lift {
 }
 
 impl Lift {
-    pub fn new(model: &Transys) -> Self {
+    pub fn new(ts: &Transys) -> Self {
         let mut solver = SatSolver::new();
-        let false_lit: Lit = solver.new_var().into();
-        solver.add_clause(&[!false_lit]);
-        while solver.num_var() < model.num_var {
-            solver.new_var();
-        }
-        for cls in model.trans.iter() {
-            solver.add_clause(cls)
-        }
+        ts.load_trans(&mut solver, false);
         Self { solver, num_act: 0 }
     }
 }
 
 impl IC3 {
-    pub fn minimal_predecessor(&mut self, unblock: BlockResultNo) -> Cube {
-        let start = Instant::now();
+    pub fn get_predecessor(&mut self, unblock: BlockResultNo) -> (Cube, Cube) {
+        let solver = unsafe { &mut *unblock.solver };
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {
-            self.lift = Lift::new(&self.model)
+            self.lift = Lift::new(&self.ts)
         }
         let act: Lit = self.lift.solver.new_var().into();
         let mut assumption = Cube::from([act]);
-        let mut cls = !&unblock.assumption;
-        cls.push(!act);
+        let mut cls = unblock.assumption.clone();
+        cls.extend_from_slice(&self.ts.constraints);
+        cls.push(act);
+        let cls = !cls;
+        let mut inputs = Cube::new();
         self.lift.solver.add_clause(&cls);
-        for input in self.model.inputs.iter() {
+        for input in self.ts.inputs.iter() {
             let lit = input.lit();
-            match unblock.sat.lit_value(lit) {
-                Some(true) => assumption.push(lit),
-                Some(false) => assumption.push(!lit),
-                None => (),
+            if let Some(v) = solver.sat_value(lit) {
+                inputs.push(lit.not_if(!v));
             }
         }
+        assumption.extend_from_slice(&inputs);
         let mut latchs = Cube::new();
-        for latch in self.model.latchs.iter() {
+        for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            match unblock.sat.lit_value(lit) {
+            match solver.sat_value(lit) {
                 Some(true) => latchs.push(lit),
                 Some(false) => latchs.push(!lit),
                 None => (),
@@ -300,12 +248,15 @@ impl IC3 {
         }
         self.activity.sort_by_activity(&mut latchs, false);
         assumption.extend_from_slice(&latchs);
-        let res: Cube = match self.lift.solver.solve(&assumption) {
-            SatResult::Sat(_) => panic!(),
-            SatResult::Unsat(conflict) => latchs.into_iter().filter(|l| conflict.has(*l)).collect(),
+        let res: Cube = if self.lift.solver.solve(&assumption) {
+            panic!()
+        } else {
+            latchs
+                .into_iter()
+                .filter(|l| self.lift.solver.unsat_has(*l))
+                .collect()
         };
         self.lift.solver.add_clause(&[!act]);
-        self.statistic.minimal_predecessor_time += start.elapsed();
-        res
+        (res, inputs)
     }
 }

@@ -56,7 +56,7 @@ impl Statistic {
         Self {
             num_input: model.inputs.len(),
             num_latch: model.latchs.len(),
-            num_nodes: model.num_var,
+            num_nodes: model.max_var.into(), 
             case: Case::new(case),
             ..Default::default()
         }
@@ -66,7 +66,7 @@ impl Statistic {
 impl IC3 {
     pub fn statistic(&self) {
         self.obligations.statistic();
-        self.frames.statistic();
+        self.frame.statistic();
         println!("{:#?}", self.statistic);
     }
 }

@@ -1,45 +1,46 @@
-use crate::{solver::Ic3Solver, IC3};
-use logic_form::Lemma;
-use satif::SatResult;
+use crate::IC3;
+use logic_form::{Clause, Lemma};
+use satif::Satif;
+use satif_minisat::Solver;
 use std::ops::Deref;
+use transys::Transys;
+
+pub fn verify_invariant(ts: &Transys, invariants: &[Lemma]) -> bool {
+    let mut solver = Solver::new();
+    solver.new_var_to(ts.max_var);
+    for cls in ts.trans.iter() {
+        solver.add_clause(cls)
+    }
+    for lemma in invariants {
+        solver.add_clause(&!lemma.deref());
+    }
+    for c in ts.constraints.iter() {
+        solver.add_clause(&Clause::from([*c]));
+    }
+    if solver.solve(&[ts.bad]) {
+        return false;
+    }
+    for lemma in invariants {
+        let mut assump = ts.constraints.clone();
+        assump.extend_from_slice(&[ts.bad]);
+        if solver.solve(&ts.cube_next(lemma)) {
+            return false;
+        }
+    }
+    true
+}
 
 impl IC3 {
-    fn verify_invariant(&mut self, invariants: &[Lemma]) -> bool {
-        let mut solver = Ic3Solver::new(&self.model, 1);
-        for lemma in invariants {
-            solver.add_clause(&!lemma.deref());
+    pub fn verify(&mut self) {
+        let invariants = self.frame.invariant();
+        if !verify_invariant(&self.ts, &invariants) {
+            panic!("invariant varify failed");
         }
-        if let SatResult::Sat(_) = solver.solve(&self.model.bad) {
-            return false;
+        if self.options.verbose > 0 {
+            println!(
+                "inductive invariant verified with {} lemmas!",
+                invariants.len()
+            );
         }
-        for lemma in invariants {
-            if let SatResult::Sat(_) = solver.solve(&self.model.cube_next(lemma)) {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub fn verify(&mut self) -> bool {
-        let invariant = self
-            .frames
-            .iter()
-            .position(|frame| frame.is_empty())
-            .unwrap();
-        let mut invariants = Vec::new();
-        for i in invariant..self.frames.len() {
-            for cube in self.frames[i].iter() {
-                invariants.push(cube.clone());
-            }
-        }
-        if !self.verify_invariant(&invariants) {
-            println!("invariant varify failed");
-            return false;
-        }
-        println!(
-            "inductive invariant verified with {} lemmas!",
-            invariants.len()
-        );
-        true
     }
 }
