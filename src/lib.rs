@@ -17,7 +17,7 @@ use frame::{Frame, Frames};
 use giputils::grc::Grc;
 use logic_form::{Cube, Lemma};
 pub use options::Options;
-use solver::{BlockResult, BlockResultYes, Ic3Solver, Lift};
+use solver::{Ic3Solver, Lift};
 use std::panic::{self, AssertUnwindSafe};
 use std::process::exit;
 use std::time::Instant;
@@ -52,8 +52,8 @@ impl IC3 {
 
     fn push_lemma(&mut self, frame: usize, mut cube: Cube) -> (usize, Cube) {
         for i in frame + 1..=self.level() {
-            if let BlockResult::Yes(block) = self.blocked(i, &cube, true) {
-                cube = self.inductive_core(block);
+            if self.blocked(i, &cube, true) {
+                cube = self.solvers[i - 1].inductive_core();
             } else {
                 return (i, cube);
             }
@@ -61,8 +61,8 @@ impl IC3 {
         (self.level() + 1, cube)
     }
 
-    fn generalize(&mut self, mut po: ProofObligation, blocked: BlockResultYes) -> bool {
-        let mut mic = self.inductive_core(blocked);
+    fn generalize(&mut self, mut po: ProofObligation) -> bool {
+        let mut mic = self.solvers[po.frame - 1].inductive_core();
         mic = self.mic(po.frame, mic, 0);
         let (frame, mic) = self.push_lemma(po.frame, mic);
         self.statistic.avg_po_cube_len += po.lemma.len();
@@ -96,59 +96,25 @@ impl IC3 {
             self.statistic.qblock_num += 1;
             self.statistic.qblock_avg_cube_len += po.lemma.len();
             let qblock_start = self.statistic.time.start();
-            match self.blocked_with_ordered(po.frame, &po.lemma, false, true) {
-                BlockResult::Yes(blocked) => {
-                    self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
-                    if self.generalize(po, blocked) {
-                        return None;
-                    }
+            if self.blocked_with_ordered(po.frame, &po.lemma, false, true) {
+                self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
+                if self.generalize(po) {
+                    return None;
                 }
-                BlockResult::No(unblocked) => {
-                    self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
-                    let (model, inputs) = self.get_predecessor(unblocked);
-                    self.add_obligation(ProofObligation::new(
-                        po.frame - 1,
-                        Lemma::new(model),
-                        inputs,
-                        po.depth + 1,
-                        Some(po.clone()),
-                    ));
-                    self.add_obligation(po);
-                }
+            } else {
+                self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
+                let (model, inputs) = self.get_pred(po.frame);
+                self.add_obligation(ProofObligation::new(
+                    po.frame - 1,
+                    Lemma::new(model),
+                    inputs,
+                    po.depth + 1,
+                    Some(po.clone()),
+                ));
+                self.add_obligation(po);
             }
         }
         Some(true)
-    }
-
-    #[allow(unused)]
-    fn trivial_block(&mut self, frame: usize, lemma: Lemma, limit: &mut usize) -> bool {
-        if frame == 0 {
-            return false;
-        }
-        if self.ts.cube_subsume_init(&lemma) {
-            return false;
-        }
-        if *limit == 0 {
-            return false;
-        }
-        *limit -= 1;
-        loop {
-            match self.blocked_with_ordered(frame, &lemma, false, true) {
-                BlockResult::Yes(blocked) => {
-                    let mut mic = self.inductive_core(blocked);
-                    mic = self.mic(frame, mic, 0);
-                    let (frame, mic) = self.push_lemma(frame, mic);
-                    self.add_lemma(frame - 1, mic, false, None);
-                    return true;
-                }
-                BlockResult::No(ub) => {
-                    let model = Lemma::new(self.get_predecessor(ub).0);
-                    if !self.trivial_block(frame - 1, model, limit) {
-                        return false;
-                    }
-                }
-            }
-        }
     }
 
     fn propagate(&mut self) -> bool {
@@ -162,15 +128,12 @@ impl IC3 {
                 self.statistic.qpush_num += 1;
                 self.statistic.qpush_avg_cube_len += lemma.len();
                 let qpush_start = self.statistic.time.start();
-                match self.blocked(frame_idx + 1, &lemma, false) {
-                    BlockResult::Yes(blocked) => {
-                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
-                        let conflict = self.inductive_core(blocked);
-                        self.add_lemma(frame_idx + 1, conflict, true, lemma.po);
-                    }
-                    BlockResult::No(_) => {
-                        self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
-                    }
+                if self.blocked(frame_idx + 1, &lemma, false) {
+                    self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
+                    let conflict = self.solvers[frame_idx].inductive_core();
+                    self.add_lemma(frame_idx + 1, conflict, true, lemma.po);
+                } else {
+                    self.statistic.qpush_avg_time += self.statistic.time.stop(qpush_start);
                 }
             }
             if self.frame[frame_idx].is_empty() {

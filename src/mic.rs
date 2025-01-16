@@ -1,4 +1,4 @@
-use super::{solver::BlockResult, IC3};
+use super::IC3;
 use logic_form::{Cube, Lit};
 use std::collections::HashSet;
 
@@ -14,23 +14,20 @@ impl IC3 {
             self.statistic.qgen_num += 1;
             self.statistic.qgen_avg_cube_len += cube.len();
             let qgen_start = self.statistic.time.start();
-            match self.blocked_with_ordered(frame, &cube, false, true) {
-                BlockResult::Yes(blocked) => {
-                    self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
-                    return Some(self.inductive_core(blocked));
-                }
-                BlockResult::No(unblocked) => {
-                    self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
-                    let mut cube_new = Cube::new();
-                    for lit in cube {
-                        if let Some(true) = unblocked.lit_value(lit) {
-                            cube_new.push(lit);
-                        } else if keep.contains(&lit) {
-                            return None;
-                        }
+            if self.blocked_with_ordered(frame, &cube, false, true) {
+                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
+                return Some(self.solvers[frame - 1].inductive_core());
+            } else {
+                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
+                let mut cube_new = Cube::new();
+                for lit in cube {
+                    if let Some(true) = self.solvers[frame - 1].lit_value(lit) {
+                        cube_new.push(lit);
+                    } else if keep.contains(&lit) {
+                        return None;
                     }
-                    cube = cube_new;
                 }
+                cube = cube_new;
             }
         }
     }
@@ -43,43 +40,38 @@ impl IC3 {
             if self.ts.cube_subsume_init(&cube) {
                 return None;
             }
-            match self.blocked_with_ordered(frame, &cube, false, true) {
-                BlockResult::Yes(blocked) => {
-                    return Some(self.inductive_core(blocked));
-                }
-                BlockResult::No(unblocked) => {
-                    let (model, _) = self.get_predecessor(unblocked);
-                    if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
-                        if let BlockResult::Yes(blocked) =
-                            self.blocked_with_ordered(frame - 1, &model, false, true)
-                        {
-                            ctgs += 1;
-                            let core = self.inductive_core(blocked);
-                            let mic = self.mic(frame - 1, core, 0);
-                            let (frame, mic) = self.push_lemma(frame - 1, mic);
-                            self.add_lemma(frame - 1, mic, false, None);
-                            continue;
-                        }
+            if self.blocked_with_ordered(frame, &cube, false, true) {
+                return Some(self.solvers[frame - 1].inductive_core());
+            } else {
+                let (model, _) = self.get_pred(frame);
+                if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
+                    if self.blocked_with_ordered(frame - 1, &model, false, true) {
+                        ctgs += 1;
+                        let core = self.solvers[frame - 2].inductive_core();
+                        let mic = self.mic(frame - 1, core, 0);
+                        let (frame, mic) = self.push_lemma(frame - 1, mic);
+                        self.add_lemma(frame - 1, mic, false, None);
+                        continue;
                     }
-                    // if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
-                    //     let mut limit = 5;
-                    //     if self.trivial_block(frame - 1, Lemma::new(model.clone()), &mut limit) {
-                    //         ctgs += 1;
-                    //         continue;
-                    //     }
-                    // }
-                    ctgs = 0;
-                    let cex_set: HashSet<Lit> = HashSet::from_iter(model);
-                    let mut cube_new = Cube::new();
-                    for lit in cube {
-                        if cex_set.contains(&lit) {
-                            cube_new.push(lit);
-                        } else if keep.contains(&lit) {
-                            return None;
-                        }
-                    }
-                    cube = cube_new;
                 }
+                // if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
+                //     let mut limit = 5;
+                //     if self.trivial_block(frame - 1, Lemma::new(model.clone()), &mut limit) {
+                //         ctgs += 1;
+                //         continue;
+                //     }
+                // }
+                ctgs = 0;
+                let cex_set: HashSet<Lit> = HashSet::from_iter(model);
+                let mut cube_new = Cube::new();
+                for lit in cube {
+                    if cex_set.contains(&lit) {
+                        cube_new.push(lit);
+                    } else if keep.contains(&lit) {
+                        return None;
+                    }
+                }
+                cube = cube_new;
             }
         }
     }

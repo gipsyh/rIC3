@@ -12,6 +12,9 @@ pub struct Ic3Solver {
     ts: Grc<Transys>,
     num_act: usize,
     frame: usize,
+    cube: Cube,
+    assumption: Cube,
+    act: Option<Lit>,
 }
 
 impl Ic3Solver {
@@ -24,6 +27,9 @@ impl Ic3Solver {
             ts,
             frame,
             num_act: 0,
+            cube: Default::default(),
+            assumption: Default::default(),
+            act: None,
         }
     }
 
@@ -41,18 +47,29 @@ impl Ic3Solver {
         }
     }
 
+    fn finish_last(&mut self) {
+        if let Some(act) = self.act {
+            self.solver.add_clause(&[act]);
+        }
+        self.assumption.clear();
+        self.cube.clear();
+    }
+
     pub fn add_clause(&mut self, clause: &Clause) {
+        self.finish_last();
         self.solver.add_clause(clause);
     }
 
     #[allow(unused)]
     pub fn solve(&mut self, assumptions: &[Lit]) -> bool {
+        self.finish_last();
         self.solver.solve(assumptions)
     }
 
-    fn inductive(&mut self, cube: &Cube, strengthen: bool) -> BlockResult {
+    fn inductive(&mut self, cube: &Cube, strengthen: bool) -> bool {
+        self.finish_last();
         let mut assumption = self.ts.cube_next(cube);
-        let res = if strengthen {
+        if strengthen {
             let act = self.solver.new_var().into();
             assumption.push(act);
             let mut tmp_cls = !cube;
@@ -60,42 +77,49 @@ impl Ic3Solver {
             self.solver.add_clause(&tmp_cls);
             let res = self.solver.solve(&assumption);
             let act = !assumption.pop().unwrap();
-            if res {
-                BlockResult::No(BlockResultNo {
-                    solver: self.solver.as_mut(),
-                    assumption,
-                    act: Some(act),
-                })
-            } else {
-                BlockResult::Yes(BlockResultYes {
-                    solver: self.solver.as_mut(),
-                    cube: cube.clone(),
-                    assumption,
-                    act: Some(act),
-                })
-            }
+            self.act = Some(act);
+            self.assumption = assumption;
+            self.cube = cube.clone();
+            !res
         } else {
-            if self.solver.solve(&assumption) {
-                BlockResult::No(BlockResultNo {
-                    solver: self.solver.as_mut(),
-                    assumption,
-                    act: None,
-                })
-            } else {
-                BlockResult::Yes(BlockResultYes {
-                    solver: self.solver.as_mut(),
-                    cube: cube.clone(),
-                    assumption,
-                    act: None,
-                })
+            let res = self.solver.solve(&assumption);
+            self.assumption = assumption;
+            self.cube = cube.clone();
+            !res
+        }
+    }
+
+    pub fn inductive_core(&mut self) -> Cube {
+        let mut ans = Cube::new();
+        for i in 0..self.cube.len() {
+            if self.solver.unsat_has(self.assumption[i]) {
+                ans.push(self.cube[i]);
             }
-        };
-        res
+        }
+        if self.ts.cube_subsume_init(&ans) {
+            ans = Cube::new();
+            let new = *self
+                .cube
+                .iter()
+                .find(|l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
+                .unwrap();
+            for i in 0..self.cube.len() {
+                if self.solver.unsat_has(self.assumption[i]) || self.cube[i] == new {
+                    ans.push(self.cube[i]);
+                }
+            }
+            assert!(!self.ts.cube_subsume_init(&ans));
+        }
+        ans
+    }
+
+    pub fn lit_value(&mut self, lit: Lit) -> Option<bool> {
+        self.solver.sat_value(lit)
     }
 }
 
 impl IC3 {
-    pub fn blocked(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> BlockResult {
+    pub fn blocked(&mut self, frame: usize, cube: &Cube, strengthen: bool) -> bool {
         assert!(!self.ts.cube_subsume_init(cube));
         let solver = &mut self.solvers[frame - 1];
         solver.num_act += 1;
@@ -111,7 +135,7 @@ impl IC3 {
         cube: &Cube,
         ascending: bool,
         strengthen: bool,
-    ) -> BlockResult {
+    ) -> bool {
         let mut ordered_cube = cube.clone();
         self.activity.sort_by_activity(&mut ordered_cube, ascending);
         self.blocked(frame, &ordered_cube, strengthen)
@@ -119,90 +143,13 @@ impl IC3 {
 
     pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
         let solver = self.solvers.last_mut().unwrap();
+        solver.finish_last();
         self.statistic.qbad_num += 1;
         let qbad_start = self.statistic.time.start();
-        let res = if solver.solver.solve(&[self.ts.bad]) {
-            Some(BlockResultNo {
-                assumption: Cube::from([self.ts.bad]),
-                solver: solver.solver.as_mut(),
-                act: None,
-            })
-        } else {
-            None
-        };
+        let res = solver.solver.solve(&[self.ts.bad]);
+        solver.assumption = self.ts.bad.cube();
         self.statistic.qbad_avg_time += self.statistic.time.stop(qbad_start);
-        res.map(|res| self.get_predecessor(res))
-    }
-}
-
-pub enum BlockResult {
-    Yes(BlockResultYes),
-    No(BlockResultNo),
-}
-
-pub struct BlockResultYes {
-    solver: *mut SatSolver,
-    cube: Cube,
-    assumption: Cube,
-    act: Option<Lit>,
-}
-
-impl Drop for BlockResultYes {
-    fn drop(&mut self) {
-        if let Some(act) = self.act {
-            let solver = unsafe { &mut *self.solver };
-            solver.add_clause(&[act]);
-        }
-    }
-}
-
-pub struct BlockResultNo {
-    solver: *mut SatSolver,
-    assumption: Cube,
-    act: Option<Lit>,
-}
-
-impl BlockResultNo {
-    #[inline]
-    pub fn lit_value(&self, lit: Lit) -> Option<bool> {
-        let solver = unsafe { &mut *self.solver };
-        solver.sat_value(lit)
-    }
-}
-
-impl Drop for BlockResultNo {
-    fn drop(&mut self) {
-        if let Some(act) = self.act {
-            let solver = unsafe { &mut *self.solver };
-            solver.add_clause(&[act]);
-        }
-    }
-}
-
-impl IC3 {
-    pub fn inductive_core(&mut self, block: BlockResultYes) -> Cube {
-        let mut ans = Cube::new();
-        let solver = unsafe { &mut *block.solver };
-        for i in 0..block.cube.len() {
-            if solver.unsat_has(block.assumption[i]) {
-                ans.push(block.cube[i]);
-            }
-        }
-        if self.ts.cube_subsume_init(&ans) {
-            ans = Cube::new();
-            let new = *block
-                .cube
-                .iter()
-                .find(|l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
-                .unwrap();
-            for i in 0..block.cube.len() {
-                if solver.unsat_has(block.assumption[i]) || block.cube[i] == new {
-                    ans.push(block.cube[i]);
-                }
-            }
-            assert!(!self.ts.cube_subsume_init(&ans));
-        }
-        ans
+        res.then(|| self.get_pred(self.solvers.len()))
     }
 }
 
@@ -220,15 +167,15 @@ impl Lift {
 }
 
 impl IC3 {
-    pub fn get_predecessor(&mut self, unblock: BlockResultNo) -> (Cube, Cube) {
-        let solver = unsafe { &mut *unblock.solver };
+    pub fn get_pred(&mut self, frame: usize) -> (Cube, Cube) {
         self.lift.num_act += 1;
         if self.lift.num_act > 1000 {
             self.lift = Lift::new(&self.ts)
         }
+        let solver = &mut self.solvers[frame - 1];
         let act: Lit = self.lift.solver.new_var().into();
         let mut assumption = Cube::from([act]);
-        let mut cls = unblock.assumption.clone();
+        let mut cls = solver.assumption.clone();
         cls.extend_from_slice(&self.ts.constraints);
         cls.push(act);
         let cls = !cls;
@@ -236,7 +183,7 @@ impl IC3 {
         self.lift.solver.add_clause(&cls);
         for input in self.ts.inputs.iter() {
             let lit = input.lit();
-            if let Some(v) = solver.sat_value(lit) {
+            if let Some(v) = solver.lit_value(lit) {
                 inputs.push(lit.not_if(!v));
             }
         }
@@ -244,7 +191,7 @@ impl IC3 {
         let mut latchs = Cube::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            match solver.sat_value(lit) {
+            match solver.lit_value(lit) {
                 Some(true) => latchs.push(lit),
                 Some(false) => latchs.push(!lit),
                 None => (),
