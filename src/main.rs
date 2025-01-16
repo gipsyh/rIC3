@@ -33,11 +33,17 @@ fn main() {
         Aig::from_file(&options.model)
     };
     if !aig.outputs.is_empty() {
-        println!("Warning: The outputs are ignored; the property should be in the 'bad' section of the AIGER.");
-        aig.outputs.clear();
+        if !options.certify { // not certifying, move outputs to bads
+            // Move outputs to bads if no bad properties exist
+            if aig.bads.is_empty() {
+                aig.bads = std::mem::take(&mut aig.outputs);
+                println!("info: moved {} outputs to bad properties", aig.bads.len());
+            }
+        }
     }
+    
     let origin_aig = aig.clone();
-    if aig.bads.is_empty() {
+    if aig.bads.is_empty() { // keep the orginal behaviours
         println!("warning: no property to be checked");
         verify_certifaiger(&aig, &options);
         exit(20);
@@ -60,6 +66,7 @@ fn main() {
         if options.preprocess.sec {
             panic!("sec not support");
         }
+        
         let assert_constrain = matches!(options.engine, options::Engine::IC3);
         let keep_dep = assert_constrain;
         ts = ts.simplify(&[], keep_dep, !assert_constrain);
