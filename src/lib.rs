@@ -14,18 +14,18 @@ use crate::proofoblig::{ProofObligation, ProofObligationQueue};
 use crate::statistic::Statistic;
 use activity::Activity;
 use frame::{Frame, Frames};
+use giputils::grc::Grc;
 use logic_form::{Cube, Lemma};
 pub use options::Options;
 use solver::{BlockResult, BlockResultYes, Ic3Solver, Lift};
 use std::panic::{self, AssertUnwindSafe};
 use std::process::exit;
-use std::rc::Rc;
 use std::time::Instant;
 use transys::Transys;
 
 pub struct IC3 {
     options: Options,
-    ts: Rc<Transys>,
+    ts: Grc<Transys>,
     frame: Frames,
     solvers: Vec<Ic3Solver>,
     lift: Lift,
@@ -184,7 +184,7 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(options: Options, ts: Transys) -> Self {
-        let ts = Rc::new(ts);
+        let ts = Grc::new(ts);
         let statistic = Statistic::new(&options.model, &ts);
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);

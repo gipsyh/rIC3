@@ -1,20 +1,21 @@
 use super::{Frames, IC3};
+use giputils::grc::Grc;
 use logic_form::{Clause, Cube, Lit};
 use satif::Satif;
-use std::{ops::Deref, rc::Rc};
+use std::ops::Deref;
 use transys::Transys;
 
 pub type SatSolver = satif_minisat::Solver;
 
 pub struct Ic3Solver {
     solver: Box<SatSolver>,
-    ts: Rc<Transys>,
+    ts: Grc<Transys>,
     num_act: usize,
     frame: usize,
 }
 
 impl Ic3Solver {
-    pub fn new(ts: &Rc<Transys>, frame: usize) -> Self {
+    pub fn new(ts: &Grc<Transys>, frame: usize) -> Self {
         let ts = ts.clone();
         let mut solver = Box::new(SatSolver::new());
         ts.load_trans(solver.as_mut(), true);

@@ -1,4 +1,5 @@
 use crate::{proofoblig::ProofObligation, IC3};
+use giputils::grc::Grc;
 use logic_form::{Cube, Lemma, Lit, LitSet};
 use std::{
     collections::HashSet,
@@ -75,7 +76,7 @@ pub struct Frames {
 }
 
 impl Frames {
-    pub fn new(ts: &Rc<Transys>) -> Self {
+    pub fn new(ts: &Grc<Transys>) -> Self {
         let mut tmp_lit_set = LitSet::new();
         tmp_lit_set.reserve(ts.max_latch);
         Self {
