@@ -21,7 +21,7 @@ impl IC3 {
                 self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
                 let mut cube_new = Cube::new();
                 for lit in cube {
-                    if let Some(true) = self.solvers[frame - 1].lit_value(lit) {
+                    if let Some(true) = self.solvers[frame - 1].sat_value(lit) {
                         cube_new.push(lit);
                     } else if keep.contains(&lit) {
                         return None;

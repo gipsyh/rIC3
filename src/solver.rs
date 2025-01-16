@@ -113,7 +113,7 @@ impl Ic3Solver {
         ans
     }
 
-    pub fn lit_value(&mut self, lit: Lit) -> Option<bool> {
+    pub fn sat_value(&mut self, lit: Lit) -> Option<bool> {
         self.solver.sat_value(lit)
     }
 }
@@ -183,7 +183,7 @@ impl IC3 {
         self.lift.solver.add_clause(&cls);
         for input in self.ts.inputs.iter() {
             let lit = input.lit();
-            if let Some(v) = solver.lit_value(lit) {
+            if let Some(v) = solver.sat_value(lit) {
                 inputs.push(lit.not_if(!v));
             }
         }
@@ -191,7 +191,7 @@ impl IC3 {
         let mut latchs = Cube::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            match solver.lit_value(lit) {
+            match solver.sat_value(lit) {
                 Some(true) => latchs.push(lit),
                 Some(false) => latchs.push(!lit),
                 None => (),
