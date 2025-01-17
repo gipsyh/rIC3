@@ -3,36 +3,13 @@ use logic_form::{Cube, Lit};
 use std::collections::HashSet;
 
 impl IC3 {
-    fn down(&mut self, frame: usize, cube: &Cube, keep: &HashSet<Lit>) -> Option<Cube> {
-        let mut cube = cube.clone();
-        self.statistic.num_down += 1;
-        loop {
-            if self.ts.cube_subsume_init(&cube) {
-                return None;
-            }
-
-            self.statistic.qgen_num += 1;
-            self.statistic.qgen_avg_cube_len += cube.len();
-            let qgen_start = self.statistic.time.start();
-            if self.blocked_with_ordered(frame, &cube, false, true) {
-                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
-                return Some(self.solvers[frame - 1].inductive_core());
-            } else {
-                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
-                let mut cube_new = Cube::new();
-                for lit in cube {
-                    if let Some(true) = self.solvers[frame - 1].sat_value(lit) {
-                        cube_new.push(lit);
-                    } else if keep.contains(&lit) {
-                        return None;
-                    }
-                }
-                cube = cube_new;
-            }
-        }
-    }
-
-    fn ctg_down(&mut self, frame: usize, cube: &Cube, keep: &HashSet<Lit>) -> Option<Cube> {
+    fn ctg_down(
+        &mut self,
+        frame: usize,
+        cube: &Cube,
+        keep: &HashSet<Lit>,
+        level: usize,
+    ) -> Option<Cube> {
         let mut cube = cube.clone();
         self.statistic.num_down += 1;
         let mut ctgs = 0;
@@ -43,6 +20,9 @@ impl IC3 {
             if self.blocked_with_ordered(frame, &cube, false, true) {
                 return Some(self.solvers[frame - 1].inductive_core());
             } else {
+                if level == 0 {
+                    return None;
+                }
                 let (model, _) = self.get_pred(frame);
                 if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
                     if self.blocked_with_ordered(frame - 1, &model, false, true) {
@@ -54,13 +34,6 @@ impl IC3 {
                         continue;
                     }
                 }
-                // if ctgs < 3 && frame > 1 && !self.ts.cube_subsume_init(&model) {
-                //     let mut limit = 5;
-                //     if self.trivial_block(frame - 1, Lemma::new(model.clone()), &mut limit) {
-                //         ctgs += 1;
-                //         continue;
-                //     }
-                // }
                 ctgs = 0;
                 let cex_set: HashSet<Lit> = HashSet::from_iter(model);
                 let mut cube_new = Cube::new();
@@ -111,12 +84,7 @@ impl IC3 {
             }
             let mut removed_cube = cube.clone();
             removed_cube.remove(i);
-            let res = if level == 0 {
-                self.down(frame, &removed_cube, &keep)
-            } else {
-                self.ctg_down(frame, &removed_cube, &keep)
-            };
-            if let Some(new_cube) = res {
+            if let Some(new_cube) = self.ctg_down(frame, &removed_cube, &keep, level) {
                 self.statistic.mic_drop.success();
                 (cube, i) = self.handle_down_success(frame, cube, i, new_cube);
             } else {
