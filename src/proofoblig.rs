@@ -186,7 +186,6 @@ impl ProofObligationQueue {
 
 impl IC3 {
     pub fn add_obligation(&mut self, po: ProofObligation) {
-        self.statistic.avg_po_cube_len += po.lemma.len();
         self.obligations.add(po)
     }
 

@@ -65,7 +65,6 @@ impl IC3 {
         let mut mic = self.solvers[po.frame - 1].inductive_core();
         mic = self.mic(po.frame, mic, 0);
         let (frame, mic) = self.push_lemma(po.frame, mic);
-        self.statistic.avg_po_cube_len += po.lemma.len();
         po.frame = frame;
         self.add_obligation(po.clone());
         if self.add_lemma(frame - 1, mic.clone(), false, Some(po)) {

@@ -11,15 +11,19 @@ impl IC3 {
         level: usize,
     ) -> Option<Cube> {
         let mut cube = cube.clone();
-        self.statistic.num_down += 1;
         let mut ctgs = 0;
         loop {
             if self.ts.cube_subsume_init(&cube) {
                 return None;
             }
+            self.statistic.qgen_num += 1;
+            self.statistic.qgen_avg_cube_len += cube.len();
+            let qgen_start = self.statistic.time.start();
             if self.blocked_with_ordered(frame, &cube, false, true) {
+                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
                 return Some(self.solvers[frame - 1].inductive_core());
             } else {
+                self.statistic.qgen_avg_time += self.statistic.time.stop(qgen_start);
                 if level == 0 {
                     return None;
                 }
@@ -72,8 +76,6 @@ impl IC3 {
     }
 
     pub fn mic(&mut self, frame: usize, mut cube: Cube, level: usize) -> Cube {
-        self.statistic.avg_mic_cube_len += cube.len();
-        self.statistic.num_mic += 1;
         self.activity.sort_by_activity(&mut cube, true);
         let mut keep = HashSet::new();
         let mut i = 0;
@@ -85,10 +87,8 @@ impl IC3 {
             let mut removed_cube = cube.clone();
             removed_cube.remove(i);
             if let Some(new_cube) = self.ctg_down(frame, &removed_cube, &keep, level) {
-                self.statistic.mic_drop.success();
                 (cube, i) = self.handle_down_success(frame, cube, i, new_cube);
             } else {
-                self.statistic.mic_drop.fail();
                 keep.insert(cube[i]);
                 i += 1;
             }

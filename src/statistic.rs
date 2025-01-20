@@ -1,5 +1,5 @@
 use crate::IC3;
-use giputils::statistic::{Average, AverageDuration, Case, RunningTime, SuccessRate};
+use giputils::statistic::{Average, AverageDuration, Case, RunningTime};
 use std::{fmt::Debug, time::Duration};
 use transys::Transys;
 
@@ -11,17 +11,6 @@ pub struct Statistic {
     pub num_latch: usize,
     pub num_nodes: usize,
     pub time: RunningTime,
-
-    pub avg_sat_call_time: AverageDuration,
-    pub num_sat_inductive: usize,
-    pub sat_inductive_time: Duration,
-    pub num_solver_restart: usize,
-
-    pub num_mic: usize,
-    pub avg_mic_cube_len: Average,
-    pub avg_po_cube_len: Average,
-    pub mic_drop: SuccessRate,
-    pub num_down: usize,
 
     pub qgen_num: usize,
     pub qgen_avg_time: AverageDuration,
