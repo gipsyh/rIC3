@@ -126,7 +126,11 @@ impl IC3 {
         if solver.num_act > 1000 {
             solver.reset(&self.frame);
         }
-        self.solvers[frame - 1].inductive(cube, strengthen)
+        let start = self.statistic.time.start();
+        self.statistic.sat_num += 1;
+        let res = self.solvers[frame - 1].inductive(cube, strengthen);
+        self.statistic.sat_avg_time += self.statistic.time.stop(start);
+        res
     }
 
     pub fn blocked_with_ordered(

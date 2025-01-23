@@ -12,6 +12,9 @@ pub struct Statistic {
     pub num_nodes: usize,
     pub time: RunningTime,
 
+    pub sat_num: usize,
+    pub sat_avg_time: AverageDuration,
+
     pub qgen_num: usize,
     pub qgen_avg_time: AverageDuration,
     pub qgen_avg_cube_len: Average,
