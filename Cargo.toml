@@ -21,7 +21,7 @@ giputils = { path = "./deps/giputils", version = "0.2.3" }
 satif = { path = "./deps/satif", version = "0.1" }
 abc-rs = { path = "./deps/abc-rs", version = "0.2" }
 clap = { version = "4.5.16", features = ["derive"] }
-rand = "0.8.5"
+rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
 bitfield-struct = "0.10.0"
 tempfile = "3.10.1"
