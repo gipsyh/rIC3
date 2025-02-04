@@ -9,6 +9,7 @@ pub struct TransysUnroll {
     pub num_unroll: usize,
     pub max_var: Var,
     next_map: LitMap<Vec<Lit>>,
+    simple_path: Option<Vec<Vec<Clause>>>,
 }
 
 impl TransysUnroll {
@@ -36,7 +37,20 @@ impl TransysUnroll {
             num_unroll: 0,
             max_var: ts.max_var,
             next_map,
+            simple_path: None,
         }
+    }
+
+    pub fn new_with_simple_path(ts: &Transys) -> Self {
+        let mut res = Self::new(ts);
+        res.simple_path = Some(Vec::new());
+        res
+    }
+
+    #[inline]
+    pub fn new_var(&mut self) -> Var {
+        self.max_var += 1;
+        self.max_var
     }
 
     #[inline]
@@ -51,6 +65,35 @@ impl TransysUnroll {
             .iter()
             .map(|l| self.lit_next(*l, num))
             .collect()
+    }
+
+    fn single_simple_path(&mut self, i: usize, j: usize) {
+        let mut ors = Clause::new();
+        for l in self.ts.latchs.iter() {
+            let l = l.lit();
+            let li = self.lit_next(l, i);
+            let lj = self.lit_next(l, j);
+            self.max_var += 1;
+            let n = self.max_var.lit();
+            let rel = vec![
+                Clause::from([!li, lj, n]),
+                Clause::from([li, !lj, n]),
+                Clause::from([li, lj, !n]),
+                Clause::from([!li, !lj, !n]),
+            ];
+            self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel.into_iter());
+            ors.push(n);
+        }
+        self.simple_path.as_mut().unwrap()[self.num_unroll - 1].push(ors);
+    }
+
+    fn simple_path(&mut self) {
+        let simple_path = self.simple_path.as_mut().unwrap();
+        assert!(simple_path.len() == self.num_unroll - 1);
+        simple_path.push(Vec::new());
+        for i in 0..self.num_unroll {
+            self.single_simple_path(i, self.num_unroll);
+        }
     }
 
     pub fn unroll(&mut self) {
@@ -74,6 +117,9 @@ impl TransysUnroll {
             self.next_map[!l].push(!next);
         }
         self.num_unroll += 1;
+        if self.simple_path.is_some() {
+            self.simple_path();
+        }
     }
 
     pub fn unroll_to(&mut self, k: usize) {
@@ -92,6 +138,13 @@ impl TransysUnroll {
             for c in self.ts.constraints.iter() {
                 let c = self.lit_next(*c, u);
                 satif.add_clause(&[c]);
+            }
+        }
+        if let Some(simple_path) = self.simple_path.as_ref() {
+            if !simple_path.is_empty() {
+                for c in simple_path[u - 1].iter() {
+                    satif.add_clause(c);
+                }
             }
         }
     }

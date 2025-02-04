@@ -120,6 +120,9 @@ pub struct KindOptions {
     /// use kissat solver, otherwise cadical
     #[arg(long = "kind-kissat", default_value_t = false)]
     pub kind_kissat: bool,
+    /// simple path constraint
+    #[arg(long = "kind-simple-path", default_value_t = false)]
+    pub simple_path: bool,
 }
 
 #[derive(Args, Clone, Debug)]

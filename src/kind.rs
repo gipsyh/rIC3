@@ -15,7 +15,11 @@ pub struct Kind {
 
 impl Kind {
     pub fn new(options: Options, ts: Transys) -> Self {
-        let uts = TransysUnroll::new(&ts);
+        let uts = if options.kind.simple_path {
+            TransysUnroll::new_with_simple_path(&ts)
+        } else {
+            TransysUnroll::new(&ts)
+        };
         let solver: Box<dyn Satif> = if options.kind.kind_kissat {
             Box::new(satif_kissat::Solver::new())
         } else {

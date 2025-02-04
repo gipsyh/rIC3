@@ -32,19 +32,17 @@ fn main() {
     } else {
         Aig::from_file(&options.model)
     };
-    if !aig.outputs.is_empty() {
-        if !options.certify {
-            // not certifying, move outputs to bads
-            // Move outputs to bads if no bad properties exist
-            if aig.bads.is_empty() {
-                aig.bads = std::mem::take(&mut aig.outputs);
-                println!(
-                    "Warning: property not found, moved {} outputs to bad properties",
-                    aig.bads.len()
-                );
-            } else {
-                println!("Warning: outputs are ignored");
-            }
+    if !aig.outputs.is_empty() && !options.certify {
+        // not certifying, move outputs to bads
+        // Move outputs to bads if no bad properties exist
+        if aig.bads.is_empty() {
+            aig.bads = std::mem::take(&mut aig.outputs);
+            println!(
+                "Warning: property not found, moved {} outputs to bad properties",
+                aig.bads.len()
+            );
+        } else {
+            println!("Warning: outputs are ignored");
         }
     }
 
