@@ -10,7 +10,7 @@ pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<V
         || matches!(options.engine, options::Engine::IC3) && options.ic3.inn)
     {
         let mut remap_retain = GHashSet::new();
-        remap_retain.insert(Var::new(0));
+        remap_retain.insert(Var::CONST);
         for i in aig.inputs.iter() {
             remap_retain.insert((*i).into());
         }

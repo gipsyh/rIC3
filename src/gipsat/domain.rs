@@ -32,7 +32,7 @@ impl Domain {
             }
         }
         while let Some(v) = queue.pop() {
-            for d in ts.dependence[v].iter() {
+            for d in ts.rel.dep[v].iter() {
                 if !marked.contains(d) {
                     marked.insert(*d);
                     queue.push(*d);
@@ -71,7 +71,7 @@ impl Domain {
         while now < self.domain.len() {
             let v = self.domain[now];
             now += 1;
-            for d in ts.dependence[v].iter() {
+            for d in ts.rel.dep[v].iter() {
                 // if value.v(d.lit()).is_none() {
                 self.domain.insert(*d);
                 // }
@@ -116,13 +116,13 @@ impl Solver {
         self.domain.reset();
         self.domain.domain.insert(var);
         if deps {
-            let mut queue = self.ts.dependence[var].clone();
+            let mut queue = self.ts.rel.dep[var].clone();
             while let Some(d) = queue.pop() {
                 if self.domain.has(d) {
                     continue;
                 }
                 self.domain.domain.insert(d);
-                for dd in self.ts.dependence[d].iter() {
+                for dd in self.ts.rel.dep[d].iter() {
                     queue.push(*dd);
                 }
             }

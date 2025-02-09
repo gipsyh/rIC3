@@ -48,7 +48,7 @@ impl TransysBuilder {
             })
             .collect();
         let max_var = self.rel.max_var();
-        let max_latch = *latchs.iter().max().unwrap_or(&Var::new(0));
+        let max_latch = *latchs.iter().max().unwrap_or(&Var::CONST);
         let mut init_map = VarMap::new_with(max_latch);
         let mut is_latch = VarMap::new_with(max_var);
         let mut init = LitVec::new();
@@ -82,14 +82,12 @@ impl TransysBuilder {
             bad: self.bad,
             init_map,
             constraints: self.constraint,
-            trans: self.rel.cnf.to_vec(),
-            max_var: self.rel.max_var(),
+            rel: self.rel,
             is_latch,
             next_map,
             prev_map,
-            dependence: self.rel.dep,
             max_latch,
-            restore: self.rst.clone(),
+            restore: self.rst,
         }
     }
 }

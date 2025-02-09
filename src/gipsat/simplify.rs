@@ -90,7 +90,7 @@ impl Solver {
             })
             .collect();
         clauses.sort_by_key(|(_, l)| l.len());
-        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.ts.max_var);
+        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.ts.max_var());
         for (i, cls) in clauses.iter().enumerate() {
             for l in cls.1.iter() {
                 occurs[*l].push(i);
