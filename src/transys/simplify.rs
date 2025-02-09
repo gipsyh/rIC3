@@ -1,6 +1,6 @@
 use super::Transys;
 use giputils::hash::{GHashMap, GHashSet};
-use logic_form::{Clause, Lit, LitMap, Var, VarMap};
+use logic_form::{Lit, LitMap, LitVec, Var, VarMap};
 use satif::Satif;
 use satif_minisat::SimpSolver;
 
@@ -47,7 +47,7 @@ impl Transys {
         deps
     }
 
-    pub fn simplify(&self, lemmas: &[Clause], keep_dep: bool, assert_constrain: bool) -> Self {
+    pub fn simplify(&self, lemmas: &[LitVec], keep_dep: bool, assert_constrain: bool) -> Self {
         let mut simp_solver: Box<dyn Satif> = if keep_dep {
             Box::new(SimpSolver::new())
         } else {
@@ -82,7 +82,7 @@ impl Transys {
             println!("warning: model trans simplified with unsat");
         }
         let mut trans = simp_solver.clauses();
-        trans.push(Clause::from([!false_lit]));
+        trans.push(LitVec::from([!false_lit]));
         let mut max_var = false_lit.var();
         let mut domain = GHashSet::from_iter(frozens);
         max_var = *domain.iter().max().unwrap_or(&max_var);

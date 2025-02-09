@@ -418,7 +418,7 @@ impl Solver {
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
         for cref in take(&mut self.cdb.lemmas) {
             let cls = self.cdb.get(cref);
-            let lemma = Lemma::new(!logic_form::Clause::from(cls.slice()));
+            let lemma = Lemma::new(!logic_form::LitVec::from(cls.slice()));
             if let Some(r) = lazy_remove_map.get_mut(&lemma) {
                 *r -= 1;
                 if *r == 0 {

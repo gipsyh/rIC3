@@ -2,7 +2,7 @@ use super::{
     cdb::{CRef, CREF_NONE},
     Solver,
 };
-use logic_form::{Clause, Lit, Var, VarMap};
+use logic_form::{Lit, LitVec, Var, VarMap};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -99,7 +99,7 @@ impl Solver {
         true
     }
 
-    fn minimal_learnt(&mut self, mut learnt: Clause) -> Clause {
+    fn minimal_learnt(&mut self, mut learnt: LitVec) -> LitVec {
         let mut now = 1;
         for i in 1..learnt.len() {
             if !self.lit_redundant(learnt[i]) {
@@ -111,8 +111,8 @@ impl Solver {
         learnt
     }
 
-    pub fn analyze(&mut self, mut conflict: CRef) -> (Clause, usize) {
-        let mut learnt = Clause::from([Lit::default()]);
+    pub fn analyze(&mut self, mut conflict: CRef) -> (LitVec, usize) {
+        let mut learnt = LitVec::from([Lit::default()]);
         let mut path = 0;
         let mut trail_idx = self.trail.len() - 1;
         let mut resolve_lit = None;

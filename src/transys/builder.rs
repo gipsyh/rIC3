@@ -1,14 +1,14 @@
 use super::Transys;
 use aig::Aig;
 use giputils::hash::GHashMap;
-use logic_form::{Cube, DagCnf, Lit, LitMap, Var, VarMap};
+use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Default, Debug)]
 pub struct TransysBuilder {
     pub input: Vec<Var>,
     pub latch: GHashMap<Var, (Option<bool>, Lit)>,
     pub bad: Lit,
-    pub constraint: Cube,
+    pub constraint: LitVec,
     pub rel: DagCnf,
     pub rst: GHashMap<Var, Var>,
 }
@@ -20,7 +20,7 @@ impl TransysBuilder {
 
     pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {
         let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
-        let constraint: Cube = aig.constraints.iter().map(|c| c.to_lit()).collect();
+        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
         let mut latch = GHashMap::new();
         for l in aig.latchs.iter() {
             latch.insert(Var::from(l.input), (l.init, l.next.to_lit()));
@@ -51,12 +51,12 @@ impl TransysBuilder {
         let max_latch = *latchs.iter().max().unwrap_or(&Var::new(0));
         let mut init_map = VarMap::new_with(max_latch);
         let mut is_latch = VarMap::new_with(max_var);
-        let mut init = Cube::new();
+        let mut init = LitVec::new();
         let mut next_map = LitMap::new_with(max_latch);
         let mut prev_map = LitMap::new_with(max_var);
         for (v, p) in latchs.iter().cloned().zip(primes.iter().cloned()) {
             let l = v.lit();
-            let (i, n) = self.latch.get(&v).unwrap().clone();
+            let (i, n) = *self.latch.get(&v).unwrap();
             self.rel.add_assign_rel(p, n);
             if let Some(i) = i {
                 init_map[v] = Some(i);

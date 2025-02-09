@@ -12,7 +12,7 @@ pub mod transys;
 
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
-use logic_form::{Cube, Lbool, Var};
+use logic_form::{Lbool, LitVec, Var};
 use options::Options;
 use std::{
     fs::File,
@@ -34,7 +34,7 @@ pub trait Engine {
     fn statistic(&mut self) {}
 }
 
-pub fn witness_encode(aig: &Aig, witness: &[Cube]) -> String {
+pub fn witness_encode(aig: &Aig, witness: &[LitVec]) -> String {
     let mut wit = vec!["1".to_string(), "b".to_string()];
     let map: GHashMap<Var, bool> =
         GHashMap::from_iter(witness[0].iter().map(|l| (l.var(), l.polarity())));

@@ -8,7 +8,7 @@ use activity::Activity;
 use aig::{Aig, AigEdge};
 use frame::{Frame, Frames};
 use giputils::grc::Grc;
-use logic_form::{Clause, Cube, Lemma, Var};
+use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{rngs::StdRng, SeedableRng};
@@ -32,8 +32,8 @@ pub struct IC3 {
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
-    pre_lemmas: Vec<Clause>,
-    abs_cst: Cube,
+    pre_lemmas: Vec<LitVec>,
+    abs_cst: LitVec,
     bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll)>,
 
     auxiliary_var: Vec<Var>,
@@ -55,9 +55,9 @@ impl IC3 {
         self.frame.push(Frame::new());
         if self.level() == 0 {
             for init in self.ts.init.clone() {
-                self.add_lemma(0, Cube::from([!init]), true, None);
+                self.add_lemma(0, LitVec::from([!init]), true, None);
             }
-            let mut init = Cube::new();
+            let mut init = LitVec::new();
             for l in self.ts.latchs.iter() {
                 if self.ts.init_map[*l].is_none() {
                     if let Some(v) = self.solvers[0].sat_value(l.lit()) {
@@ -76,7 +76,7 @@ impl IC3 {
         }
     }
 
-    fn push_lemma(&mut self, frame: usize, mut cube: Cube) -> (usize, Cube) {
+    fn push_lemma(&mut self, frame: usize, mut cube: LitVec) -> (usize, LitVec) {
         let start = Instant::now();
         for i in frame + 1..=self.level() {
             if self.solvers[i - 1].inductive(&cube, true) {
@@ -211,7 +211,7 @@ impl IC3 {
         &mut self,
         frame: usize,
         lemma: Lemma,
-        constraint: &[Clause],
+        constraint: &[LitVec],
         limit: &mut usize,
         parameter: DropVarParameter,
     ) -> bool {
@@ -254,7 +254,7 @@ impl IC3 {
         &mut self,
         frame: usize,
         lemma: Lemma,
-        constraint: &[Clause],
+        constraint: &[LitVec],
         parameter: DropVarParameter,
     ) -> bool {
         let mut limit = parameter.limit;
@@ -315,7 +315,7 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<Clause>) -> Self {
+    pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         if options.ic3.inn {
             let mut uts = TransysUnroll::new(&ts);
             uts.unroll();
@@ -328,7 +328,7 @@ impl IC3 {
         let frame = Frames::new(&ts);
         let lift = Solver::new(options.clone(), None, &ts);
         let abs_cst = if options.ic3.abs_cst {
-            Cube::new()
+            LitVec::new()
         } else {
             ts.constraints.clone()
         };
@@ -407,7 +407,7 @@ impl Engine for IC3 {
         let invariants = self.frame.invariant();
         let invariants = invariants
             .iter()
-            .map(|l| Cube::from_iter(l.iter().map(|l| self.ts.restore(*l))));
+            .map(|l| LitVec::from_iter(l.iter().map(|l| self.ts.restore(*l))));
         let mut certifaiger = aig.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {
@@ -425,9 +425,9 @@ impl Engine for IC3 {
     }
 
     fn witness(&mut self, aig: &Aig) -> String {
-        let mut res: Vec<Cube> = vec![Cube::new()];
+        let mut res: Vec<LitVec> = vec![LitVec::new()];
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            let mut wit = vec![Cube::new()];
+            let mut wit = vec![LitVec::new()];
             for l in uts.ts.latchs.iter() {
                 let l = l.lit();
                 if let Some(v) = bmc_solver.sat_value(l) {
@@ -435,7 +435,7 @@ impl Engine for IC3 {
                 }
             }
             for k in 0..=uts.num_unroll {
-                let mut w = Cube::new();
+                let mut w = LitVec::new();
                 for l in uts.ts.inputs.iter() {
                     let l = l.lit();
                     let kl = uts.lit_next(l, k);

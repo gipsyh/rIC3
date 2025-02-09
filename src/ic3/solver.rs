@@ -1,12 +1,12 @@
 use super::IC3;
 use crate::gipsat::ClauseKind;
 use giputils::hash::GHashSet;
-use logic_form::{Clause, Cube, Lemma, Lit, Var};
+use logic_form::{Lemma, Lit, LitVec, Var};
 use rand::seq::SliceRandom;
 use std::time::Instant;
 
 impl IC3 {
-    pub fn get_bad(&mut self) -> Option<(Cube, Cube)> {
+    pub fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
         let solver = self.solvers.last_mut().unwrap();
@@ -25,7 +25,7 @@ impl IC3 {
     pub fn blocked_with_ordered(
         &mut self,
         frame: usize,
-        cube: &Cube,
+        cube: &LitVec,
         ascending: bool,
         strengthen: bool,
     ) -> bool {
@@ -37,27 +37,27 @@ impl IC3 {
     pub fn blocked_with_ordered_with_constrain(
         &mut self,
         frame: usize,
-        cube: &Cube,
+        cube: &LitVec,
         ascending: bool,
         strengthen: bool,
-        constraint: Vec<Clause>,
+        constraint: Vec<LitVec>,
     ) -> bool {
         let mut ordered_cube = cube.clone();
         self.activity.sort_by_activity(&mut ordered_cube, ascending);
         self.solvers[frame - 1].inductive_with_constrain(&ordered_cube, strengthen, constraint)
     }
 
-    pub fn get_pred(&mut self, frame: usize, strengthen: bool) -> (Cube, Cube) {
+    pub fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, LitVec) {
         let start = Instant::now();
         let solver = &mut self.solvers[frame - 1];
-        let mut cls: Cube = solver.get_last_assump().clone();
+        let mut cls: LitVec = solver.get_last_assump().clone();
         cls.extend_from_slice(&self.abs_cst);
         if cls.is_empty() {
-            return (Cube::new(), Cube::new());
+            return (LitVec::new(), LitVec::new());
         }
         let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let cls = !cls;
-        let mut inputs = Cube::new();
+        let mut inputs = LitVec::new();
         for input in self.ts.inputs.iter() {
             let lit = input.lit();
             if let Some(v) = solver.sat_value(lit) {
@@ -65,7 +65,7 @@ impl IC3 {
             }
         }
         self.lift.set_domain(cls.iter().cloned());
-        let mut latchs = Cube::new();
+        let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
             if self.lift.domain.has(lit.var()) {
@@ -76,14 +76,14 @@ impl IC3 {
                 }
             }
         }
-        let inn: Box<dyn FnMut(&mut Cube)> = Box::new(|cube: &mut Cube| {
+        let inn: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             cube.sort();
             cube.reverse();
         });
-        let act: Box<dyn FnMut(&mut Cube)> = Box::new(|cube: &mut Cube| {
+        let act: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             self.activity.sort_by_activity(cube, false);
         });
-        let rev: Box<dyn FnMut(&mut Cube)> = Box::new(|cube: &mut Cube| {
+        let rev: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             cube.reverse();
         });
         let mut order = if self.options.ic3.inn || !self.auxiliary_var.is_empty() {
@@ -125,11 +125,11 @@ impl IC3 {
         state: Var,
         next: Lit,
         init: Option<bool>,
-        mut trans: Vec<Clause>,
+        mut trans: Vec<LitVec>,
         dep: Vec<Var>,
     ) {
         for i in 0..trans.len() {
-            let mut nt = Clause::new();
+            let mut nt = LitVec::new();
             for l in trans[i].iter() {
                 nt.push(if l.var() == state {
                     next.not_if(!l.polarity())

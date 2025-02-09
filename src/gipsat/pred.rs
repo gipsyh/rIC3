@@ -1,6 +1,6 @@
 use super::Solver;
 use giputils::hash::GHashSet;
-use logic_form::{Clause, Cube, Lit, Var};
+use logic_form::{Lit, LitVec, Var};
 use rand::seq::SliceRandom;
 
 impl Solver {
@@ -9,9 +9,9 @@ impl Solver {
         &mut self,
         inputs: &[Lit],
         latchs: &[Lit],
-        target_constrain: &Clause,
-    ) -> Option<Cube> {
-        let assump = Cube::from_iter(inputs.iter().chain(latchs.iter()).copied());
+        target_constrain: &LitVec,
+    ) -> Option<LitVec> {
+        let assump = LitVec::from_iter(inputs.iter().chain(latchs.iter()).copied());
         if self.solve(&assump, vec![target_constrain.clone()]) {
             return None;
         }
@@ -25,15 +25,15 @@ impl Solver {
     }
 
     #[allow(unused)]
-    pub fn get_pred(&mut self, solver: &mut Solver, strengthen: bool) -> (Cube, Cube) {
-        let mut cls: Cube = solver.assump.clone();
+    pub fn get_pred(&mut self, solver: &mut Solver, strengthen: bool) -> (LitVec, LitVec) {
+        let mut cls: LitVec = solver.assump.clone();
         cls.extend_from_slice(&self.ts.constraints);
         if cls.is_empty() {
-            return (Cube::new(), Cube::new());
+            return (LitVec::new(), LitVec::new());
         }
         let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let cls = !cls;
-        let mut inputs = Cube::new();
+        let mut inputs = LitVec::new();
         for input in self.ts.inputs.iter() {
             let lit = input.lit();
             if let Some(v) = solver.sat_value(lit) {
@@ -41,7 +41,7 @@ impl Solver {
             }
         }
         self.set_domain(cls.iter().cloned());
-        let mut latchs = Cube::new();
+        let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
             if self.domain.has(lit.var()) {

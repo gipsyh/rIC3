@@ -13,13 +13,13 @@ rust-version = "1.85"
 
 [dependencies]
 aig = { path = "./deps/aig-rs", version = "0.2.8" }
-satif-minisat = { path = "./deps/minisat-rs", version = "0.2" }
-satif-cadical = { path = "./deps/cadical-rs", version = "0.1.6" }
-satif-kissat = { path = "./deps/kissat-rs", version = "0.4" }
-logic-form = { path = "./deps/logic-form", version = "0.2.11" }
+satif-minisat = { path = "deps/minisat-rs", version = "0.2.6" }
+satif-cadical = { path = "./deps/cadical-rs", version = "0.1.7" }
+satif-kissat = { path = "./deps/kissat-rs", version = "0.4.6" }
+logic-form = { path = "./deps/logic-form", version = "0.3.0" }
 giputils = { path = "./deps/giputils", version = "0.2.6" }
-satif = { path = "./deps/satif", version = "0.1" }
-abc-rs = { path = "./deps/abc-rs", version = "0.2" }
+satif = { path = "./deps/satif", version = "0.1.4" }
+abc-rs = { path = "./deps/abc-rs", version = "0.2.4" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }

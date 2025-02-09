@@ -1,5 +1,5 @@
 use crate::transys::Transys;
-use logic_form::{Cube, Lit, Var, VarMap};
+use logic_form::{Lit, LitVec, Var, VarMap};
 use std::ops::MulAssign;
 
 pub struct Activity {
@@ -46,12 +46,12 @@ impl Activity {
         self.act_inc *= 1.0 / 0.9
     }
 
-    pub fn bump_cube_activity(&mut self, cube: &Cube) {
+    pub fn bump_cube_activity(&mut self, cube: &LitVec) {
         self.decay();
         cube.iter().for_each(|l| self.bump(l.var()));
     }
 
-    pub fn sort_by_activity(&self, cube: &mut Cube, ascending: bool) {
+    pub fn sort_by_activity(&self, cube: &mut LitVec, ascending: bool) {
         let ascending_func =
             |a: &Lit, b: &Lit| self.activity[*a].partial_cmp(&self.activity[*b]).unwrap();
         if ascending {
@@ -62,7 +62,7 @@ impl Activity {
     }
 
     #[allow(unused)]
-    pub fn cube_average_activity(&self, cube: &Cube) -> f64 {
+    pub fn cube_average_activity(&self, cube: &LitVec) -> f64 {
         let sum: f64 = cube.iter().map(|l| self.activity[*l]).sum();
         sum / cube.len() as f64
     }

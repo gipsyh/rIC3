@@ -1,6 +1,6 @@
 use super::{cdb::CREF_NONE, Solver};
 use giputils::{gvec::Gvec, OptionU32};
-use logic_form::{Cube, Lbool, Lit, Var, VarMap};
+use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
 use std::ops::{Index, MulAssign};
 
@@ -161,7 +161,7 @@ impl Activity {
     }
 
     #[allow(unused)]
-    pub fn sort_by_activity(&self, cube: &mut Cube, ascending: bool) {
+    pub fn sort_by_activity(&self, cube: &mut LitVec, ascending: bool) {
         if ascending {
             cube.sort_by(|a, b| self.activity[*a].partial_cmp(&self.activity[*b]).unwrap());
         } else {

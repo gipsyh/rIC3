@@ -1,6 +1,6 @@
 use super::Transys;
 use giputils::hash::{GHashMap, GHashSet};
-use logic_form::{Clause, Cube, Lit, LitMap, Var};
+use logic_form::{Lit, LitMap, LitVec, Var};
 use satif::Satif;
 
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub struct TransysUnroll {
     pub num_unroll: usize,
     pub max_var: Var,
     next_map: LitMap<Vec<Lit>>,
-    simple_path: Option<Vec<Vec<Clause>>>,
+    simple_path: Option<Vec<Vec<LitVec>>>,
 }
 
 impl TransysUnroll {
@@ -68,7 +68,7 @@ impl TransysUnroll {
     }
 
     fn single_simple_path(&mut self, i: usize, j: usize) {
-        let mut ors = Clause::new();
+        let mut ors = LitVec::new();
         for l in self.ts.latchs.iter() {
             let l = l.lit();
             let li = self.lit_next(l, i);
@@ -76,10 +76,10 @@ impl TransysUnroll {
             self.max_var += 1;
             let n = self.max_var.lit();
             let rel = vec![
-                Clause::from([!li, lj, n]),
-                Clause::from([li, !lj, n]),
-                Clause::from([li, lj, !n]),
-                Clause::from([!li, !lj, !n]),
+                LitVec::from([!li, lj, n]),
+                LitVec::from([li, !lj, n]),
+                LitVec::from([li, lj, !n]),
+                LitVec::from([!li, !lj, !n]),
             ];
             self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel.into_iter());
             ors.push(n);
@@ -151,7 +151,7 @@ impl TransysUnroll {
 
     pub fn compile(&self) -> Transys {
         let mut inputs = Vec::new();
-        let mut constraints = Cube::new();
+        let mut constraints = LitVec::new();
         let mut trans = Vec::new();
         for u in 0..=self.num_unroll {
             for i in self.ts.inputs.iter() {
@@ -162,7 +162,7 @@ impl TransysUnroll {
                 constraints.push(c);
             }
             for c in self.ts.trans.iter() {
-                let c: Clause = self.lits_next(c, u);
+                let c: LitVec = self.lits_next(c, u);
                 trans.push(c);
             }
         }

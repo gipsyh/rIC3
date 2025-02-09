@@ -4,7 +4,7 @@ use crate::{
     witness_encode, Engine,
 };
 use aig::Aig;
-use logic_form::Cube;
+use logic_form::LitVec;
 use satif::Satif;
 use std::time::Duration;
 
@@ -92,7 +92,7 @@ impl Engine for BMC {
     }
 
     fn witness(&mut self, aig: &Aig) -> String {
-        let mut wit = vec![Cube::new()];
+        let mut wit = vec![LitVec::new()];
         for l in self.uts.ts.latchs.iter() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l) {
@@ -100,7 +100,7 @@ impl Engine for BMC {
             }
         }
         for k in 0..=self.uts.num_unroll {
-            let mut w = Cube::new();
+            let mut w = LitVec::new();
             for l in self.uts.ts.inputs.iter() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);

@@ -4,18 +4,18 @@ pub mod simulate;
 pub mod unroll;
 
 use giputils::hash::{GHashMap, GHashSet};
-use logic_form::{Clause, Cube, Lit, LitMap, Var, VarMap};
+use logic_form::{Lit, LitMap, LitVec, Var, VarMap};
 use satif::Satif;
 
 #[derive(Clone, Default, Debug)]
 pub struct Transys {
     pub inputs: Vec<Var>,
     pub latchs: Vec<Var>,
-    pub init: Cube,
+    pub init: LitVec,
     pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
-    pub constraints: Cube,
-    pub trans: Vec<Clause>,
+    pub constraints: LitVec,
+    pub trans: Vec<LitVec>,
     pub max_var: Var,
     is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
@@ -48,7 +48,7 @@ impl Transys {
         state: Var,
         next: Lit,
         init: Option<bool>,
-        trans: Vec<Clause>,
+        trans: Vec<LitVec>,
         dep: Vec<Var>,
     ) {
         assert!(dep.iter().all(|v| self.is_latch(*v)));
@@ -95,12 +95,12 @@ impl Transys {
     }
 
     #[inline]
-    pub fn cube_next(&self, cube: &[Lit]) -> Cube {
+    pub fn cube_next(&self, cube: &[Lit]) -> LitVec {
         cube.iter().map(|l| self.lit_next(*l)).collect()
     }
 
     #[inline]
-    pub fn cube_prev(&self, cube: &[Lit]) -> Cube {
+    pub fn cube_prev(&self, cube: &[Lit]) -> LitVec {
         cube.iter().map(|l| self.lit_prev(*l)).collect()
     }
 

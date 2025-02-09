@@ -3,13 +3,13 @@ use super::{
     Solver,
 };
 use giputils::gvec::Gvec;
-use logic_form::{Cube, Lemma, LitMap};
+use logic_form::{Lemma, LitMap, LitVec};
 use std::mem::take;
 
 pub struct Simplify {
     pub last_num_assign: u32,
     pub last_simplify: usize,
-    pub lazy_remove: Vec<Cube>,
+    pub lazy_remove: Vec<LitVec>,
     pub last_num_lemma: u32,
 }
 
@@ -85,7 +85,7 @@ impl Solver {
             .into_iter()
             .map(|cref| {
                 let cls = self.cdb.get(cref);
-                let lemma = Lemma::new(Cube::from(cls.slice()));
+                let lemma = Lemma::new(LitVec::from(cls.slice()));
                 (cref, lemma)
             })
             .collect();
@@ -125,7 +125,7 @@ impl Solver {
                             self.detach_clause(clauses[*subsumed].0);
                             self.strengthen_clause(clauses[cls_idx].0, diff);
                             let strengthen = self.cdb.get(clauses[cls_idx].0);
-                            clauses[cls_idx].1 = Lemma::new(Cube::from(strengthen.slice()));
+                            clauses[cls_idx].1 = Lemma::new(LitVec::from(strengthen.slice()));
                         } else {
                             // println!("{}", lemma);
                             // println!("{}", clauses[*subsumed].1);
@@ -134,7 +134,7 @@ impl Solver {
                     } else {
                         self.strengthen_clause(clauses[*subsumed].0, !diff);
                         let strengthen = self.cdb.get(clauses[*subsumed].0);
-                        clauses[*subsumed].1 = Lemma::new(Cube::from(strengthen.slice()));
+                        clauses[*subsumed].1 = Lemma::new(LitVec::from(strengthen.slice()));
                     }
                 }
             }

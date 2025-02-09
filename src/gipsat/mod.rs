@@ -15,7 +15,7 @@ use cdb::{CRef, ClauseDB, CREF_NONE};
 use domain::Domain;
 use giputils::{grc::Grc, gvec::Gvec};
 use logic_form::Lbool;
-use logic_form::{Clause, Cube, Lemma, Lit, LitSet, Var, VarMap};
+use logic_form::{Lemma, Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::{rngs::StdRng, SeedableRng};
 use search::Value;
@@ -45,8 +45,8 @@ pub struct Solver {
 
     ts: Grc<Transys>,
 
-    assump: Cube,
-    constraint: Vec<Clause>,
+    assump: LitVec,
+    constraint: Vec<LitVec>,
 
     trivial_unsat: bool,
     mark: LitSet,
@@ -132,9 +132,9 @@ impl Solver {
         self.constrain_act.into()
     }
 
-    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logic_form::Clause> {
+    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logic_form::LitVec> {
         assert!(self.highest_level() == 0);
-        let mut clause = logic_form::Clause::new();
+        let mut clause = logic_form::LitVec::new();
         for l in cls.iter() {
             assert!(self.num_var() + 1 > l.var().into());
             match self.value.v(*l) {
@@ -187,7 +187,7 @@ impl Solver {
 
     // #[inline]
     // pub fn remove_lemma(&mut self, lemma: &[Lit]) {
-    // self.simplify.lazy_remove.push(Cube::from(lemma));
+    // self.simplify.lazy_remove.push(LitVec::from(lemma));
     // }
 
     #[allow(unused)]
@@ -196,11 +196,11 @@ impl Solver {
         let mut lemmas = Vec::new();
         for t in self.trail.iter() {
             if self.ts.is_latch(t.var()) {
-                lemmas.push(Lemma::new(Cube::from([!*t])));
+                lemmas.push(Lemma::new(LitVec::from([!*t])));
             }
         }
         for l in self.cdb.lemmas.iter() {
-            let lemma = Cube::from_iter(self.cdb.get(*l).slice().iter().map(|l| !*l));
+            let lemma = LitVec::from_iter(self.cdb.get(*l).slice().iter().map(|l| !*l));
             lemmas.push(Lemma::new(lemma));
         }
         lemmas
@@ -217,7 +217,7 @@ impl Solver {
     fn new_round(
         &mut self,
         domain: impl Iterator<Item = Var>,
-        constraint: Vec<Clause>,
+        constraint: Vec<LitVec>,
         bucket: bool,
     ) -> bool {
         self.backtrack(0, self.temporary_domain);
@@ -258,7 +258,7 @@ impl Solver {
         true
     }
 
-    fn solve_inner(&mut self, assump: &[Lit], constraint: Vec<Clause>, bucket: bool) -> bool {
+    fn solve_inner(&mut self, assump: &[Lit], constraint: Vec<LitVec>, bucket: bool) -> bool {
         self.assump = assump.into();
         self.constraint = constraint.clone();
         if self.trivial_unsat {
@@ -274,7 +274,7 @@ impl Solver {
             return false;
         }
         let assump = if !constraint.is_empty() {
-            assumption = Cube::new();
+            assumption = LitVec::new();
             assumption.push(self.constrain_act.lit());
             assumption.extend_from_slice(assump);
             let mut cc = Vec::new();
@@ -301,11 +301,11 @@ impl Solver {
         self.search_with_restart(assump)
     }
 
-    pub fn solve(&mut self, assump: &[Lit], constraint: Vec<Clause>) -> bool {
+    pub fn solve(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
         self.solve_inner(assump, constraint, true)
     }
 
-    pub fn solve_without_bucket(&mut self, assump: &[Lit], constraint: Vec<Clause>) -> bool {
+    pub fn solve_without_bucket(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
         self.solve_inner(assump, constraint, false)
     }
 
@@ -313,11 +313,11 @@ impl Solver {
         &mut self,
         cube: &[Lit],
         strengthen: bool,
-        mut constraint: Vec<Clause>,
+        mut constraint: Vec<LitVec>,
     ) -> bool {
         let assump = self.ts.cube_next(cube);
         if strengthen {
-            constraint.push(Clause::from_iter(cube.iter().map(|l| !*l)));
+            constraint.push(LitVec::from_iter(cube.iter().map(|l| !*l)));
         }
         !self.solve(&assump, constraint.clone())
     }
@@ -326,15 +326,15 @@ impl Solver {
         self.inductive_with_constrain(cube, strengthen, vec![])
     }
 
-    pub fn inductive_core(&mut self) -> Cube {
-        let mut ans = Cube::new();
+    pub fn inductive_core(&mut self) -> LitVec {
+        let mut ans = LitVec::new();
         for l in self.assump.iter() {
             if self.unsat_has(*l) {
                 ans.push(self.ts.lit_prev(*l));
             }
         }
         if self.ts.cube_subsume_init(&ans) {
-            ans = Cube::new();
+            ans = LitVec::new();
             let new = self
                 .assump
                 .iter()
@@ -402,7 +402,7 @@ impl Solver {
     }
 
     #[inline]
-    pub fn get_last_assump(&self) -> &Cube {
+    pub fn get_last_assump(&self) -> &LitVec {
         &self.assump
     }
 
@@ -414,8 +414,8 @@ impl Solver {
     }
 
     #[allow(unused)]
-    pub fn trivial_predecessor(&mut self) -> Cube {
-        let mut latchs = Cube::new();
+    pub fn trivial_predecessor(&mut self) -> LitVec {
+        let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
             if let Some(v) = self.sat_value(lit) {

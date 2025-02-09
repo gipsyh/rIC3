@@ -1,7 +1,7 @@
 use super::IC3;
 use crate::options::Options;
 use giputils::hash::GHashSet;
-use logic_form::{Clause, Cube, Lemma, Lit};
+use logic_form::{Lemma, Lit, LitVec};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -51,12 +51,12 @@ impl IC3 {
     fn down(
         &mut self,
         frame: usize,
-        cube: &Cube,
+        cube: &LitVec,
         keep: &GHashSet<Lit>,
-        full: &Cube,
-        constraint: &[Clause],
+        full: &LitVec,
+        constraint: &[LitVec],
         cex: &mut Vec<(Lemma, Lemma)>,
-    ) -> Option<Cube> {
+    ) -> Option<LitVec> {
         let mut cube = cube.clone();
         self.statistic.num_down += 1;
         loop {
@@ -81,7 +81,7 @@ impl IC3 {
                 return Some(self.solvers[frame - 1].inductive_core());
             }
             let mut ret = false;
-            let mut cube_new = Cube::new();
+            let mut cube_new = LitVec::new();
             for lit in cube {
                 if keep.contains(&lit) {
                     if let Some(true) = self.solvers[frame - 1].sat_value(lit) {
@@ -97,8 +97,8 @@ impl IC3 {
                 }
             }
             cube = cube_new;
-            let mut s = Cube::new();
-            let mut t = Cube::new();
+            let mut s = LitVec::new();
+            let mut t = LitVec::new();
             for l in full.iter() {
                 if let Some(v) = self.solvers[frame - 1].sat_value(*l) {
                     if !self.solvers[frame - 1].flip_to_none(l.var()) {
@@ -120,11 +120,11 @@ impl IC3 {
     fn ctg_down(
         &mut self,
         frame: usize,
-        cube: &Cube,
+        cube: &LitVec,
         keep: &GHashSet<Lit>,
-        full: &Cube,
+        full: &LitVec,
         parameter: DropVarParameter,
-    ) -> Option<Cube> {
+    ) -> Option<LitVec> {
         let mut cube = cube.clone();
         self.statistic.num_down += 1;
         let mut ctg = 0;
@@ -163,7 +163,7 @@ impl IC3 {
                 continue;
             }
             ctg = 0;
-            let mut cube_new = Cube::new();
+            let mut cube_new = LitVec::new();
             for lit in cube {
                 if cex_set.contains(&lit) {
                     cube_new.push(lit);
@@ -178,10 +178,10 @@ impl IC3 {
     fn handle_down_success(
         &mut self,
         _frame: usize,
-        cube: Cube,
+        cube: LitVec,
         i: usize,
-        mut new_cube: Cube,
-    ) -> (Cube, usize) {
+        mut new_cube: LitVec,
+    ) -> (LitVec, usize) {
         new_cube = cube
             .iter()
             .filter(|l| new_cube.contains(l))
@@ -200,10 +200,10 @@ impl IC3 {
     pub fn mic_by_drop_var(
         &mut self,
         frame: usize,
-        mut cube: Cube,
-        constraint: &[Clause],
+        mut cube: LitVec,
+        constraint: &[LitVec],
         parameter: DropVarParameter,
-    ) -> Cube {
+    ) -> LitVec {
         let start = Instant::now();
         if parameter.level == 0 {
             self.solvers[frame - 1].set_domain(
@@ -262,10 +262,10 @@ impl IC3 {
     pub fn mic(
         &mut self,
         frame: usize,
-        cube: Cube,
-        constraint: &[Clause],
+        cube: LitVec,
+        constraint: &[LitVec],
         mic_type: MicType,
-    ) -> Cube {
+    ) -> LitVec {
         match mic_type {
             MicType::NoMic => cube,
             MicType::DropVar(parameter) => self.mic_by_drop_var(frame, cube, constraint, parameter),

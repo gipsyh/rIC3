@@ -1,6 +1,6 @@
 use super::{proofoblig::ProofObligation, IC3};
 use crate::transys::{unroll::TransysUnroll, Transys};
-use logic_form::{Clause, Cube, Lemma, Lit};
+use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;
 use satif_minisat::Solver;
 use std::ops::Deref;
@@ -15,7 +15,7 @@ pub fn verify_invariant(ts: &Transys, invariants: &[Lemma]) -> bool {
         solver.add_clause(&!lemma.deref());
     }
     for c in ts.constraints.iter() {
-        solver.add_clause(&Clause::from([*c]));
+        solver.add_clause(&LitVec::from([*c]));
     }
     if solver.solve(&ts.bad.cube()) {
         return false;
@@ -80,9 +80,9 @@ impl IC3 {
         &mut self,
         solver: &mut S,
         uts: &TransysUnroll,
-        constraint: &Cube,
+        constraint: &LitVec,
     ) -> bool {
-        let mut assumps = Cube::new();
+        let mut assumps = LitVec::new();
         for k in 0..=uts.num_unroll {
             assumps.extend_from_slice(&uts.lits_next(constraint, k));
         }
@@ -90,7 +90,7 @@ impl IC3 {
         solver.solve(&assumps)
     }
 
-    pub fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<Cube> {
+    pub fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll_to(b.depth);
         let mut solver: Box<dyn satif::Satif> = Box::new(satif_cadical::Solver::new());

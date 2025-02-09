@@ -2,19 +2,19 @@ use super::{proofoblig::ProofObligation, IC3};
 use crate::transys::Transys;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
-use logic_form::{Cube, Lemma, Lit, LitSet};
+use logic_form::{Lemma, Lit, LitSet, LitVec};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct FrameLemma {
     lemma: Lemma,
     pub po: Option<ProofObligation>,
-    pub _ctp: Option<Cube>,
+    pub _ctp: Option<LitVec>,
 }
 
 impl FrameLemma {
     #[inline]
-    pub fn new(lemma: Lemma, po: Option<ProofObligation>, ctp: Option<Cube>) -> Self {
+    pub fn new(lemma: Lemma, po: Option<ProofObligation>, ctp: Option<LitVec>) -> Self {
         Self {
             lemma,
             po,
@@ -141,12 +141,12 @@ impl Frames {
     }
 
     #[allow(unused)]
-    pub fn similar(&self, cube: &[Lit], frame: usize) -> Vec<Cube> {
+    pub fn similar(&self, cube: &[Lit], frame: usize) -> Vec<LitVec> {
         let cube_set: GHashSet<Lit> = GHashSet::from_iter(cube.iter().copied());
         let mut res = GHashSet::new();
         for frame in self.frames[frame..].iter() {
             for lemma in frame.iter() {
-                let sec: Cube = lemma
+                let sec: LitVec = lemma
                     .iter()
                     .filter(|l| cube_set.contains(l))
                     .copied()
@@ -202,7 +202,7 @@ impl IC3 {
     pub fn add_lemma(
         &mut self,
         frame: usize,
-        lemma: Cube,
+        lemma: LitVec,
         contained_check: bool,
         po: Option<ProofObligation>,
     ) -> bool {
@@ -264,7 +264,7 @@ impl IC3 {
         inv_found
     }
 
-    // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<Cube>) {
+    // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {
     //     let lemmas: GHashSet<Lemma> = GHashSet::from_iter(lemmas.into_iter().map(Lemma::new));
     //     for i in (1..=frame).rev() {
     //         let mut j = 0;

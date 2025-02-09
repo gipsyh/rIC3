@@ -1,12 +1,12 @@
 use super::Transys;
 use crate::transys::unroll::TransysUnroll;
 use giputils::hash::GHashMap;
-use logic_form::{Cube, Var};
+use logic_form::{LitVec, Var};
 use satif::Satif;
 use satif_cadical::Solver;
 
 impl Transys {
-    pub fn simulations(&self) -> Vec<Cube> {
+    pub fn simulations(&self) -> Vec<LitVec> {
         let mut uts = TransysUnroll::new(self);
         let depth = 5;
         uts.unroll_to(depth);
@@ -16,13 +16,13 @@ impl Transys {
             uts.load_trans(&mut solver, k, true);
         }
         let mut res = vec![];
-        let ninit: Cube = uts.lits_next(&self.init, depth + 1);
+        let ninit: LitVec = uts.lits_next(&self.init, depth + 1);
         solver.add_clause(&!&ninit);
         while res.len() < 64 {
             if !solver.solve(&[]) {
                 break;
             };
-            let mut cube = Cube::new();
+            let mut cube = LitVec::new();
             for l in self.latchs.iter() {
                 let l = l.lit();
                 let nl = uts.lit_next(l, depth + 1);
@@ -33,17 +33,17 @@ impl Transys {
             }
             for r in res.iter().skip(1) {
                 let its = cube.intersection(r);
-                let nits: Cube = uts.lits_next(&its, depth + 1);
+                let nits: LitVec = uts.lits_next(&its, depth + 1);
                 solver.add_clause(&!&nits);
             }
-            let ncube: Cube = uts.lits_next(&cube, depth + 1);
+            let ncube: LitVec = uts.lits_next(&cube, depth + 1);
             solver.add_clause(&!&ncube);
             res.push(cube);
         }
         res
     }
 
-    pub fn simulation_bv(&self, simulation: Vec<Cube>) -> Option<GHashMap<Var, u64>> {
+    pub fn simulation_bv(&self, simulation: Vec<LitVec>) -> Option<GHashMap<Var, u64>> {
         let mut bv = GHashMap::new();
         for v in self.latchs.iter() {
             bv.insert(*v, 0);
