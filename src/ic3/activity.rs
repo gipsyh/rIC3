@@ -20,6 +20,7 @@ impl Activity {
     }
 
     #[inline]
+    #[allow(unused)]
     pub fn reserve(&mut self, var: Var) {
         self.activity.reserve(var);
     }

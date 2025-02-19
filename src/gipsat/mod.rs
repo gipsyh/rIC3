@@ -90,7 +90,7 @@ impl Solver {
         while solver.num_var() < solver.ts.num_var() {
             solver.new_var();
         }
-        for cls in ts.trans.iter() {
+        for cls in ts.rel.iter() {
             solver.add_clause_inner(cls, ClauseKind::Trans);
         }
         if solver.id.is_some() {
