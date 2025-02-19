@@ -3,6 +3,7 @@ use giputils::hash::GHashMap;
 use logic_form::{Lit, LitMap, LitVec, Var, VarMap};
 use minisat::SimpSolver;
 use satif::Satif;
+use std::time::Instant;
 
 impl Transys {
     pub fn simplify(&self, lemmas: &[LitVec], keep_dep: bool, assert_constrain: bool) -> Self {
@@ -31,7 +32,9 @@ impl Transys {
         for f in frozens.iter() {
             simp_solver.set_frozen(*f, true);
         }
-        let rel = self.rel.simplify(frozens.iter().copied());
+        dbg!(self.rel.len());
+        let trans = self.rel.simplify(frozens.iter().copied());
+        dbg!(trans.len());
         let start = Instant::now();
         if let Some(false) = simp_solver.simplify() {
             println!("warning: model trans simplified with unsat");
@@ -39,11 +42,12 @@ impl Transys {
         let mut trans = simp_solver.clauses();
         dbg!(trans.len());
         dbg!(start.elapsed());
+        // todo!();
+        // trans.push(LitVec::from([Lit::constant(true)]));
         todo!();
-        trans.push(LitVec::from([Lit::constant(true)]));
         let mut rel = self.rel.clone();
-        unsafe { rel.set_cls(trans) };
-        let domain_map = rel.arrange();
+        // unsafe { rel.set_cls(trans.clauses().to_vec()) };
+        let domain_map = rel.arrange(frozens.into_iter());
         let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
         let inputs = self.inputs.iter().map(|v| domain_map[v]).collect();
         let latchs: Vec<Var> = self.latchs.iter().map(|v| domain_map[v]).collect();
