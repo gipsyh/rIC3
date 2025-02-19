@@ -16,9 +16,9 @@ impl TransysBuilder {
         }
         let mut frozens = vec![Var::CONST, self.bad.var()];
         frozens.extend_from_slice(&self.input);
-        for (&l, (_, n)) in self.latch.iter() {
-            frozens.push(l);
-            frozens.push(n.var());
+        for l in self.latch.iter() {
+            frozens.push(*l);
+            frozens.push(self.next[l].var());
         }
         for c in self.constraint.iter() {
             if assert_constrain {
@@ -39,10 +39,12 @@ impl TransysBuilder {
         let domain_map = self.rel.arrange(frozens.into_iter());
         let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[v]).collect();
-        self.latch = self
-            .latch
+        self.latch = self.latch.iter().map(|v| domain_map[v]).collect();
+        self.init = self.init.iter().map(|(v, i)| (domain_map[v], *i)).collect();
+        self.next = self
+            .next
             .iter()
-            .map(|(l, (i, n))| (domain_map[l], (*i, map_lit(n))))
+            .map(|(v, n)| (domain_map[v], map_lit(n)))
             .collect();
         self.bad = map_lit(&self.bad);
         self.constraint = if assert_constrain {
