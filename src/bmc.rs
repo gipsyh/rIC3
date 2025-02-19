@@ -18,9 +18,9 @@ impl BMC {
     pub fn new(options: Options, ts: Transys) -> Self {
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if options.bmc.bmc_kissat {
-            Box::new(satif_kissat::Solver::new())
+            Box::new(kissat::Solver::new())
         } else {
-            Box::new(satif_cadical::Solver::new())
+            Box::new(cadical::Solver::new())
         };
         ts.load_init(solver.as_mut());
         Self {
@@ -32,9 +32,9 @@ impl BMC {
 
     pub fn reset_solver(&mut self) {
         self.solver = if self.options.bmc.bmc_kissat {
-            Box::new(satif_kissat::Solver::new())
+            Box::new(kissat::Solver::new())
         } else {
-            Box::new(satif_cadical::Solver::new())
+            Box::new(cadical::Solver::new())
         };
         self.uts.ts.load_init(self.solver.as_mut());
     }

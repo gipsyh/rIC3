@@ -1,9 +1,9 @@
 use super::Transys;
 use crate::transys::unroll::TransysUnroll;
+use cadical::Solver;
 use giputils::hash::GHashMap;
 use logic_form::{LitVec, Var};
 use satif::Satif;
-use satif_cadical::Solver;
 
 impl Transys {
     pub fn simulations(&self) -> Vec<LitVec> {

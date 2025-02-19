@@ -1,8 +1,8 @@
 use super::Transys;
 use giputils::hash::{GHashMap, GHashSet};
 use logic_form::{Lit, LitMap, LitVec, Var, VarMap};
+use minisat::SimpSolver;
 use satif::Satif;
-use satif_minisat::SimpSolver;
 
 impl Transys {
     fn compress_deps_rec(
@@ -51,7 +51,7 @@ impl Transys {
         let mut simp_solver: Box<dyn Satif> = if keep_dep {
             Box::new(SimpSolver::new())
         } else {
-            Box::new(satif_cadical::Solver::new())
+            Box::new(cadical::Solver::new())
         };
         let false_lit: Lit = simp_solver.new_var().into();
         simp_solver.add_clause(&[!false_lit]);

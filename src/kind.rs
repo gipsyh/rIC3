@@ -21,9 +21,9 @@ impl Kind {
             TransysUnroll::new(&ts)
         };
         let solver: Box<dyn Satif> = if options.kind.kind_kissat {
-            Box::new(satif_kissat::Solver::new())
+            Box::new(kissat::Solver::new())
         } else {
-            Box::new(satif_cadical::Solver::new())
+            Box::new(cadical::Solver::new())
         };
         Self {
             uts,
@@ -57,9 +57,9 @@ impl Kind {
 
     pub fn reset_solver(&mut self) {
         self.solver = if self.options.kind.kind_kissat {
-            Box::new(satif_kissat::Solver::new())
+            Box::new(kissat::Solver::new())
         } else {
-            Box::new(satif_cadical::Solver::new())
+            Box::new(cadical::Solver::new())
         };
     }
 }

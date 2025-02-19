@@ -259,7 +259,7 @@ impl TransysUnroll {
         let mut init_map = self.ts.init_map.clone();
         init_map.reserve(max_latch);
         let mut init = self.ts.init.clone();
-        let mut solver = satif_minisat::Solver::new();
+        let mut solver = minisat::Solver::new();
         solver.new_var_to(self.max_var);
         for cls in trans.iter() {
             solver.add_clause(cls);
