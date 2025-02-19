@@ -7,22 +7,14 @@ use std::ops::Deref;
 
 pub fn verify_invariant(ts: &Transys, invariants: &[Lemma]) -> bool {
     let mut solver = Solver::new();
-    solver.new_var_to(ts.max_var);
-    for cls in ts.trans.iter() {
-        solver.add_clause(cls)
-    }
+    ts.load_trans(&mut solver, true);
     for lemma in invariants {
         solver.add_clause(&!lemma.deref());
-    }
-    for c in ts.constraints.iter() {
-        solver.add_clause(&LitVec::from([*c]));
     }
     if solver.solve(&ts.bad.cube()) {
         return false;
     }
     for lemma in invariants {
-        let mut assump = ts.constraints.clone();
-        assump.push(ts.bad);
         if solver.solve(&ts.cube_next(lemma)) {
             return false;
         }

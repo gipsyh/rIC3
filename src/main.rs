@@ -105,6 +105,9 @@ fn main() {
     };
     let res = engine.check();
     if options.verbose > 0 {
+        engine.statistic();
+    }
+    if options.verbose > 0 {
         print!("result: ");
     }
     match res {

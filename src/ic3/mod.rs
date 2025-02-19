@@ -361,12 +361,10 @@ impl Engine for IC3 {
                 match self.block() {
                     Some(false) => {
                         self.statistic.overall_block_time += start.elapsed();
-                        self.statistic();
                         return Some(false);
                     }
                     None => {
                         self.statistic.overall_block_time += start.elapsed();
-                        self.statistic();
                         self.verify();
                         return Some(true);
                     }
@@ -396,7 +394,6 @@ impl Engine for IC3 {
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
-                self.statistic();
                 self.verify();
                 return Some(true);
             }
@@ -471,19 +468,17 @@ impl Engine for IC3 {
     }
 
     fn statistic(&mut self) {
-        if self.options.verbose > 0 {
-            self.statistic.num_auxiliary_var = self.auxiliary_var.len();
-            self.obligations.statistic();
-            for f in self.frame.iter() {
-                print!("{} ", f.len());
-            }
-            println!();
-            let mut statistic = SolverStatistic::default();
-            for s in self.solvers.iter() {
-                statistic += s.statistic;
-            }
-            println!("{:#?}", statistic);
-            println!("{:#?}", self.statistic);
+        self.statistic.num_auxiliary_var = self.auxiliary_var.len();
+        self.obligations.statistic();
+        for f in self.frame.iter() {
+            print!("{} ", f.len());
         }
+        println!();
+        let mut statistic = SolverStatistic::default();
+        for s in self.solvers.iter() {
+            statistic += s.statistic;
+        }
+        println!("{:#?}", statistic);
+        println!("{:#?}", self.statistic);
     }
 }
