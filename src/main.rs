@@ -68,20 +68,19 @@ fn main() {
         Box::new(Portfolio::new(options.clone(), &origin_aig))
     } else {
         let (aig, restore) = aig_preprocess(&aig, &options);
-        let mut ts = TransysBuilder::from_aig(&aig, &restore).build();
-        let pre_lemmas = vec![];
+        let mut ts = TransysBuilder::from_aig(&aig, &restore);
         if options.preprocess.sec {
             panic!("sec not support");
         }
-
         let assert_constrain = matches!(options.engine, options::Engine::IC3);
         let keep_dep = assert_constrain;
-        ts = ts.simplify(&[], keep_dep, !assert_constrain);
+        ts.simplify(keep_dep, !assert_constrain);
+        let ts = ts.build();
         if options.verbose > 1 {
             ts.print_info();
         }
         let mut engine: Box<dyn Engine> = match options.engine {
-            options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, pre_lemmas)),
+            options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
             options::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
             options::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
             _ => unreachable!(),

@@ -321,7 +321,7 @@ impl IC3 {
             let mut uts = TransysUnroll::new(&ts);
             uts.unroll();
             ts = uts.interal_signals();
-            ts = ts.simplify(&[], true, false);
+            //TODO: Simplify
         }
         let ts = Grc::new(ts);
         let statistic = Statistic::new(options.model.to_str().unwrap());
