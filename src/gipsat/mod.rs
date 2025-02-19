@@ -18,6 +18,7 @@ use logic_form::Lbool;
 use logic_form::{Lemma, Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::{rngs::StdRng, SeedableRng};
+use satif::Satif;
 use search::Value;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
@@ -107,24 +108,6 @@ impl Solver {
         }
         solver.simplify_satisfied();
         solver
-    }
-
-    pub fn new_var(&mut self) -> Var {
-        self.reset();
-        let v = self.constrain_act;
-        let var = Var::new(self.num_var() + 1);
-        self.value.reserve(var);
-        self.level.reserve(var);
-        self.reason.reserve(var);
-        self.watchers.reserve(var);
-        self.vsids.reserve(var);
-        self.phase_saving.reserve(var);
-        self.analyze.reserve(var);
-        self.unsat_core.reserve(var);
-        self.domain.reserve(var);
-        self.mark.reserve(var);
-        self.constrain_act = var;
-        v
     }
 
     #[inline]
@@ -388,20 +371,6 @@ impl Solver {
     }
 
     #[inline]
-    pub fn sat_value(&self, lit: Lit) -> Option<bool> {
-        match self.value.v(lit) {
-            Lbool::TRUE => Some(true),
-            Lbool::FALSE => Some(false),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn unsat_has(&self, lit: Lit) -> bool {
-        self.unsat_core.has(lit)
-    }
-
-    #[inline]
     pub fn get_last_assump(&self) -> &LitVec {
         &self.assump
     }
@@ -425,5 +394,57 @@ impl Solver {
             }
         }
         latchs
+    }
+}
+
+impl Satif for Solver {
+    #[inline]
+    fn new_var(&mut self) -> Var {
+        self.reset();
+        let v = self.constrain_act;
+        let var = Var::new(self.num_var() + 1);
+        self.value.reserve(var);
+        self.level.reserve(var);
+        self.reason.reserve(var);
+        self.watchers.reserve(var);
+        self.vsids.reserve(var);
+        self.phase_saving.reserve(var);
+        self.analyze.reserve(var);
+        self.unsat_core.reserve(var);
+        self.domain.reserve(var);
+        self.mark.reserve(var);
+        self.constrain_act = var;
+        v
+    }
+
+    #[inline]
+    fn num_var(&self) -> usize {
+        self.constrain_act.into()
+    }
+
+    fn add_clause(&mut self, _clause: &[Lit]) {
+        todo!()
+    }
+
+    fn solve(&mut self, assumps: &[Lit]) -> bool {
+        self.solve_inner(assumps, vec![], true)
+    }
+
+    fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
+        self.solve_inner(assumps, constraint, true)
+    }
+
+    #[inline]
+    fn sat_value(&self, lit: Lit) -> Option<bool> {
+        match self.value.v(lit) {
+            Lbool::TRUE => Some(true),
+            Lbool::FALSE => Some(false),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn unsat_has(&self, lit: Lit) -> bool {
+        self.unsat_core.has(lit)
     }
 }

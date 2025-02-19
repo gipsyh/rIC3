@@ -1,7 +1,7 @@
 use super::Solver;
-use giputils::hash::GHashSet;
-use logic_form::{Lit, LitVec, Var};
+use logic_form::{Lit, LitVec};
 use rand::seq::SliceRandom;
+use satif::Satif;
 
 impl Solver {
     #[inline]
@@ -25,13 +25,17 @@ impl Solver {
     }
 
     #[allow(unused)]
-    pub fn get_pred(&mut self, solver: &mut Solver, strengthen: bool) -> (LitVec, LitVec) {
-        let mut cls: LitVec = solver.assump.clone();
+    pub fn get_pred(
+        &mut self,
+        solver: &impl Satif,
+        target: &[Lit],
+        strengthen: bool,
+    ) -> (LitVec, LitVec) {
+        let mut cls: LitVec = target.into();
         cls.extend_from_slice(&self.ts.constraints);
         if cls.is_empty() {
             return (LitVec::new(), LitVec::new());
         }
-        let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let cls = !cls;
         let mut inputs = LitVec::new();
         for input in self.ts.inputs.iter() {
@@ -46,9 +50,7 @@ impl Solver {
             let lit = latch.lit();
             if self.domain.has(lit.var()) {
                 if let Some(v) = solver.sat_value(lit) {
-                    if in_cls.contains(latch) || !solver.flip_to_none(*latch) {
-                        latchs.push(lit.not_if(!v));
-                    }
+                    latchs.push(lit.not_if(!v));
                 }
             }
         }

@@ -2,6 +2,7 @@ use super::IC3;
 use crate::options::Options;
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitVec};
+use satif::Satif;
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -12,6 +12,7 @@ use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{rngs::StdRng, SeedableRng};
+use satif::Satif;
 use statistic::Statistic;
 use std::time::Instant;
 

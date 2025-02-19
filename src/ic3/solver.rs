@@ -3,6 +3,7 @@ use crate::gipsat::ClauseKind;
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitVec, Var};
 use rand::seq::SliceRandom;
+use satif::Satif;
 use std::time::Instant;
 
 impl IC3 {
