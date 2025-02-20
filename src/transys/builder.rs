@@ -1,9 +1,10 @@
 use super::Transys;
 use aig::Aig;
+use dagcnf::DagCnf;
 use giputils::hash::GHashMap;
-use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
+use logic_form::{Lit, LitMap, LitVec, LitVvec, Var, VarMap};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct TransysBuilder {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,
@@ -18,6 +19,16 @@ pub struct TransysBuilder {
 impl TransysBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[inline]
+    pub fn max_var(&self) -> Var {
+        self.rel.max_var()
+    }
+
+    #[inline]
+    pub fn lit_next(&self, lit: Lit) -> Lit {
+        self.next[&lit.var()].not_if(!lit.polarity())
     }
 
     pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {
@@ -66,7 +77,7 @@ impl TransysBuilder {
             let l = v.lit();
             let i = self.init.get(&v).cloned();
             let n = self.next[&v];
-            self.rel.add_assign_rel(p, n);
+            self.rel.add_rel(p.var(), &LitVvec::cnf_assign(p, n));
             if let Some(i) = i {
                 init_map[v] = Some(i);
                 init.push(l.not_if(!i));

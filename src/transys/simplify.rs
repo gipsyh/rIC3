@@ -30,12 +30,18 @@ impl TransysBuilder {
         for f in frozens.iter() {
             simp_solver.set_frozen(*f, true);
         }
+        let start = std::time::Instant::now();
         if let Some(false) = simp_solver.simplify() {
             println!("warning: model trans simplified with unsat");
         }
+        dbg!(start.elapsed());
         let mut trans = simp_solver.clauses();
+        dbg!(trans.len());
         trans.push(LitVec::from([Lit::constant(true)]));
-        unsafe { self.rel.set_cls(trans) };
+        let start = std::time::Instant::now();
+        self.rel = self.rel.simplify(frozens.iter().copied());
+        dbg!(start.elapsed());
+        dbg!(self.rel.len());
         let domain_map = self.rel.arrange(frozens.into_iter());
         let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[v]).collect();
