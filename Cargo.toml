@@ -18,7 +18,6 @@ cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.
 kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.4.7" }
 logic-form = { path = "./deps/logic-form", version = "0.3.0" }
 giputils = { path = "./deps/giputils", version = "0.2.6" }
-dagcnf = { path = "./deps/dagcnf", version = "0.1.0" }
 satif = { path = "./deps/satif", version = "0.2.1" }
 abc-rs = { path = "./deps/abc-rs", version = "0.2.4" }
 clap = { version = "4.5.16", features = ["derive"] }
