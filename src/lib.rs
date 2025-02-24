@@ -147,13 +147,17 @@ fn certifaiger_check(option: &Options, certificate: &str) {
         .arg(&option.model)
         .arg(certificate)
         .output()
-        .expect("certifaiger not found, please build docker image from https://github.com/Froleyks/certifaiger");
-    if option.verbose > 1 {
-        io::stdout().write_all(&output.stdout).unwrap();
-    }
+        .unwrap();
     if output.status.success() {
         println!("certifaiger check passed");
     } else {
-        panic!("certifaiger check failed");
+        if option.verbose > 1 {
+            io::stdout().write_all(&output.stdout).unwrap();
+            io::stderr().write_all(&output.stderr).unwrap();
+        }
+        match output.status.code() {
+            Some(1) => panic!("certifaiger check failed"),
+            _ => panic!("certifaiger maybe not avaliable, please build docker image from https://github.com/Froleyks/certifaiger"),
+           }
     }
 }
