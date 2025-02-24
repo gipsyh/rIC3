@@ -8,7 +8,8 @@ mod simplify;
 mod statistic;
 mod vsids;
 
-use crate::{options::Options, transys::Transys};
+use crate::transys::TransysIf;
+use crate::{options::Options, transys::TransysCtx};
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CRef, ClauseDB, CREF_NONE};
@@ -44,7 +45,7 @@ pub struct Solver {
     prepared_vsids: bool,
     constrain_act: Var,
 
-    ts: Grc<Transys>,
+    ts: Grc<TransysCtx>,
 
     assump: LitVec,
     constraint: Vec<LitVec>,
@@ -58,7 +59,7 @@ pub struct Solver {
 }
 
 impl Solver {
-    pub fn new(options: Options, id: Option<usize>, ts: &Grc<Transys>) -> Self {
+    pub fn new(options: Options, id: Option<usize>, ts: &Grc<TransysCtx>) -> Self {
         let mut solver = Self {
             id,
             ts: ts.clone(),
@@ -90,7 +91,7 @@ impl Solver {
         while solver.num_var() < solver.ts.num_var() {
             solver.new_var();
         }
-        for cls in ts.rel.iter() {
+        for cls in ts.rel.clause() {
             solver.add_clause_inner(cls, ClauseKind::Trans);
         }
         if solver.id.is_some() {
@@ -298,7 +299,7 @@ impl Solver {
         strengthen: bool,
         mut constraint: Vec<LitVec>,
     ) -> bool {
-        let assump = self.ts.cube_next(cube);
+        let assump = self.ts.lits_next(cube);
         if strengthen {
             constraint.push(LitVec::from_iter(cube.iter().map(|l| !*l)));
         }
@@ -313,7 +314,7 @@ impl Solver {
         let mut ans = LitVec::new();
         for l in self.assump.iter() {
             if self.unsat_has(*l) {
-                ans.push(self.ts.lit_prev(*l));
+                ans.push(self.ts.prev(*l));
             }
         }
         if self.ts.cube_subsume_init(&ans) {
@@ -322,13 +323,13 @@ impl Solver {
                 .assump
                 .iter()
                 .find(|l| {
-                    let l = self.ts.lit_prev(**l);
+                    let l = self.ts.prev(**l);
                     self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity())
                 })
                 .unwrap();
             for l in self.assump.iter() {
                 if self.unsat_has(*l) || l.eq(new) {
-                    ans.push(self.ts.lit_prev(*l));
+                    ans.push(self.ts.prev(*l));
                 }
             }
             assert!(!self.ts.cube_subsume_init(&ans));

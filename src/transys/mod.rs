@@ -1,151 +1,203 @@
-pub mod builder;
-pub mod simplify;
-pub mod simulate;
+mod ctx;
+pub mod nodep;
 pub mod unroll;
-pub mod uunroll;
 
+use aig::Aig;
+pub use ctx::*;
 use giputils::hash::GHashMap;
-use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
+use logic_form::{DagCnf, Lit, LitVec, Var};
 use satif::Satif;
 
-#[derive(Clone, Default, Debug)]
-pub struct Transys {
-    pub inputs: Vec<Var>,
-    pub latchs: Vec<Var>,
-    pub init: LitVec,
-    pub bad: Lit,
-    pub init_map: VarMap<Option<bool>>,
-    pub constraints: LitVec,
-    pub rel: DagCnf,
-    is_latch: VarMap<bool>,
-    next_map: LitMap<Lit>,
-    prev_map: LitMap<Lit>,
-    pub max_latch: Var,
-    restore: GHashMap<Var, Var>,
-}
+pub trait TransysIf {
+    fn max_var(&self) -> Var;
 
-impl Transys {
+    fn input(&self) -> impl Iterator<Item = Var>;
+
+    fn latch(&self) -> impl Iterator<Item = Var>;
+
+    fn next(&self, lit: Lit) -> Lit;
+
+    fn prev(&self, _lit: Lit) -> Lit {
+        panic!("prev not supported");
+    }
+
+    fn init(&self) -> impl Iterator<Item = Lit>;
+
+    fn constraint(&self) -> impl Iterator<Item = Lit>;
+
+    fn trans(&self) -> impl Iterator<Item = &LitVec>;
+
+    fn restore(&self, lit: Lit) -> Lit;
+
     #[inline]
-    pub fn num_var(&self) -> usize {
-        Into::<usize>::into(self.max_var()) + 1
+    fn var_next(&self, var: Var) -> Var {
+        self.next(var.lit()).var()
     }
 
     #[inline]
-    pub fn max_var(&self) -> Var {
+    fn lits_next<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
+        lits.into_iter().map(|l| self.next(*l)).collect()
+    }
+
+    #[inline]
+    fn lits_prev<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
+        lits.into_iter().map(|l| self.prev(*l)).collect()
+    }
+
+    #[inline]
+    fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
+        satif.new_var_to(self.max_var());
+        for i in self.init() {
+            satif.add_clause(&[i]);
+        }
+    }
+
+    #[inline]
+    fn load_trans(&self, satif: &mut impl Satif, constraint: bool) {
+        satif.new_var_to(self.max_var());
+        for c in self.trans() {
+            satif.add_clause(c);
+        }
+        if constraint {
+            for c in self.constraint() {
+                satif.add_clause(&[c]);
+            }
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Transys {
+    pub input: Vec<Var>,
+    pub latch: Vec<Var>,
+    pub next: GHashMap<Var, Lit>,
+    pub init: GHashMap<Var, bool>,
+    pub bad: Lit,
+    pub constraint: LitVec,
+    pub rel: DagCnf,
+    pub rst: GHashMap<Var, Var>,
+}
+
+impl TransysIf for Transys {
+    #[inline]
+    fn max_var(&self) -> Var {
         self.rel.max_var()
     }
 
     #[inline]
-    pub fn new_var(&mut self) -> Var {
-        let max_var = self.rel.new_var();
-        self.init_map.reserve(max_var);
-        self.next_map.reserve(max_var);
-        self.prev_map.reserve(max_var);
-        self.is_latch.reserve(max_var);
-        max_var
+    fn input(&self) -> impl Iterator<Item = Var> {
+        self.input.iter().copied()
     }
 
     #[inline]
-    pub fn add_latch(&mut self, state: Var, init: Option<bool>, trans: Vec<LitVec>) {
-        let next = self.rel.new_var().lit();
-        self.latchs.push(state);
-        let lit = state.lit();
-        self.init_map[state] = init;
-        self.is_latch[state] = true;
-        self.next_map[lit] = next;
-        self.next_map[!lit] = !next;
-        self.prev_map[next] = lit;
-        self.prev_map[!next] = !lit;
-        if let Some(i) = init {
-            self.init.push(lit.not_if(!i));
+    fn latch(&self) -> impl Iterator<Item = Var> {
+        self.latch.iter().copied()
+    }
+
+    #[inline]
+    fn next(&self, lit: Lit) -> Lit {
+        self.next[&lit.var()].not_if(!lit.polarity())
+    }
+
+    #[inline]
+    fn init(&self) -> impl Iterator<Item = Lit> {
+        self.init.iter().map(|(v, i)| Lit::new(*v, *i))
+    }
+
+    #[inline]
+    fn constraint(&self) -> impl Iterator<Item = Lit> {
+        self.constraint.iter().copied()
+    }
+
+    #[inline]
+    fn trans(&self) -> impl Iterator<Item = &LitVec> {
+        self.rel.clause()
+    }
+
+    #[inline]
+    fn restore(&self, lit: Lit) -> Lit {
+        self.rst[&lit.var()].lit().not_if(!lit.polarity())
+    }
+}
+
+impl Transys {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {
+        let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
+        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
+        let mut latch = Vec::new();
+        let mut next = GHashMap::new();
+        let mut init = GHashMap::new();
+        for l in aig.latchs.iter() {
+            let lv = Var::from(l.input);
+            latch.push(lv);
+            next.insert(lv, l.next.to_lit());
+            if let Some(i) = l.init {
+                init.insert(lv, i);
+            }
         }
-        self.rel.add_rel(state, &trans);
-        let next_trans: Vec<_> = trans
+        let bad = aig.bads[0].to_lit();
+        let rel = aig.get_cnf();
+        Self {
+            input,
+            latch,
+            next,
+            init,
+            bad,
+            constraint,
+            rel,
+            rst: rst.clone(),
+        }
+    }
+
+    pub fn simplify(&mut self) {
+        // let mut simp_solver = SimpSolver::new();
+        // simp_solver.new_var_to(self.rel.max_var());
+        // for c in self.rel.iter() {
+        //     simp_solver.add_clause(c);
+        // }
+        let mut frozens = vec![Var::CONST, self.bad.var()];
+        frozens.extend_from_slice(&self.input);
+        for l in self.latch.iter() {
+            frozens.push(*l);
+            frozens.push(self.next[l].var());
+        }
+        for c in self.constraint.iter() {
+            frozens.push(c.var());
+        }
+        // for f in frozens.iter() {
+        //     simp_solver.set_frozen(*f, true);
+        // }
+        // let start = std::time::Instant::now();
+        // if let Some(false) = simp_solver.simplify() {
+        //     println!("warning: model trans simplified with unsat");
+        // }
+        // dbg!(start.elapsed());
+        // let mut trans = simp_solver.clauses();
+        // dbg!(trans.len());
+        let start = std::time::Instant::now();
+        self.rel = self.rel.simplify(frozens.iter().copied());
+        dbg!(start.elapsed());
+        dbg!(self.rel.len());
+        let domain_map = self.rel.arrange(frozens.into_iter());
+        let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
+        self.input = self.input.iter().map(|v| domain_map[v]).collect();
+        self.latch = self.latch.iter().map(|v| domain_map[v]).collect();
+        self.init = self.init.iter().map(|(v, i)| (domain_map[v], *i)).collect();
+        self.next = self
+            .next
             .iter()
-            .map(|c| c.iter().map(|l| self.lit_next(*l)).collect())
+            .map(|(v, n)| (domain_map[v], map_lit(n)))
             .collect();
-        self.rel.add_rel(next.var(), &next_trans);
-    }
-
-    pub fn add_init(&mut self, v: Var, init: Option<bool>) {
-        assert!(self.is_latch(v));
-        self.init_map[v] = init;
-        if let Some(i) = init {
-            self.init.push(v.lit().not_if(!i));
-        }
-    }
-
-    #[inline]
-    pub fn var_next(&self, var: Var) -> Var {
-        self.next_map[var.lit()].var()
-    }
-
-    #[inline]
-    pub fn lit_next(&self, lit: Lit) -> Lit {
-        self.next_map[lit]
-    }
-
-    #[inline]
-    pub fn lit_prev(&self, lit: Lit) -> Lit {
-        self.prev_map[lit]
-    }
-
-    #[inline]
-    pub fn cube_next(&self, cube: &[Lit]) -> LitVec {
-        cube.iter().map(|l| self.lit_next(*l)).collect()
-    }
-
-    #[inline]
-    pub fn cube_prev(&self, cube: &[Lit]) -> LitVec {
-        cube.iter().map(|l| self.lit_prev(*l)).collect()
-    }
-
-    #[inline]
-    pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
-        for x in x {
-            if let Some(init) = self.init_map[x.var()] {
-                if init != x.polarity() {
-                    return false;
-                }
-            }
-        }
-        true
-    }
-
-    #[inline]
-    pub fn is_latch(&self, var: Var) -> bool {
-        self.is_latch[var]
-    }
-
-    pub fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
-        satif.new_var_to(self.max_var());
-        for i in self.init.iter() {
-            satif.add_clause(&[*i]);
-        }
-    }
-
-    pub fn load_trans(&self, satif: &mut impl Satif, constraint: bool) {
-        satif.new_var_to(self.max_var());
-        for c in self.rel.clause() {
-            satif.add_clause(c);
-        }
-        if constraint {
-            for c in self.constraints.iter() {
-                satif.add_clause(&[*c]);
-            }
-        }
-    }
-
-    #[inline]
-    pub fn restore(&self, lit: Lit) -> Lit {
-        let var = self.restore[&lit.var()];
-        Lit::new(var, lit.polarity())
-    }
-
-    pub fn print_info(&self) {
-        println!("num input: {}", self.inputs.len());
-        println!("num latch: {}", self.latchs.len());
-        println!("trans size: {}", self.rel.len());
-        println!("num constraint: {}", self.constraints.len());
+        self.bad = map_lit(&self.bad);
+        self.constraint = self.constraint.iter().map(map_lit).collect();
+        self.rst = self
+            .rst
+            .iter()
+            .filter_map(|(k, &v)| domain_map.get(k).map(|&dk| (dk, v)))
+            .collect();
     }
 }

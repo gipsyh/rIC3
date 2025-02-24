@@ -1,5 +1,5 @@
 use super::{search::Value, Solver};
-use crate::transys::Transys;
+use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use logic_form::{Var, VarSet};
@@ -22,7 +22,7 @@ impl Domain {
         self.domain.reserve(var);
     }
 
-    pub fn calculate_constrain(&mut self, ts: &Grc<Transys>, value: &Value) {
+    pub fn calculate_constrain(&mut self, ts: &Grc<TransysCtx>, value: &Value) {
         let mut marked = GHashSet::new();
         let mut queue = Vec::new();
         for c in ts.constraints.iter() {
@@ -58,7 +58,7 @@ impl Domain {
     pub fn enable_local(
         &mut self,
         domain: impl Iterator<Item = Var>,
-        ts: &Grc<Transys>,
+        ts: &Grc<TransysCtx>,
         _value: &Value,
     ) {
         self.reset();
