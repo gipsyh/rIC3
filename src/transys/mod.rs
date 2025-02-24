@@ -4,9 +4,8 @@ pub mod simulate;
 pub mod unroll;
 pub mod uunroll;
 
-use dagcnf::DagCnf;
 use giputils::hash::GHashMap;
-use logic_form::{Lit, LitMap, LitVec, Var, VarMap};
+use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 use satif::Satif;
 
 #[derive(Clone, Default, Debug)]
