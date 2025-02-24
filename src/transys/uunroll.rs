@@ -1,5 +1,5 @@
 use super::builder::TransysBuilder;
-use logic_form::{Lit, LitMap, LitVec, Var};
+use logic_form::{Lit, LitMap, LitVec, LitVvec, Var};
 use satif::Satif;
 
 #[derive(Debug)]
@@ -53,6 +53,11 @@ impl TransysUnroll {
     }
 
     #[inline]
+    pub fn var_next(&self, var: Var, num: usize) -> Var {
+        self.next_map[var.lit()][num].var()
+    }
+
+    #[inline]
     pub fn lit_next(&self, lit: Lit, num: usize) -> Lit {
         self.next_map[lit][num]
     }
@@ -74,13 +79,8 @@ impl TransysUnroll {
             let lj = self.lit_next(l, j);
             self.max_var += 1;
             let n = self.max_var.lit();
-            let rel = vec![
-                LitVec::from([!li, lj, n]),
-                LitVec::from([li, !lj, n]),
-                LitVec::from([li, lj, !n]),
-                LitVec::from([!li, !lj, !n]),
-            ];
-            self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel.into_iter());
+            let rel = LitVvec::cnf_xor(n, li, lj);
+            self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel);
             ors.push(n);
         }
         self.simple_path.as_mut().unwrap()[self.num_unroll - 1].push(ors);
@@ -160,7 +160,9 @@ impl TransysUnroll {
                 let c = self.lit_next(*c, u);
                 constraint.push(c);
             }
-
+            for (v, cls) in self.ts.rel.iter() {
+                let v = self.var_next(v, u);
+            }
             // for c in self.ts.trans.iter() {
             //     let c: LitVec = self.lits_next(c, u);
             //     trans.push(c);
