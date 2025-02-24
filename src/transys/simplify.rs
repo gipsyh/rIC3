@@ -1,19 +1,17 @@
 use super::builder::TransysBuilder;
-use logic_form::{Lit, LitVec, Var};
-use minisat::SimpSolver;
-use satif::Satif;
+use logic_form::{Lit, Var};
 
 impl TransysBuilder {
     pub fn simplify(&mut self, keep_dep: bool, assert_constrain: bool) {
-        let mut simp_solver: Box<dyn Satif> = if keep_dep {
-            Box::new(SimpSolver::new())
-        } else {
-            Box::new(cadical::Solver::new())
-        };
-        simp_solver.new_var_to(self.rel.max_var());
-        for c in self.rel.iter() {
-            simp_solver.add_clause(c);
-        }
+        // let mut simp_solver: Box<dyn Satif> = if keep_dep {
+        //     Box::new(SimpSolver::new())
+        // } else {
+        //     Box::new(cadical::Solver::new())
+        // };
+        // simp_solver.new_var_to(self.rel.max_var());
+        // for c in self.rel.iter() {
+        //     simp_solver.add_clause(c);
+        // }
         let mut frozens = vec![Var::CONST, self.bad.var()];
         frozens.extend_from_slice(&self.input);
         for l in self.latch.iter() {
@@ -22,22 +20,22 @@ impl TransysBuilder {
         }
         for c in self.constraint.iter() {
             if assert_constrain {
-                simp_solver.add_clause(&[*c]);
+                // simp_solver.add_clause(&[*c]);
             } else {
                 frozens.push(c.var());
             }
         }
-        for f in frozens.iter() {
-            simp_solver.set_frozen(*f, true);
-        }
-        let start = std::time::Instant::now();
-        if let Some(false) = simp_solver.simplify() {
-            println!("warning: model trans simplified with unsat");
-        }
-        dbg!(start.elapsed());
-        let mut trans = simp_solver.clauses();
-        dbg!(trans.len());
-        trans.push(LitVec::from([Lit::constant(true)]));
+        // for f in frozens.iter() {
+        //     simp_solver.set_frozen(*f, true);
+        // }
+        // let start = std::time::Instant::now();
+        // if let Some(false) = simp_solver.simplify() {
+        //     println!("warning: model trans simplified with unsat");
+        // }
+        // dbg!(start.elapsed());
+        // let mut trans = simp_solver.clauses();
+        // dbg!(trans.len());
+        // trans.push(LitVec::from([Lit::constant(true)]));
         let start = std::time::Instant::now();
         self.rel = self.rel.simplify(frozens.iter().copied());
         dbg!(start.elapsed());
@@ -58,8 +56,6 @@ impl TransysBuilder {
         } else {
             self.constraint.iter().map(map_lit).collect()
         };
-        dbg!(&self.constraint);
-        dbg!(&self.rel);
         self.rst = self
             .rst
             .iter()
