@@ -1,8 +1,7 @@
 use super::Transys;
 use aig::Aig;
-use dagcnf::DagCnf;
 use giputils::hash::GHashMap;
-use logic_form::{Lit, LitMap, LitVec, LitVvec, Var, VarMap};
+use logic_form::{DagCnf, Lit, LitMap, LitVec, LitVvec, Var, VarMap};
 
 #[derive(Default, Debug, Clone)]
 pub struct TransysBuilder {
