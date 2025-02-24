@@ -1,4 +1,4 @@
-use crate::transys::Transys;
+use crate::transys::TransysCtx;
 use logic_form::{Lit, LitVec, Var, VarMap};
 use std::ops::MulAssign;
 
@@ -9,7 +9,7 @@ pub struct Activity {
 }
 
 impl Activity {
-    pub fn new(ts: &Transys) -> Self {
+    pub fn new(ts: &TransysCtx) -> Self {
         let mut activity = VarMap::new();
         activity.reserve(ts.max_latch);
         Self {

@@ -1,5 +1,5 @@
 use super::IC3;
-use crate::options::Options;
+use crate::{options::Options, transys::TransysIf};
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;
@@ -106,7 +106,7 @@ impl IC3 {
                         s.push(l.not_if(!v));
                     }
                 }
-                let lt = self.ts.lit_next(*l);
+                let lt = self.ts.next(*l);
                 if let Some(v) = self.solvers[frame - 1].sat_value(lt) {
                     t.push(l.not_if(!v));
                 }
@@ -209,7 +209,7 @@ impl IC3 {
         if parameter.level == 0 {
             self.solvers[frame - 1].set_domain(
                 self.ts
-                    .cube_next(&cube)
+                    .lits_next(&cube)
                     .iter()
                     .copied()
                     .chain(cube.iter().copied()),
@@ -240,7 +240,7 @@ impl IC3 {
                     self.solvers[frame - 1].unset_domain();
                     self.solvers[frame - 1].set_domain(
                         self.ts
-                            .cube_next(&cube)
+                            .lits_next(&cube)
                             .iter()
                             .copied()
                             .chain(cube.iter().copied()),

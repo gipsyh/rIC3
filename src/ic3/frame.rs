@@ -1,5 +1,5 @@
 use super::{proofoblig::ProofObligation, IC3};
-use crate::transys::Transys;
+use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitSet, LitVec};
@@ -72,7 +72,7 @@ pub struct Frames {
 }
 
 impl Frames {
-    pub fn new(ts: &Grc<Transys>) -> Self {
+    pub fn new(ts: &Grc<TransysCtx>) -> Self {
         let mut tmp_lit_set = LitSet::new();
         tmp_lit_set.reserve(ts.max_latch);
         Self {

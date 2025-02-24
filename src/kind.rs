@@ -1,6 +1,6 @@
 use crate::{
     options::Options,
-    transys::{unroll::TransysUnroll, Transys},
+    transys::{nodep::NoDepTransys, unroll::TransysUnroll, Transys, TransysIf},
     witness_encode, Engine,
 };
 use aig::{Aig, AigEdge};
@@ -8,13 +8,16 @@ use logic_form::LitVec;
 use satif::Satif;
 
 pub struct Kind {
-    uts: TransysUnroll,
+    uts: TransysUnroll<NoDepTransys>,
     options: Options,
     solver: Box<dyn Satif>,
 }
 
 impl Kind {
     pub fn new(options: Options, ts: Transys) -> Self {
+        let mut ts = ts.remove_dep();
+        ts.assert_constraint();
+        ts.simplify();
         let uts = if options.kind.simple_path {
             TransysUnroll::new_with_simple_path(&ts)
         } else {
@@ -88,7 +91,7 @@ impl Engine for Kind {
                 self.uts.load_trans(self.solver.as_mut(), i, true);
             }
             if !self.options.kind.no_bmc {
-                let mut assump = self.uts.ts.init.clone();
+                let mut assump: LitVec = self.uts.ts.init().collect();
                 assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), bmc_k));
                 if self.options.verbose > 0 {
                     println!("kind bmc depth: {bmc_k}");
@@ -230,7 +233,7 @@ impl Engine for Kind {
 
     fn witness(&mut self, aig: &Aig) -> String {
         let mut wit = vec![LitVec::new()];
-        for l in self.uts.ts.latchs.iter() {
+        for l in self.uts.ts.latch() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l) {
                 wit[0].push(self.uts.ts.restore(l.not_if(!v)));
@@ -238,7 +241,7 @@ impl Engine for Kind {
         }
         for k in 0..=self.uts.num_unroll {
             let mut w = LitVec::new();
-            for l in self.uts.ts.inputs.iter() {
+            for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
                 if let Some(v) = self.solver.sat_value(kl) {

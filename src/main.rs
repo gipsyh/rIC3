@@ -10,7 +10,7 @@ use rIC3::{
     kind::Kind,
     options::{self, Options},
     portfolio::Portfolio,
-    transys::builder::TransysBuilder,
+    transys::Transys,
     Engine,
 };
 use std::{
@@ -68,16 +68,9 @@ fn main() {
         Box::new(Portfolio::new(options.clone(), &origin_aig))
     } else {
         let (aig, restore) = aig_preprocess(&aig, &options);
-        let mut ts = TransysBuilder::from_aig(&aig, &restore);
+        let ts = Transys::from_aig(&aig, &restore);
         if options.preprocess.sec {
             panic!("sec not support");
-        }
-        let assert_constrain = matches!(options.engine, options::Engine::IC3);
-        let keep_dep = assert_constrain;
-        ts.simplify(keep_dep, !assert_constrain);
-        let ts = ts.build();
-        if options.verbose > 1 {
-            ts.print_info();
         }
         let mut engine: Box<dyn Engine> = match options.engine {
             options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),

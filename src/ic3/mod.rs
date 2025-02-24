@@ -1,7 +1,7 @@
 use crate::{
     gipsat::{Solver, SolverStatistic},
     options::Options,
-    transys::{unroll::TransysUnroll, Transys},
+    transys::{unroll::TransysUnroll, Transys, TransysCtx, TransysIf},
     witness_encode, Engine,
 };
 use activity::Activity;
@@ -26,7 +26,7 @@ mod verify;
 
 pub struct IC3 {
     options: Options,
-    ts: Grc<Transys>,
+    ts: Grc<TransysCtx>,
     frame: Frames,
     solvers: Vec<Solver>,
     lift: Solver,
@@ -35,7 +35,7 @@ pub struct IC3 {
     statistic: Statistic,
     pre_lemmas: Vec<LitVec>,
     abs_cst: LitVec,
-    bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll)>,
+    bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll<TransysCtx>)>,
 
     auxiliary_var: Vec<Var>,
     rng: StdRng,
@@ -318,12 +318,14 @@ impl IC3 {
 impl IC3 {
     pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         if options.ic3.inn {
-            let mut uts = TransysUnroll::new(&ts);
-            uts.unroll();
-            ts = uts.interal_signals();
+            todo!();
+            // let mut uts = TransysUnroll::new(&ts);
+            // uts.unroll();
+            // ts = uts.interal_signals();
             //TODO: Simplify
         }
-        let ts = Grc::new(ts);
+        ts.simplify();
+        let ts = Grc::new(ts.ctx());
         let statistic = Statistic::new(options.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
@@ -448,7 +450,7 @@ impl Engine for IC3 {
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         let mut assump = if let Some(next) = b.next.clone() {
-            self.ts.cube_next(&next.lemma)
+            self.ts.lits_next(&next.lemma)
         } else {
             self.ts.bad.cube()
         };

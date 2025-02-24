@@ -2,6 +2,7 @@ use super::{
     cdb::{CRef, CREF_NONE},
     Solver,
 };
+use crate::transys::TransysIf;
 use giputils::gvec::Gvec;
 use logic_form::{Lemma, LitMap, LitVec};
 use std::mem::take;
