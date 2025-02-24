@@ -42,7 +42,6 @@ impl TransysBuilder {
         self.rel = self.rel.simplify(frozens.iter().copied());
         dbg!(start.elapsed());
         dbg!(self.rel.len());
-        todo!();
         let domain_map = self.rel.arrange(frozens.into_iter());
         let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[v]).collect();
@@ -59,6 +58,8 @@ impl TransysBuilder {
         } else {
             self.constraint.iter().map(map_lit).collect()
         };
+        dbg!(&self.constraint);
+        dbg!(&self.rel);
         self.rst = self
             .rst
             .iter()
