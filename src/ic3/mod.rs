@@ -317,12 +317,12 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+        ts.simplify();
         if options.ic3.inn {
             let mut uts = TransysUnroll::new(&ts);
             uts.unroll();
             ts = uts.interal_signals();
         }
-        ts.simplify();
         let ts = Grc::new(ts.ctx());
         let statistic = Statistic::new(options.model.to_str().unwrap());
         let activity = Activity::new(&ts);
