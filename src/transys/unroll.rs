@@ -1,4 +1,5 @@
 use super::{Transys, TransysIf};
+use giputils::hash::GHashMap;
 use logic_form::{Lit, LitMap, LitVec, LitVvec, Var};
 use satif::Satif;
 
@@ -169,6 +170,9 @@ impl TransysUnroll<Transys> {
             }
             for (v, cls) in self.ts.rel.iter() {
                 let v = self.var_next(v, u);
+                if rel.has_rel(v) {
+                    continue;
+                }
                 let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, u)).collect();
                 rel.add_rel(v, &cls);
             }
@@ -193,70 +197,42 @@ impl TransysUnroll<Transys> {
     }
 
     pub fn interal_signals(&self) -> Transys {
-        // let mut rel = self.ts.rel.clone();
-        // for c in self.ts.trans.iter() {
-        //     trans.push(self.lits_next(c, 1));
-        // }
+        let mut keep = self.ts.rel.fanouts(self.ts.input());
+        for l in self.ts.latch() {
+            keep.insert(self.ts.var_next(l));
+        }
+        let mut rel = self.ts.rel.clone();
+        for (v, cls) in self.ts.rel.iter() {
+            if keep.contains(&v) {
+                continue;
+            }
+            let v = self.var_next(v, 1);
+            if rel.has_rel(v) {
+                continue;
+            }
+            let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, 1)).collect();
+            rel.add_rel(v, &cls);
+        }
+        let mut latch = Vec::new();
+        let mut next = GHashMap::new();
+        for v in Var::new(1)..=self.ts.max_var() {
+            if !keep.contains(&v) {
+                latch.push(v);
+                next.insert(v, self.lit_next(v.lit(), 1));
+            }
+        }
 
-        // let mut keep: GHashSet<Var> = GHashSet::from_iter(self.ts.inputs.iter().cloned());
-        // for i in 0..self.ts.num_var() {
-        //     let v = Var::new(i);
-        //     if dependence[v].iter().any(|d| keep.contains(d)) {
-        //         keep.insert(v);
-        //     }
-        // }
-        // for l in self.ts.latchs.iter() {
-        //     keep.insert(self.ts.var_next(*l));
-        // }
-        // if !self.ts.is_latch(self.ts.bad.var()) {
-        //     keep.insert(self.ts.bad.var());
-        // }
-        // let mut latchs = Vec::new();
-        // for v in Var::new(1)..=self.ts.max_var() {
-        //     if !keep.contains(&v) {
-        //         latchs.push(v);
-        //         is_latch[v] = true;
-        //     }
-        // }
-        // let max_latch = *latchs.last().unwrap_or(&Var::new(0));
-        // let mut init_map = self.ts.init_map.clone();
-        // init_map.reserve(max_latch);
-        // let mut init = self.ts.init.clone();
-        // let mut solver = satif_minisat::Solver::new();
-        // solver.new_var_to(self.max_var);
-        // for cls in trans.iter() {
-        //     solver.add_clause(cls);
-        // }
-        // for c in self.ts.constraints.iter() {
-        //     solver.add_clause(&[*c]);
-        // }
-        // let implies: GHashSet<Lit> = GHashSet::from_iter(solver.implies(&init));
-        // for l in latchs.iter() {
-        //     let l = l.lit();
-        //     if implies.contains(&l) {
-        //         init.push(l);
-        //         init_map[l] = Some(true);
-        //     } else if implies.contains(&!l) {
-        //         init.push(!l);
-        //         init_map[l] = Some(false);
-        //     }
-        // }
-        // Transys {
-        //     inputs: self.ts.inputs.clone(),
-        //     latchs,
-        //     init,
-        //     bad: self.ts.bad,
-        //     init_map,
-        //     constraints: self.ts.constraints.clone(),
-        //     trans,
-        //     max_var: self.max_var,
-        //     next_map,
-        //     prev_map,
-        //     dependence,
-        //     max_latch,
-        //     is_latch,
-        //     restore: self.ts.restore.clone(),
-        // }
-        todo!()
+        // TODO: EXTEND INIT
+
+        Transys {
+            input: self.ts.input.clone(),
+            latch,
+            next,
+            init: self.ts.init.clone(),
+            bad: self.ts.bad,
+            constraint: self.ts.constraint.clone(),
+            rel,
+            rst: self.ts.rst.clone(),
+        }
     }
 }

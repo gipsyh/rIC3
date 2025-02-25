@@ -34,7 +34,7 @@ shadow-rs = "1.0.0"
 shadow-rs = "1.0.0"
 
 [features]
-default = ["no_bound_check"]
+default = []
 no_bound_check = ["logic-form/no_bound_check", "giputils/no_bound_check"]
 
 [profile.dev]
