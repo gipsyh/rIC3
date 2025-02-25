@@ -197,10 +197,7 @@ impl TransysUnroll<Transys> {
     }
 
     pub fn interal_signals(&self) -> Transys {
-        let mut keep = self.ts.rel.fanouts(self.ts.input());
-        for l in self.ts.latch() {
-            keep.insert(self.ts.var_next(l));
-        }
+        let keep = self.ts.rel.fanouts(self.ts.input());
         let mut rel = self.ts.rel.clone();
         for (v, cls) in self.ts.rel.iter() {
             if keep.contains(&v) {
