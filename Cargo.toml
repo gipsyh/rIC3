@@ -41,7 +41,6 @@ no_bound_check = ["logic-form/no_bound_check", "giputils/no_bound_check"]
 opt-level = 3
 
 [profile.release]
-debug = true
-# lto = true
-# panic = "abort"
-# strip = true
+lto = true
+panic = "abort"
+strip = true
