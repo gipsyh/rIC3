@@ -1,8 +1,9 @@
 use crate::{
+    Engine,
     gipsat::{Solver, SolverStatistic},
     options::Options,
-    transys::{unroll::TransysUnroll, Transys, TransysCtx, TransysIf},
-    witness_encode, Engine,
+    transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
+    witness_encode,
 };
 use activity::Activity;
 use aig::{Aig, AigEdge};
@@ -11,7 +12,7 @@ use giputils::grc::Grc;
 use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use statistic::Statistic;
 use std::time::Instant;

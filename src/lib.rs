@@ -157,7 +157,9 @@ fn certifaiger_check(option: &Options, certificate: &str) {
         }
         match output.status.code() {
             Some(1) => panic!("certifaiger check failed"),
-            _ => panic!("certifaiger maybe not avaliable, please build docker image from https://github.com/Froleyks/certifaiger"),
-           }
+            _ => panic!(
+                "certifaiger maybe not avaliable, please build docker image from https://github.com/Froleyks/certifaiger"
+            ),
+        }
     }
 }

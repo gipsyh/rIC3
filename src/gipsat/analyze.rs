@@ -1,6 +1,6 @@
 use super::{
-    cdb::{CRef, CREF_NONE},
     Solver,
+    cdb::{CREF_NONE, CRef},
 };
 use logic_form::{Lit, LitVec, Var, VarMap};
 use std::ops::{Deref, DerefMut};

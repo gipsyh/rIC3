@@ -1,4 +1,4 @@
-use super::{search::Value, Solver};
+use super::{Solver, search::Value};
 use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
