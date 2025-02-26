@@ -16,7 +16,8 @@ pub struct BMC {
 }
 
 impl BMC {
-    pub fn new(options: Options, ts: Transys) -> Self {
+    pub fn new(options: Options, mut ts: Transys) -> Self {
+        ts.coi(true);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();
