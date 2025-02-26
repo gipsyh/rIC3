@@ -154,11 +154,6 @@ impl Transys {
     }
 
     pub fn simplify(&mut self) {
-        // let mut simp_solver = SimpSolver::new();
-        // simp_solver.new_var_to(self.rel.max_var());
-        // for c in self.rel.iter() {
-        //     simp_solver.add_clause(c);
-        // }
         let mut frozens = vec![Var::CONST, self.bad.var()];
         frozens.extend_from_slice(&self.input);
         for l in self.latch.iter() {
@@ -168,20 +163,7 @@ impl Transys {
         for c in self.constraint.iter() {
             frozens.push(c.var());
         }
-        // for f in frozens.iter() {
-        //     simp_solver.set_frozen(*f, true);
-        // }
-        // let start = std::time::Instant::now();
-        // if let Some(false) = simp_solver.simplify() {
-        //     println!("warning: model trans simplified with unsat");
-        // }
-        // dbg!(start.elapsed());
-        // let mut trans = simp_solver.clauses();
-        // dbg!(trans.len());
-        let start = std::time::Instant::now();
         self.rel = self.rel.simplify(frozens.iter().copied());
-        dbg!(start.elapsed());
-        dbg!(self.rel.len());
         let domain_map = self.rel.arrange(frozens.into_iter());
         let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[v]).collect();

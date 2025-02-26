@@ -19,6 +19,3 @@
 [submodule "deps/kissat-rs"]
 	path = deps/kissat-rs
 	url = https://github.com/gipsyh/kissat-rs.git
-[submodule "deps/minisat-rs"]
-	path = deps/minisat-rs
-	url = https://github.com/gipsyh/minisat-rs.git

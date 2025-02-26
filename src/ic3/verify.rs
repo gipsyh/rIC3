@@ -1,7 +1,7 @@
 use super::{proofoblig::ProofObligation, IC3};
 use crate::transys::{unroll::TransysUnroll, TransysCtx, TransysIf};
+use cadical::Solver;
 use logic_form::{Lemma, Lit, LitVec};
-use minisat::Solver;
 use satif::Satif;
 use std::ops::Deref;
 
