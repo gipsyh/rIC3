@@ -4,7 +4,7 @@ pub mod unroll;
 
 use aig::Aig;
 pub use ctx::*;
-use giputils::hash::GHashMap;
+use giputils::hash::{GHashMap, GHashSet};
 use logic_form::{DagCnf, Lit, LitVec, Var};
 use satif::Satif;
 
@@ -151,6 +151,48 @@ impl Transys {
             rel,
             rst: rst.clone(),
         }
+    }
+
+    pub fn coi(&mut self, partial: bool) {
+        assert!(partial == true);
+        let mut queue = Vec::from_iter(self.constraint.iter().copied().chain([
+            self.bad,
+            Lit::constant(false),
+            Lit::constant(true),
+        ]));
+        let mut mark: GHashSet<Lit> = GHashSet::from_iter(queue.iter().copied());
+        while let Some(l) = queue.pop() {
+            for c in &self.rel[l.var()] {
+                if c.last() == !l {
+                    for &d in c.iter() {
+                        if d == !l {
+                            continue;
+                        }
+                        if !mark.contains(&d) {
+                            mark.insert(d);
+                            queue.push(d);
+                        }
+                    }
+                }
+            }
+            if let Some(n) = self.next.get(&l.var()).map(|n| n.not_if(!l.polarity())) {
+                if !mark.contains(&n) {
+                    mark.insert(n);
+                    queue.push(n);
+                }
+            }
+        }
+        let mut remove = GHashSet::new();
+        for v in Var::CONST..=self.max_var() {
+            let lv = v.lit();
+            if !mark.contains(&lv) {
+                remove.insert(lv);
+            }
+            if !mark.contains(&!lv) {
+                remove.insert(!lv);
+            }
+        }
+        self.rel.pol_filter(remove);
     }
 
     pub fn simplify(&mut self) {

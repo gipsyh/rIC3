@@ -319,6 +319,10 @@ impl IC3 {
 impl IC3 {
     pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         ts.simplify();
+        dbg!(ts.rel.clause().count());
+        let lift_ts = ts.clone();
+        ts.coi(true);
+        dbg!(ts.rel.clause().count());
         if options.ic3.inn {
             let mut uts = TransysUnroll::new(&ts);
             uts.unroll();
@@ -328,7 +332,7 @@ impl IC3 {
         let statistic = Statistic::new(options.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
-        let lift = Solver::new(options.clone(), None, &ts);
+        let lift = Solver::new(options.clone(), None, &Grc::new(lift_ts.ctx()));
         let abs_cst = if options.ic3.abs_cst {
             LitVec::new()
         } else {
