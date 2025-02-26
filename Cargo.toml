@@ -12,13 +12,13 @@ rust-version = "1.85"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aig = { path = "./deps/aig-rs", version = "0.2.8" }
-cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.1.8" }
-kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.4.7" }
-logic-form = { path = "./deps/logic-form", version = "0.3.0" }
-giputils = { path = "./deps/giputils", version = "0.2.6" }
+aig = { path = "./deps/aig-rs", version = "0.3.0" }
+cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.1.9" }
+kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.4.8" }
+logic-form = { path = "./deps/logic-form", version = "0.3.2" }
+giputils = { path = "./deps/giputils", version = "0.3.0" }
 satif = { path = "./deps/satif", version = "0.2.1" }
-abc-rs = { path = "./deps/abc-rs", version = "0.2.4" }
+abc-rs = { path = "./deps/abc-rs", version = "0.2.5" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
@@ -31,10 +31,6 @@ shadow-rs = "1.0.0"
 
 [build-dependencies]
 shadow-rs = "1.0.0"
-
-[features]
-default = ["no_bound_check"]
-no_bound_check = ["logic-form/no_bound_check", "giputils/no_bound_check"]
 
 [profile.dev]
 opt-level = 3
