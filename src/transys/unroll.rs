@@ -1,18 +1,22 @@
-use super::Transys;
-use logic_form::{Lit, LitMap, LitVec, Var};
+use super::{Transys, TransysIf};
+use giputils::hash::GHashMap;
+use logic_form::{Lit, LitMap, LitVec, LitVvec, Var};
 use satif::Satif;
 
 #[derive(Debug)]
-pub struct TransysUnroll {
-    pub ts: Transys,
+pub struct TransysUnroll<T: TransysIf> {
+    pub ts: T,
     pub num_unroll: usize,
     pub max_var: Var,
     next_map: LitMap<Vec<Lit>>,
     simple_path: Option<Vec<Vec<LitVec>>>,
 }
 
-impl TransysUnroll {
-    pub fn new(ts: &Transys) -> Self {
+impl<T: TransysIf> TransysUnroll<T> {
+    pub fn new(ts: &T) -> Self
+    where
+        T: Clone,
+    {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
         next_map.reserve(ts.max_var());
         let false_lit = Lit::constant(false);
@@ -25,9 +29,9 @@ impl TransysUnroll {
                 next_map[!l].push(!l);
             }
         }
-        for l in ts.latchs.iter() {
+        for l in ts.latch() {
             let l = l.lit();
-            let next = ts.lit_next(l);
+            let next = ts.next(l);
             next_map[l].push(next);
             next_map[!l].push(!next);
         }
@@ -40,7 +44,10 @@ impl TransysUnroll {
         }
     }
 
-    pub fn new_with_simple_path(ts: &Transys) -> Self {
+    pub fn new_with_simple_path(ts: &T) -> Self
+    where
+        T: Clone,
+    {
         let mut res = Self::new(ts);
         res.simple_path = Some(Vec::new());
         res
@@ -50,6 +57,11 @@ impl TransysUnroll {
     pub fn new_var(&mut self) -> Var {
         self.max_var += 1;
         self.max_var
+    }
+
+    #[inline]
+    pub fn var_next(&self, var: Var, num: usize) -> Var {
+        self.next_map[var.lit()][num].var()
     }
 
     #[inline]
@@ -68,19 +80,14 @@ impl TransysUnroll {
 
     fn single_simple_path(&mut self, i: usize, j: usize) {
         let mut ors = LitVec::new();
-        for l in self.ts.latchs.iter() {
+        for l in self.ts.latch() {
             let l = l.lit();
             let li = self.lit_next(l, i);
             let lj = self.lit_next(l, j);
             self.max_var += 1;
             let n = self.max_var.lit();
-            let rel = vec![
-                LitVec::from([!li, lj, n]),
-                LitVec::from([li, !lj, n]),
-                LitVec::from([li, lj, !n]),
-                LitVec::from([!li, !lj, !n]),
-            ];
-            self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel.into_iter());
+            let rel = LitVvec::cnf_xor(n, li, lj);
+            self.simple_path.as_mut().unwrap()[self.num_unroll - 1].extend(rel);
             ors.push(n);
         }
         self.simple_path.as_mut().unwrap()[self.num_unroll - 1].push(ors);
@@ -109,9 +116,9 @@ impl TransysUnroll {
             }
             assert!(self.next_map[l].len() == self.num_unroll + 2);
         }
-        for l in self.ts.latchs.iter() {
+        for l in self.ts.latch() {
             let l = l.lit();
-            let next = self.lit_next(self.ts.lit_next(l), self.num_unroll + 1);
+            let next = self.lit_next(self.lit_next(l, 1), self.num_unroll + 1);
             self.next_map[l].push(next);
             self.next_map[!l].push(!next);
         }
@@ -129,13 +136,13 @@ impl TransysUnroll {
 
     pub fn load_trans<S: Satif + ?Sized>(&self, satif: &mut S, u: usize, constraint: bool) {
         satif.new_var_to(self.max_var);
-        for c in self.ts.rel.iter() {
+        for c in self.ts.trans() {
             let c: Vec<Lit> = c.iter().map(|l| self.lit_next(*l, u)).collect();
             satif.add_clause(&c);
         }
         if constraint {
-            for c in self.ts.constraints.iter() {
-                let c = self.lit_next(*c, u);
+            for c in self.ts.constraint() {
+                let c = self.lit_next(c, u);
                 satif.add_clause(&[c]);
             }
         }
@@ -147,153 +154,82 @@ impl TransysUnroll {
             }
         }
     }
-
+}
+impl TransysUnroll<Transys> {
     pub fn compile(&self) -> Transys {
-        todo!()
-        // let mut inputs = Vec::new();
-        // let mut constraints = LitVec::new();
-        // let mut trans = Vec::new();
-        // for u in 0..=self.num_unroll {
-        //     for i in self.ts.inputs.iter() {
-        //         inputs.push(self.lit_next(i.lit(), u).var());
-        //     }
-        //     for c in self.ts.constraints.iter() {
-        //         let c = self.lit_next(*c, u);
-        //         constraints.push(c);
-        //     }
-        //     for c in self.ts.trans.iter() {
-        //         let c: LitVec = self.lits_next(c, u);
-        //         trans.push(c);
-        //     }
-        // }
-        // let mut next_map = self.ts.next_map.clone();
-        // let mut prev_map = self.ts.prev_map.clone();
-        // for l in self.ts.latchs.iter() {
-        //     let l = l.lit();
-        //     let n = self.lit_next(l, self.num_unroll);
-        //     next_map[l] = n;
-        //     prev_map[n] = l;
-        //     next_map[!l] = !n;
-        //     prev_map[!n] = !l;
-        // }
-        // let mut dependence = self.ts.dependence.clone();
-        // dependence.reserve(self.max_var);
-        // for u in 1..=self.num_unroll {
-        //     for i in 0..self.ts.num_var() {
-        //         let v = Var::new(i);
-        //         let n = self.lit_next(v.lit(), u).var();
-        //         if dependence[n].is_empty() {
-        //             dependence[n] = dependence[v]
-        //                 .iter()
-        //                 .map(|l| self.lit_next(l.lit(), u).var())
-        //                 .collect()
-        //         }
-        //     }
-        // }
-        // Transys {
-        //     inputs,
-        //     latchs: self.ts.latchs.clone(),
-        //     init: self.ts.init.clone(),
-        //     bad: self.lit_next(self.ts.bad, 1),
-        //     init_map: self.ts.init_map.clone(),
-        //     constraints,
-        //     trans,
-        //     max_var: self.max_var,
-        //     prev_map,
-        //     next_map,
-        //     dependence,
-        //     max_latch: self.ts.max_latch,
-        //     is_latch: self.ts.is_latch.clone(),
-        //     restore: GHashMap::new(),
-        // }
+        let mut input = Vec::new();
+        let mut constraint = LitVec::new();
+        let mut rel = self.ts.rel.clone();
+        for u in 0..=self.num_unroll {
+            for i in self.ts.input.iter() {
+                input.push(self.lit_next(i.lit(), u).var());
+            }
+            for c in self.ts.constraint.iter() {
+                let c = self.lit_next(*c, u);
+                constraint.push(c);
+            }
+            for (v, cls) in self.ts.rel.iter() {
+                let v = self.var_next(v, u);
+                if rel.has_rel(v) {
+                    continue;
+                }
+                let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, u)).collect();
+                rel.add_rel(v, &cls);
+            }
+        }
+        let next = self
+            .ts
+            .next
+            .iter()
+            .map(|(v, n)| (*v, self.lit_next(*n, self.num_unroll)))
+            .collect();
+        let bad = self.lit_next(self.ts.bad, self.num_unroll);
+        Transys {
+            input,
+            latch: self.ts.latch.clone(),
+            next,
+            init: self.ts.init.clone(),
+            bad,
+            constraint,
+            rel,
+            rst: self.ts.rst.clone(),
+        }
     }
 
     pub fn interal_signals(&self) -> Transys {
-        // let mut trans = self.ts.trans.clone();
-        // for c in self.ts.trans.iter() {
-        //     trans.push(self.lits_next(c, 1));
-        // }
-        // let mut dependence = self.ts.dependence.clone();
-        // dependence.reserve(self.max_var);
-        // let mut next_map = self.ts.next_map.clone();
-        // let mut prev_map = self.ts.prev_map.clone();
-        // let mut is_latch = self.ts.is_latch.clone();
-        // next_map.reserve(self.max_var);
-        // prev_map.reserve(self.max_var);
-        // is_latch.reserve(self.max_var);
-        // for v in Var::new(1)..=self.ts.max_var {
-        //     let l = v.lit();
-        //     let n = self.lit_next(l, 1);
-        //     next_map[l] = n;
-        //     prev_map[n] = l;
-        //     next_map[!l] = !n;
-        //     prev_map[!n] = !l;
-        //     if dependence[n].is_empty() {
-        //         dependence[n] = dependence[l]
-        //             .iter()
-        //             .map(|l| self.lit_next(l.lit(), 1).var())
-        //             .collect()
-        //     }
-        // }
-        // let mut keep: GHashSet<Var> = GHashSet::from_iter(self.ts.inputs.iter().cloned());
-        // for i in 0..self.ts.num_var() {
-        //     let v = Var::new(i);
-        //     if dependence[v].iter().any(|d| keep.contains(d)) {
-        //         keep.insert(v);
-        //     }
-        // }
-        // for l in self.ts.latchs.iter() {
-        //     keep.insert(self.ts.var_next(*l));
-        // }
-        // if !self.ts.is_latch(self.ts.bad.var()) {
-        //     keep.insert(self.ts.bad.var());
-        // }
-        // let mut latchs = Vec::new();
-        // for v in Var::new(1)..=self.ts.max_var() {
-        //     if !keep.contains(&v) {
-        //         latchs.push(v);
-        //         is_latch[v] = true;
-        //     }
-        // }
-        // let max_latch = *latchs.last().unwrap_or(&Var::new(0));
-        // let mut init_map = self.ts.init_map.clone();
-        // init_map.reserve(max_latch);
-        // let mut init = self.ts.init.clone();
-        // let mut solver = satif_minisat::Solver::new();
-        // solver.new_var_to(self.max_var);
-        // for cls in trans.iter() {
-        //     solver.add_clause(cls);
-        // }
-        // for c in self.ts.constraints.iter() {
-        //     solver.add_clause(&[*c]);
-        // }
-        // let implies: GHashSet<Lit> = GHashSet::from_iter(solver.implies(&init));
-        // for l in latchs.iter() {
-        //     let l = l.lit();
-        //     if implies.contains(&l) {
-        //         init.push(l);
-        //         init_map[l] = Some(true);
-        //     } else if implies.contains(&!l) {
-        //         init.push(!l);
-        //         init_map[l] = Some(false);
-        //     }
-        // }
-        // Transys {
-        //     inputs: self.ts.inputs.clone(),
-        //     latchs,
-        //     init,
-        //     bad: self.ts.bad,
-        //     init_map,
-        //     constraints: self.ts.constraints.clone(),
-        //     trans,
-        //     max_var: self.max_var,
-        //     next_map,
-        //     prev_map,
-        //     dependence,
-        //     max_latch,
-        //     is_latch,
-        //     restore: self.ts.restore.clone(),
-        // }
-        todo!()
+        let keep = self.ts.rel.fanouts(self.ts.input());
+        let mut rel = self.ts.rel.clone();
+        for (v, cls) in self.ts.rel.iter() {
+            if keep.contains(&v) {
+                continue;
+            }
+            let v = self.var_next(v, 1);
+            if rel.has_rel(v) {
+                continue;
+            }
+            let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, 1)).collect();
+            rel.add_rel(v, &cls);
+        }
+        let mut latch = Vec::new();
+        let mut next = GHashMap::new();
+        for v in Var::new(1)..=self.ts.max_var() {
+            if !keep.contains(&v) {
+                latch.push(v);
+                next.insert(v, self.lit_next(v.lit(), 1));
+            }
+        }
+
+        // TODO: EXTEND INIT
+
+        Transys {
+            input: self.ts.input.clone(),
+            latch,
+            next,
+            init: self.ts.init.clone(),
+            bad: self.ts.bad,
+            constraint: self.ts.constraint.clone(),
+            rel,
+            rst: self.ts.rst.clone(),
+        }
     }
 }

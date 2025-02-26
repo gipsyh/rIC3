@@ -78,7 +78,7 @@ impl Portfolio {
         new_engine("-e bmc --step 10");
         new_engine("-e bmc --bmc-kissat --step 70");
         new_engine("-e bmc --bmc-kissat --step 135");
-        new_engine("-e kind --step 1");
+        new_engine("-e kind --step 1 --kind-simple-path");
         Self {
             option,
             _model_file: model_file,

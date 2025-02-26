@@ -1,6 +1,6 @@
 use crate::{
     options::Options,
-    transys::{unroll::TransysUnroll, Transys},
+    transys::{nodep::NoDepTransys, unroll::TransysUnroll, Transys, TransysIf},
     witness_encode, Engine,
 };
 use aig::Aig;
@@ -9,13 +9,16 @@ use satif::Satif;
 use std::time::Duration;
 
 pub struct BMC {
-    uts: TransysUnroll,
+    uts: TransysUnroll<NoDepTransys>,
     options: Options,
     solver: Box<dyn Satif>,
 }
 
 impl BMC {
     pub fn new(options: Options, ts: Transys) -> Self {
+        let mut ts = ts.remove_dep();
+        ts.assert_constraint();
+        ts.simplify();
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if options.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())
@@ -93,7 +96,7 @@ impl Engine for BMC {
 
     fn witness(&mut self, aig: &Aig) -> String {
         let mut wit = vec![LitVec::new()];
-        for l in self.uts.ts.latchs.iter() {
+        for l in self.uts.ts.latch() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l) {
                 wit[0].push(self.uts.ts.restore(l.not_if(!v)));
@@ -101,7 +104,7 @@ impl Engine for BMC {
         }
         for k in 0..=self.uts.num_unroll {
             let mut w = LitVec::new();
-            for l in self.uts.ts.inputs.iter() {
+            for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
                 if let Some(v) = self.solver.sat_value(kl) {
