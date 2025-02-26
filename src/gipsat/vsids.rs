@@ -1,5 +1,5 @@
-use super::{cdb::CREF_NONE, Solver};
-use giputils::{gvec::Gvec, OptionU32};
+use super::{Solver, cdb::CREF_NONE};
+use giputils::{OptionU32, gvec::Gvec};
 use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
 use std::ops::{Index, MulAssign};

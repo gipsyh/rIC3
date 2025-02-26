@@ -1,6 +1,6 @@
 use super::{
-    cdb::{CRef, ClauseKind, CREF_NONE},
     Solver,
+    cdb::{CREF_NONE, CRef, ClauseKind},
 };
 use logic_form::{Lbool, Lit, Var, VarMap};
 

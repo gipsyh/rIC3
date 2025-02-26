@@ -3,6 +3,7 @@
 use aig::Aig;
 use clap::Parser;
 use rIC3::{
+    Engine,
     bmc::BMC,
     certificate,
     frontend::aig::aig_preprocess,
@@ -11,7 +12,6 @@ use rIC3::{
     options::{self, Options},
     portfolio::Portfolio,
     transys::Transys,
-    Engine,
 };
 use std::{
     fs,
@@ -29,7 +29,9 @@ fn main() {
         println!("the model to be checked: {}", options.model.display());
     }
     let mut aig = if options.model.ends_with(".btor") || options.model.ends_with(".btor2") {
-        panic!("rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format.")
+        panic!(
+            "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
+        )
     } else {
         Aig::from_file(options.model.to_str().unwrap())
     };
@@ -56,10 +58,14 @@ fn main() {
         exit(20);
     } else if aig.bads.len() > 1 {
         if options.certify {
-            panic!("Error: Multiple properties detected. Cannot compress properties when certification is enabled.");
+            panic!(
+                "Error: Multiple properties detected. Cannot compress properties when certification is enabled."
+            );
         }
         if options.verbose > 0 {
-            println!("Warning: Multiple properties detected. rIC3 has compressed them into a single property.");
+            println!(
+                "Warning: Multiple properties detected. rIC3 has compressed them into a single property."
+            );
         }
         options.certify = false;
         aig.compress_property();

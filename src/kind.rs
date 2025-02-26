@@ -1,7 +1,8 @@
 use crate::{
+    Engine,
     options::Options,
-    transys::{nodep::NoDepTransys, unroll::TransysUnroll, Transys, TransysIf},
-    witness_encode, Engine,
+    transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
+    witness_encode,
 };
 use aig::{Aig, AigEdge};
 use logic_form::LitVec;

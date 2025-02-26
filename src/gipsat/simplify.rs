@@ -1,6 +1,6 @@
 use super::{
-    cdb::{CRef, CREF_NONE},
     Solver,
+    cdb::{CREF_NONE, CRef},
 };
 use crate::transys::TransysIf;
 use giputils::gvec::Gvec;

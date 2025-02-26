@@ -6,7 +6,7 @@ use std::{
     fs::File,
     io::Read,
     mem::take,
-    process::{exit, Command, Stdio},
+    process::{Command, Stdio, exit},
     sync::{Arc, Condvar, Mutex},
     thread::spawn,
 };

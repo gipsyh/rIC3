@@ -2,7 +2,7 @@ use super::IC3;
 use giputils::grc::Grc;
 use logic_form::{Lemma, LitVec};
 use std::cmp::Ordering;
-use std::collections::{btree_set, BTreeSet};
+use std::collections::{BTreeSet, btree_set};
 use std::fmt::{self, Debug};
 use std::ops::{Deref, DerefMut};
 

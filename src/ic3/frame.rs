@@ -1,4 +1,4 @@
-use super::{proofoblig::ProofObligation, IC3};
+use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;

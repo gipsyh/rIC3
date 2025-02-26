@@ -1,6 +1,6 @@
 use super::{
-    cdb::{CRef, Clause, CREF_NONE},
     Solver,
+    cdb::{CREF_NONE, CRef, Clause},
 };
 use giputils::gvec::Gvec;
 use logic_form::{Lbool, Lit, LitMap, Var};

@@ -1,5 +1,5 @@
-use super::{proofoblig::ProofObligation, IC3};
-use crate::transys::{unroll::TransysUnroll, TransysCtx, TransysIf};
+use super::{IC3, proofoblig::ProofObligation};
+use crate::transys::{TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
 use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;
@@ -56,10 +56,12 @@ impl IC3 {
                     .map(|l| l.var()),
                 assump.iter(),
             );
-            assert!(imply
-                .iter()
-                .chain(self.ts.constraints.iter())
-                .all(|l| self.lift.sat_value(*l).is_some_and(|v| v)));
+            assert!(
+                imply
+                    .iter()
+                    .chain(self.ts.constraints.iter())
+                    .all(|l| self.lift.sat_value(*l).is_some_and(|v| v))
+            );
             b = bad.next.clone();
         }
         if self.options.verbose > 0 {
