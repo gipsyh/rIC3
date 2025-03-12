@@ -41,6 +41,7 @@ impl IC3 {
 
     fn extend(&mut self) {
         self.frame.push(Frame::new());
+        self.statistic.num_frame = self.frame.len();
         self.solvers
             .push(Ic3Solver::new(&self.ts, self.solvers.len()));
         if self.level() == 0 {
@@ -166,7 +167,7 @@ impl IC3 {
         res
     }
 
-    fn check(&mut self) -> Option<bool> {
+    pub fn check(&mut self) -> Option<bool> {
         loop {
             let start = Instant::now();
             loop {
