@@ -180,7 +180,7 @@ impl IC3 {
                     None => {
                         self.statistic.overall_block_time += start.elapsed();
                         self.statistic();
-                        // self.verify();
+                        self.verify();
                         return Some(true);
                     }
                     _ => (),
@@ -211,7 +211,7 @@ impl IC3 {
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
                 self.statistic();
-                // self.verify();
+                self.verify();
                 return Some(true);
             }
         }
