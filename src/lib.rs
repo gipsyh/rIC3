@@ -103,6 +103,7 @@ impl IC3 {
             } else {
                 self.statistic.qblock_avg_time += self.statistic.time.stop(qblock_start);
                 let (model, inputs) = self.get_pred(po.frame);
+                self.statistic.avg_po_len += model.len();
                 self.add_obligation(ProofObligation::new(
                     po.frame - 1,
                     Lemma::new(model),
@@ -178,12 +179,13 @@ impl IC3 {
                     None => {
                         self.statistic.overall_block_time += start.elapsed();
                         self.statistic();
-                        self.verify();
+                        // self.verify();
                         return Some(true);
                     }
                     _ => (),
                 }
                 if let Some((bad, inputs)) = self.get_bad() {
+                    self.statistic.avg_po_len += bad.len();
                     let bad = Lemma::new(bad);
                     self.add_obligation(ProofObligation::new(self.level(), bad, inputs, 0, None))
                 } else {
@@ -208,7 +210,7 @@ impl IC3 {
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
                 self.statistic();
-                self.verify();
+                // self.verify();
                 return Some(true);
             }
         }

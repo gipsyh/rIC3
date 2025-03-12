@@ -32,15 +32,15 @@ pub fn verify_invariant(ts: &Transys, invariants: &[Lemma]) -> bool {
 
 impl IC3 {
     pub fn verify(&mut self) {
-        // let invariants = self.frame.invariant();
-        // if !verify_invariant(&self.ts, &invariants) {
-        //     panic!("invariant varify failed");
-        // }
-        // if self.options.verbose > 0 {
-        //     println!(
-        //         "inductive invariant verified with {} lemmas!",
-        //         invariants.len()
-        //     );
-        // }
+        let invariants = self.frame.invariant();
+        if !verify_invariant(&self.ts, &invariants) {
+            panic!("invariant varify failed");
+        }
+        if self.options.verbose > 0 {
+            println!(
+                "inductive invariant verified with {} lemmas!",
+                invariants.len()
+            );
+        }
     }
 }
