@@ -6,6 +6,10 @@ pub struct Options {
     /// input aiger file
     pub model: String,
 
+    /// certify
+    #[arg(long, default_value_t = false)]
+    pub certify: bool,
+
     /// verbose level
     #[arg(short, default_value_t = 1)]
     pub verbose: usize,

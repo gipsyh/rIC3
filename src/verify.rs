@@ -32,6 +32,9 @@ pub fn verify_invariant(ts: &Transys, invariants: &[Lemma]) -> bool {
 
 impl IC3 {
     pub fn verify(&mut self) {
+        if !self.options.certify {
+            return;
+        }
         let invariants = self.frame.invariant();
         if !verify_invariant(&self.ts, &invariants) {
             panic!("invariant varify failed");
