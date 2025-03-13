@@ -48,7 +48,7 @@ impl Engine for BMC {
     fn check(&mut self) -> Option<bool> {
         let step = self.options.step as usize;
         let bmc_max_k = self.options.bmc.bmc_max_k as usize;
-        for k in (step - 1..).step_by(step).take(if bmc_max_k == 0 { usize::MAX } else { bmc_max_k }) {
+        for k in (step - 1..=self.options.bmc.bmc_max_k).step_by(step) {
             self.uts.unroll_to(k);
             let last_bound = if self.options.bmc.bmc_kissat {
                 self.reset_solver();
@@ -90,17 +90,14 @@ impl Engine for BMC {
                 return Some(false);
             }
 
-            if bmc_max_k != 0 && k >= bmc_max_k - step {
-                if self.options.verbose > 0 {
-                    println!("bmc reached bound {bmc_max_k}, stopping search");
-                }
-                return None;
-            }
             // for s in last_bound..=k {
             //     solver.add_clause(&[!self.uts.lit_next(self.uts.ts.bad, s)]);
             // }
         }
-        unreachable!();
+        if self.options.verbose > 0 {
+            println!("bmc reached bound {bmc_max_k}, stopping search");
+        }
+        return None;
     }
 
     fn witness(&mut self, aig: &Aig) -> String {
