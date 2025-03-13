@@ -111,6 +111,9 @@ pub struct BMCOptions {
     /// use kissat solver, otherwise cadical
     #[arg(long = "bmc-kissat", default_value_t = false)]
     pub bmc_kissat: bool,
+    /// Bound to check up until k when bmc (default 0 means no bound)
+    #[arg(long = "bmc-max-k", short = 'k', default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..))]
+    pub bmc_max_k: u32
 }
 
 #[derive(Args, Clone, Debug)]
