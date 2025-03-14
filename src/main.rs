@@ -28,12 +28,14 @@ fn main() {
     if options.verbose > 0 {
         println!("the model to be checked: {}", options.model.display());
     }
-    let mut aig = if options.model.ends_with(".btor") || options.model.ends_with(".btor2") {
-        panic!(
+    let mut aig = match options.model.extension() {
+        Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
             "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
-        )
-    } else {
-        Aig::from_file(options.model.to_str().unwrap())
+        ),
+        Some(ext) if (ext == "aig") | (ext == "aag") => {
+            Aig::from_file(options.model.to_str().unwrap())
+        }
+        _ => panic!("unsupported file format"),
     };
     if !aig.outputs.is_empty() && !options.certify {
         // not certifying, move outputs to bads
