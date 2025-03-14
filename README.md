@@ -38,5 +38,3 @@ To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or dow
 - run: ```docker run -v <AIGER FILE>:/model.aig ric3 model.aig```
 
 Copyright (C) 2023 - Present, Yuheng Su (gipsyh.icu@gmail.com). All rights reserved.
-
-Without obtaining authorization, rIC3 is not allowed to be used for any commercial purposes.
