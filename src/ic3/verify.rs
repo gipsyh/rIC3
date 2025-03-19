@@ -9,6 +9,12 @@ pub fn verify_invariant(ts: &TransysCtx, invariants: &[Lemma]) -> bool {
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
     for lemma in invariants {
+        let assump: LitVec = ts.init.iter().chain(lemma.iter()).copied().collect();
+        if solver.solve(&assump) {
+            return false;
+        }
+    }
+    for lemma in invariants {
         solver.add_clause(&!lemma.deref());
     }
     if solver.solve(&ts.bad.cube()) {
