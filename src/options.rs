@@ -101,6 +101,10 @@ pub struct IC3Options {
     /// ic3 with abstract constrains
     #[arg(long = "ic3-abs-cst", default_value_t = false)]
     pub abs_cst: bool,
+
+    /// ic3 without predicate property
+    #[arg(long = "ic3-no-pred-prop", default_value_t = false)]
+    pub no_pred_prop: bool,
 }
 
 #[derive(Args, Clone, Debug)]

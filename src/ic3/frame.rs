@@ -3,6 +3,7 @@ use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitSet, LitVec};
+use satif::Satif;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
@@ -213,6 +214,9 @@ impl IC3 {
         if frame == 0 {
             assert!(self.frame.len() == 1);
             self.solvers[0].add_lemma(&!lemma.cube());
+            if !self.options.ic3.no_pred_prop && self.level() == frame {
+                self.bad_solver.add_clause(&!lemma.cube());
+            }
             self.frame[0].push(FrameLemma::new(lemma, po, None));
             return false;
         }
@@ -234,6 +238,9 @@ impl IC3 {
                         let clause = !lemma.cube();
                         for k in i + 1..=frame {
                             self.solvers[k].add_lemma(&clause);
+                        }
+                        if !self.options.ic3.no_pred_prop && self.level() == frame {
+                            self.bad_solver.add_clause(&!lemma.cube());
                         }
                         self.frame[frame].push(FrameLemma::new(lemma, po, None));
                         self.frame.early = self.frame.early.min(i + 1);
@@ -258,6 +265,9 @@ impl IC3 {
         let begin = begin.unwrap_or(1);
         for i in begin..=frame {
             self.solvers[i].add_lemma(&clause);
+        }
+        if !self.options.ic3.no_pred_prop && self.level() == frame {
+            self.bad_solver.add_clause(&!lemma.cube());
         }
         self.frame[frame].push(FrameLemma::new(lemma, po, None));
         self.frame.early = self.frame.early.min(begin);
