@@ -9,10 +9,22 @@ impl IC3 {
     pub fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
-        let solver = self.solvers.last_mut().unwrap();
-        let res = solver.solve_without_bucket(&self.ts.bad.cube(), vec![]);
-        self.statistic.block_get_bad_time += start.elapsed();
-        res.then(|| self.get_pred(self.solvers.len(), true))
+        if !self.options.ic3.no_pred_prop {
+            let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
+            self.statistic.block_get_bad_time += start.elapsed();
+            res.then(|| {
+                self.bad_lift
+                    .get_pred(&self.bad_solver, &self.bad_ts.bad.cube(), true)
+            })
+        } else {
+            let res = self
+                .solvers
+                .last_mut()
+                .unwrap()
+                .solve_without_bucket(&self.ts.bad.cube(), vec![]);
+            self.statistic.block_get_bad_time += start.elapsed();
+            res.then(|| self.get_pred(self.solvers.len(), true))
+        }
     }
 }
 

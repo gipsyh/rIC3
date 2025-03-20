@@ -28,9 +28,12 @@ mod verify;
 pub struct IC3 {
     options: Options,
     ts: Grc<TransysCtx>,
-    frame: Frames,
     solvers: Vec<Solver>,
     lift: Solver,
+    bad_ts: Grc<TransysCtx>,
+    bad_solver: cadical::Solver,
+    bad_lift: Solver,
+    frame: Frames,
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
@@ -49,6 +52,10 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
+        if !self.options.ic3.no_pred_prop {
+            self.bad_solver = cadical::Solver::new();
+            self.bad_ts.load_trans(&mut self.bad_solver, true);
+        }
         let mut solver = Solver::new(self.options.clone(), Some(self.frame.len()), &self.ts);
         for v in self.auxiliary_var.iter() {
             solver.add_domain(*v, true);
@@ -314,32 +321,58 @@ impl IC3 {
         self.frame.early = self.level();
         false
     }
+
+    fn base(&mut self) -> bool {
+        if !self.options.ic3.no_pred_prop {
+            let mut base = cadical::Solver::new();
+            self.ts.load_trans(&mut base, true);
+            self.ts.load_init(&mut base);
+            let bad = self.ts.bad;
+            if base.solve(&bad.cube()) {
+                let (bad, inputs) = self.lift.get_pred(&base, &bad.cube(), true);
+                self.add_obligation(ProofObligation::new(0, Lemma::new(bad), inputs, 0, None));
+                return false;
+            }
+            self.ts.constraints.push(!bad);
+            self.lift = Solver::new(self.options.clone(), None, &self.ts);
+        }
+        self.extend();
+        true
+    }
 }
 
 impl IC3 {
-    pub fn new(options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+    pub fn new(mut options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         ts.simplify();
+        let mut uts = TransysUnroll::new(&ts);
+        uts.unroll();
         if options.ic3.inn {
-            let mut uts = TransysUnroll::new(&ts);
-            uts.unroll();
+            options.ic3.no_pred_prop = true;
             ts = uts.interal_signals();
         }
+        let mut bad_ts = uts.compile();
+        bad_ts.constraint.push(!ts.bad);
         let ts = Grc::new(ts.ctx());
+        let bad_ts = Grc::new(bad_ts.ctx());
         let statistic = Statistic::new(options.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
         let lift = Solver::new(options.clone(), None, &ts);
+        let bad_lift = Solver::new(options.clone(), None, &bad_ts);
         let abs_cst = if options.ic3.abs_cst {
             LitVec::new()
         } else {
             ts.constraints.clone()
         };
         let rng = StdRng::seed_from_u64(options.rseed);
-        let mut res = Self {
+        Self {
             options,
             ts,
             activity,
             solvers: Vec::new(),
+            bad_ts,
+            bad_solver: cadical::Solver::new(),
+            bad_lift,
             lift,
             statistic,
             obligations: ProofObligationQueue::new(),
@@ -349,14 +382,15 @@ impl IC3 {
             auxiliary_var: Vec::new(),
             bmc_solver: None,
             rng,
-        };
-        res.extend();
-        res
+        }
     }
 }
 
 impl Engine for IC3 {
     fn check(&mut self) -> Option<bool> {
+        if !self.base() {
+            return Some(false);
+        }
         loop {
             let start = Instant::now();
             loop {
@@ -414,7 +448,12 @@ impl Engine for IC3 {
                 .push(certifaiger.new_ands_node(cube.into_iter().map(AigEdge::from_lit)));
         }
         let invariants = certifaiger.new_ors_node(certifaiger_dnf.into_iter());
-        let constrains: Vec<AigEdge> = certifaiger.constraints.iter().map(|e| !*e).collect();
+        let constrains: Vec<AigEdge> = certifaiger
+            .constraints
+            .iter()
+            .map(|e| !*e)
+            .chain(certifaiger.bads.iter().copied())
+            .collect();
         let constrains = certifaiger.new_ors_node(constrains.into_iter());
         let invariants = certifaiger.new_or_node(invariants, constrains);
         certifaiger.bads.clear();
