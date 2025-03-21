@@ -113,6 +113,18 @@ pub struct IC3Options {
     /// ic3 reverse sort order
     #[arg(long = "ic3-reverse-sort", default_value_t = false)]
     pub reverse_sort: bool,
+
+    /// ic3 use hybrid sort strategy (combine topology and activity)
+    #[arg(long = "ic3-hybrid-sort", default_value_t = false)]
+    pub hybrid_sort: bool,
+    
+    /// initial topology weight for hybrid sort (0.0-1.0)
+    #[arg(long = "ic3-hybrid-topo-weight", default_value_t = 0.7)]
+    pub hybrid_topo_weight: f64,
+    
+    /// frame factor for hybrid sort that controls how quickly topo weight decreases with frame
+    #[arg(long = "ic3-hybrid-frame-factor", default_value_t = 0.1)]
+    pub hybrid_frame_factor: f64,
 }
 
 #[derive(Args, Clone, Debug)]

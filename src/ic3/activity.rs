@@ -46,6 +46,11 @@ impl Activity {
     pub fn decay(&mut self) {
         self.act_inc *= 1.0 / 0.9
     }
+    
+    #[inline]
+    pub fn get_activity(&self, var: Var) -> f64 {
+        self.activity[var]
+    }
 
     pub fn bump_cube_activity(&mut self, cube: &LitVec) {
         self.decay();
