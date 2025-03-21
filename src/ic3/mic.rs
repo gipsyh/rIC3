@@ -218,7 +218,18 @@ impl IC3 {
         self.statistic.avg_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         let mut cex = Vec::new();
-        self.activity.sort_by_activity(&mut cube, true);
+        if self.options.ic3.topo_sort {
+            // Sort by topological order
+            cube.sort();
+            // Apply reverse if requested
+            if self.options.ic3.reverse_sort {
+                cube.reverse();
+            }
+        } else {
+            // Sort by activity
+            let ascending = !self.options.ic3.reverse_sort;
+            self.activity.sort_by_activity(&mut cube, ascending);
+        }
         let mut keep = GHashSet::new();
         let mut i = 0;
         while i < cube.len() {
