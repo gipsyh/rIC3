@@ -105,6 +105,14 @@ pub struct IC3Options {
     /// ic3 without predicate property
     #[arg(long = "ic3-no-pred-prop", default_value_t = false)]
     pub no_pred_prop: bool,
+
+    /// ic3 sort by topology instead of activity
+    #[arg(long = "ic3-topo-sort", default_value_t = false)]
+    pub topo_sort: bool,
+
+    /// ic3 reverse sort order
+    #[arg(long = "ic3-reverse-sort", default_value_t = false)]
+    pub reverse_sort: bool,
 }
 
 #[derive(Args, Clone, Debug)]
