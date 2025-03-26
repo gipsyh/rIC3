@@ -29,9 +29,13 @@ fn main() {
         println!("the model to be checked: {}", options.model.display());
     }
     let mut aig = match options.model.extension() {
-        Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
-            "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
-        ),
+        Some(ext) if (ext == "btor") | (ext == "btor2") => {
+            // options.certifaiger_path = None;
+            // options.certify = false;
+            // btor_to_aiger(&options.model)
+            rIC3::test::test(options);
+            return;
+        },
         Some(ext) if (ext == "aig") | (ext == "aag") => {
             Aig::from_file(options.model.to_str().unwrap())
         }

@@ -8,6 +8,7 @@ pub mod ic3;
 pub mod kind;
 pub mod options;
 pub mod portfolio;
+pub mod test;
 pub mod transys;
 
 use aig::{Aig, TernarySimulate};
