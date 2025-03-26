@@ -65,6 +65,14 @@ pub trait TransysIf {
             }
         }
     }
+
+    #[inline]
+    fn print_info(&self) {
+        println!("num input: {}", self.input().count());
+        println!("num latch: {}", self.latch().count());
+        println!("trans size: {}", self.trans().flatten().count());
+        println!("num constraint: {}", self.constraint().count());
+    }
 }
 
 #[derive(Default, Debug, Clone)]

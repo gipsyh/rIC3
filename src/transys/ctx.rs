@@ -128,13 +128,6 @@ impl TransysCtx {
     pub fn is_latch(&self, var: Var) -> bool {
         self.is_latch[var]
     }
-
-    pub fn print_info(&self) {
-        println!("num input: {}", self.inputs.len());
-        println!("num latch: {}", self.latchs.len());
-        println!("trans size: {}", self.rel.len());
-        println!("num constraint: {}", self.constraints.len());
-    }
 }
 
 impl Transys {

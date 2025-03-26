@@ -23,4 +23,4 @@ jobs:
 
       - name: test docker image
         run: |
-          docker run -v ./examples/counter.aig:/model.aig ric3 model.aig || [ $? -eq 10 ]
+          docker run -v ./examples/counter/counter.aig:/model.aig ric3 model.aig || [ $? -eq 10 ]
