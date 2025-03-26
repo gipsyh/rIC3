@@ -28,16 +28,17 @@ fn main() {
     if options.verbose > 0 {
         println!("the model to be checked: {}", options.model.display());
     }
-    let mut aig = match options.model.extension() {
+    let mut ts = match options.model.extension() {
         Some(ext) if (ext == "btor") | (ext == "btor2") => {
-            // options.certifaiger_path = None;
-            // options.certify = false;
+            options.certificate = None;
+            options.certify = false;
+            options.witness = false;
             // btor_to_aiger(&options.model)
             rIC3::test::test(options);
             return;
         }
         Some(ext) if (ext == "aig") | (ext == "aag") => {
-            Aig::from_file(options.model.to_str().unwrap())
+            Aig::from_file(options.model.to_str().unwrap());
         }
         _ => panic!("unsupported file format"),
     };
