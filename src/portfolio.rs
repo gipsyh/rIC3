@@ -61,6 +61,12 @@ impl Portfolio {
             for a in args {
                 engine.arg(a);
             }
+            if option.preprocess.sec {
+                engine.arg("--sec");
+            }
+            if option.preprocess.no_abc {
+                engine.arg("--no-abc");
+            }
             engines.push(engine);
         };
         new_engine("-e ic3");
