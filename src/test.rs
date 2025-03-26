@@ -1,4 +1,6 @@
-use crate::{bmc::BMC, ic3::IC3, options::Options, wl::transys::Transys, Engine};
+use crate::{
+    Engine, bmc::BMC, ic3::IC3, options::Options, transys::TransysIf, wl::transys::Transys,
+};
 use btor::Btor;
 
 pub fn test(options: Options) {
@@ -17,9 +19,9 @@ pub fn test(options: Options) {
         bitblast.simplify();
         bitblast.print_info();
     }
-    let ts = bitblast.to_bit_level();
+    let mut ts = bitblast.to_bit_level();
+    ts.simplify();
     let bmc = true;
-    let ts = ts.simplify(&[], !bmc, bmc);
     ts.print_info();
     if bmc {
         let mut engine = BMC::new(options, ts);

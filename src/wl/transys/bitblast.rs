@@ -1,23 +1,23 @@
 use super::Transys;
 use crate::transys::{self as blts};
 use fol::{
-    bitblast::{bitblast_terms, cnf_encode_terms},
     Term, TermManager,
+    bitblast::{bitblast_terms, cnf_encode_terms},
 };
-use logic_form::{Cube, DagCnf};
-use std::collections::HashMap;
+use giputils::hash::GHashMap;
+use logic_form::{DagCnf, LitVec};
 
 impl Transys {
     pub fn bitblast(&self) -> Self {
         let mut tm = TermManager::new();
-        let mut map = HashMap::new();
+        let mut map = GHashMap::new();
         let input: Vec<Term> = bitblast_terms(self.input.iter(), &mut tm, &mut map)
             .flatten()
             .collect();
         let latch: Vec<Term> = bitblast_terms(self.latch.iter(), &mut tm, &mut map)
             .flatten()
             .collect();
-        let mut init = HashMap::new();
+        let mut init = GHashMap::new();
         for l in self.latch.iter() {
             let Some(i) = self.init.get(l) else {
                 continue;
@@ -38,7 +38,7 @@ impl Transys {
                 init.insert(l.clone(), i.clone());
             }
         }
-        let mut next = HashMap::new();
+        let mut next = GHashMap::new();
         for l in self.latch.iter() {
             let n = self.next.get(l).unwrap();
             let l = l.bitblast(&mut tm, &mut map);
@@ -64,46 +64,41 @@ impl Transys {
 
     pub fn to_bit_level(&self) -> blts::Transys {
         let mut dc = DagCnf::new();
-        let mut map = HashMap::new();
+        let mut map = GHashMap::new();
         let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
             .map(|i| i.var())
             .collect();
         let latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
             .map(|l| l.var())
             .collect();
-        let mut init = HashMap::new();
+        let mut init = GHashMap::new();
         for l in self.latch.iter() {
             if let Some(i) = self.init.get(l) {
-                let l = l.cnf_encode(&mut dc, &mut map);
+                let l = l.cnf_encode(&mut dc, &mut map).var();
                 let i = i.cnf_encode(&mut dc, &mut map);
                 assert!(i.is_constant(false) || i.is_constant(true));
                 init.insert(l, i.is_constant(true));
             }
         }
-        let mut next = HashMap::new();
+        let mut next = GHashMap::new();
         for l in self.latch.iter() {
             let n = self.next.get(l).unwrap();
-            let l = l.cnf_encode(&mut dc, &mut map);
+            let l = l.cnf_encode(&mut dc, &mut map).var();
             let n = n.cnf_encode(&mut dc, &mut map);
             next.insert(l, n);
         }
-        let mut latch_map = HashMap::new();
-        for v in latch {
-            let l = v.lit();
-            let init = init.get(&l).cloned();
-            let next = *next.get(&l).unwrap();
-            latch_map.insert(v, (init, next));
-        }
         let bad = self.bad.cnf_encode(&mut dc, &mut map);
-        let constraint: Cube =
+        let constraint: LitVec =
             cnf_encode_terms(self.constraint.iter(), &mut dc, &mut map).collect();
-        let builder = blts::builder::TransysBuilder {
+        blts::Transys {
             input,
-            latch: latch_map,
+            latch,
             bad,
             constraint,
             rel: dc,
-        };
-        builder.build()
+            next,
+            init,
+            rst: GHashMap::default(),
+        }
     }
 }

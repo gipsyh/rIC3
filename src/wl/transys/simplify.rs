@@ -1,15 +1,13 @@
 use super::Transys;
 use fol::{Term, TermType};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use giputils::hash::{GHashMap, GHashSet};
+use std::ops::Deref;
 
 impl Transys {
     pub fn coi_refine(&mut self) {
         let mut queue = self.constraint.clone();
         queue.push(self.bad.clone());
-        let mut touch: HashSet<Term> = HashSet::from_iter(queue.iter().cloned());
+        let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
         while let Some(t) = queue.pop() {
             match &t.deref() {
                 TermType::Const(_) => (),
@@ -36,7 +34,7 @@ impl Transys {
     }
 
     pub fn simplify(&mut self) {
-        let mut map = HashMap::new();
+        let mut map = GHashMap::new();
         for (_, n) in self.next.iter_mut() {
             *n = n.simplify(&mut self.tm, &mut map);
         }

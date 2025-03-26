@@ -35,7 +35,7 @@ fn main() {
             // btor_to_aiger(&options.model)
             rIC3::test::test(options);
             return;
-        },
+        }
         Some(ext) if (ext == "aig") | (ext == "aag") => {
             Aig::from_file(options.model.to_str().unwrap())
         }

@@ -10,6 +10,7 @@ pub mod options;
 pub mod portfolio;
 pub mod test;
 pub mod transys;
+pub mod wl;
 
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
