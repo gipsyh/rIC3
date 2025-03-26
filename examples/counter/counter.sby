@@ -1,0 +1,12 @@
+[options]
+mode bmc
+
+[engines]
+btor pono
+
+[script]
+read_verilog -formal counter.v
+prep -top main
+
+[files]
+counter.v
