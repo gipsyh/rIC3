@@ -344,6 +344,7 @@ impl IC3 {
 impl IC3 {
     pub fn new(mut options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         ts.simplify();
+        ts.print_info();
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if options.ic3.inn {
