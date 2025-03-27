@@ -3,7 +3,6 @@ pub mod nodep;
 mod simp;
 pub mod unroll;
 
-use aig::Aig;
 pub use ctx::*;
 use giputils::hash::GHashMap;
 use logic_form::{DagCnf, Lit, LitVec, Var};
@@ -132,33 +131,5 @@ impl TransysIf for Transys {
 impl Transys {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {
-        let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
-        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        let mut latch = Vec::new();
-        let mut next = GHashMap::new();
-        let mut init = GHashMap::new();
-        for l in aig.latchs.iter() {
-            let lv = Var::from(l.input);
-            latch.push(lv);
-            next.insert(lv, l.next.to_lit());
-            if let Some(i) = l.init {
-                init.insert(lv, i);
-            }
-        }
-        let bad = aig.bads[0].to_lit();
-        let rel = aig.get_cnf();
-        Self {
-            input,
-            latch,
-            next,
-            init,
-            bad,
-            constraint,
-            rel,
-            rst: rst.clone(),
-        }
     }
 }
