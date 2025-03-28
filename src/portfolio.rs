@@ -1,10 +1,9 @@
-use crate::{Engine, Options};
-use aig::Aig;
+use crate::{Options, certifaiger_check};
 use process_control::{ChildExt, Control};
 use std::{
     env::current_exe,
     fs::File,
-    io::Read,
+    io::{Read, Write},
     mem::take,
     process::{Command, Stdio, exit},
     sync::{Arc, Condvar, Mutex},
@@ -35,7 +34,6 @@ impl PortfolioState {
 
 pub struct Portfolio {
     option: Options,
-    _model_file: NamedTempFile,
     engines: Vec<Command>,
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
@@ -44,18 +42,15 @@ pub struct Portfolio {
 }
 
 impl Portfolio {
-    pub fn new(option: Options, aig: &Aig) -> Self {
+    pub fn new(option: Options) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
-        let model_file = tempfile::NamedTempFile::with_suffix_in(".aig", temp_dir_path).unwrap();
-        let model_path = model_file.path().as_os_str().to_str().unwrap();
-        aig.to_file(model_path, false);
         let mut engines = Vec::new();
         let mut new_engine = |args: &str| {
             let args = args.split(" ");
             let mut engine = Command::new(current_exe().unwrap());
             engine.env("RIC3_TMP_DIR", temp_dir_path);
-            engine.arg(model_path);
+            engine.arg(&option.model);
             engine.arg("-v");
             engine.arg("0");
             for a in args {
@@ -87,7 +82,6 @@ impl Portfolio {
         new_engine("-e kind --step 1 --kind-simple-path");
         Self {
             option,
-            _model_file: model_file,
             engines,
             temp_dir,
             certificate: None,
@@ -195,6 +189,17 @@ impl Portfolio {
         self.engine_pids.clear();
         Some(res)
     }
+
+    pub fn check(&mut self) -> Option<bool> {
+        let ric3 = self as *mut Self as usize;
+        ctrlc::set_handler(move || {
+            let ric3 = unsafe { &mut *(ric3 as *mut Portfolio) };
+            ric3.terminate();
+            exit(124);
+        })
+        .unwrap();
+        self.check_inner()
+    }
 }
 
 impl Drop for Portfolio {
@@ -206,30 +211,90 @@ impl Drop for Portfolio {
     }
 }
 
-impl Engine for Portfolio {
-    fn check(&mut self) -> Option<bool> {
-        let ric3 = self as *mut Self as usize;
-        ctrlc::set_handler(move || {
-            let ric3 = unsafe { &mut *(ric3 as *mut Portfolio) };
-            ric3.terminate();
-            exit(124);
-        })
+fn certificate(engine: &mut Portfolio, option: &Options, res: bool) {
+    if res {
+        if option.certificate.is_none() && !option.certify {
+            return;
+        }
+        if let Some(certificate_path) = &option.certificate {
+            std::fs::copy(engine.certificate.as_ref().unwrap(), certificate_path).unwrap();
+        }
+    } else {
+        if option.certificate.is_none() && !option.certify && !option.witness {
+            return;
+        }
+        let mut witness = String::new();
+        File::open(
+            engine
+                .certificate
+                .as_ref()
+                .unwrap()
+                .path()
+                .as_os_str()
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap()
+        .read_to_string(&mut witness)
         .unwrap();
-        self.check_inner()
+        if option.witness {
+            println!("{}", witness);
+        }
+        if let Some(certificate_path) = &option.certificate {
+            let mut file: File = File::create(certificate_path).unwrap();
+            file.write_all(witness.as_bytes()).unwrap();
+        }
     }
-
-    fn certifaiger(&mut self, _aig: &aig::Aig) -> Aig {
-        let certificate = take(&mut self.certificate);
-        Aig::from_file(certificate.unwrap().path().as_os_str().to_str().unwrap())
+    if !option.certify {
+        return;
     }
-
-    fn witness(&mut self, _aig: &Aig) -> String {
-        let mut res = String::new();
-        let certificate = take(&mut self.certificate);
-        File::open(certificate.unwrap().path().as_os_str().to_str().unwrap())
+    certifaiger_check(
+        option,
+        engine
+            .certificate
+            .as_ref()
             .unwrap()
-            .read_to_string(&mut res)
-            .unwrap();
-        res
+            .path()
+            .as_os_str()
+            .to_str()
+            .unwrap(),
+    );
+}
+
+pub fn portfolio_main(options: Options) {
+    let mut engine = Portfolio::new(options.clone());
+    let res = engine.check();
+    if options.verbose > 0 {
+        print!("result: ");
+    }
+    match res {
+        Some(true) => {
+            if options.verbose > 0 {
+                println!("safe");
+            }
+            if options.witness {
+                println!("0");
+            }
+            certificate(&mut engine, &options, true)
+        }
+        Some(false) => {
+            if options.verbose > 0 {
+                println!("unsafe");
+            }
+            certificate(&mut engine, &options, false)
+        }
+        _ => {
+            if options.verbose > 0 {
+                println!("unknown");
+            }
+            if options.witness {
+                println!("2");
+            }
+        }
+    }
+    if let Some(res) = res {
+        exit(if res { 20 } else { 10 })
+    } else {
+        exit(0)
     }
 }
