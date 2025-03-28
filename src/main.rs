@@ -10,7 +10,7 @@ use rIC3::{
     ic3::IC3,
     kind::Kind,
     options::{self, Options},
-    portfolio::Portfolio,
+    portfolio::portfolio_main,
     transys::Transys,
 };
 use std::{
@@ -27,6 +27,10 @@ fn main() {
     options.model = options.model.canonicalize().unwrap();
     if options.verbose > 0 {
         println!("the model to be checked: {}", options.model.display());
+    }
+    if let options::Engine::Portfolio = options.engine {
+        portfolio_main(options);
+        unreachable!();
     }
     let mut aig = match options.model.extension() {
         Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
@@ -72,37 +76,32 @@ fn main() {
         options.certify = false;
         aig.compress_property();
     }
-    let mut engine: Box<dyn Engine> = if let options::Engine::Portfolio = options.engine {
-        Box::new(Portfolio::new(options.clone(), &origin_aig))
-    } else {
-        let (aig, restore) = aig_preprocess(&aig, &options);
-        let ts = Transys::from_aig(&aig, &restore);
-        if options.preprocess.sec {
-            panic!("sec not support");
-        }
-        let mut engine: Box<dyn Engine> = match options.engine {
-            options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
-            options::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
-            options::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
-            _ => unreachable!(),
-        };
-        if options.interrupt_statistic {
-            let e: (usize, usize) =
-                unsafe { transmute((engine.as_mut() as *mut dyn Engine).to_raw_parts()) };
-            let _ = ctrlc::set_handler(move || {
-                let e: *mut dyn Engine = unsafe {
-                    ptr::from_raw_parts_mut(
-                        e.0 as *mut (),
-                        transmute::<usize, std::ptr::DynMetadata<dyn rIC3::Engine>>(e.1),
-                    )
-                };
-                let e = unsafe { &mut *e };
-                e.statistic();
-                exit(124);
-            });
-        }
-        engine
+    let (aig, restore) = aig_preprocess(&aig, &options);
+    let ts = Transys::from_aig(&aig, &restore);
+    if options.preprocess.sec {
+        panic!("sec not support");
+    }
+    let mut engine: Box<dyn Engine> = match options.engine {
+        options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
+        options::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
+        options::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
+        _ => unreachable!(),
     };
+    if options.interrupt_statistic {
+        let e: (usize, usize) =
+            unsafe { transmute((engine.as_mut() as *mut dyn Engine).to_raw_parts()) };
+        let _ = ctrlc::set_handler(move || {
+            let e: *mut dyn Engine = unsafe {
+                ptr::from_raw_parts_mut(
+                    e.0 as *mut (),
+                    transmute::<usize, std::ptr::DynMetadata<dyn rIC3::Engine>>(e.1),
+                )
+            };
+            let e = unsafe { &mut *e };
+            e.statistic();
+            exit(124);
+        });
+    }
     let res = engine.check();
     if options.verbose > 0 {
         engine.statistic();
@@ -135,11 +134,7 @@ fn main() {
             }
         }
     }
-    if let options::Engine::Portfolio = options.engine {
-        drop(engine);
-    } else {
-        mem::forget(engine);
-    }
+    mem::forget(engine);
     if let Some(res) = res {
         exit(if res { 20 } else { 10 })
     } else {
