@@ -5,23 +5,28 @@ use std::{
     fs::File,
     io::{Read, Write},
     mem::take,
+    ops::{Deref, DerefMut},
     process::{Command, Stdio, exit},
     sync::{Arc, Condvar, Mutex},
     thread::spawn,
 };
 use tempfile::{NamedTempFile, TempDir};
 
-#[derive(Default)]
 enum PortfolioState {
-    #[default]
-    Checking,
+    Checking(usize),
     Finished(bool, String, Option<NamedTempFile>),
     Terminate,
 }
 
 impl PortfolioState {
+    fn new(nt: usize) -> Self {
+        PortfolioState::Checking(nt)
+    }
+}
+
+impl PortfolioState {
     fn is_checking(&self) -> bool {
-        matches!(self, Self::Checking)
+        matches!(self, Self::Checking(_))
     }
 
     fn result(&mut self) -> (bool, String, Option<NamedTempFile>) {
@@ -38,7 +43,7 @@ pub struct Portfolio {
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
     certificate: Option<NamedTempFile>,
-    result: Arc<(Mutex<PortfolioState>, Condvar)>,
+    state: Arc<(Mutex<PortfolioState>, Condvar)>,
 }
 
 impl Portfolio {
@@ -80,18 +85,19 @@ impl Portfolio {
         new_engine("-e bmc --bmc-kissat --step 70");
         new_engine("-e bmc --bmc-kissat --step 135");
         new_engine("-e kind --step 1 --kind-simple-path");
+        let ps = PortfolioState::new(engines.len());
         Self {
             option,
             engines,
             temp_dir,
             certificate: None,
             engine_pids: Default::default(),
-            result: Arc::new((Mutex::new(PortfolioState::default()), Condvar::new())),
+            state: Arc::new((Mutex::new(ps), Condvar::new())),
         }
     }
 
     pub fn terminate(&mut self) {
-        let Ok(mut lock) = self.result.0.try_lock() else {
+        let Ok(mut lock) = self.state.0.try_lock() else {
             return;
         };
         if lock.is_checking() {
@@ -117,7 +123,7 @@ impl Portfolio {
     }
 
     fn check_inner(&mut self) -> Option<bool> {
-        let lock = self.result.0.lock().unwrap();
+        let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
             let certificate = if self.option.certificate.is_some()
                 || self.option.certify
@@ -133,14 +139,15 @@ impl Portfolio {
             let mut child = engine.stderr(Stdio::piped()).spawn().unwrap();
             self.engine_pids.push(child.id() as i32);
             let option = self.option.clone();
-            let result = self.result.clone();
+            let state = self.state.clone();
             spawn(move || {
-                let config = engine
+                let mut config = engine
                     .get_args()
                     .skip(4)
                     .map(|cstr| cstr.to_str().unwrap())
-                    .collect::<Vec<&str>>()
-                    .join(" ");
+                    .collect::<Vec<&str>>();
+                config.pop();
+                let config = config.join(" ");
                 if option.verbose > 1 {
                     println!("start engine: {config}");
                 }
@@ -157,20 +164,38 @@ impl Portfolio {
                     Some(10) => false,
                     Some(20) => true,
                     e => {
-                        if option.verbose > 0 && result.0.lock().unwrap().is_checking() {
-                            println!("{config} unsuccessfully exited, exit code: {:?}", e);
+                        let mut ps = state.0.lock().unwrap();
+                        if let PortfolioState::Checking(np) = ps.deref_mut() {
+                            if option.verbose > 0 {
+                                println!("{config} unexpectedly exited, exit code: {:?}", e);
+                                let mut stderr = String::new();
+                                child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
+                                print!("stderr:");
+                                print!("{}", stderr);
+                            }
+                            *np -= 1;
+                            if *np == 0 {
+                                state.1.notify_one();
+                            }
                         }
                         return;
                     }
                 };
-                let mut lock = result.0.lock().unwrap();
+                let mut lock = state.0.lock().unwrap();
                 if lock.is_checking() {
                     *lock = PortfolioState::Finished(res, config, certificate);
-                    result.1.notify_one();
+                    state.1.notify_one();
                 }
             });
         }
-        let mut result = self.result.1.wait(lock).unwrap();
+        let mut result = self.state.1.wait(lock).unwrap();
+        if let PortfolioState::Checking(np) = result.deref() {
+            assert!(*np == 0);
+            if self.option.verbose > 0 {
+                println!("all workers unexpectedly exited :(");
+            }
+            return None;
+        }
         let (res, config, certificate) = result.result();
         drop(result);
         self.certificate = certificate;
