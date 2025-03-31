@@ -5,8 +5,8 @@ mode prove
 aiger rIC3
 
 [script]
-read_verilog -formal counter.v
-prep -top main
+read_verilog -formal fifo.v
+prep -top fifo
 
 [files]
-counter.v
+fifo.v
