@@ -224,7 +224,7 @@ impl Engine for Kind {
             .chain(certifaiger.outputs.iter())
             .copied()
             .collect();
-        let bads = certifaiger.new_ors_node(bads.into_iter());
+        let bads = certifaiger.new_ors_node(bads);
         certifaiger.bads.clear();
         certifaiger.outputs.clear();
         certifaiger.outputs.push(bads);

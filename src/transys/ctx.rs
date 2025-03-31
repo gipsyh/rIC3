@@ -1,6 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logic_form::{DagCnf, Lit, LitMap, LitVec, LitVvec, Var, VarMap};
+use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Clone, Default, Debug)]
 pub struct TransysCtx {
@@ -15,7 +15,7 @@ pub struct TransysCtx {
     next_map: LitMap<Lit>,
     prev_map: LitMap<Lit>,
     pub max_latch: Var,
-    restore: GHashMap<Var, Var>,
+    pub restore: GHashMap<Var, Var>,
 }
 
 impl TransysIf for TransysCtx {
@@ -133,11 +133,7 @@ impl TransysCtx {
 impl Transys {
     pub fn ctx(mut self) -> TransysCtx {
         self.latch.sort();
-        let primes: Vec<Lit> = self
-            .latch
-            .iter()
-            .map(|l| self.rel.new_var().lit().not_if(!self.next[l].polarity()))
-            .collect();
+        let primes: Vec<Lit> = self.latch.iter().map(|l| self.next(l.lit())).collect();
         let max_var = self.rel.max_var();
         let max_latch = *self.latch.iter().max().unwrap_or(&Var::CONST);
         let mut init_map = VarMap::new_with(max_latch);
@@ -148,8 +144,6 @@ impl Transys {
         for (v, p) in self.latch.iter().cloned().zip(primes.iter().cloned()) {
             let l = v.lit();
             let i = self.init.get(&v).cloned();
-            let n = self.next[&v];
-            self.rel.add_rel(p.var(), &LitVvec::cnf_assign(p, n));
             if let Some(i) = i {
                 init_map[v] = Some(i);
                 init.push(l.not_if(!i));
@@ -159,13 +153,6 @@ impl Transys {
             prev_map[p] = l;
             prev_map[!p] = !l;
             is_latch[v] = true;
-        }
-        for (l, p) in self.latch.iter().zip(primes.iter()) {
-            let n = self.next[l];
-            assert!(p.polarity() == n.polarity());
-            if let Some(r) = self.rst.get(&n.var()).cloned() {
-                self.rst.insert(p.var(), r);
-            }
         }
         TransysCtx {
             inputs: self.input,

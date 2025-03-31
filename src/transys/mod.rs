@@ -5,8 +5,8 @@ pub mod unroll;
 
 use aig::Aig;
 pub use ctx::*;
-use giputils::hash::GHashMap;
-use logic_form::{DagCnf, Lit, LitVec, Var};
+use giputils::hash::{GHashMap, GHashSet};
+use logic_form::{DagCnf, Lit, LitVec, LitVvec, Var};
 use satif::Satif;
 
 pub trait TransysIf {
@@ -132,6 +132,24 @@ impl TransysIf for Transys {
 impl Transys {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn unique_prime(&mut self) {
+        let mut unique = GHashSet::new();
+        unique.insert(Var::CONST);
+        for l in self.latch.clone() {
+            let mut n = self.next[&l];
+            if unique.contains(&n.var()) {
+                let u = self.rel.new_var().lit();
+                self.rel.add_rel(u.var(), &LitVvec::cnf_assign(u, n));
+                self.next.insert(l, u);
+                if let Some(&r) = self.rst.get(&n.var()) {
+                    self.rst.insert(u.var(), r);
+                }
+                n = u;
+            }
+            unique.insert(n.var());
+        }
     }
 
     pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {

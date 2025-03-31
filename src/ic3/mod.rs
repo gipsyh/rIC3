@@ -8,7 +8,7 @@ use crate::{
 use activity::Activity;
 use aig::{Aig, AigEdge};
 use frame::{Frame, Frames};
-use giputils::grc::Grc;
+use giputils::{grc::Grc, hash::GHashMap};
 use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -33,6 +33,7 @@ pub struct IC3 {
     bad_ts: Grc<TransysCtx>,
     bad_solver: cadical::Solver,
     bad_lift: Solver,
+    bad_input: GHashMap<Var, Var>,
     frame: Frames,
     obligations: ProofObligationQueue,
     activity: Activity,
@@ -205,7 +206,7 @@ impl IC3 {
                 self.add_obligation(ProofObligation::new(
                     po.frame - 1,
                     Lemma::new(model),
-                    inputs,
+                    vec![inputs],
                     po.depth + 1,
                     Some(po.clone()),
                 ));
@@ -330,7 +331,13 @@ impl IC3 {
             let bad = self.ts.bad;
             if base.solve(&bad.cube()) {
                 let (bad, inputs) = self.lift.get_pred(&base, &bad.cube(), true);
-                self.add_obligation(ProofObligation::new(0, Lemma::new(bad), inputs, 0, None));
+                self.add_obligation(ProofObligation::new(
+                    0,
+                    Lemma::new(bad),
+                    vec![inputs],
+                    0,
+                    None,
+                ));
                 return false;
             }
             self.ts.constraints.push(!bad);
@@ -343,12 +350,17 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(mut options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+        ts.unique_prime();
         ts.simplify();
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if options.ic3.inn {
             options.ic3.no_pred_prop = true;
             ts = uts.interal_signals();
+        }
+        let mut bad_input = GHashMap::new();
+        for &l in ts.input.iter() {
+            bad_input.insert(uts.var_next(l, 1), l);
         }
         let mut bad_ts = uts.compile();
         bad_ts.constraint.push(!ts.bad);
@@ -373,6 +385,7 @@ impl IC3 {
             bad_ts,
             bad_solver: cadical::Solver::new(),
             bad_lift,
+            bad_input,
             lift,
             statistic,
             obligations: ProofObligationQueue::new(),
@@ -447,14 +460,14 @@ impl Engine for IC3 {
             certifaiger_dnf
                 .push(certifaiger.new_ands_node(cube.into_iter().map(AigEdge::from_lit)));
         }
-        let invariants = certifaiger.new_ors_node(certifaiger_dnf.into_iter());
+        let invariants = certifaiger.new_ors_node(certifaiger_dnf);
         let constrains: Vec<AigEdge> = certifaiger
             .constraints
             .iter()
             .map(|e| !*e)
             .chain(certifaiger.bads.iter().copied())
             .collect();
-        let constrains = certifaiger.new_ors_node(constrains.into_iter());
+        let constrains = certifaiger.new_ors_node(constrains);
         let invariants = certifaiger.new_or_node(invariants, constrains);
         certifaiger.bads.clear();
         certifaiger.outputs.clear();
@@ -487,22 +500,16 @@ impl Engine for IC3 {
         }
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
-        let mut assump = if let Some(next) = b.next.clone() {
-            self.ts.lits_next(&next.lemma)
-        } else {
-            self.ts.bad.cube()
-        };
-        assump.extend_from_slice(&b.input);
-        assert!(self.solvers[0].solve(&assump, vec![]));
-        for l in self.ts.latchs.iter() {
-            let l = l.lit();
+        for &l in b.lemma.iter() {
             if let Some(v) = self.solvers[0].sat_value(l) {
                 res[0].push(self.ts.restore(l.not_if(!v)));
             }
         }
         let mut b = Some(b);
         while let Some(bad) = b {
-            res.push(bad.input.iter().map(|l| self.ts.restore(*l)).collect());
+            for i in bad.input.iter() {
+                res.push(i.iter().map(|l| self.ts.restore(*l)).collect());
+            }
             b = bad.next.clone();
         }
         witness_encode(aig, &res)

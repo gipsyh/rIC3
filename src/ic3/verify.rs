@@ -1,7 +1,7 @@
 use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::{TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
-use logic_form::{Lemma, Lit, LitVec};
+use logic_form::{Lemma, LitVec};
 use satif::Satif;
 use std::ops::Deref;
 
@@ -43,37 +43,6 @@ impl IC3 {
                 invariants.len()
             );
         }
-    }
-
-    pub fn check_witness(&mut self) -> Option<Lit> {
-        let mut b = self.obligations.peak();
-        while let Some(bad) = b {
-            let imply = if let Some(next) = bad.next.clone() {
-                self.ts.lits_next(&next.lemma)
-            } else {
-                self.ts.bad.cube()
-            };
-            let mut assump = bad.lemma.deref().clone();
-            assump.extend_from_slice(&bad.input);
-            self.lift.imply(
-                imply
-                    .iter()
-                    .chain(self.ts.constraints.iter())
-                    .map(|l| l.var()),
-                assump.iter(),
-            );
-            assert!(
-                imply
-                    .iter()
-                    .chain(self.ts.constraints.iter())
-                    .all(|l| self.lift.sat_value(*l).is_some_and(|v| v))
-            );
-            b = bad.next.clone();
-        }
-        if self.options.verbose > 0 {
-            println!("witness checking passed");
-        }
-        None
     }
 
     fn check_witness_with_constrain<S: Satif + ?Sized>(
