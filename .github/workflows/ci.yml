@@ -34,8 +34,8 @@ jobs:
         run: docker pull ghcr.io/gipsyh/certifaiger:latest
       - name: Test examples
         run: |
-          cargo r --release -- ./examples/counter/counter.aig --certify
-          cargo r --release -- ./examples/fifo/fifo.aig --certify
+          cargo r -- ./examples/counter/counter.aig --certify
+          cargo r -- ./examples/fifo/fifo.aig --certify
   deploy:
     needs: build-and-test
     # if: github.event_name == 'release'
