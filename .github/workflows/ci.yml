@@ -38,7 +38,7 @@ jobs:
           cargo r --release -- ./examples/fifo/fifo.aig --certify
   deploy:
     needs: build-and-test
-    if: github.event_name == 'release'
+    # if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +54,6 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/my-image:${{ github.event.release.tag_name }}
+            # ghcr.io/${{ github.repository_owner }}/my-image:${{ github.event.release.tag_name }}
             ghcr.io/${{ github.repository_owner }}/my-image:latest
 
