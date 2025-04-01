@@ -54,6 +54,6 @@ jobs:
         with:
           push: true
           tags: |
-            # ghcr.io/${{ github.repository_owner }}/my-image:${{ github.event.release.tag_name }}
-            ghcr.io/${{ github.repository_owner }}/my-image:latest
+            # ghcr.io/${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
+            ghcr.io/${{ github.repository_owner }}/ric3:latest
 
