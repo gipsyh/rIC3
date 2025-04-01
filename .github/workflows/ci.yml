@@ -50,12 +50,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push docker image
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/ric3:latest
-
-# ghcr.io/${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
+      - name: Build docker image
+        run: |
+          docker build . -t ric3
+      - name: Push
+        run: |
+          docker tag ric3 ghcr.io/${{ github.repository_owner }}/ric3:latest
+          docker push ghcr.io/${{ github.repository_owner }}/ric3:latest
