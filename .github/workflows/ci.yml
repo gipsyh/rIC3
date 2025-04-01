@@ -40,12 +40,11 @@ jobs:
   #         cargo r -- ./examples/fifo/fifo.aig --certify || [ $? -eq 20 ]
   deploy:
     # needs: build-and-test
-    # if: github.event_name == 'release'
+    # if: github.event_name == 'release' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to ghcr
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
