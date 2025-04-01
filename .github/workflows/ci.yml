@@ -5,6 +5,8 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]
+  release:
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,9 +24,15 @@ jobs:
           components: rustfmt, clippy
       - name: Pull submodules
         run: git submodule update --init --recursive
+      - name: Format check
+        run: cargo fmt --check
       - name: Build
         run: cargo build
       - name: Run test
         run: cargo test
-      - name: Format check
-        run: cargo fmt --check
+      - name: Pull certifaiger
+        run: docker pull ghcr.io/gipsyh/certifaiger:latest
+      - name: Test examples
+        run: |
+          cargo r --release -- ./examples/counter/counter.aig --certify
+          cargo r --release -- ./examples/fifo/fifo.aig --certify
