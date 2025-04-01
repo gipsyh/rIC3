@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jwlawson/actions-setup-cmake@v2.0.2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Pull submodules
+        run: git submodule update --init --recursive
+      - name: Format check
+        run: cargo fmt --check
+      - name: Build
+        run: cargo build
+      - name: Run test
+        run: cargo test
+      - name: Pull certifaiger
+        run: |
+          docker pull ghcr.io/gipsyh/certifaiger:latest
+          docker tag ghcr.io/gipsyh/certifaiger certifaiger
+      - name: Test examples
+        run: |
+          cargo r -- ./examples/counter/counter.aig --certify || [ $? -eq 10 ]
+          cargo r -- ./examples/fifo/fifo.aig --certify || [ $? -eq 20 ]
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build docker image
+        run: |
+          docker build . -t ric3
+      - name: Release
+        if: github.event_name == 'release'
+        run: |
+          docker tag ric3 ${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
+          docker push ${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
+          docker tag ric3 ghcr.io/${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
+          docker push ghcr.io/${{ github.repository_owner }}/ric3:${{ github.event.release.tag_name }}
