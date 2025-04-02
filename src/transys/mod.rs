@@ -1,9 +1,9 @@
 mod ctx;
 pub mod nodep;
+mod others;
 mod simp;
 pub mod unroll;
 
-use aig::Aig;
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
 use logic_form::{DagCnf, Lit, LitVec, LitVvec, Var};
@@ -11,6 +11,15 @@ use satif::Satif;
 
 pub trait TransysIf {
     fn max_var(&self) -> Var;
+
+    fn new_var(&mut self) -> Var;
+
+    #[inline]
+    fn new_var_to(&mut self, var: Var) {
+        while self.max_var() < var {
+            self.new_var();
+        }
+    }
 
     fn input(&self) -> impl Iterator<Item = Var>;
 
@@ -94,6 +103,11 @@ impl TransysIf for Transys {
     }
 
     #[inline]
+    fn new_var(&mut self) -> Var {
+        self.rel.new_var()
+    }
+
+    #[inline]
     fn input(&self) -> impl Iterator<Item = Var> {
         self.input.iter().copied()
     }
@@ -149,34 +163,6 @@ impl Transys {
                 n = u;
             }
             unique.insert(n.var());
-        }
-    }
-
-    pub fn from_aig(aig: &Aig, rst: &GHashMap<Var, Var>) -> Self {
-        let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
-        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        let mut latch = Vec::new();
-        let mut next = GHashMap::new();
-        let mut init = GHashMap::new();
-        for l in aig.latchs.iter() {
-            let lv = Var::from(l.input);
-            latch.push(lv);
-            next.insert(lv, l.next.to_lit());
-            if let Some(i) = l.init {
-                init.insert(lv, i);
-            }
-        }
-        let bad = aig.bads[0].to_lit();
-        let rel = aig.get_cnf();
-        Self {
-            input,
-            latch,
-            next,
-            init,
-            bad,
-            constraint,
-            rel,
-            rst: rst.clone(),
         }
     }
 }

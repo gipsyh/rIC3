@@ -1,4 +1,4 @@
-use crate::{Options, certifaiger_check};
+use crate::{Options, frontend::aig::certificate::certifaiger_check};
 use process_control::{ChildExt, Control};
 use std::{
     env::current_exe,

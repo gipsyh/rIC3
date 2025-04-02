@@ -1,10 +1,8 @@
 use crate::{
-    Engine,
+    Engine, Witness,
     options::Options,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
-    witness_encode,
 };
-use aig::Aig;
 use logic_form::LitVec;
 use satif::Satif;
 use std::time::Duration;
@@ -100,12 +98,12 @@ impl Engine for BMC {
         None
     }
 
-    fn witness(&mut self, aig: &Aig) -> String {
-        let mut wit = vec![LitVec::new()];
+    fn witness(&mut self, _ts: &Transys) -> Witness {
+        let mut wit = Witness::default();
         for l in self.uts.ts.latch() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l) {
-                wit[0].push(self.uts.ts.restore(l.not_if(!v)));
+                wit.init.push(self.uts.ts.restore(l.not_if(!v)));
             }
         }
         for k in 0..=self.uts.num_unroll {
@@ -117,8 +115,8 @@ impl Engine for BMC {
                     w.push(self.uts.ts.restore(l.not_if(!v)));
                 }
             }
-            wit.push(w);
+            wit.wit.push(w);
         }
-        witness_encode(aig, &wit)
+        wit
     }
 }

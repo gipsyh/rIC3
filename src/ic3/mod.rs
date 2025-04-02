@@ -1,12 +1,10 @@
 use crate::{
-    Engine,
+    Engine, Proof, Witness,
     gipsat::{Solver, SolverStatistic},
     options::Options,
     transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
-    witness_encode,
 };
 use activity::Activity;
-use aig::{Aig, AigEdge};
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap};
 use logic_form::{Lemma, LitVec, Var};
@@ -15,7 +13,7 @@ use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use statistic::Statistic;
-use std::time::Instant;
+use std::{iter::once, time::Instant};
 
 mod activity;
 mod frame;
@@ -446,40 +444,35 @@ impl Engine for IC3 {
         }
     }
 
-    fn certifaiger(&mut self, aig: &Aig) -> Aig {
+    fn proof(&mut self, ts: &Transys) -> Proof {
         let invariants = self.frame.invariant();
         let invariants = invariants
             .iter()
             .map(|l| LitVec::from_iter(l.iter().map(|l| self.ts.restore(*l))));
-        let mut certifaiger = aig.clone();
+        let mut proof = ts.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {
-            certifaiger_dnf
-                .push(certifaiger.new_ands_node(cube.into_iter().map(AigEdge::from_lit)));
+            certifaiger_dnf.push(proof.rel.new_and(cube));
         }
-        let invariants = certifaiger.new_ors_node(certifaiger_dnf);
-        let constrains: Vec<AigEdge> = certifaiger
-            .constraints
+        let invariants = proof.rel.new_or(certifaiger_dnf);
+        let constrains: Vec<_> = proof
+            .constraint
             .iter()
             .map(|e| !*e)
-            .chain(certifaiger.bads.iter().copied())
+            .chain(once(proof.bad))
             .collect();
-        let constrains = certifaiger.new_ors_node(constrains);
-        let invariants = certifaiger.new_or_node(invariants, constrains);
-        certifaiger.bads.clear();
-        certifaiger.outputs.clear();
-        certifaiger.outputs.push(invariants);
-        certifaiger
+        let constrains = proof.rel.new_or(constrains);
+        proof.bad = proof.rel.new_or([invariants, constrains]);
+        Proof { proof }
     }
 
-    fn witness(&mut self, aig: &Aig) -> String {
-        let mut res: Vec<LitVec> = vec![LitVec::new()];
+    fn witness(&mut self, _ts: &Transys) -> Witness {
+        let mut res = Witness::default();
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            let mut wit = vec![LitVec::new()];
             for l in uts.ts.latchs.iter() {
                 let l = l.lit();
                 if let Some(v) = bmc_solver.sat_value(l) {
-                    wit[0].push(uts.ts.restore(l.not_if(!v)));
+                    res.init.push(uts.ts.restore(l.not_if(!v)));
                 }
             }
             for k in 0..=uts.num_unroll {
@@ -491,23 +484,24 @@ impl Engine for IC3 {
                         w.push(uts.ts.restore(l.not_if(!v)));
                     }
                 }
-                wit.push(w);
+                res.wit.push(w);
             }
-            return witness_encode(aig, &wit);
+            return res;
         }
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         for &l in b.lemma.iter() {
-            res[0].push(self.ts.restore(l));
+            res.init.push(self.ts.restore(l));
         }
         let mut b = Some(b);
         while let Some(bad) = b {
             for i in bad.input.iter() {
-                res.push(i.iter().map(|l| self.ts.restore(*l)).collect());
+                res.wit
+                    .push(i.iter().map(|l| self.ts.restore(*l)).collect());
             }
             b = bad.next.clone();
         }
-        witness_encode(aig, &res)
+        res
     }
 
     fn statistic(&mut self) {
