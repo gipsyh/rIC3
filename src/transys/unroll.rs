@@ -170,7 +170,7 @@ impl TransysUnroll<Transys> {
             }
             for (v, cls) in self.ts.rel.iter() {
                 let v = self.var_next(v, u);
-                if rel.has_rel(v) {
+                if v <= rel.max_var() && rel.has_rel(v) {
                     continue;
                 }
                 let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, u)).collect();

@@ -25,6 +25,11 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
+    fn new_var(&mut self) -> Var {
+        self.rel.new_var()
+    }
+
+    #[inline]
     fn input(&self) -> impl Iterator<Item = Var> {
         self.inputs.iter().copied()
     }

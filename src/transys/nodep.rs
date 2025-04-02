@@ -74,6 +74,11 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
+    fn new_var(&mut self) -> Var {
+        self.rel.new_var()
+    }
+
+    #[inline]
     fn input(&self) -> impl Iterator<Item = Var> {
         self.input.iter().copied()
     }
