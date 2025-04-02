@@ -123,6 +123,7 @@ pub fn certifaiger_check(opt: &Options, certificate: &str) {
         .args([
             "run",
             "--rm",
+            "--pull=never",
             "-v",
             &format!(
                 "{}:{}",
@@ -131,7 +132,7 @@ pub fn certifaiger_check(opt: &Options, certificate: &str) {
             ),
             "-v",
             &format!("{}:{}", certificate, certificate),
-            "certifaiger",
+            "ghcr.io/gipsyh/certifaiger",
         ])
         .arg(&opt.model)
         .arg(certificate)
@@ -147,7 +148,7 @@ pub fn certifaiger_check(opt: &Options, certificate: &str) {
         match output.status.code() {
             Some(1) => panic!("certifaiger check failed"),
             _ => panic!(
-                "certifaiger maybe not avaliable, please build docker image from https://github.com/Froleyks/certifaiger"
+                "certifaiger maybe not avaliable, please `docker pull ghcr.io/gipsyh/certifaiger:latest`"
             ),
         }
     }
