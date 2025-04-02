@@ -173,6 +173,7 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
         .args([
             "run",
             "--rm",
+            "--pull=never",
             "-v",
             &format!(
                 "{}:{}",
@@ -180,8 +181,8 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
                 option.model.as_path().display()
             ),
             "-v",
-            &format!("{}:{}", certificate.display(), certificate.display()),
-            "certifaiger",
+            &format!("{}:{}", certificate, certificate),
+            "ghcr.io/gipsyh/certifaiger",
         ])
         .arg(&option.model)
         .arg(certificate)
@@ -197,7 +198,7 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
         match output.status.code() {
             Some(1) => panic!("certifaiger check failed"),
             _ => panic!(
-                "certifaiger maybe not avaliable, please build docker image from https://github.com/Froleyks/certifaiger"
+                "certifaiger maybe not avaliable, please `docker pull ghcr.io/gipsyh/certifaiger:latest`"
             ),
         }
     }
