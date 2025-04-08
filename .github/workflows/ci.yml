@@ -33,7 +33,6 @@ jobs:
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
-          docker tag ghcr.io/gipsyh/certifaiger certifaiger
       - name: Test examples
         run: |
           cargo r -- ./examples/counter/counter.aig --certify || [ $? -eq 10 ]
