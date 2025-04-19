@@ -41,9 +41,7 @@ fn main() {
         }
         _ => panic!("unsupported file format"),
     };
-    if !aig.outputs.is_empty() && !options.certify {
-        // not certifying, move outputs to bads
-        // Move outputs to bads if no bad properties exist
+    if !aig.outputs.is_empty() {
         if aig.bads.is_empty() {
             aig.bads = std::mem::take(&mut aig.outputs);
             println!(

@@ -324,13 +324,11 @@ impl IC3 {
     }
 
     fn base(&mut self) -> bool {
+        self.extend();
         if !self.options.ic3.no_pred_prop {
-            let mut base = cadical::Solver::new();
-            self.ts.load_trans(&mut base, true);
-            self.ts.load_init(&mut base);
             let bad = self.ts.bad;
-            if base.solve(&bad.cube()) {
-                let (bad, inputs) = self.lift.get_pred(&base, &bad.cube(), true);
+            if self.solvers[0].solve_without_bucket(&self.ts.bad.cube(), vec![]) {
+                let (bad, inputs) = self.get_pred(self.solvers.len(), true);
                 self.add_obligation(ProofObligation::new(
                     0,
                     Lemma::new(bad),
@@ -343,7 +341,6 @@ impl IC3 {
             self.ts.constraints.push(!bad);
             self.lift = Solver::new(self.options.clone(), None, &self.ts);
         }
-        self.extend();
         true
     }
 }
