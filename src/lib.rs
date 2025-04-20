@@ -8,7 +8,9 @@ pub mod ic3;
 pub mod kind;
 pub mod options;
 pub mod portfolio;
+pub mod test;
 pub mod transys;
+pub mod wl;
 
 use logic_form::LitVec;
 use options::Options;
