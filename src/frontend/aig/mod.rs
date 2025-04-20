@@ -34,12 +34,12 @@ impl From<&Transys> for Aig {
                     if last.polarity() == true {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(aig.new_ands_node(
+                        r.push(aig.trivial_new_ands_node(
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = aig.new_ors_node(r);
+                let n = aig.trivial_new_ors_node(r);
                 map.insert(v, n);
             }
         }
@@ -57,8 +57,8 @@ impl From<&Transys> for Aig {
     }
 }
 
-impl From<&Aig> for Transys {
-    fn from(aig: &Aig) -> Self {
+impl Transys {
+    pub fn from_aig(aig: &Aig, compact: bool) -> Transys {
         let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
         let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
         let mut latch = Vec::new();
@@ -73,7 +73,7 @@ impl From<&Aig> for Transys {
             }
         }
         let bad = aig.bads[0].to_lit();
-        let rel = aig.get_cnf();
+        let rel = aig.cnf(compact);
         let mut rst = GHashMap::new();
         for v in Var::CONST..=rel.max_var() {
             rst.insert(v, v);
@@ -130,7 +130,7 @@ pub struct AigFrontend {
 
 impl AigFrontend {
     pub fn new(opt: &Options) -> Self {
-        let mut origin_aig = Aig::from_file(opt.model.to_str().unwrap());
+        let mut origin_aig = Aig::from_file(&opt.model);
         if !origin_aig.outputs.is_empty() {
             if origin_aig.bads.is_empty() {
                 origin_aig.bads = std::mem::take(&mut origin_aig.outputs);
@@ -169,7 +169,7 @@ impl AigFrontend {
             }
             aig.compress_property();
         }
-        let origin_ts = Transys::from(&origin_aig);
+        let origin_ts = Transys::from_aig(&origin_aig, false);
         Self {
             origin_aig,
             origin_ts,
@@ -179,7 +179,7 @@ impl AigFrontend {
 
     pub fn ts(&mut self) -> Transys {
         let (aig, rst) = aig_preprocess(&self.origin_aig, &self.opt);
-        let mut ts = Transys::from(&aig);
+        let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
         ts
     }
