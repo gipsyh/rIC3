@@ -57,7 +57,7 @@ fn main() {
     if aig.bads.is_empty() {
         println!("warning: no property to be checked");
         if let Some(certificate) = &options.certificate {
-            aig.to_file(certificate.to_str().unwrap(), true);
+            aig.to_file(certificate, true);
         }
         exit(20);
     } else if aig.bads.len() > 1 {

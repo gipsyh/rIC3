@@ -17,6 +17,7 @@ use options::Options;
 use std::{
     fs::File,
     io::{self, Write},
+    path::Path,
     process::Command,
 };
 
@@ -98,15 +99,14 @@ pub fn certificate(engine: &mut Box<dyn Engine>, aig: &Aig, option: &Options, re
             );
         }
         if let Some(certificate_path) = &option.certificate {
-            certifaiger.to_file(certificate_path.to_str().unwrap(), true);
+            certifaiger.to_file(certificate_path, true);
         }
         if !option.certify {
             return;
         }
         let certificate_file = tempfile::NamedTempFile::new().unwrap();
-        let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
-        certifaiger.to_file(certificate_path, true);
-        certifaiger_check(option, certificate_path);
+        certifaiger.to_file(certificate_file.path(), true);
+        certifaiger_check(option, certificate_file.path());
     } else {
         if option.certificate.is_none() && !option.certify && !option.witness {
             return;
@@ -129,7 +129,8 @@ pub fn certificate(engine: &mut Box<dyn Engine>, aig: &Aig, option: &Options, re
     }
 }
 
-fn certifaiger_check(option: &Options, certificate: &str) {
+fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
+    let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([
             "run",
@@ -141,7 +142,7 @@ fn certifaiger_check(option: &Options, certificate: &str) {
                 option.model.as_path().display()
             ),
             "-v",
-            &format!("{}:{}", certificate, certificate),
+            &format!("{}:{}", certificate.display(), certificate.display()),
             "certifaiger",
         ])
         .arg(&option.model)

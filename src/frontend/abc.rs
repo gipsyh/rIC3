@@ -52,11 +52,13 @@ pub fn abc_preprocess(mut aig: Aig) -> Aig {
         Err(_) => "/tmp/rIC3".to_string(),
     };
     let tmpfile = tempfile::NamedTempFile::new_in(dir).unwrap();
-    let path = tmpfile.path().as_os_str().to_str().unwrap();
-    aig.to_file(path, false);
-    let mut join = procspawn::spawn(path.to_string(), preprocess);
+    aig.to_file(tmpfile.path(), false);
+    let mut join = procspawn::spawn(
+        tmpfile.path().as_os_str().to_str().unwrap().to_string(),
+        preprocess,
+    );
     if join.join_timeout(Duration::from_secs(5)).is_ok() {
-        aig = Aig::from_file(path);
+        aig = Aig::from_file(tmpfile.path());
     } else {
         println!("abc preprocess timeout");
         let _ = join.kill();
