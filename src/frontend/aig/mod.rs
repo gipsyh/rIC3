@@ -134,14 +134,14 @@ impl AigFrontend {
         if !origin_aig.outputs.is_empty() {
             if origin_aig.bads.is_empty() {
                 origin_aig.bads = std::mem::take(&mut origin_aig.outputs);
-                if options.verbose > 0 {
+                if opt.verbose > 0 {
                     println!(
                         "Warning: property not found, moved {} outputs to bad properties",
                         origin_aig.bads.len()
                     );
                 }
             } else {
-                if options.verbose > 0 {
+                if opt.verbose > 0 {
                     println!("Warning: outputs are ignored");
                 }
                 origin_aig.outputs.clear();
@@ -149,25 +149,24 @@ impl AigFrontend {
         }
         let mut aig = origin_aig.clone();
         if aig.bads.is_empty() {
-            if options.verbose > 0 {
+            if opt.verbose > 0 {
                 println!("Warning: no property to be checked");
             }
-            if let Some(certificate) = &options.certificate {
+            if let Some(certificate) = &opt.certificate {
                 aig.to_file(certificate, true);
             }
             exit(20);
         } else if aig.bads.len() > 1 {
-            if options.certify {
+            if opt.certify {
                 panic!(
                     "Error: Multiple properties detected. Cannot compress properties when certification is enabled."
                 );
             }
-            if options.verbose > 0 {
+            if opt.verbose > 0 {
                 println!(
                     "Warning: Multiple properties detected. rIC3 has compressed them into a single property."
                 );
             }
-            options.certify = false;
             aig.compress_property();
         }
         let origin_ts = Transys::from(&origin_aig);

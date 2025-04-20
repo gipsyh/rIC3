@@ -7,6 +7,7 @@ use crate::{Engine, Proof, Witness, options::Options};
 use std::{
     fs::File,
     io::{self, Write},
+    path::Path,
     process::Command,
 };
 
@@ -50,55 +51,6 @@ impl AigFrontend {
             certifaiger_check(&self.opt, wit_path);
         }
     }
-
-
-pub fn certificate(engine: &mut Box<dyn Engine>, aig: &Aig, option: &Options, res: bool) {
-    if res {
-        if option.certificate.is_none() && !option.certify {
-            return;
-        }
-        let mut certifaiger = engine.certifaiger(aig);
-        certifaiger = certifaiger.reencode();
-        certifaiger.symbols.clear();
-        for i in 0..aig.inputs.len() {
-            certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", aig.inputs[i] * 2));
-        }
-        for i in 0..aig.latchs.len() {
-            certifaiger.set_symbol(
-                certifaiger.latchs[i].input,
-                &format!("= {}", aig.latchs[i].input * 2),
-            );
-        }
-        if let Some(certificate_path) = &option.certificate {
-            certifaiger.to_file(certificate_path, true);
-        }
-        if !option.certify {
-            return;
-        }
-        let certificate_file = tempfile::NamedTempFile::new().unwrap();
-        certifaiger.to_file(certificate_file.path(), true);
-        certifaiger_check(option, certificate_file.path());
-    } else {
-        if option.certificate.is_none() && !option.certify && !option.witness {
-            return;
-        }
-        let witness = engine.witness(aig);
-        if option.witness {
-            println!("{}", witness);
-        }
-        if let Some(certificate_path) = &option.certificate {
-            let mut file: File = File::create(certificate_path).unwrap();
-            file.write_all(witness.as_bytes()).unwrap();
-        }
-        if !option.certify {
-            return;
-        }
-        let mut wit_file = tempfile::NamedTempFile::new().unwrap();
-        wit_file.write_all(witness.as_bytes()).unwrap();
-        let wit_path = wit_file.path().as_os_str().to_str().unwrap();
-        certifaiger_check(option, wit_path);
-    }
-}
 
     pub fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
@@ -181,7 +133,7 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
                 option.model.as_path().display()
             ),
             "-v",
-            &format!("{}:{}", certificate, certificate),
+            &format!("{}:{}", certificate.display(), certificate.display()),
             "ghcr.io/gipsyh/certifaiger",
         ])
         .arg(&option.model)
