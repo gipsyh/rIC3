@@ -498,9 +498,7 @@ impl Engine for IC3 {
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         for &l in b.lemma.iter() {
-            if let Some(v) = self.solvers[0].sat_value(l) {
-                res[0].push(self.ts.restore(l.not_if(!v)));
-            }
+            res[0].push(self.ts.restore(l));
         }
         let mut b = Some(b);
         while let Some(bad) = b {

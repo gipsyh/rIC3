@@ -26,7 +26,7 @@ fn main() {
     let mut options = Options::parse();
     options.model = options.model.canonicalize().unwrap();
     if options.verbose > 0 {
-        println!("the model to be checked: {}", options.model.display());
+        println!("Info: the model to be checked: {}", options.model.display());
     }
     if let options::Engine::Portfolio = options.engine {
         portfolio_main(options);
@@ -34,28 +34,35 @@ fn main() {
     }
     let mut aig = match options.model.extension() {
         Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
-            "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
+            "Error: rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
         ),
         Some(ext) if (ext == "aig") | (ext == "aag") => {
             Aig::from_file(options.model.to_str().unwrap())
         }
-        _ => panic!("unsupported file format"),
+        _ => panic!("Error: unsupported file format"),
     };
     if !aig.outputs.is_empty() {
         if aig.bads.is_empty() {
             aig.bads = std::mem::take(&mut aig.outputs);
-            println!(
-                "Warning: property not found, moved {} outputs to bad properties",
-                aig.bads.len()
-            );
+            if options.verbose > 0 {
+                println!(
+                    "Warning: property not found, moved {} outputs to bad properties",
+                    aig.bads.len()
+                );
+            }
         } else {
-            println!("Warning: outputs are ignored");
+            if options.verbose > 0 {
+                println!("Warning: outputs are ignored");
+            }
+            aig.outputs.clear();
         }
     }
 
     let origin_aig = aig.clone();
     if aig.bads.is_empty() {
-        println!("warning: no property to be checked");
+        if options.verbose > 0 {
+            println!("Warning: no property to be checked");
+        }
         if let Some(certificate) = &options.certificate {
             aig.to_file(certificate, true);
         }
@@ -77,7 +84,7 @@ fn main() {
     let (aig, restore) = aig_preprocess(&aig, &options);
     let ts = Transys::from_aig(&aig, &restore);
     if options.preprocess.sec {
-        panic!("sec not support");
+        panic!("Error: sec not support");
     }
     let mut engine: Box<dyn Engine> = match options.engine {
         options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
