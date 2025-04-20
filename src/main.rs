@@ -1,17 +1,14 @@
 #![feature(ptr_metadata)]
 
-use aig::Aig;
 use clap::Parser;
 use rIC3::{
     Engine,
     bmc::BMC,
-    certificate,
-    frontend::aig::aig_preprocess,
+    frontend::aig::AigFrontend,
     ic3::IC3,
     kind::Kind,
     options::{self, Options},
     portfolio::portfolio_main,
-    transys::Transys,
 };
 use std::{
     fs,
@@ -36,53 +33,10 @@ fn main() {
         Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
             "Error: rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
         ),
-        Some(ext) if (ext == "aig") | (ext == "aag") => {
-            Aig::from_file(options.model.to_str().unwrap())
-        }
+        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&options),
         _ => panic!("Error: unsupported file format"),
     };
-    if !aig.outputs.is_empty() {
-        if aig.bads.is_empty() {
-            aig.bads = std::mem::take(&mut aig.outputs);
-            if options.verbose > 0 {
-                println!(
-                    "Warning: property not found, moved {} outputs to bad properties",
-                    aig.bads.len()
-                );
-            }
-        } else {
-            if options.verbose > 0 {
-                println!("Warning: outputs are ignored");
-            }
-            aig.outputs.clear();
-        }
-    }
-
-    let origin_aig = aig.clone();
-    if aig.bads.is_empty() {
-        if options.verbose > 0 {
-            println!("Warning: no property to be checked");
-        }
-        if let Some(certificate) = &options.certificate {
-            aig.to_file(certificate, true);
-        }
-        exit(20);
-    } else if aig.bads.len() > 1 {
-        if options.certify {
-            panic!(
-                "Error: Multiple properties detected. Cannot compress properties when certification is enabled."
-            );
-        }
-        if options.verbose > 0 {
-            println!(
-                "Warning: Multiple properties detected. rIC3 has compressed them into a single property."
-            );
-        }
-        options.certify = false;
-        aig.compress_property();
-    }
-    let (aig, restore) = aig_preprocess(&aig, &options);
-    let ts = Transys::from_aig(&aig, &restore);
+    let ts = aig.ts();
     if options.preprocess.sec {
         panic!("Error: sec not support");
     }
@@ -122,13 +76,13 @@ fn main() {
             if options.witness {
                 println!("0");
             }
-            certificate(&mut engine, &origin_aig, &options, true)
+            aig.certificate(&mut engine, true)
         }
         Some(false) => {
             if options.verbose > 0 {
                 println!("unsafe");
             }
-            certificate(&mut engine, &origin_aig, &options, false)
+            aig.certificate(&mut engine, false)
         }
         _ => {
             if options.verbose > 0 {
