@@ -3,7 +3,7 @@ use crate::{
     options::Options,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
-use logic_form::{LitVec, Var};
+use logic_form::{Lit, LitVec, Var};
 use satif::Satif;
 
 pub struct Kind {
@@ -133,99 +133,111 @@ impl Engine for Kind {
             //TODO: support certifaiger with simple path constraint
             panic!("k-induction with simple path constraint not support certifaiger");
         }
+        let mut ts = ts.clone();
+        if !ts.constraint.is_empty() {
+            ts.constraint = LitVec::from([ts.rel.new_and(ts.constraint)]);
+        }
         let mut proof = ts.clone();
-        proof.constraint = LitVec::from([proof.rel.new_and(proof.constraint.into_iter())]);
         let ni = proof.input.len();
         let nl = proof.latch.len();
-        let nc = proof.constraint.len();
         let k = self.uts.num_unroll;
+        let mut inputs = proof.input.clone();
+        let mut latchs = proof.latch.clone();
+        let mut next = proof.next.clone();
+        let mut inits = proof.init.clone();
+        let mut bads = vec![proof.bad];
+        let mut constrains = proof.constraint.clone();
         for _ in 1..k {
-            proof.merge(ts);
+            let offset = proof.max_var();
+            let map = |x: Var| {
+                if x == Var::CONST { x } else { x + offset }
+            };
+            proof.new_var_to(map(ts.max_var()));
+            let lmap = |x: Lit| Lit::new(map(x.var()), x.polarity());
+            for v in Var(1)..=ts.max_var() {
+                let rel: Vec<LitVec> = ts.rel[v]
+                    .iter()
+                    .map(|cls| cls.iter().map(|l| lmap(*l)).collect())
+                    .collect();
+                let mv = map(v);
+                proof.rel.add_rel(mv, &rel);
+            }
+            for &i in ts.input.iter() {
+                inputs.push(map(i));
+            }
+            for &l in ts.latch.iter() {
+                let ml = map(l);
+                latchs.push(ml);
+                next.insert(ml, lmap(ts.next[&l]));
+                if let Some(i) = ts.init.get(&l) {
+                    inits.insert(ml, *i);
+                }
+            }
+            bads.push(lmap(ts.bad));
+            for &l in ts.constraint.iter() {
+                constrains.push(lmap(l));
+            }
         }
-        let inputs = proof.input.clone();
-        proof.input.truncate(ni);
-        let latchs = proof.latch.clone();
-        proof.latch.truncate(nl);
-        // let mut bads: Vec<AigEdge> = certifaiger
-        //     .bads
-        //     .iter()
-        //     .chain(certifaiger.outputs.iter())
-        //     .copied()
-        //     .collect();
-        // certifaiger.bads.clear();
-        // certifaiger.outputs.clear();
-        // let mut constrains = Vec::new();
-        proof.constraint.truncate(nc);
-        // for i in 0..k {
-        //     bads[i] = certifaiger.new_or_node(bads[i], !constrains[i]);
-        // }
-        // let sum = inputs.len() + latchs.len();
-        let mut aux_latchs: Vec<Var> = Vec::new();
+        if !constrains.is_empty() {
+            for i in 0..k {
+                bads[i] = proof.rel.new_or([bads[i], !constrains[i]]);
+            }
+        }
+        let sum = inputs.len() + latchs.len();
+        let mut aux_latchs: Vec<Lit> = Vec::new();
         for i in 0..k {
-            let input = proof.new_var();
-            aux_latchs.push(input.into());
-            //     let (next, init) = if i == 0 {
-            //         (input.into(), Some(true))
-            //     } else {
-            //         (aux_latchs[i - 1], Some(false))
-            //     };
-            //     certifaiger.add_latch(input, next, init);
+            let aux = proof.new_var().lit();
+            aux_latchs.push(aux);
+            let (next, init) = if i == 0 {
+                (aux, Some(true))
+            } else {
+                (aux_latchs[i - 1], Some(false))
+            };
+            proof.add_latch(aux.var(), init, next);
         }
-        // for i in 1..k {
-        //     for j in 0..ni {
-        //         certifaiger.add_latch(inputs[j + i * ni], inputs[j + (i - 1) * ni].into(), None);
-        //     }
-        //     for j in 0..nl {
-        //         certifaiger.add_latch(
-        //             latchs[j + i * nl].input,
-        //             latchs[j + (i - 1) * nl].input.into(),
-        //             None,
-        //         );
-        //     }
-        // }
-        // for i in 0..k {
-        //     let al = aux_latchs[i];
-        //     let p = certifaiger.new_imply_node(al, !bads[i]);
-        //     certifaiger.bads.push(!p);
-        // }
-        // for i in 1..k {
-        //     let al = aux_latchs[i];
-        //     let al_next = aux_latchs[i - 1];
-        //     let p = certifaiger.new_imply_node(al, al_next);
-        //     certifaiger.bads.push(!p);
-        //     let mut eqs = Vec::new();
-        //     let mut init = Vec::new();
-        //     for j in 0..nl {
-        //         if let Some(linit) = latchs[j].init {
-        //             init.push(AigEdge::new(latchs[(i - 1) * nl + j].input, !linit))
-        //         }
-        //         eqs.push(certifaiger.new_eq_node(
-        //             latchs[j + i * nl].next,
-        //             latchs[j + (i - 1) * nl].input.into(),
-        //         ));
-        //     }
-        //     let p = certifaiger.new_ands_node(eqs.into_iter());
-        //     let p = certifaiger.new_imply_node(al, p);
-        //     certifaiger.bads.push(!p);
-        //     let init = certifaiger.new_ands_node(init.into_iter());
-        //     let p = certifaiger.new_and_node(!al, al_next);
-        //     let p = certifaiger.new_imply_node(p, init);
-        //     certifaiger.bads.push(!p);
-        // }
-        // certifaiger.bads.push(!aux_latchs[0]);
-        // let bads: Vec<AigEdge> = certifaiger
-        //     .bads
-        //     .iter()
-        //     .chain(certifaiger.outputs.iter())
-        //     .copied()
-        //     .collect();
-        // let bads = certifaiger.new_ors_node(bads.into_iter());
-        // certifaiger.bads.clear();
-        // certifaiger.outputs.clear();
-        // certifaiger.outputs.push(bads);
-        // assert!(certifaiger.inputs.len() + certifaiger.latchs.len() == sum + k);
-        // certifaiger
-        todo!();
+        for i in 1..k {
+            for j in 0..ni {
+                proof.add_latch(inputs[j + i * ni], None, inputs[j + (i - 1) * ni].lit());
+            }
+            for j in 0..nl {
+                proof.add_latch(latchs[j + i * nl], None, latchs[j + (i - 1) * nl].lit());
+            }
+        }
+        for i in 0..k {
+            let al = aux_latchs[i];
+            let p = proof.rel.new_imply(al, !bads[i]);
+            bads[i] = !p;
+        }
+
+        for i in 1..k {
+            let al = aux_latchs[i];
+            let al_next = aux_latchs[i - 1];
+            let p = proof.rel.new_imply(al, al_next);
+            bads.push(!p);
+            let mut eqs = Vec::new();
+            let mut init = Vec::new();
+            for j in 0..nl {
+                if let Some(linit) = inits.get(&latchs[j]) {
+                    init.push(Lit::new(latchs[(i - 1) * nl + j], *linit))
+                }
+                eqs.push(
+                    proof
+                        .rel
+                        .new_xnor(next[&latchs[j + i * nl]], latchs[j + (i - 1) * nl].lit()),
+                );
+            }
+            let p = proof.rel.new_and(eqs);
+            let p = proof.rel.new_imply(al, p);
+            bads.push(!p);
+            let init = proof.rel.new_and(init);
+            let p = proof.rel.new_and([!al, al_next]);
+            let p = proof.rel.new_imply(p, init);
+            bads.push(!p);
+        }
+        bads.push(!aux_latchs[0]);
+        proof.bad = proof.rel.new_or(bads);
+        assert!(proof.input.len() + proof.latch.len() == sum + k);
+        Proof { proof }
     }
 
     fn witness(&mut self, _ts: &Transys) -> Witness {

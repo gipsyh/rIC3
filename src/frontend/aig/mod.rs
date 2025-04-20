@@ -31,7 +31,7 @@ impl From<&Transys> for Aig {
                 for rel in rel {
                     let last = rel.last();
                     assert!(last.var() == v);
-                    if last.polarity() == true {
+                    if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
                         r.push(aig.trivial_new_ands_node(

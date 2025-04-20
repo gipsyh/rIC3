@@ -29,7 +29,7 @@ impl Transys {
                 self.init.insert(ml, *i);
             }
         }
-        let bad = self.rel.new_or([self.bad, lmap(other.bad)].into_iter());
+        let bad = self.rel.new_or([self.bad, lmap(other.bad)]);
         self.bad = bad;
         for &l in other.constraint.iter() {
             self.constraint.push(lmap(l));
@@ -49,10 +49,7 @@ impl Transys {
             encode_map.insert(*f, t);
         }
         for (f, _) in self.rel.iter() {
-            if !encode_map.contains_key(&f) {
-                let t = res.new_var();
-                encode_map.insert(f, t);
-            }
+            encode_map.entry(f).or_insert_with(|| res.new_var());
         }
         res.rel = self.rel.map(|v| encode_map[&v]);
         for l in self.input.iter() {

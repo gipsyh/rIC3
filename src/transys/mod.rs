@@ -82,6 +82,11 @@ pub trait TransysIf {
         println!("trans size: {}", self.trans().flatten().count());
         println!("num constraint: {}", self.constraint().count());
     }
+
+    #[inline]
+    fn add_latch(&mut self, _latch: Var, _init: Option<bool>, _next: Lit) {
+        panic!("Error: add latch not support");
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -140,6 +145,15 @@ impl TransysIf for Transys {
     #[inline]
     fn restore(&self, lit: Lit) -> Lit {
         self.rst[&lit.var()].lit().not_if(!lit.polarity())
+    }
+
+    #[inline]
+    fn add_latch(&mut self, latch: Var, init: Option<bool>, next: Lit) {
+        self.latch.push(latch);
+        self.next.insert(latch, next);
+        if let Some(i) = init {
+            self.init.insert(latch, i);
+        }
     }
 }
 
