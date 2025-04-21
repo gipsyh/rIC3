@@ -1,4 +1,4 @@
-use super::Transys;
+use super::WlTransys;
 use crate::transys::{self as blts};
 use fol::{
     Term, TermManager,
@@ -7,7 +7,7 @@ use fol::{
 use giputils::hash::GHashMap;
 use logic_form::{DagCnf, LitVec};
 
-impl Transys {
+impl WlTransys {
     pub fn bitblast(&self) -> Self {
         let mut tm = TermManager::new();
         let mut map = GHashMap::new();

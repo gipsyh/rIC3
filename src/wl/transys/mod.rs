@@ -7,7 +7,7 @@ use fol::{Term, TermManager};
 use giputils::hash::GHashMap;
 
 #[derive(Clone, Debug)]
-pub struct Transys {
+pub struct WlTransys {
     pub tm: TermManager,
     pub input: Vec<Term>,
     pub latch: Vec<Term>,
@@ -17,8 +17,8 @@ pub struct Transys {
     pub constraint: Vec<Term>,
 }
 
-impl Transys {
-    pub fn new(btor: &Btor) -> Self {
+impl WlTransys {
+    pub fn from_btor(btor: &Btor) -> Self {
         Self {
             tm: btor.tm.clone(),
             input: btor.input.clone(),

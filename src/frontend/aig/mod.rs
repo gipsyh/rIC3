@@ -2,14 +2,18 @@ mod abc;
 pub mod certificate;
 
 use crate::{
+    Engine,
     options::{self, Options},
     transys::{Transys, TransysIf},
 };
 use abc::abc_preprocess;
 use aig::{Aig, AigEdge};
+use certificate::certifaiger_check;
 use giputils::hash::{GHashMap, GHashSet};
 use logic_form::{Lit, LitVec, Var};
-use std::process::exit;
+use std::{fs::File, io::Write, process::exit};
+
+use super::Frontend;
 
 impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
@@ -176,11 +180,47 @@ impl AigFrontend {
             opt: opt.clone(),
         }
     }
+}
 
-    pub fn ts(&mut self) -> Transys {
+impl Frontend for AigFrontend {
+    fn ts(&mut self) -> Transys {
         let (aig, rst) = aig_preprocess(&self.origin_aig, &self.opt);
         let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
         ts
+    }
+
+    fn certificate_safe(&mut self, engine: &mut dyn Engine) {
+        let proof = engine.proof(&self.origin_ts);
+        let certifaiger = self.proof(proof);
+        if let Some(certificate_path) = &self.opt.certificate {
+            certifaiger.to_file(certificate_path.to_str().unwrap(), true);
+        }
+        if !self.opt.certify {
+            return;
+        }
+        let certificate_file = tempfile::NamedTempFile::new().unwrap();
+        let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
+        certifaiger.to_file(certificate_path, true);
+        certifaiger_check(&self.opt, certificate_path);
+    }
+
+    fn certificate_unsafe(&mut self, engine: &mut dyn Engine) {
+        let witness = engine.witness(&self.origin_ts);
+        let witness = self.witness(witness);
+        if self.opt.witness {
+            println!("{}", witness);
+        }
+        if let Some(certificate_path) = &self.opt.certificate {
+            let mut file: File = File::create(certificate_path).unwrap();
+            file.write_all(witness.as_bytes()).unwrap();
+        }
+        if !self.opt.certify {
+            return;
+        }
+        let mut wit_file = tempfile::NamedTempFile::new().unwrap();
+        wit_file.write_all(witness.as_bytes()).unwrap();
+        let wit_path = wit_file.path().as_os_str().to_str().unwrap();
+        certifaiger_check(&self.opt, wit_path);
     }
 }

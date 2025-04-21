@@ -3,55 +3,14 @@ use giputils::hash::GHashMap;
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, options::Options};
+use crate::{Proof, Witness, options::Options};
 use std::{
-    fs::File,
     io::{self, Write},
     path::Path,
     process::Command,
 };
 
 impl AigFrontend {
-    pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
-        if res {
-            if self.opt.certificate.is_none() && !self.opt.certify {
-                return;
-            }
-            let proof = engine.proof(&self.origin_ts);
-            let certifaiger = self.proof(proof);
-            if let Some(certificate_path) = &self.opt.certificate {
-                certifaiger.to_file(certificate_path.to_str().unwrap(), true);
-            }
-            if !self.opt.certify {
-                return;
-            }
-            let certificate_file = tempfile::NamedTempFile::new().unwrap();
-            let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
-            certifaiger.to_file(certificate_path, true);
-            certifaiger_check(&self.opt, certificate_path);
-        } else {
-            if self.opt.certificate.is_none() && !self.opt.certify && !self.opt.witness {
-                return;
-            }
-            let witness = engine.witness(&self.origin_ts);
-            let witness = self.witness(witness);
-            if self.opt.witness {
-                println!("{}", witness);
-            }
-            if let Some(certificate_path) = &self.opt.certificate {
-                let mut file: File = File::create(certificate_path).unwrap();
-                file.write_all(witness.as_bytes()).unwrap();
-            }
-            if !self.opt.certify {
-                return;
-            }
-            let mut wit_file = tempfile::NamedTempFile::new().unwrap();
-            wit_file.write_all(witness.as_bytes()).unwrap();
-            let wit_path = wit_file.path().as_os_str().to_str().unwrap();
-            certifaiger_check(&self.opt, wit_path);
-        }
-    }
-
     pub fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
         let map: GHashMap<Var, bool> =

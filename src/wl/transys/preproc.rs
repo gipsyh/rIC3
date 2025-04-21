@@ -1,7 +1,7 @@
-use super::Transys;
+use super::WlTransys;
 use fol::op::Ite;
 
-impl Transys {
+impl WlTransys {
     pub fn remove_reset(&mut self) {
         if self.constraint.len() > 0 {
             return;

@@ -1,9 +1,9 @@
-use super::Transys;
+use super::WlTransys;
 use fol::{Term, TermType};
 use giputils::hash::{GHashMap, GHashSet};
 use std::ops::Deref;
 
-impl Transys {
+impl WlTransys {
     pub fn coi_refine(&mut self) {
         let mut queue = self.constraint.clone();
         queue.push(self.bad.clone());

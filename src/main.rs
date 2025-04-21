@@ -4,7 +4,7 @@ use clap::Parser;
 use rIC3::{
     Engine,
     bmc::BMC,
-    frontend::aig::AigFrontend,
+    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend},
     ic3::IC3,
     kind::Kind,
     options::{self, Options},
@@ -29,14 +29,12 @@ fn main() {
         portfolio_main(options);
         unreachable!();
     }
-    let mut aig = match options.model.extension() {
-        Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
-            "Error: rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
-        ),
-        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&options),
+    let mut frontend: Box<dyn Frontend> = match options.model.extension() {
+        Some(ext) if (ext == "aig") | (ext == "aag") => Box::new(AigFrontend::new(&options)),
+        Some(ext) if (ext == "btor") | (ext == "btor2") => Box::new(BtorFrontend::new(&options)),
         _ => panic!("Error: unsupported file format"),
     };
-    let ts = aig.ts();
+    let ts = frontend.ts();
     if options.preprocess.sec {
         panic!("Error: sec not support");
     }
@@ -76,13 +74,17 @@ fn main() {
             if options.witness {
                 println!("0");
             }
-            aig.certificate(&mut engine, true)
+            if options.certificate.is_some() || options.certify {
+                frontend.certificate_safe(&mut *engine)
+            }
         }
         Some(false) => {
             if options.verbose > 0 {
                 println!("unsafe");
             }
-            aig.certificate(&mut engine, false)
+            if options.certificate.is_some() || options.certify || options.witness {
+                frontend.certificate_unsafe(&mut *engine)
+            }
         }
         _ => {
             if options.verbose > 0 {
