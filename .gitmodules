@@ -19,9 +19,6 @@
 [submodule "deps/kissat-rs"]
 	path = deps/kissat-rs
 	url = https://github.com/gipsyh/kissat-rs.git
-[submodule "deps/fol"]
-	path = deps/fol
-	url = https://github.com/gipsyh/fol.git
 [submodule "deps/btor-rs"]
 	path = deps/btor-rs
 	url = https://github.com/gipsyh/btor-rs.git
