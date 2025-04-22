@@ -12,6 +12,8 @@ pub struct BtorFrontend {
 impl BtorFrontend {
     pub fn new(opt: &Options) -> Self {
         let mut origin_btor = Btor::from_file(&opt.model);
+        origin_btor.to_file("test.btor");
+        todo!();
         let mut btor = origin_btor.clone();
         if btor.bad.is_empty() {
             if opt.verbose > 0 {
@@ -52,7 +54,6 @@ impl Frontend for BtorFrontend {
             ts.simplify();
             // ts.print_info();
         }
-        // ts.remove_reset();
         let mut bitblast = ts.bitblast();
         for _ in 0..3 {
             bitblast.coi_refine();

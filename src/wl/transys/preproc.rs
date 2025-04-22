@@ -1,5 +1,5 @@
 use super::WlTransys;
-use fol::op::Ite;
+use logic_form::fol::op::Ite;
 
 impl WlTransys {
     pub fn remove_reset(&mut self) {

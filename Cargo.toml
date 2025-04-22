@@ -19,7 +19,6 @@ giputils = { path = "./deps/giputils", version = "0.3.0" }
 satif = { path = "./deps/satif", version = "0.2.1" }
 abc-rs = { path = "./deps/abc-rs", version = "0.2.6" }
 btor = { path = "./deps/btor-rs", version = "0.1" }
-fol = { path = "./deps/fol", version = "0.1" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }

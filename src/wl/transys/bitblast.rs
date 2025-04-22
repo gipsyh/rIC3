@@ -1,6 +1,6 @@
 use super::WlTransys;
 use crate::transys::{self as blts};
-use fol::{
+use logic_form::fol::{
     Term, TermManager,
     bitblast::{bitblast_terms, cnf_encode_terms},
 };

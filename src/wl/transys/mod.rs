@@ -3,7 +3,7 @@ mod preproc;
 mod simplify;
 
 use btor::Btor;
-use fol::{Term, TermManager};
+use logic_form::fol::{Term, TermManager};
 use giputils::hash::GHashMap;
 
 #[derive(Clone, Debug)]

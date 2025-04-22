@@ -1,5 +1,5 @@
 use super::WlTransys;
-use fol::{Term, TermType};
+use logic_form::fol::{Term, TermType};
 use giputils::hash::{GHashMap, GHashSet};
 use std::ops::Deref;
 
