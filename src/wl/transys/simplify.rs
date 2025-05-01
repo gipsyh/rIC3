@@ -1,6 +1,6 @@
 use super::WlTransys;
-use logic_form::fol::{Term, TermType};
 use giputils::hash::{GHashMap, GHashSet};
+use logic_form::fol::{Term, TermType};
 use std::ops::Deref;
 
 impl WlTransys {

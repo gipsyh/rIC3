@@ -3,8 +3,8 @@ mod preproc;
 mod simplify;
 
 use btor::Btor;
-use logic_form::fol::{Term, TermManager};
 use giputils::hash::GHashMap;
+use logic_form::fol::{Term, TermManager};
 
 #[derive(Clone, Debug)]
 pub struct WlTransys {
@@ -19,10 +19,19 @@ pub struct WlTransys {
 
 impl WlTransys {
     pub fn from_btor(btor: &Btor) -> Self {
+        let mut latch = Vec::new();
+        let mut input = btor.input.clone();
+        for l in btor.latch.iter() {
+            if btor.next.contains_key(&l) {
+                latch.push(l.clone());
+            } else {
+                input.push(l.clone());
+            }
+        }
         Self {
             tm: btor.tm.clone(),
-            input: btor.input.clone(),
-            latch: btor.latch.clone(),
+            input,
+            latch,
             init: btor.init.clone(),
             next: btor.next.clone(),
             bad: btor.bad[0].clone(),

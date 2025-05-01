@@ -1,10 +1,10 @@
 use super::WlTransys;
 use crate::transys::{self as blts};
+use giputils::hash::GHashMap;
 use logic_form::fol::{
     Term, TermManager,
     bitblast::{bitblast_terms, cnf_encode_terms},
 };
-use giputils::hash::GHashMap;
 use logic_form::{DagCnf, LitVec};
 
 impl WlTransys {

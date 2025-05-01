@@ -1,6 +1,7 @@
 use super::Frontend;
 use crate::{options::Options, transys as bl, wl::transys::WlTransys};
 use btor::Btor;
+use logic_form::fol::Term;
 use std::process::exit;
 
 pub struct BtorFrontend {
@@ -12,16 +13,13 @@ pub struct BtorFrontend {
 impl BtorFrontend {
     pub fn new(opt: &Options) -> Self {
         let mut origin_btor = Btor::from_file(&opt.model);
-        origin_btor.to_file("test.btor");
-        todo!();
         let mut btor = origin_btor.clone();
         if btor.bad.is_empty() {
             if opt.verbose > 0 {
                 println!("Warning: no property to be checked");
             }
             if let Some(certificate) = &opt.certificate {
-                todo!()
-                // btor.to_file(certificate, true);
+                btor.to_file(certificate);
             }
             exit(20);
         } else if btor.bad.len() > 1 {
