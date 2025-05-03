@@ -9,6 +9,7 @@ use rIC3::{
     kind::Kind,
     options::{self, Options},
     portfolio::portfolio_main,
+    transys::TransysIf,
 };
 use std::{
     fs,
@@ -35,6 +36,9 @@ fn main() {
         _ => panic!("Error: unsupported file format"),
     };
     let ts = frontend.ts();
+    if options.verbose > 0 {
+        ts.print_info();
+    }
     if options.preprocess.sec {
         panic!("Error: sec not support");
     }

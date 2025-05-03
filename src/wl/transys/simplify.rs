@@ -17,6 +17,11 @@ impl WlTransys {
                             queue.push(n.clone());
                         }
                     }
+                    if let Some(i) = self.init.get(&t) {
+                        if touch.insert(i.clone()) {
+                            queue.push(i.clone());
+                        }
+                    }
                 }
                 TermType::Op(op) => {
                     for s in op.terms.iter() {

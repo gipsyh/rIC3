@@ -1,11 +1,14 @@
 use super::WlTransys;
 use crate::transys::{self as blts};
 use giputils::hash::GHashMap;
-use logic_form::fol::{
-    Term, TermManager,
-    bitblast::{bitblast_terms, cnf_encode_terms},
-};
 use logic_form::{DagCnf, LitVec};
+use logic_form::{
+    Lit,
+    fol::{
+        Term, TermManager,
+        bitblast::{bitblast_terms, cnf_encode_terms},
+    },
+};
 
 impl WlTransys {
     pub fn bitblast(&self) -> Self {
@@ -26,9 +29,8 @@ impl WlTransys {
             let l = l.bitblast(&mut tm, &mut map);
             let mut i = i.bitblast(&mut tm, &mut map);
             if s.is_array() {
-                let i_len = i.len();
-                assert!(l.len() & i.len() == 0);
-                let ext = i[0..i_len].to_vec();
+                assert!(l.len() % i.len() == 0);
+                let ext = i[0..i.len()].to_vec();
                 while i.len() < l.len() {
                     i.extend_from_slice(&ext);
                 }
@@ -68,18 +70,9 @@ impl WlTransys {
         let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
             .map(|i| i.var())
             .collect();
-        let latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
+        let mut latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
             .map(|l| l.var())
             .collect();
-        let mut init = GHashMap::new();
-        for l in self.latch.iter() {
-            if let Some(i) = self.init.get(l) {
-                let l = l.cnf_encode(&mut dc, &mut map).var();
-                let i = i.cnf_encode(&mut dc, &mut map);
-                assert!(i.is_constant(false) || i.is_constant(true));
-                init.insert(l, i.is_constant(true));
-            }
-        }
         let mut next = GHashMap::new();
         for l in self.latch.iter() {
             let n = self.next.get(l).unwrap();
@@ -87,9 +80,26 @@ impl WlTransys {
             let n = n.cnf_encode(&mut dc, &mut map);
             next.insert(l, n);
         }
-        let bad = self.bad.cnf_encode(&mut dc, &mut map);
-        let constraint: LitVec =
+        let mut constraint: LitVec =
             cnf_encode_terms(self.constraint.iter(), &mut dc, &mut map).collect();
+        let mut init = GHashMap::new();
+        let reset = dc.new_var();
+        latch.push(reset);
+        init.insert(reset, true);
+        next.insert(reset, Lit::constant(false));
+        for l in self.latch.iter() {
+            if let Some(i) = self.init.get(l) {
+                let l = l.cnf_encode(&mut dc, &mut map).var();
+                let i = i.cnf_encode(&mut dc, &mut map);
+                if i.is_constant(false) || i.is_constant(true) {
+                    init.insert(l, i.is_constant(true));
+                } else {
+                    let eq = dc.new_xnor(l.lit(), i);
+                    constraint.push(dc.new_imply(reset.lit(), eq));
+                }
+            }
+        }
+        let bad = self.bad.cnf_encode(&mut dc, &mut map);
         blts::Transys {
             input,
             latch,
