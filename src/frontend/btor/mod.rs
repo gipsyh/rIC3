@@ -1,7 +1,8 @@
+mod array;
+
 use super::Frontend;
 use crate::{options::Options, transys as bl, wl::transys::WlTransys};
 use btor::Btor;
-use logic_form::fol::Term;
 use std::process::exit;
 
 pub struct BtorFrontend {
@@ -47,6 +48,11 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> bl::Transys {
         let mut ts = self.origin_ts.clone();
+        if self.opt.ic3.abs_array {
+            ts = ts.abs_array();
+        }
+        ts.coi_refine();
+        dbg!(&ts);
         for _ in 0..3 {
             ts.coi_refine();
             ts.simplify();
@@ -67,5 +73,28 @@ impl Frontend for BtorFrontend {
 
     fn certificate_unsafe(&mut self, engine: &mut dyn crate::Engine) {
         todo!()
+    }
+}
+
+impl WlTransys {
+    fn from_btor(btor: &Btor) -> Self {
+        let mut latch = Vec::new();
+        let mut input = btor.input.clone();
+        for l in btor.latch.iter() {
+            if btor.next.contains_key(&l) {
+                latch.push(l.clone());
+            } else {
+                input.push(l.clone());
+            }
+        }
+        Self {
+            tm: btor.tm.clone(),
+            input,
+            latch,
+            init: btor.init.clone(),
+            next: btor.next.clone(),
+            bad: btor.bad[0].clone(),
+            constraint: btor.constraint.clone(),
+        }
     }
 }

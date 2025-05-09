@@ -105,6 +105,10 @@ pub struct IC3Options {
     /// ic3 without predicate property
     #[arg(long = "ic3-no-pred-prop", default_value_t = false)]
     pub no_pred_prop: bool,
+
+    /// ic3 with abstract array
+    #[arg(long = "ic3-abs-array", default_value_t = false)]
+    pub abs_array: bool,
 }
 
 #[derive(Args, Clone, Debug)]
