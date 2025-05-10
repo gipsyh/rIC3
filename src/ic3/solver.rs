@@ -6,7 +6,7 @@ use satif::Satif;
 use std::time::Instant;
 
 impl IC3 {
-    pub fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>)> {
+    pub fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
         if !self.options.ic3.no_pred_prop {
@@ -24,7 +24,7 @@ impl IC3 {
                         input[0].push(i);
                     }
                 }
-                (s, input)
+                (s, input, 1)
             })
         } else {
             let res = self
@@ -34,7 +34,7 @@ impl IC3 {
                 .solve_without_bucket(&self.ts.bad.cube(), vec![]);
             self.statistic.block_get_bad_time += start.elapsed();
             res.then(|| self.get_pred(self.solvers.len(), true))
-                .map(|(s, i)| (s, vec![i]))
+                .map(|(s, i)| (s, vec![i], 0))
         }
     }
 }

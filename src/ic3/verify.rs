@@ -1,5 +1,5 @@
 use super::{IC3, proofoblig::ProofObligation};
-use crate::transys::{TransysCtx, TransysIf, unroll::TransysUnroll};
+use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
 use logic_form::{Lemma, LitVec};
 use satif::Satif;
@@ -48,7 +48,7 @@ impl IC3 {
     fn check_witness_with_constrain<S: Satif + ?Sized>(
         &mut self,
         solver: &mut S,
-        uts: &TransysUnroll<TransysCtx>,
+        uts: &TransysUnroll<Transys>,
         constraint: &LitVec,
     ) -> bool {
         let mut assumps = LitVec::new();
@@ -60,14 +60,14 @@ impl IC3 {
     }
 
     pub fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
-        let mut uts = TransysUnroll::new(self.ts.deref());
+        let mut uts = TransysUnroll::new(&self.origin_ts);
         uts.unroll_to(b.depth);
         let mut solver: Box<dyn satif::Satif> = Box::new(cadical::Solver::new());
         for k in 0..=b.depth {
             uts.load_trans(solver.as_mut(), k, false);
         }
         uts.ts.load_init(solver.as_mut());
-        let mut cst = uts.ts.constraints.clone();
+        let mut cst: LitVec = uts.ts.constraint().collect();
         if self.check_witness_with_constrain(solver.as_mut(), &uts, &cst) {
             if self.options.verbose > 0 {
                 println!("witness checking passed");

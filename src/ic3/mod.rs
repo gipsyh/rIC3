@@ -25,6 +25,7 @@ mod verify;
 
 pub struct IC3 {
     options: Options,
+    origin_ts: Transys,
     ts: Grc<TransysCtx>,
     solvers: Vec<Solver>,
     lift: Solver,
@@ -38,7 +39,7 @@ pub struct IC3 {
     statistic: Statistic,
     pre_lemmas: Vec<LitVec>,
     abs_cst: LitVec,
-    bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll<TransysCtx>)>,
+    bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll<Transys>)>,
 
     auxiliary_var: Vec<Var>,
     rng: StdRng,
@@ -359,6 +360,7 @@ impl IC3 {
         }
         let mut bad_ts = uts.compile();
         bad_ts.constraint.push(!ts.bad);
+        let origin_ts = ts.clone();
         let ts = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
         let statistic = Statistic::new(options.model.to_str().unwrap());
@@ -374,6 +376,7 @@ impl IC3 {
         let rng = StdRng::seed_from_u64(options.rseed);
         Self {
             options,
+            origin_ts,
             ts,
             activity,
             solvers: Vec::new(),
@@ -414,9 +417,15 @@ impl Engine for IC3 {
                     }
                     _ => (),
                 }
-                if let Some((bad, inputs)) = self.get_bad() {
+                if let Some((bad, inputs, depth)) = self.get_bad() {
                     let bad = Lemma::new(bad);
-                    self.add_obligation(ProofObligation::new(self.level(), bad, inputs, 0, None))
+                    self.add_obligation(ProofObligation::new(
+                        self.level(),
+                        bad,
+                        inputs,
+                        depth,
+                        None,
+                    ))
                 } else {
                     break;
                 }
@@ -469,7 +478,7 @@ impl Engine for IC3 {
     fn witness(&mut self, _ts: &Transys) -> Witness {
         let mut res = Witness::default();
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            for l in uts.ts.latchs.iter() {
+            for l in uts.ts.latch() {
                 let l = l.lit();
                 if let Some(v) = bmc_solver.sat_value(l) {
                     res.init.push(uts.ts.restore(l.not_if(!v)));
@@ -477,7 +486,7 @@ impl Engine for IC3 {
             }
             for k in 0..=uts.num_unroll {
                 let mut w = LitVec::new();
-                for l in uts.ts.inputs.iter() {
+                for l in uts.ts.input() {
                     let l = l.lit();
                     let kl = uts.lit_next(l, k);
                     if let Some(v) = bmc_solver.sat_value(kl) {
