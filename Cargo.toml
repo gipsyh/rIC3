@@ -21,7 +21,7 @@ abc-rs = { path = "./deps/abc-rs", version = "0.2.6" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
-bitfield-struct = "0.10.0"
+bitfield-struct = "0.11.0"
 tempfile = "3.10.1"
 process_control = "5.0.0"
 nix = { version = "0.29.0", features = ["signal"] }
