@@ -90,9 +90,9 @@ impl IC3 {
                         break;
                     }
                 } else if let Some(true) = self.solvers[frame - 1].sat_value(lit) {
-                    if !self.solvers[frame - 1].flip_to_none(lit.var()) {
-                        cube_new.push(lit);
-                    }
+                    // if !self.solvers[frame - 1].flip_to_none(lit.var()) {
+                    cube_new.push(lit);
+                    // }
                 }
             }
             cube = cube_new;
@@ -100,9 +100,9 @@ impl IC3 {
             let mut t = Cube::new();
             for l in full.iter() {
                 if let Some(v) = self.solvers[frame - 1].sat_value(*l) {
-                    if !self.solvers[frame - 1].flip_to_none(l.var()) {
-                        s.push(l.not_if(!v));
-                    }
+                    // if !self.solvers[frame - 1].flip_to_none(l.var()) {
+                    s.push(l.not_if(!v));
+                    // }
                 }
                 let lt = self.ts.lit_next(*l);
                 if let Some(v) = self.solvers[frame - 1].sat_value(lt) {
@@ -141,7 +141,7 @@ impl IC3 {
                     return None;
                 }
             }
-            let (model, _) = self.get_pred(frame, false);
+            let (model, _) = self.get_pred(frame);
             let cex_set: HashSet<Lit> = HashSet::from_iter(model.iter().cloned());
             for lit in cube.iter() {
                 if keep.contains(lit) && !cex_set.contains(lit) {
@@ -204,15 +204,15 @@ impl IC3 {
         parameter: DropVarParameter,
     ) -> Cube {
         let start = Instant::now();
-        if parameter.level == 0 {
-            self.solvers[frame - 1].set_domain(
-                self.ts
-                    .cube_next(&cube)
-                    .iter()
-                    .copied()
-                    .chain(cube.iter().copied()),
-            );
-        }
+        // if parameter.level == 0 {
+        //     self.solvers[frame - 1].set_domain(
+        //         self.ts
+        //             .cube_next(&cube)
+        //             .iter()
+        //             .copied()
+        //             .chain(cube.iter().copied()),
+        //     );
+        // }
         self.statistic.avg_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         let mut cex = Vec::new();
@@ -234,25 +234,25 @@ impl IC3 {
             if let Some(new_cube) = mic {
                 self.statistic.mic_drop.success();
                 (cube, i) = self.handle_down_success(frame, cube, i, new_cube);
-                if parameter.level == 0 {
-                    self.solvers[frame - 1].unset_domain();
-                    self.solvers[frame - 1].set_domain(
-                        self.ts
-                            .cube_next(&cube)
-                            .iter()
-                            .copied()
-                            .chain(cube.iter().copied()),
-                    );
-                }
+                // if parameter.level == 0 {
+                //     self.solvers[frame - 1].unset_domain();
+                //     self.solvers[frame - 1].set_domain(
+                //         self.ts
+                //             .cube_next(&cube)
+                //             .iter()
+                //             .copied()
+                //             .chain(cube.iter().copied()),
+                //     );
+                // }
             } else {
                 self.statistic.mic_drop.fail();
                 keep.insert(cube[i]);
                 i += 1;
             }
         }
-        if parameter.level == 0 {
-            self.solvers[frame - 1].unset_domain();
-        }
+        // if parameter.level == 0 {
+        //     self.solvers[frame - 1].unset_domain();
+        // }
         self.activity.bump_cube_activity(&cube);
         self.statistic.block_mic_time += start.elapsed();
         cube

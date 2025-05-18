@@ -48,32 +48,33 @@ impl IC3 {
     }
 
     pub fn check_witness(&mut self) -> Option<Lit> {
-        let mut b = self.obligations.peak();
-        while let Some(bad) = b {
-            let imply = if let Some(next) = bad.next.clone() {
-                self.ts.cube_next(&next.lemma)
-            } else {
-                self.ts.bad.cube()
-            };
-            let mut assump = bad.lemma.deref().clone();
-            assump.extend_from_slice(&bad.input);
-            self.lift.imply(
-                imply
-                    .iter()
-                    .chain(self.ts.constraints.iter())
-                    .map(|l| l.var()),
-                assump.iter(),
-            );
-            assert!(imply
-                .iter()
-                .chain(self.ts.constraints.iter())
-                .all(|l| self.lift.sat_value(*l).is_some_and(|v| v)));
-            b = bad.next.clone();
-        }
-        if self.options.verbose > 0 {
-            println!("witness checking passed");
-        }
-        None
+        todo!()
+        // let mut b = self.obligations.peak();
+        // while let Some(bad) = b {
+        //     let imply = if let Some(next) = bad.next.clone() {
+        //         self.ts.cube_next(&next.lemma)
+        //     } else {
+        //         self.ts.bad.cube()
+        //     };
+        //     let mut assump = bad.lemma.deref().clone();
+        //     assump.extend_from_slice(&bad.input);
+        //     self.lift.imply(
+        //         imply
+        //             .iter()
+        //             .chain(self.ts.constraints.iter())
+        //             .map(|l| l.var()),
+        //         assump.iter(),
+        //     );
+        //     assert!(imply
+        //         .iter()
+        //         .chain(self.ts.constraints.iter())
+        //         .all(|l| self.lift.sat_value(*l).is_some_and(|v| v)));
+        //     b = bad.next.clone();
+        // }
+        // if self.options.verbose > 0 {
+        //     println!("witness checking passed");
+        // }
+        // None
     }
 
     fn check_witness_with_constrain<S: Satif + ?Sized>(

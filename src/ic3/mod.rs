@@ -11,6 +11,7 @@ use giputils::grc::Grc;
 use logic_form::{Clause, Cube, Lemma, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
+use solver::{Ic3Solver, Lift};
 use statistic::Statistic;
 use std::time::Instant;
 
@@ -26,8 +27,8 @@ pub struct IC3 {
     options: Options,
     ts: Grc<Transys>,
     frame: Frames,
-    solvers: Vec<Solver>,
-    lift: Solver,
+    solvers: Vec<Ic3Solver>,
+    lift: Lift,
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
@@ -45,28 +46,28 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
-        let mut solver = Solver::new(self.options.clone(), Some(self.frame.len()), &self.ts);
-        for v in self.auxiliary_var.iter() {
-            solver.add_domain(*v, true);
-        }
+        let solver = Ic3Solver::new(&self.ts, self.frame.len());
+        // for v in self.auxiliary_var.iter() {
+        //     solver.add_domain(*v, true);
+        // }
         self.solvers.push(solver);
         self.frame.push(Frame::new());
         if self.level() == 0 {
             for init in self.ts.init.clone() {
                 self.add_lemma(0, Cube::from([!init]), true, None);
             }
-            let mut init = Cube::new();
-            for l in self.ts.latchs.iter() {
-                if self.ts.init_map[*l].is_none() {
-                    if let Some(v) = self.solvers[0].sat_value(l.lit()) {
-                        let l = l.lit().not_if(!v);
-                        init.push(l);
-                    }
-                }
-            }
-            for i in init {
-                self.ts.add_init(i.var(), Some(i.polarity()));
-            }
+            // let mut init = Cube::new();
+            // for l in self.ts.latchs.iter() {
+            //     if self.ts.init_map[*l].is_none() {
+            //         if let Some(v) = self.solvers[0].sat_value(l.lit()) {
+            //             let l = l.lit().not_if(!v);
+            //             init.push(l);
+            //         }
+            //     }
+            // }
+            // for i in init {
+            //     self.ts.add_init(i.var(), Some(i.polarity()));
+            // }
         } else if self.level() == 1 {
             for cls in self.pre_lemmas.clone().iter() {
                 self.add_lemma(1, !cls.clone(), true, None);
@@ -77,7 +78,7 @@ impl IC3 {
     fn push_lemma(&mut self, frame: usize, mut cube: Cube) -> (usize, Cube) {
         let start = Instant::now();
         for i in frame + 1..=self.level() {
-            if self.solvers[i - 1].inductive(&cube, true) {
+            if self.blocked(i, &cube, true) {
                 cube = self.solvers[i - 1].inductive_core();
             } else {
                 return (i, cube);
@@ -132,7 +133,8 @@ impl IC3 {
                         return Some(false);
                     }
                 } else if self.options.ic3.inn && po.frame > 0 {
-                    assert!(!self.solvers[0].solve_with_domain(&po.lemma, vec![], true));
+                    todo!()
+                    // assert!(!self.solvers[0].solve_with_domain(&po.lemma, vec![], true));
                 } else {
                     self.add_obligation(po.clone());
                     assert!(po.frame == 0);
@@ -190,7 +192,7 @@ impl IC3 {
                     return None;
                 }
             } else {
-                let (model, inputs) = self.get_pred(po.frame, true);
+                let (model, inputs) = self.get_pred(po.frame);
                 self.add_obligation(ProofObligation::new(
                     po.frame - 1,
                     Lemma::new(model),
@@ -240,7 +242,7 @@ impl IC3 {
                 if *limit == 0 {
                     return false;
                 }
-                let model = Lemma::new(self.get_pred(frame, false).0);
+                let model = Lemma::new(self.get_pred(frame).0);
                 if !self.trivial_block_rec(frame - 1, model, constrain, limit, parameter) {
                     return false;
                 }
@@ -288,10 +290,8 @@ impl IC3 {
                     if !self.options.ic3.ctp {
                         break;
                     }
-                    let (ctp, _) = self.get_pred(frame_idx + 1, false);
-                    if !self.ts.cube_subsume_init(&ctp)
-                        && self.solvers[frame_idx - 1].inductive(&ctp, true)
-                    {
+                    let (ctp, _) = self.get_pred(frame_idx + 1);
+                    if !self.ts.cube_subsume_init(&ctp) && self.blocked(frame_idx, &ctp, true) {
                         let core = self.solvers[frame_idx - 1].inductive_core();
                         let mic =
                             self.mic(frame_idx, core, &[], MicType::DropVar(Default::default()));
@@ -324,7 +324,7 @@ impl IC3 {
         let statistic = Statistic::new(&options.model);
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
-        let lift = Solver::new(options.clone(), None, &ts);
+        let lift = Lift::new(&ts);
         let abs_cst = if options.ic3.abs_cst {
             Cube::new()
         } else {
@@ -451,7 +451,8 @@ impl Engine for IC3 {
             self.ts.bad.cube()
         };
         assump.extend_from_slice(&b.input);
-        assert!(self.solvers[0].solve_with_domain(&assump, vec![], false));
+        todo!();
+        // assert!(self.solvers[0].solve_with_domain(&assump, vec![], false));
         for l in self.ts.latchs.iter() {
             let l = l.lit();
             if let Some(v) = self.solvers[0].sat_value(l) {
@@ -474,11 +475,11 @@ impl Engine for IC3 {
                 print!("{} ", f.len());
             }
             println!();
-            let mut statistic = SolverStatistic::default();
-            for s in self.solvers.iter() {
-                statistic += s.statistic;
-            }
-            println!("{:#?}", statistic);
+            // let mut statistic = SolverStatistic::default();
+            // for s in self.solvers.iter() {
+            //     statistic += s.statistic;
+            // }
+            // println!("{:#?}", statistic);
             println!("{:#?}", self.statistic);
         }
     }
