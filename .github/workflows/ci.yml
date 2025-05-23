@@ -35,8 +35,8 @@ jobs:
           docker pull ghcr.io/gipsyh/certifaiger:latest
       - name: Test examples
         run: |
-          cargo r -- ./examples/counter/counter.aig --certify || [ $? -eq 10 ]
-          cargo r -- ./examples/fifo/fifo.aig --certify || [ $? -eq 20 ]
+          cargo r -- ./examples/counter/counter.aig --certify; [ $? -eq 10 ]
+          cargo r -- ./examples/fifo/fifo.aig --certify; [ $? -eq 20 ]
 
   deploy:
     needs: build-and-test
