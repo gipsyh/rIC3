@@ -97,6 +97,6 @@ fn main() {
     if let Some(res) = res {
         exit(if res { 20 } else { 10 })
     } else {
-        exit(0)
+        exit(30)
     }
 }
