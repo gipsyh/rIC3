@@ -15,6 +15,11 @@ rIC3 achieved first place in both the bit-level track and the word-level bit-vec
 
 To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or download the binary release at https://github.com/gipsyh/rIC3-HWMCC24.
 
+### Publications
+- [CAV2025] [The rIC3 Hardware Model Checker](https://arxiv.org/abs/2502.13605)
+- [CAV2025] [Deeply Optimizing the SAT Solver for the IC3 Algorithm](https://arxiv.org/abs/2501.18612)
+- [arXiv] [Extended CTG Generalization and Dynamic Adjustment of Generalization Strategies in IC3](https://arxiv.org/abs/2501.02480)
+
 ### rIC3 Tool Flow
 ![Image of rIC3 toolflow](./images/toolflow.jpg)
 
