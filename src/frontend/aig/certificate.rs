@@ -1,15 +1,11 @@
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
+use log::{debug, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
 use crate::{Engine, Proof, Witness, options::Options};
-use std::{
-    fs::File,
-    io::{self, Write},
-    path::Path,
-    process::Command,
-};
+use std::{fs::File, io::Write, path::Path, process::Command};
 
 impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
@@ -36,7 +32,7 @@ impl AigFrontend {
             let witness = engine.witness(&self.origin_ts);
             let witness = self.witness(witness);
             if self.opt.witness {
-                println!("{}", witness);
+                println!("{witness}");
             }
             if let Some(certificate_path) = &self.opt.certificate {
                 let mut file: File = File::create(certificate_path).unwrap();
@@ -141,12 +137,10 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
         .output()
         .unwrap();
     if output.status.success() {
-        println!("certifaiger check passed");
+        info!("certifaiger check passed");
     } else {
-        if option.verbose > 1 {
-            io::stdout().write_all(&output.stdout).unwrap();
-            io::stderr().write_all(&output.stderr).unwrap();
-        }
+        debug!("{}", String::from_utf8_lossy(&output.stdout));
+        debug!("{}", String::from_utf8_lossy(&output.stderr));
         match output.status.code() {
             Some(1) => panic!("certifaiger check failed"),
             _ => panic!(

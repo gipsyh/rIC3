@@ -51,10 +51,6 @@ pub struct Options {
     #[arg(long, default_value_t = 0)]
     pub rseed: u64,
 
-    /// verbose level
-    #[arg(short, default_value_t = 1)]
-    pub verbose: usize,
-
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,

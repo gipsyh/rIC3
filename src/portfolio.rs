@@ -1,4 +1,5 @@
 use crate::{Options, frontend::aig::certificate::certifaiger_check};
+use log::info;
 use process_control::{ChildExt, Control};
 use std::{
     env::current_exe,
@@ -55,9 +56,8 @@ impl Portfolio {
             let args = args.split(" ");
             let mut engine = Command::new(current_exe().unwrap());
             engine.env("RIC3_TMP_DIR", temp_dir_path);
+            engine.env("RUST_LOG", "warn");
             engine.arg(&option.model);
-            engine.arg("-v");
-            engine.arg("0");
             for a in args {
                 engine.arg(a);
             }
@@ -138,7 +138,6 @@ impl Portfolio {
             };
             let mut child = engine.stderr(Stdio::piped()).spawn().unwrap();
             self.engine_pids.push(child.id() as i32);
-            let option = self.option.clone();
             let state = self.state.clone();
             spawn(move || {
                 let mut config = engine
@@ -148,9 +147,7 @@ impl Portfolio {
                     .collect::<Vec<&str>>();
                 config.pop();
                 let config = config.join(" ");
-                if option.verbose > 1 {
-                    println!("start engine: {config}");
-                }
+                info!("start engine: {config}");
                 #[cfg(target_os = "linux")]
                 let status = child
                     .controlled()
@@ -166,13 +163,10 @@ impl Portfolio {
                     e => {
                         let mut ps = state.0.lock().unwrap();
                         if let PortfolioState::Checking(np) = ps.deref_mut() {
-                            if option.verbose > 0 {
-                                println!("{config} unexpectedly exited, exit code: {:?}", e);
-                                let mut stderr = String::new();
-                                child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
-                                print!("stderr:");
-                                print!("{}", stderr);
-                            }
+                            info!("{config} unexpectedly exited, exit code: {e:?}");
+                            let mut stderr = String::new();
+                            child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
+                            info!("{stderr}");
                             *np -= 1;
                             if *np == 0 {
                                 state.1.notify_one();
@@ -191,15 +185,13 @@ impl Portfolio {
         let mut result = self.state.1.wait(lock).unwrap();
         if let PortfolioState::Checking(np) = result.deref() {
             assert!(*np == 0);
-            if self.option.verbose > 0 {
-                println!("all workers unexpectedly exited :(");
-            }
+            info!("all workers unexpectedly exited :(");
             return None;
         }
         let (res, config, certificate) = result.result();
         drop(result);
         self.certificate = certificate;
-        println!("best configuration: {}", config);
+        info!("best configuration: {config}");
         let pids: Vec<String> = self.engine_pids.iter().map(|p| format!("{}", *p)).collect();
         let pid = pids.join(",");
         let _ = Command::new("pkill")
@@ -263,7 +255,7 @@ fn certificate(engine: &mut Portfolio, option: &Options, res: bool) {
         .read_to_string(&mut witness)
         .unwrap();
         if option.witness {
-            println!("{}", witness);
+            println!("{witness}");
         }
         if let Some(certificate_path) = &option.certificate {
             let mut file: File = File::create(certificate_path).unwrap();
@@ -289,29 +281,20 @@ fn certificate(engine: &mut Portfolio, option: &Options, res: bool) {
 pub fn portfolio_main(options: Options) {
     let mut engine = Portfolio::new(options.clone());
     let res = engine.check();
-    if options.verbose > 0 {
-        print!("result: ");
-    }
     match res {
         Some(true) => {
-            if options.verbose > 0 {
-                println!("safe");
-            }
+            println!("result: safe");
             if options.witness {
                 println!("0");
             }
             certificate(&mut engine, &options, true)
         }
         Some(false) => {
-            if options.verbose > 0 {
-                println!("unsafe");
-            }
+            println!("result: unsafe");
             certificate(&mut engine, &options, false)
         }
         _ => {
-            if options.verbose > 0 {
-                println!("unknown");
-            }
+            println!("result: unknown");
             if options.witness {
                 println!("2");
             }
@@ -320,6 +303,6 @@ pub fn portfolio_main(options: Options) {
     if let Some(res) = res {
         exit(if res { 20 } else { 10 })
     } else {
-        exit(0)
+        exit(30)
     }
 }

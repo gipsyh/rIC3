@@ -1,6 +1,7 @@
 use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
+use log::{error, info};
 use logic_form::{Lemma, LitVec};
 use satif::Satif;
 use std::ops::Deref;
@@ -35,14 +36,13 @@ impl IC3 {
         }
         let invariants = self.frame.invariant();
         if !verify_invariant(&self.ts, &invariants) {
-            panic!("invariant varify failed");
+            error!("invariant varify failed");
+            panic!();
         }
-        if self.options.verbose > 0 {
-            println!(
-                "inductive invariant verified with {} lemmas!",
-                invariants.len()
-            );
-        }
+        info!(
+            "inductive invariant verified with {} lemmas!",
+            invariants.len()
+        );
     }
 
     fn check_witness_with_constrain<S: Satif + ?Sized>(
@@ -69,9 +69,7 @@ impl IC3 {
         uts.ts.load_init(solver.as_mut());
         let mut cst: LitVec = uts.ts.constraint().collect();
         if self.check_witness_with_constrain(solver.as_mut(), &uts, &cst) {
-            if self.options.verbose > 0 {
-                println!("witness checking passed");
-            }
+            info!("witness checking passed");
             self.bmc_solver = Some((solver, uts));
             None
         } else {

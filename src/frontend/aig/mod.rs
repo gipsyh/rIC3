@@ -8,6 +8,7 @@ use crate::{
 use abc::abc_preprocess;
 use aig::{Aig, AigEdge};
 use giputils::hash::{GHashMap, GHashSet};
+use log::{error, warn};
 use logic_form::{Lit, LitVec, Var};
 use std::process::exit;
 
@@ -134,39 +135,30 @@ impl AigFrontend {
         if !origin_aig.outputs.is_empty() {
             if origin_aig.bads.is_empty() {
                 origin_aig.bads = std::mem::take(&mut origin_aig.outputs);
-                if opt.verbose > 0 {
-                    println!(
-                        "Warning: property not found, moved {} outputs to bad properties",
-                        origin_aig.bads.len()
-                    );
-                }
+                warn!(
+                    "property not found, moved {} outputs to bad properties",
+                    origin_aig.bads.len()
+                );
             } else {
-                if opt.verbose > 0 {
-                    println!("Warning: outputs are ignored");
-                }
+                warn!("outputs in aiger are ignored");
                 origin_aig.outputs.clear();
             }
         }
         let mut aig = origin_aig.clone();
         if aig.bads.is_empty() {
-            if opt.verbose > 0 {
-                println!("Warning: no property to be checked");
-            }
+            warn!("no property to be checked");
             if let Some(certificate) = &opt.certificate {
                 aig.to_file(certificate, true);
             }
             exit(20);
         } else if aig.bads.len() > 1 {
             if opt.certify {
-                panic!(
-                    "Error: Multiple properties detected. Cannot compress properties when certification is enabled."
+                error!(
+                    "multiple properties detected. cannot compress properties when certification is enabled"
                 );
+                panic!();
             }
-            if opt.verbose > 0 {
-                println!(
-                    "Warning: Multiple properties detected. rIC3 has compressed them into a single property."
-                );
-            }
+            warn!("multiple properties detected. rIC3 has compressed them into a single property");
             aig.compress_property();
         }
         let origin_ts = Transys::from_aig(&origin_aig, false);

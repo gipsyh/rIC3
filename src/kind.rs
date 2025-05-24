@@ -3,6 +3,7 @@ use crate::{
     options::Options,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
+use log::{error, info};
 use logic_form::{Lit, LitVec, Var};
 use satif::Satif;
 
@@ -33,29 +34,6 @@ impl Kind {
             solver,
         }
     }
-
-    // pub fn check_in_depth(&mut self, depth: usize) -> bool {
-    //     println!("{}", self.options.model);
-    //     assert!(depth > 0);
-    //     let mut solver = kissat::Solver::new();
-    //     self.uts.unroll_to(depth);
-    //     for k in 0..=depth {
-    //         self.uts.load_trans(&mut solver, k, true);
-    //     }
-    //     for k in 0..depth {
-    //         solver.add_clause(&!self.uts.lits_next(&self.uts.ts.bad, k));
-    //         self.load_pre_lemmas(&mut solver, k);
-    //     }
-    //     for b in self.uts.lits_next(&self.uts.ts.bad, depth).iter() {
-    //         solver.add_clause(&[*b]);
-    //     }
-    //     println!("kind depth: {depth}");
-    //     if !solver.solve(&[]) {
-    //         println!("kind proofed in depth {depth}");
-    //         return true;
-    //     }
-    //     false
-    // }
 
     pub fn reset_solver(&mut self) {
         self.solver = if self.options.kind.kind_kissat {
@@ -92,13 +70,9 @@ impl Engine for Kind {
             if !self.options.kind.no_bmc {
                 let mut assump: LitVec = self.uts.ts.init().collect();
                 assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), bmc_k));
-                if self.options.verbose > 0 {
-                    println!("kind bmc depth: {bmc_k}");
-                }
+                info!("kind bmc depth: {bmc_k}");
                 if self.solver.solve(&assump) {
-                    if self.options.verbose > 0 {
-                        println!("bmc found cex in depth {bmc_k}");
-                    }
+                    info!("bmc found counter-example in depth {bmc_k}");
                     return Some(false);
                 }
             }
@@ -108,9 +82,7 @@ impl Engine for Kind {
             }
             self.uts.unroll_to(k);
             self.uts.load_trans(self.solver.as_mut(), k, true);
-            if self.options.verbose > 0 {
-                println!("kind depth: {k}");
-            }
+            info!("kind depth: {k}");
             let res = if self.options.kind.kind_kissat {
                 for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
                     self.solver.add_clause(&[l]);
@@ -121,7 +93,7 @@ impl Engine for Kind {
                     .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k))
             };
             if !res {
-                println!("k-induction proofed in depth {k}");
+                info!("k-induction proofed in depth {k}");
                 return Some(true);
             }
         }
@@ -131,7 +103,8 @@ impl Engine for Kind {
     fn proof(&mut self, ts: &Transys) -> Proof {
         if self.options.kind.simple_path {
             //TODO: support certifaiger with simple path constraint
-            panic!("k-induction with simple path constraint not support certifaiger");
+            error!("k-induction with simple path constraint not support certifaiger");
+            panic!();
         }
         let mut ts = ts.clone();
         if !ts.constraint.is_empty() {

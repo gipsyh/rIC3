@@ -91,20 +91,20 @@ impl IC3 {
                         ret = true;
                         break;
                     }
-                } else if let Some(true) = self.solvers[frame - 1].sat_value(lit) {
-                    if !self.solvers[frame - 1].flip_to_none(lit.var()) {
-                        cube_new.push(lit);
-                    }
+                } else if let Some(true) = self.solvers[frame - 1].sat_value(lit)
+                    && !self.solvers[frame - 1].flip_to_none(lit.var())
+                {
+                    cube_new.push(lit);
                 }
             }
             cube = cube_new;
             let mut s = LitVec::new();
             let mut t = LitVec::new();
             for l in full.iter() {
-                if let Some(v) = self.solvers[frame - 1].sat_value(*l) {
-                    if !self.solvers[frame - 1].flip_to_none(l.var()) {
-                        s.push(l.not_if(!v));
-                    }
+                if let Some(v) = self.solvers[frame - 1].sat_value(*l)
+                    && self.solvers[frame - 1].flip_to_none(l.var())
+                {
+                    s.push(l.not_if(!v));
                 }
                 let lt = self.ts.next(*l);
                 if let Some(v) = self.solvers[frame - 1].sat_value(lt) {

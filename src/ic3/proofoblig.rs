@@ -204,8 +204,8 @@ impl ProofObligationQueue {
         self.obligations.iter()
     }
 
-    pub fn statistic(&self) {
-        println!("{:?}", self.num);
+    pub fn statistic(&self) -> String {
+        format!("{:?}", self.num)
     }
 }
 
