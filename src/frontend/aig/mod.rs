@@ -125,6 +125,7 @@ pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<V
 
 pub struct AigFrontend {
     origin_aig: Aig,
+    aig: Aig,
     origin_ts: Transys,
     opt: Options,
 }
@@ -165,12 +166,13 @@ impl AigFrontend {
         Self {
             origin_aig,
             origin_ts,
+            aig,
             opt: opt.clone(),
         }
     }
 
     pub fn ts(&mut self) -> Transys {
-        let (aig, rst) = aig_preprocess(&self.origin_aig, &self.opt);
+        let (aig, rst) = aig_preprocess(&self.aig, &self.opt);
         let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
         ts
