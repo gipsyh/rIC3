@@ -131,11 +131,11 @@ impl Solver {
                 self.vsids.decay();
                 self.cdb.decay();
             } else {
-                if let Some(noc) = noc {
-                    if num_conflict >= noc {
-                        self.backtrack(assumption.len(), true);
-                        return None;
-                    }
+                if let Some(noc) = noc
+                    && num_conflict >= noc
+                {
+                    self.backtrack(assumption.len(), true);
+                    return None;
                 }
                 self.clean_leanrt(false);
                 while self.highest_level() < assumption.len() {

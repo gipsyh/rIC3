@@ -146,11 +146,11 @@ impl<T: TransysIf> TransysUnroll<T> {
                 satif.add_clause(&[c]);
             }
         }
-        if let Some(simple_path) = self.simple_path.as_ref() {
-            if !simple_path.is_empty() {
-                for c in simple_path[u - 1].iter() {
-                    satif.add_clause(c);
-                }
+        if let Some(simple_path) = self.simple_path.as_ref()
+            && !simple_path.is_empty()
+        {
+            for c in simple_path[u - 1].iter() {
+                satif.add_clause(c);
             }
         }
     }

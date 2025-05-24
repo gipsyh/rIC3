@@ -120,10 +120,10 @@ impl TransysCtx {
     #[inline]
     pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
         for x in x {
-            if let Some(init) = self.init_map[x.var()] {
-                if init != x.polarity() {
-                    return false;
-                }
+            if let Some(init) = self.init_map[x.var()]
+                && init != x.polarity()
+            {
+                return false;
             }
         }
         true

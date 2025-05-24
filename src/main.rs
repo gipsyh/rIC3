@@ -1,6 +1,7 @@
 #![feature(ptr_metadata)]
 
 use clap::Parser;
+use log::info;
 use rIC3::{
     Engine,
     bmc::BMC,
@@ -11,20 +12,24 @@ use rIC3::{
     portfolio::portfolio_main,
 };
 use std::{
-    fs,
+    env, fs,
     mem::{self, transmute},
     process::exit,
     ptr,
 };
 
 fn main() {
+    if env::var("RUST_LOG").is_err() {
+        unsafe { env::set_var("RUST_LOG", "info") };
+    }
     procspawn::init();
+    env_logger::Builder::from_default_env()
+        .format_timestamp(None)
+        .init();
     fs::create_dir_all("/tmp/rIC3").unwrap();
     let mut options = Options::parse();
     options.model = options.model.canonicalize().unwrap();
-    if options.verbose > 0 {
-        println!("Info: the model to be checked: {}", options.model.display());
-    }
+    info!("the model to be checked: {}", options.model.display());
     if let options::Engine::Portfolio = options.engine {
         portfolio_main(options);
         unreachable!();
@@ -62,32 +67,21 @@ fn main() {
         });
     }
     let res = engine.check();
-    if options.verbose > 0 {
-        engine.statistic();
-    }
-    if options.verbose > 0 {
-        print!("result: ");
-    }
+    engine.statistic();
     match res {
         Some(true) => {
-            if options.verbose > 0 {
-                println!("safe");
-            }
+            println!("result: safe");
             if options.witness {
                 println!("0");
             }
             aig.certificate(&mut engine, true)
         }
         Some(false) => {
-            if options.verbose > 0 {
-                println!("unsafe");
-            }
+            println!("result: unsafe");
             aig.certificate(&mut engine, false)
         }
         _ => {
-            if options.verbose > 0 {
-                println!("unknown");
-            }
+            println!("result: unknown");
             if options.witness {
                 println!("2");
             }

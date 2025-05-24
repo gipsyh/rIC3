@@ -7,6 +7,7 @@ use crate::{
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap};
+use log::{debug, info};
 use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -68,11 +69,11 @@ impl IC3 {
             }
             let mut init = LitVec::new();
             for l in self.ts.latchs.iter() {
-                if self.ts.init_map[*l].is_none() {
-                    if let Some(v) = self.solvers[0].sat_value(l.lit()) {
-                        let l = l.lit().not_if(!v);
-                        init.push(l);
-                    }
+                if self.ts.init_map[*l].is_none()
+                    && let Some(v) = self.solvers[0].sat_value(l.lit())
+                {
+                    let l = l.lit().not_if(!v);
+                    init.push(l);
                 }
             }
             for i in init {
@@ -129,9 +130,7 @@ impl IC3 {
                             assert!(!self.abs_cst.contains(&c));
                             self.abs_cst.push(c);
                         }
-                        if self.options.verbose > 1 {
-                            println!("abs cst len: {}", self.abs_cst.len(),);
-                        }
+                        info!("abs cst len: {}", self.abs_cst.len(),);
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
                             for l in f.iter_mut() {
@@ -155,9 +154,7 @@ impl IC3 {
                 self.add_obligation(po);
                 continue;
             }
-            if self.options.verbose > 2 {
-                self.frame.statistic();
-            }
+            debug!("{}", self.frame.statistic());
             po.bump_act();
             let blocked_start = Instant::now();
             let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false, false);
@@ -286,11 +283,12 @@ impl IC3 {
                         } else {
                             self.solvers[frame_idx].inductive_core()
                         };
-                        if let Some(po) = &mut lemma.po {
-                            if po.frame < frame_idx + 2 && self.obligations.remove(po) {
-                                po.push_to(frame_idx + 2);
-                                self.obligations.add(po.clone());
-                            }
+                        if let Some(po) = &mut lemma.po
+                            && po.frame < frame_idx + 2
+                            && self.obligations.remove(po)
+                        {
+                            po.push_to(frame_idx + 2);
+                            self.obligations.add(po.clone());
                         }
                         self.add_lemma(frame_idx + 1, core, true, lemma.po);
                         self.statistic.ctp.statistic(ctp > 0);
@@ -431,16 +429,8 @@ impl Engine for IC3 {
                 }
             }
             let blocked_time = start.elapsed();
-            if self.options.verbose > 1 {
-                self.frame.statistic();
-                println!(
-                    "[{}:{}] frame: {}, time: {:?}",
-                    file!(),
-                    line!(),
-                    self.level(),
-                    blocked_time,
-                );
-            }
+            info!("{}", self.frame.statistic());
+            info!("frame: {}, time: {:?}", self.level(), blocked_time,);
             self.statistic.overall_block_time += blocked_time;
             self.extend();
             let start = Instant::now();
@@ -515,16 +505,13 @@ impl Engine for IC3 {
 
     fn statistic(&mut self) {
         self.statistic.num_auxiliary_var = self.auxiliary_var.len();
-        self.obligations.statistic();
-        for f in self.frame.iter() {
-            print!("{} ", f.len());
-        }
-        println!();
+        info!("{}", self.obligations.statistic());
+        info!("{}", self.frame.statistic());
         let mut statistic = SolverStatistic::default();
         for s in self.solvers.iter() {
             statistic += s.statistic;
         }
-        println!("{:#?}", statistic);
-        println!("{:#?}", self.statistic);
+        info!("{statistic:#?}");
+        info!("{:#?}", self.statistic);
     }
 }

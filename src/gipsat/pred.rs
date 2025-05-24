@@ -48,10 +48,10 @@ impl Solver {
         let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            if self.domain.has(lit.var()) {
-                if let Some(v) = solver.sat_value(lit) {
-                    latchs.push(lit.not_if(!v));
-                }
+            if self.domain.has(lit.var())
+                && let Some(v) = solver.sat_value(lit)
+            {
+                latchs.push(lit.not_if(!v));
             }
         }
         for _ in 0.. {

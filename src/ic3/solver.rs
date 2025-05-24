@@ -91,12 +91,11 @@ impl IC3 {
         let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            if self.lift.domain.has(lit.var()) {
-                if let Some(v) = solver.sat_value(lit) {
-                    if in_cls.contains(latch) || !solver.flip_to_none(*latch) {
-                        latchs.push(lit.not_if(!v));
-                    }
-                }
+            if self.lift.domain.has(lit.var())
+                && let Some(v) = solver.sat_value(lit)
+                && (in_cls.contains(latch) || !solver.flip_to_none(*latch))
+            {
+                latchs.push(lit.not_if(!v));
             }
         }
         let inn: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {

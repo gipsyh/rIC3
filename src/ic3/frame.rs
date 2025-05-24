@@ -2,9 +2,13 @@ use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
+use log::trace;
 use logic_form::{Lemma, Lit, LitSet, LitVec};
 use satif::Satif;
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Write,
+    ops::{Deref, DerefMut},
+};
 
 #[derive(Clone)]
 pub struct FrameLemma {
@@ -167,11 +171,12 @@ impl Frames {
     }
 
     #[inline]
-    pub fn statistic(&self) {
+    pub fn statistic(&self) -> String {
+        let mut s = String::new();
         for f in self.frames.iter() {
-            print!("{} ", f.len());
+            s.write_fmt(format_args!("{} ", f.len())).unwrap();
         }
-        println!();
+        s
     }
 }
 
@@ -208,9 +213,7 @@ impl IC3 {
         po: Option<ProofObligation>,
     ) -> bool {
         let lemma = Lemma::new(lemma);
-        if self.options.verbose > 5 {
-            println!("add lemma: frame:{frame}, {}", lemma);
-        }
+        trace!("add lemma: frame:{frame}, {lemma}");
         if frame == 0 {
             assert!(self.frame.len() == 1);
             self.solvers[0].add_lemma(&!lemma.cube());
