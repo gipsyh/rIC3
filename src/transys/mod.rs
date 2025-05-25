@@ -1,4 +1,5 @@
 mod ctx;
+mod l2s;
 pub mod nodep;
 mod others;
 mod simp;
@@ -97,6 +98,8 @@ pub struct Transys {
     pub init: GHashMap<Var, bool>,
     pub bad: Lit,
     pub constraint: LitVec,
+    pub justice: LitVec,
+    pub fairness: LitVec,
     pub rel: DagCnf,
     pub rst: GHashMap<Var, Var>,
 }
