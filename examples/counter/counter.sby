@@ -1,16 +1,18 @@
 [tasks]
-prove
-live
+s0
+l0
+l1
 
 [options]
-prove: mode prove
-live:  mode live
+s0: mode prove
+l0: mode live
+l1: mode live
 
 [engines]
 aiger suprove
 
 [script]
-read -formal counter.sv
+read -formal -D L1 counter.sv
 prep -top main
 
 [files]
