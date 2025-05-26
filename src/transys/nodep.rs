@@ -109,8 +109,10 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
-    fn restore(&self, lit: Lit) -> Lit {
-        self.rst[&lit.var()].lit().not_if(!lit.polarity())
+    fn restore(&self, lit: Lit) -> Option<Lit> {
+        self.rst
+            .get(&lit.var())
+            .map(|v| v.lit().not_if(!lit.polarity()))
     }
 }
 

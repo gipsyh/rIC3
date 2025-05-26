@@ -1,12 +1,19 @@
+[tasks]
+s0
+l0
+l1
+
 [options]
-mode prove
+s0: mode prove
+l0: mode live
+l1: mode live
 
 [engines]
-aiger rIC3
+aiger suprove
 
 [script]
-read_verilog -formal counter.v
+read -formal -D L1 counter.sv
 prep -top main
 
 [files]
-counter.v
+counter.sv

@@ -1,4 +1,5 @@
 mod ctx;
+mod l2s;
 pub mod nodep;
 mod others;
 mod simp;
@@ -37,7 +38,7 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
-    fn restore(&self, lit: Lit) -> Lit;
+    fn restore(&self, lit: Lit) -> Option<Lit>;
 
     #[inline]
     fn var_next(&self, var: Var) -> Var {
@@ -97,6 +98,8 @@ pub struct Transys {
     pub init: GHashMap<Var, bool>,
     pub bad: Lit,
     pub constraint: LitVec,
+    pub justice: LitVec,
+    pub fairness: LitVec,
     pub rel: DagCnf,
     pub rst: GHashMap<Var, Var>,
 }
@@ -143,8 +146,10 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn restore(&self, lit: Lit) -> Lit {
-        self.rst[&lit.var()].lit().not_if(!lit.polarity())
+    fn restore(&self, lit: Lit) -> Option<Lit> {
+        self.rst
+            .get(&lit.var())
+            .map(|v| v.lit().not_if(!lit.polarity()))
     }
 
     #[inline]

@@ -4,16 +4,17 @@ use log::{debug, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, options::Options};
+use crate::{Engine, Proof, Witness, options::Options, transys::Transys};
 use std::{fs::File, io::Write, path::Path, process::Command};
 
 impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
+        let origin_ts = Transys::from_aig(&self.origin_aig, false);
         if res {
             if self.opt.certificate.is_none() && !self.opt.certify {
                 return;
             }
-            let proof = engine.proof(&self.origin_ts);
+            let proof = engine.proof(&origin_ts);
             let certifaiger = self.proof(proof);
             if let Some(certificate_path) = &self.opt.certificate {
                 certifaiger.to_file(certificate_path.to_str().unwrap(), true);
@@ -29,7 +30,7 @@ impl AigFrontend {
             if self.opt.certificate.is_none() && !self.opt.certify && !self.opt.witness {
                 return;
             }
-            let witness = engine.witness(&self.origin_ts);
+            let witness = engine.witness(&origin_ts);
             let witness = self.witness(witness);
             if self.opt.witness {
                 println!("{witness}");
@@ -48,7 +49,7 @@ impl AigFrontend {
         }
     }
 
-    pub fn witness(&self, wit: Witness) -> String {
+    fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
         let map: GHashMap<Var, bool> =
             GHashMap::from_iter(wit.init.iter().map(|l| (l.var(), l.polarity())));
@@ -84,18 +85,23 @@ impl AigFrontend {
             res.push(line);
             simulate.simulate(input);
         }
-        let p = self
-            .origin_aig
-            .bads
-            .iter()
-            .position(|b| simulate.value(*b).is_true())
-            .unwrap();
-        res[1] = format!("b{p}");
+        if self.origin_aig.bads.is_empty() {
+            assert!(!self.origin_aig.justice.is_empty());
+            res[1] = "j0".to_string();
+        } else {
+            let p = self
+                .origin_aig
+                .bads
+                .iter()
+                .position(|b| simulate.value(*b).is_true())
+                .unwrap();
+            res[1] = format!("b{p}");
+        }
         res.push(".\n".to_string());
         res.join("\n")
     }
 
-    pub fn proof(&self, proof: Proof) -> Aig {
+    fn proof(&self, proof: Proof) -> Aig {
         let mut certifaiger = Aig::from(&proof.proof);
         certifaiger = certifaiger.reencode();
         certifaiger.symbols.clear();

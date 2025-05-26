@@ -50,10 +50,14 @@ impl From<&Transys> for Aig {
             let init = ts.init.get(l).copied();
             aig.add_latch(map[l].node_id(), next, init);
         }
+        aig.bads.push(map_lit(ts.bad));
         for c in ts.constraint() {
             aig.constraints.push(map_lit(c));
         }
-        aig.bads.push(map_lit(ts.bad));
+        aig.justice = vec![ts.justice.iter().map(|&j| map_lit(j)).collect()];
+        for &f in ts.fairness.iter() {
+            aig.fairness.push(map_lit(f));
+        }
         aig
     }
 }
@@ -61,7 +65,6 @@ impl From<&Transys> for Aig {
 impl Transys {
     pub fn from_aig(aig: &Aig, compact: bool) -> Transys {
         let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
-        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
         let mut latch = Vec::new();
         let mut next = GHashMap::new();
         let mut init = GHashMap::new();
@@ -73,7 +76,17 @@ impl Transys {
                 init.insert(lv, i);
             }
         }
-        let bad = aig.bads[0].to_lit();
+        let bad = aig
+            .bads
+            .first()
+            .map_or(Lit::constant(false), |e| e.to_lit());
+        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
+        let justice = aig
+            .justice
+            .first()
+            .map(|j| j.iter().map(|e| e.to_lit()).collect())
+            .unwrap_or_default();
+        let fairness: LitVec = aig.fairness.iter().map(|f| f.to_lit()).collect();
         let rel = aig.cnf(compact);
         let mut rst = GHashMap::new();
         for v in Var::CONST..=rel.max_var() {
@@ -86,6 +99,8 @@ impl Transys {
             init,
             bad,
             constraint,
+            justice,
+            fairness,
             rel,
             rst,
         }
@@ -125,8 +140,8 @@ pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<V
 
 pub struct AigFrontend {
     origin_aig: Aig,
-    origin_ts: Transys,
     opt: Options,
+    ts: Transys,
 }
 
 impl AigFrontend {
@@ -145,34 +160,55 @@ impl AigFrontend {
             }
         }
         let mut aig = origin_aig.clone();
-        if aig.bads.is_empty() {
-            warn!("no property to be checked");
-            if let Some(certificate) = &opt.certificate {
-                aig.to_file(certificate, true);
-            }
-            exit(20);
-        } else if aig.bads.len() > 1 {
-            if opt.certify {
+        if !aig.justice.is_empty() {
+            if !aig.bads.is_empty() {
                 error!(
-                    "multiple properties detected. cannot compress properties when certification is enabled"
+                    "rIC3 does not support solving both safety and liveness properties simultaneously"
                 );
                 panic!();
             }
-            warn!("multiple properties detected. rIC3 has compressed them into a single property");
-            aig.compress_property();
+            if opt.certify || opt.certificate.is_some() {
+                error!("rIC3 does not support solving liveness property with certificate");
+                panic!();
+            }
+        } else {
+            if !aig.fairness.is_empty() {
+                warn!("fairness constraints are ignored when solving the safety property");
+                aig.fairness.clear();
+            }
+            if aig.bads.is_empty() {
+                warn!("no property to be checked");
+                if let Some(certificate) = &opt.certificate {
+                    aig.to_file(certificate, true);
+                }
+                exit(20);
+            } else if aig.bads.len() > 1 {
+                if opt.certify || opt.certificate.is_some() {
+                    error!(
+                        "multiple properties detected. cannot compress properties when certification is enabled"
+                    );
+                    panic!();
+                }
+                warn!(
+                    "multiple properties detected. rIC3 has compressed them into a single property"
+                );
+                aig.compress_property();
+            }
         }
-        let origin_ts = Transys::from_aig(&origin_aig, false);
+        let (aig, rst) = aig_preprocess(&aig, opt);
+        let mut ts = Transys::from_aig(&aig, true);
+        ts.rst = rst;
+        if opt.l2s {
+            ts = ts.l2s();
+        }
         Self {
             origin_aig,
-            origin_ts,
+            ts,
             opt: opt.clone(),
         }
     }
 
     pub fn ts(&mut self) -> Transys {
-        let (aig, rst) = aig_preprocess(&self.origin_aig, &self.opt);
-        let mut ts = Transys::from_aig(&aig, true);
-        ts.rst = rst;
-        ts
+        self.ts.clone()
     }
 }
