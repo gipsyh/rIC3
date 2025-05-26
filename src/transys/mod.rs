@@ -38,7 +38,7 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
-    fn restore(&self, lit: Lit) -> Lit;
+    fn restore(&self, lit: Lit) -> Option<Lit>;
 
     #[inline]
     fn var_next(&self, var: Var) -> Var {
@@ -146,8 +146,10 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn restore(&self, lit: Lit) -> Lit {
-        self.rst[&lit.var()].lit().not_if(!lit.polarity())
+    fn restore(&self, lit: Lit) -> Option<Lit> {
+        self.rst
+            .get(&lit.var())
+            .map(|v| v.lit().not_if(!lit.polarity()))
     }
 
     #[inline]

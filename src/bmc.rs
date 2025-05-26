@@ -95,8 +95,10 @@ impl Engine for BMC {
         let mut wit = Witness::default();
         for l in self.uts.ts.latch() {
             let l = l.lit();
-            if let Some(v) = self.solver.sat_value(l) {
-                wit.init.push(self.uts.ts.restore(l.not_if(!v)));
+            if let Some(v) = self.solver.sat_value(l)
+                && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+            {
+                wit.init.push(r);
             }
         }
         for k in 0..=self.uts.num_unroll {
@@ -104,8 +106,10 @@ impl Engine for BMC {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(self.uts.ts.restore(l.not_if(!v)));
+                if let Some(v) = self.solver.sat_value(kl)
+                    && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                {
+                    w.push(r);
                 }
             }
             wit.wit.push(w);

@@ -85,13 +85,18 @@ impl AigFrontend {
             res.push(line);
             simulate.simulate(input);
         }
-        let p = self
-            .origin_aig
-            .bads
-            .iter()
-            .position(|b| simulate.value(*b).is_true())
-            .unwrap();
-        res[1] = format!("b{p}");
+        if self.origin_aig.bads.is_empty() {
+            assert!(!self.origin_aig.justice.is_empty());
+            res[1] = "j0".to_string();
+        } else {
+            let p = self
+                .origin_aig
+                .bads
+                .iter()
+                .position(|b| simulate.value(*b).is_true())
+                .unwrap();
+            res[1] = format!("b{p}");
+        }
         res.push(".\n".to_string());
         res.join("\n")
     }

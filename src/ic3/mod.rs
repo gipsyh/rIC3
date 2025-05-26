@@ -447,7 +447,7 @@ impl Engine for IC3 {
         let invariants = self.frame.invariant();
         let invariants = invariants
             .iter()
-            .map(|l| LitVec::from_iter(l.iter().map(|l| self.ts.restore(*l))));
+            .map(|l| LitVec::from_iter(l.iter().filter_map(|l| self.ts.restore(*l))));
         let mut proof = ts.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {
@@ -470,8 +470,10 @@ impl Engine for IC3 {
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
             for l in uts.ts.latch() {
                 let l = l.lit();
-                if let Some(v) = bmc_solver.sat_value(l) {
-                    res.init.push(uts.ts.restore(l.not_if(!v)));
+                if let Some(v) = bmc_solver.sat_value(l)
+                    && let Some(r) = uts.ts.restore(l.not_if(!v))
+                {
+                    res.init.push(r);
                 }
             }
             for k in 0..=uts.num_unroll {
@@ -479,8 +481,10 @@ impl Engine for IC3 {
                 for l in uts.ts.input() {
                     let l = l.lit();
                     let kl = uts.lit_next(l, k);
-                    if let Some(v) = bmc_solver.sat_value(kl) {
-                        w.push(uts.ts.restore(l.not_if(!v)));
+                    if let Some(v) = bmc_solver.sat_value(kl)
+                        && let Some(r) = uts.ts.restore(l.not_if(!v))
+                    {
+                        w.push(r);
                     }
                 }
                 res.wit.push(w);
@@ -490,13 +494,15 @@ impl Engine for IC3 {
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         for &l in b.lemma.iter() {
-            res.init.push(self.ts.restore(l));
+            if let Some(r) = self.ts.restore(l) {
+                res.init.push(r);
+            }
         }
         let mut b = Some(b);
         while let Some(bad) = b {
             for i in bad.input.iter() {
                 res.wit
-                    .push(i.iter().map(|l| self.ts.restore(*l)).collect());
+                    .push(i.iter().filter_map(|l| self.ts.restore(*l)).collect());
             }
             b = bad.next.clone();
         }
