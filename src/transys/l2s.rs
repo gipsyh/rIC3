@@ -24,6 +24,7 @@ impl Transys {
             let jl = l2s.new_var();
             jls.push(jl);
             let jln = l2s.rel.new_and([encounter_next, j]);
+            let jln = l2s.rel.new_or([jl.lit(), jln]);
             l2s.add_latch(jl, Some(false), jln);
         }
         l2s.bad = l2s
