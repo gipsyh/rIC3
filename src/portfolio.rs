@@ -1,4 +1,4 @@
-use crate::{Options, frontend::aig::certificate::certifaiger_check};
+use crate::{Config, frontend::aig::certificate::certifaiger_check};
 use log::info;
 use process_control::{ChildExt, Control};
 use std::{
@@ -39,7 +39,7 @@ impl PortfolioState {
 }
 
 pub struct Portfolio {
-    option: Options,
+    option: Config,
     engines: Vec<Command>,
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
@@ -48,7 +48,7 @@ pub struct Portfolio {
 }
 
 impl Portfolio {
-    pub fn new(option: Options) -> Self {
+    pub fn new(option: Config) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
@@ -228,7 +228,7 @@ impl Drop for Portfolio {
     }
 }
 
-fn certificate(engine: &mut Portfolio, option: &Options, res: bool) {
+fn certificate(engine: &mut Portfolio, option: &Config, res: bool) {
     if res {
         if option.certificate.is_none() && !option.certify {
             return;
@@ -278,7 +278,7 @@ fn certificate(engine: &mut Portfolio, option: &Options, res: bool) {
     );
 }
 
-pub fn portfolio_main(options: Options) {
+pub fn portfolio_main(options: Config) {
     let mut engine = Portfolio::new(options.clone());
     let res = engine.check();
     match res {

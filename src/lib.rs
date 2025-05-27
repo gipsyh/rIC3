@@ -10,7 +10,7 @@ pub mod kind;
 pub mod portfolio;
 pub mod transys;
 
-use config::Options;
+use config::Config;
 use logic_form::LitVec;
 use transys::Transys;
 

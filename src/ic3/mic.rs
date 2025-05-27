@@ -1,5 +1,5 @@
 use super::IC3;
-use crate::{config::Options, transys::TransysIf};
+use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;
@@ -34,7 +34,7 @@ pub enum MicType {
 }
 
 impl MicType {
-    pub fn from_options(options: &Options) -> Self {
+    pub fn from_options(options: &Config) -> Self {
         let p = if options.ic3.ctg {
             DropVarParameter {
                 limit: options.ic3.ctg_limit,

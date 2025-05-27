@@ -1,6 +1,6 @@
 use crate::{
     Engine, Proof, Witness,
-    config::Options,
+    config::Config,
     gipsat::{Solver, SolverStatistic},
     transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
 };
@@ -25,7 +25,7 @@ mod statistic;
 mod verify;
 
 pub struct IC3 {
-    options: Options,
+    options: Config,
     origin_ts: Transys,
     ts: Grc<TransysCtx>,
     solvers: Vec<Solver>,
@@ -343,7 +343,7 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(mut options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+    pub fn new(mut options: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         ts.unique_prime();
         ts.simplify();
         let mut uts = TransysUnroll::new(&ts);

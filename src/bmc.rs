@@ -1,6 +1,6 @@
 use crate::{
     Engine, Witness,
-    config::Options,
+    config::Config,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
@@ -10,12 +10,12 @@ use std::time::Duration;
 
 pub struct BMC {
     uts: TransysUnroll<NoDepTransys>,
-    options: Options,
+    options: Config,
     solver: Box<dyn Satif>,
 }
 
 impl BMC {
-    pub fn new(options: Options, ts: Transys) -> Self {
+    pub fn new(options: Config, ts: Transys) -> Self {
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();

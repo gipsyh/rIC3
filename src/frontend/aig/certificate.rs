@@ -4,7 +4,7 @@ use log::{debug, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, config::Options, transys::Transys};
+use crate::{Engine, Proof, Witness, config::Config, transys::Transys};
 use std::{fs::File, io::Write, path::Path, process::Command};
 
 impl AigFrontend {
@@ -121,7 +121,7 @@ impl AigFrontend {
     }
 }
 
-pub fn certifaiger_check<P: AsRef<Path>>(option: &Options, certificate: P) {
+pub fn certifaiger_check<P: AsRef<Path>>(option: &Config, certificate: P) {
     let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([

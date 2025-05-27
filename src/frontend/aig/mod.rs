@@ -2,7 +2,7 @@ mod abc;
 pub mod certificate;
 
 use crate::{
-    config::{self, Options},
+    config::{self, Config},
     transys::{Transys, TransysIf},
 };
 use abc::abc_preprocess;
@@ -107,7 +107,7 @@ impl Transys {
     }
 }
 
-pub fn aig_preprocess(aig: &Aig, options: &config::Options) -> (Aig, GHashMap<Var, Var>) {
+pub fn aig_preprocess(aig: &Aig, options: &config::Config) -> (Aig, GHashMap<Var, Var>) {
     let (mut aig, mut remap) = aig.coi_refine();
     if !(options.preprocess.no_abc
         || matches!(options.engine, config::Engine::IC3) && options.ic3.inn)
@@ -140,12 +140,12 @@ pub fn aig_preprocess(aig: &Aig, options: &config::Options) -> (Aig, GHashMap<Va
 
 pub struct AigFrontend {
     origin_aig: Aig,
-    opt: Options,
+    opt: Config,
     ts: Transys,
 }
 
 impl AigFrontend {
-    pub fn new(opt: &Options) -> Self {
+    pub fn new(opt: &Config) -> Self {
         let mut origin_aig = Aig::from_file(&opt.model);
         if !origin_aig.outputs.is_empty() {
             if origin_aig.bads.is_empty() {

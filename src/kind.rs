@@ -1,6 +1,6 @@
 use crate::{
     Engine, Proof, Witness,
-    config::Options,
+    config::Config,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
@@ -9,12 +9,12 @@ use satif::Satif;
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
-    options: Options,
+    options: Config,
     solver: Box<dyn Satif>,
 }
 
 impl Kind {
-    pub fn new(options: Options, ts: Transys) -> Self {
+    pub fn new(options: Config, ts: Transys) -> Self {
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();

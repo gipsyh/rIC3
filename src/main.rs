@@ -5,7 +5,7 @@ use log::info;
 use rIC3::{
     Engine,
     bmc::BMC,
-    config::{self, Options},
+    config::{self, Config},
     frontend::aig::AigFrontend,
     ic3::IC3,
     kind::Kind,
@@ -27,7 +27,7 @@ fn main() {
         .format_timestamp(None)
         .init();
     fs::create_dir_all("/tmp/rIC3").unwrap();
-    let mut options = Options::parse();
+    let mut options = Config::parse();
     options.model = options.model.canonicalize().unwrap();
     info!("the model to be checked: {}", options.model.display());
     if let config::Engine::Portfolio = options.engine {
