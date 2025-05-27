@@ -10,31 +10,27 @@ use std::time::Duration;
 
 pub struct BMC {
     uts: TransysUnroll<NoDepTransys>,
-    options: Config,
+    cfg: Config,
     solver: Box<dyn Satif>,
 }
 
 impl BMC {
-    pub fn new(options: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, ts: Transys) -> Self {
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();
         let uts = TransysUnroll::new(&ts);
-        let mut solver: Box<dyn Satif> = if options.bmc.bmc_kissat {
+        let mut solver: Box<dyn Satif> = if cfg.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())
         } else {
             Box::new(cadical::Solver::new())
         };
         ts.load_init(solver.as_mut());
-        Self {
-            uts,
-            options,
-            solver,
-        }
+        Self { uts, cfg, solver }
     }
 
     pub fn reset_solver(&mut self) {
-        self.solver = if self.options.bmc.bmc_kissat {
+        self.solver = if self.cfg.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())
         } else {
             Box::new(cadical::Solver::new())
@@ -45,11 +41,11 @@ impl BMC {
 
 impl Engine for BMC {
     fn check(&mut self) -> Option<bool> {
-        let step = self.options.step as usize;
-        let bmc_max_k = self.options.bmc.bmc_max_k;
+        let step = self.cfg.step as usize;
+        let bmc_max_k = self.cfg.bmc.bmc_max_k;
         for k in (step - 1..=bmc_max_k).step_by(step) {
             self.uts.unroll_to(k);
-            let last_bound = if self.options.bmc.bmc_kissat {
+            let last_bound = if self.cfg.bmc.bmc_kissat {
                 self.reset_solver();
                 0
             } else {
@@ -59,14 +55,14 @@ impl Engine for BMC {
                 self.uts.load_trans(self.solver.as_mut(), s, true);
             }
             let mut assump = self.uts.lits_next(&self.uts.ts.bad.cube(), k);
-            if self.options.bmc.bmc_kissat {
+            if self.cfg.bmc.bmc_kissat {
                 for b in assump.iter() {
                     self.solver.add_clause(&[*b]);
                 }
                 assump.clear();
             }
             info!("bmc depth: {k}");
-            let r = if let Some(limit) = self.options.bmc.time_limit {
+            let r = if let Some(limit) = self.cfg.bmc.time_limit {
                 let Some(r) = self
                     .solver
                     .solve_with_limit(&assump, Duration::from_secs(limit))

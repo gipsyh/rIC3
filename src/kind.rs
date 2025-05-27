@@ -9,34 +9,30 @@ use satif::Satif;
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
-    options: Config,
+    cfg: Config,
     solver: Box<dyn Satif>,
 }
 
 impl Kind {
-    pub fn new(options: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, ts: Transys) -> Self {
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();
-        let uts = if options.kind.simple_path {
+        let uts = if cfg.kind.simple_path {
             TransysUnroll::new_with_simple_path(&ts)
         } else {
             TransysUnroll::new(&ts)
         };
-        let solver: Box<dyn Satif> = if options.kind.kind_kissat {
+        let solver: Box<dyn Satif> = if cfg.kind.kind_kissat {
             Box::new(kissat::Solver::new())
         } else {
             Box::new(cadical::Solver::new())
         };
-        Self {
-            uts,
-            options,
-            solver,
-        }
+        Self { uts, cfg, solver }
     }
 
     pub fn reset_solver(&mut self) {
-        self.solver = if self.options.kind.kind_kissat {
+        self.solver = if self.cfg.kind.kind_kissat {
             Box::new(kissat::Solver::new())
         } else {
             Box::new(cadical::Solver::new())
@@ -46,12 +42,12 @@ impl Kind {
 
 impl Engine for Kind {
     fn check(&mut self) -> Option<bool> {
-        let step = self.options.step as usize;
+        let step = self.cfg.step as usize;
         self.uts.load_trans(self.solver.as_mut(), 0, true);
         for k in (step..).step_by(step) {
             let bmc_k = k - 1;
             let start = k + 1 - step;
-            if self.options.kind.kind_kissat {
+            if self.cfg.kind.kind_kissat {
                 self.reset_solver();
                 for i in 0..start {
                     self.uts.load_trans(self.solver.as_mut(), i, true);
@@ -67,7 +63,7 @@ impl Engine for Kind {
             for i in start..=bmc_k {
                 self.uts.load_trans(self.solver.as_mut(), i, true);
             }
-            if !self.options.kind.no_bmc {
+            if !self.cfg.kind.no_bmc {
                 let mut assump: LitVec = self.uts.ts.init().collect();
                 assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), bmc_k));
                 info!("kind bmc depth: {bmc_k}");
@@ -83,7 +79,7 @@ impl Engine for Kind {
             self.uts.unroll_to(k);
             self.uts.load_trans(self.solver.as_mut(), k, true);
             info!("kind depth: {k}");
-            let res = if self.options.kind.kind_kissat {
+            let res = if self.cfg.kind.kind_kissat {
                 for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
                     self.solver.add_clause(&[l]);
                 }
@@ -101,7 +97,7 @@ impl Engine for Kind {
     }
 
     fn proof(&mut self, ts: &Transys) -> Proof {
-        if self.options.kind.simple_path {
+        if self.cfg.kind.simple_path {
             //TODO: support certifaiger with simple path constraint
             error!("k-induction with simple path constraint not support certifaiger");
             panic!();

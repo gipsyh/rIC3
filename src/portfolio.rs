@@ -39,7 +39,7 @@ impl PortfolioState {
 }
 
 pub struct Portfolio {
-    option: Config,
+    cfg: Config,
     engines: Vec<Command>,
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
@@ -48,7 +48,7 @@ pub struct Portfolio {
 }
 
 impl Portfolio {
-    pub fn new(option: Config) -> Self {
+    pub fn new(cfg: Config) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
@@ -57,14 +57,14 @@ impl Portfolio {
             let mut engine = Command::new(current_exe().unwrap());
             engine.env("RIC3_TMP_DIR", temp_dir_path);
             engine.env("RUST_LOG", "warn");
-            engine.arg(&option.model);
+            engine.arg(&cfg.model);
             for a in args {
                 engine.arg(a);
             }
-            if option.preprocess.sec {
+            if cfg.preprocess.sec {
                 engine.arg("--sec");
             }
-            if option.preprocess.no_abc {
+            if cfg.preprocess.no_abc {
                 engine.arg("--no-abc");
             }
             engines.push(engine);
@@ -87,7 +87,7 @@ impl Portfolio {
         new_engine("-e kind --step 1 --kind-simple-path");
         let ps = PortfolioState::new(engines.len());
         Self {
-            option,
+            cfg,
             engines,
             temp_dir,
             certificate: None,
@@ -125,17 +125,16 @@ impl Portfolio {
     fn check_inner(&mut self) -> Option<bool> {
         let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
-            let certificate = if self.option.certificate.is_some()
-                || self.option.certify
-                || self.option.witness
-            {
-                let certificate = tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
-                let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                engine.arg(certify_path);
-                Some(certificate)
-            } else {
-                None
-            };
+            let certificate =
+                if self.cfg.certificate.is_some() || self.cfg.certify || self.cfg.witness {
+                    let certificate =
+                        tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
+                    let certify_path = certificate.path().as_os_str().to_str().unwrap();
+                    engine.arg(certify_path);
+                    Some(certificate)
+                } else {
+                    None
+                };
             let mut child = engine.stderr(Stdio::piped()).spawn().unwrap();
             self.engine_pids.push(child.id() as i32);
             let state = self.state.clone();
@@ -228,16 +227,16 @@ impl Drop for Portfolio {
     }
 }
 
-fn certificate(engine: &mut Portfolio, option: &Config, res: bool) {
+fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
     if res {
-        if option.certificate.is_none() && !option.certify {
+        if cfg.certificate.is_none() && !cfg.certify {
             return;
         }
-        if let Some(certificate_path) = &option.certificate {
+        if let Some(certificate_path) = &cfg.certificate {
             std::fs::copy(engine.certificate.as_ref().unwrap(), certificate_path).unwrap();
         }
     } else {
-        if option.certificate.is_none() && !option.certify && !option.witness {
+        if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
             return;
         }
         let mut witness = String::new();
@@ -254,19 +253,19 @@ fn certificate(engine: &mut Portfolio, option: &Config, res: bool) {
         .unwrap()
         .read_to_string(&mut witness)
         .unwrap();
-        if option.witness {
+        if cfg.witness {
             println!("{witness}");
         }
-        if let Some(certificate_path) = &option.certificate {
+        if let Some(certificate_path) = &cfg.certificate {
             let mut file: File = File::create(certificate_path).unwrap();
             file.write_all(witness.as_bytes()).unwrap();
         }
     }
-    if !option.certify {
+    if !cfg.certify {
         return;
     }
     certifaiger_check(
-        option,
+        cfg,
         engine
             .certificate
             .as_ref()
@@ -278,24 +277,24 @@ fn certificate(engine: &mut Portfolio, option: &Config, res: bool) {
     );
 }
 
-pub fn portfolio_main(options: Config) {
-    let mut engine = Portfolio::new(options.clone());
+pub fn portfolio_main(cfg: Config) {
+    let mut engine = Portfolio::new(cfg.clone());
     let res = engine.check();
     match res {
         Some(true) => {
             println!("result: safe");
-            if options.witness {
+            if cfg.witness {
                 println!("0");
             }
-            certificate(&mut engine, &options, true)
+            certificate(&mut engine, &cfg, true)
         }
         Some(false) => {
             println!("result: unsafe");
-            certificate(&mut engine, &options, false)
+            certificate(&mut engine, &cfg, false)
         }
         _ => {
             println!("result: unknown");
-            if options.witness {
+            if cfg.witness {
                 println!("2");
             }
         }

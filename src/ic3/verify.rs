@@ -31,7 +31,7 @@ pub fn verify_invariant(ts: &TransysCtx, invariants: &[Lemma]) -> bool {
 
 impl IC3 {
     pub fn verify(&mut self) {
-        if !self.options.certify {
+        if !self.cfg.certify {
             return;
         }
         let invariants = self.frame.invariant();

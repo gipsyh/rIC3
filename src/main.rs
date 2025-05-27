@@ -27,31 +27,31 @@ fn main() {
         .format_timestamp(None)
         .init();
     fs::create_dir_all("/tmp/rIC3").unwrap();
-    let mut options = Config::parse();
-    options.model = options.model.canonicalize().unwrap();
-    info!("the model to be checked: {}", options.model.display());
-    if let config::Engine::Portfolio = options.engine {
-        portfolio_main(options);
+    let mut cfg = Config::parse();
+    cfg.model = cfg.model.canonicalize().unwrap();
+    info!("the model to be checked: {}", cfg.model.display());
+    if let config::Engine::Portfolio = cfg.engine {
+        portfolio_main(cfg);
         unreachable!();
     }
-    let mut aig = match options.model.extension() {
+    let mut aig = match cfg.model.extension() {
         Some(ext) if (ext == "btor") | (ext == "btor2") => panic!(
             "Error: rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
         ),
-        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&options),
+        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&cfg),
         _ => panic!("Error: unsupported file format"),
     };
     let ts = aig.ts();
-    if options.preprocess.sec {
+    if cfg.preprocess.sec {
         panic!("Error: sec not support");
     }
-    let mut engine: Box<dyn Engine> = match options.engine {
-        config::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
-        config::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
-        config::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
+    let mut engine: Box<dyn Engine> = match cfg.engine {
+        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, vec![])),
+        config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
+        config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
         _ => unreachable!(),
     };
-    if options.interrupt_statistic {
+    if cfg.interrupt_statistic {
         let e: (usize, usize) =
             unsafe { transmute((engine.as_mut() as *mut dyn Engine).to_raw_parts()) };
         let _ = ctrlc::set_handler(move || {
@@ -71,7 +71,7 @@ fn main() {
     match res {
         Some(true) => {
             println!("result: safe");
-            if options.witness {
+            if cfg.witness {
                 println!("0");
             }
             aig.certificate(&mut engine, true)
@@ -82,7 +82,7 @@ fn main() {
         }
         _ => {
             println!("result: unknown");
-            if options.witness {
+            if cfg.witness {
                 println!("2");
             }
         }

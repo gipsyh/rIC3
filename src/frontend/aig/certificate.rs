@@ -11,41 +11,41 @@ impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
         let origin_ts = Transys::from_aig(&self.origin_aig, false);
         if res {
-            if self.opt.certificate.is_none() && !self.opt.certify {
+            if self.cfg.certificate.is_none() && !self.cfg.certify {
                 return;
             }
             let proof = engine.proof(&origin_ts);
             let certifaiger = self.proof(proof);
-            if let Some(certificate_path) = &self.opt.certificate {
+            if let Some(certificate_path) = &self.cfg.certificate {
                 certifaiger.to_file(certificate_path.to_str().unwrap(), true);
             }
-            if !self.opt.certify {
+            if !self.cfg.certify {
                 return;
             }
             let certificate_file = tempfile::NamedTempFile::new().unwrap();
             let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
             certifaiger.to_file(certificate_path, true);
-            certifaiger_check(&self.opt, certificate_path);
+            certifaiger_check(&self.cfg, certificate_path);
         } else {
-            if self.opt.certificate.is_none() && !self.opt.certify && !self.opt.witness {
+            if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
             let witness = engine.witness(&origin_ts);
             let witness = self.witness(witness);
-            if self.opt.witness {
+            if self.cfg.witness {
                 println!("{witness}");
             }
-            if let Some(certificate_path) = &self.opt.certificate {
+            if let Some(certificate_path) = &self.cfg.certificate {
                 let mut file: File = File::create(certificate_path).unwrap();
                 file.write_all(witness.as_bytes()).unwrap();
             }
-            if !self.opt.certify {
+            if !self.cfg.certify {
                 return;
             }
             let mut wit_file = tempfile::NamedTempFile::new().unwrap();
             wit_file.write_all(witness.as_bytes()).unwrap();
             let wit_path = wit_file.path().as_os_str().to_str().unwrap();
-            certifaiger_check(&self.opt, wit_path);
+            certifaiger_check(&self.cfg, wit_path);
         }
     }
 
@@ -121,7 +121,7 @@ impl AigFrontend {
     }
 }
 
-pub fn certifaiger_check<P: AsRef<Path>>(option: &Config, certificate: P) {
+pub fn certifaiger_check<P: AsRef<Path>>(cfg: &Config, certificate: P) {
     let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([
@@ -131,14 +131,14 @@ pub fn certifaiger_check<P: AsRef<Path>>(option: &Config, certificate: P) {
             "-v",
             &format!(
                 "{}:{}",
-                option.model.as_path().display(),
-                option.model.as_path().display()
+                cfg.model.as_path().display(),
+                cfg.model.as_path().display()
             ),
             "-v",
             &format!("{}:{}", certificate.display(), certificate.display()),
             "ghcr.io/gipsyh/certifaiger",
         ])
-        .arg(&option.model)
+        .arg(&cfg.model)
         .arg(certificate)
         .output()
         .unwrap();

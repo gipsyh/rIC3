@@ -9,7 +9,7 @@ impl IC3 {
     pub fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
-        if !self.options.ic3.no_pred_prop {
+        if !self.cfg.ic3.no_pred_prop {
             let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
             self.statistic.block_get_bad_time += start.elapsed();
             res.then(|| {
@@ -108,7 +108,7 @@ impl IC3 {
         let rev: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             cube.reverse();
         });
-        let mut order = if self.options.ic3.inn || !self.auxiliary_var.is_empty() {
+        let mut order = if self.cfg.ic3.inn || !self.auxiliary_var.is_empty() {
             vec![inn, act, rev]
         } else {
             vec![act, rev]

@@ -217,7 +217,7 @@ impl IC3 {
         if frame == 0 {
             assert!(self.frame.len() == 1);
             self.solvers[0].add_lemma(&!lemma.cube());
-            if !self.options.ic3.no_pred_prop && self.level() == frame {
+            if !self.cfg.ic3.no_pred_prop && self.level() == frame {
                 self.bad_solver.add_clause(&!lemma.cube());
             }
             self.frame[0].push(FrameLemma::new(lemma, po, None));
@@ -227,7 +227,7 @@ impl IC3 {
             return false;
         }
         if self.ts.cube_subsume_init(lemma.cube()) {
-            assert!(self.options.ic3.inn);
+            assert!(self.cfg.ic3.inn);
         }
         let mut begin = None;
         let mut inv_found = false;
@@ -242,7 +242,7 @@ impl IC3 {
                         for k in i + 1..=frame {
                             self.solvers[k].add_lemma(&clause);
                         }
-                        if !self.options.ic3.no_pred_prop && self.level() == frame {
+                        if !self.cfg.ic3.no_pred_prop && self.level() == frame {
                             self.bad_solver.add_clause(&!lemma.cube());
                         }
                         self.frame[frame].push(FrameLemma::new(lemma, po, None));
@@ -269,7 +269,7 @@ impl IC3 {
         for i in begin..=frame {
             self.solvers[i].add_lemma(&clause);
         }
-        if !self.options.ic3.no_pred_prop && self.level() == frame {
+        if !self.cfg.ic3.no_pred_prop && self.level() == frame {
             self.bad_solver.add_clause(&!lemma.cube());
         }
         self.frame[frame].push(FrameLemma::new(lemma, po, None));

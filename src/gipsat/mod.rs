@@ -55,11 +55,11 @@ pub struct Solver {
     rng: StdRng,
     pub statistic: SolverStatistic,
     #[allow(unused)]
-    options: Config,
+    cfg: Config,
 }
 
 impl Solver {
-    pub fn new(options: Config, id: Option<usize>, ts: &Grc<TransysCtx>) -> Self {
+    pub fn new(cfg: Config, id: Option<usize>, ts: &Grc<TransysCtx>) -> Self {
         let mut solver = Self {
             id,
             ts: ts.clone(),
@@ -84,9 +84,9 @@ impl Solver {
             constraint: Default::default(),
             statistic: Default::default(),
             trivial_unsat: false,
-            rng: StdRng::seed_from_u64(options.rseed),
+            rng: StdRng::seed_from_u64(cfg.rseed),
             mark: Default::default(),
-            options,
+            cfg,
         };
         while solver.num_var() < solver.ts.num_var() {
             solver.new_var();
