@@ -57,9 +57,6 @@ impl From<&Transys> for Aig {
             aig.constraints.push(map_lit(c));
         }
         aig.justice = vec![ts.justice.iter().map(|&j| map_lit(j)).collect()];
-        for &f in ts.fairness.iter() {
-            aig.fairness.push(map_lit(f));
-        }
         aig
     }
 }
@@ -80,12 +77,12 @@ impl Transys {
         }
         let bad = aig.bads.iter().map(|c| c.to_lit()).collect();
         let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        let justice = aig
+        let mut justice: LitVec = aig
             .justice
             .first()
             .map(|j| j.iter().map(|e| e.to_lit()).collect())
             .unwrap_or_default();
-        let fairness: LitVec = aig.fairness.iter().map(|f| f.to_lit()).collect();
+        justice.extend(aig.fairness.iter().map(|f| f.to_lit()));
         let rel = aig.cnf(compact);
         let mut rst = GHashMap::new();
         for v in Var::CONST..=rel.max_var() {
@@ -99,7 +96,6 @@ impl Transys {
             bad,
             constraint,
             justice,
-            fairness,
             rel,
             rst,
         }
