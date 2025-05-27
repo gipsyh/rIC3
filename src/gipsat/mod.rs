@@ -9,7 +9,7 @@ mod statistic;
 mod vsids;
 
 use crate::transys::TransysIf;
-use crate::{options::Options, transys::TransysCtx};
+use crate::{config::Options, transys::TransysCtx};
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};

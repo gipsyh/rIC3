@@ -5,10 +5,10 @@ use log::info;
 use rIC3::{
     Engine,
     bmc::BMC,
+    config::{self, Options},
     frontend::aig::AigFrontend,
     ic3::IC3,
     kind::Kind,
-    options::{self, Options},
     portfolio::portfolio_main,
 };
 use std::{
@@ -30,7 +30,7 @@ fn main() {
     let mut options = Options::parse();
     options.model = options.model.canonicalize().unwrap();
     info!("the model to be checked: {}", options.model.display());
-    if let options::Engine::Portfolio = options.engine {
+    if let config::Engine::Portfolio = options.engine {
         portfolio_main(options);
         unreachable!();
     }
@@ -46,9 +46,9 @@ fn main() {
         panic!("Error: sec not support");
     }
     let mut engine: Box<dyn Engine> = match options.engine {
-        options::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
-        options::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
-        options::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
+        config::Engine::IC3 => Box::new(IC3::new(options.clone(), ts, vec![])),
+        config::Engine::Kind => Box::new(Kind::new(options.clone(), ts)),
+        config::Engine::BMC => Box::new(BMC::new(options.clone(), ts)),
         _ => unreachable!(),
     };
     if options.interrupt_statistic {

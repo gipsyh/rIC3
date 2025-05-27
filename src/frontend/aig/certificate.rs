@@ -4,7 +4,7 @@ use log::{debug, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, options::Options, transys::Transys};
+use crate::{Engine, Proof, Witness, config::Options, transys::Transys};
 use std::{fs::File, io::Write, path::Path, process::Command};
 
 impl AigFrontend {

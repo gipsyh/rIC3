@@ -2,7 +2,7 @@ mod abc;
 pub mod certificate;
 
 use crate::{
-    options::{self, Options},
+    config::{self, Options},
     transys::{Transys, TransysIf},
 };
 use abc::abc_preprocess;
@@ -107,10 +107,10 @@ impl Transys {
     }
 }
 
-pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<Var, Var>) {
+pub fn aig_preprocess(aig: &Aig, options: &config::Options) -> (Aig, GHashMap<Var, Var>) {
     let (mut aig, mut remap) = aig.coi_refine();
     if !(options.preprocess.no_abc
-        || matches!(options.engine, options::Engine::IC3) && options.ic3.inn)
+        || matches!(options.engine, config::Engine::IC3) && options.ic3.inn)
     {
         let mut remap_retain = GHashSet::new();
         remap_retain.insert(Var::CONST);

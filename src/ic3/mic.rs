@@ -1,5 +1,5 @@
 use super::IC3;
-use crate::{options::Options, transys::TransysIf};
+use crate::{config::Options, transys::TransysIf};
 use giputils::hash::GHashSet;
 use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;

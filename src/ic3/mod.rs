@@ -1,7 +1,7 @@
 use crate::{
     Engine, Proof, Witness,
+    config::Options,
     gipsat::{Solver, SolverStatistic},
-    options::Options,
     transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
 };
 use activity::Activity;

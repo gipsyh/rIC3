@@ -1,6 +1,6 @@
 use crate::{
     Engine, Proof, Witness,
-    options::Options,
+    config::Options,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
