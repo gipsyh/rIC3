@@ -11,7 +11,7 @@ shadow!(build);
     after_help = "Copyright (C) 2023 - Present, Yuheng Su <gipsyh.icu@gmail.com>. All rights reserved."
 )]
 #[clap(long_version = build::CLAP_LONG_VERSION)]
-pub struct Options {
+pub struct Config {
     /// model checking engine
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
     pub engine: Engine,
@@ -144,8 +144,8 @@ pub struct PreprocessOptions {
     pub no_abc: bool,
 }
 
-impl Default for Options {
+impl Default for Config {
     fn default() -> Self {
-        Options::parse_from([""])
+        Config::parse_from([""])
     }
 }

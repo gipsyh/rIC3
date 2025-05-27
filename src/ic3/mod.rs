@@ -1,7 +1,7 @@
 use crate::{
     Engine, Proof, Witness,
+    config::Config,
     gipsat::{Solver, SolverStatistic},
-    options::Options,
     transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
 };
 use activity::Activity;
@@ -25,7 +25,7 @@ mod statistic;
 mod verify;
 
 pub struct IC3 {
-    options: Options,
+    cfg: Config,
     origin_ts: Transys,
     ts: Grc<TransysCtx>,
     solvers: Vec<Solver>,
@@ -53,11 +53,11 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
-        if !self.options.ic3.no_pred_prop {
+        if !self.cfg.ic3.no_pred_prop {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
         }
-        let mut solver = Solver::new(self.options.clone(), Some(self.frame.len()), &self.ts);
+        let mut solver = Solver::new(self.cfg.clone(), Some(self.frame.len()), &self.ts);
         for v in self.auxiliary_var.iter() {
             solver.add_domain(*v, true);
         }
@@ -100,7 +100,7 @@ impl IC3 {
     }
 
     fn generalize(&mut self, mut po: ProofObligation, mic_type: MicType) -> bool {
-        if self.options.ic3.inn && self.ts.cube_subsume_init(&po.lemma) {
+        if self.cfg.ic3.inn && self.ts.cube_subsume_init(&po.lemma) {
             po.frame += 1;
             self.add_obligation(po.clone());
             return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
@@ -123,7 +123,7 @@ impl IC3 {
                 continue;
             }
             if self.ts.cube_subsume_init(&po.lemma) {
-                if self.options.ic3.abs_cst {
+                if self.cfg.ic3.abs_cst {
                     self.add_obligation(po.clone());
                     if let Some(c) = self.check_witness_by_bmc(po.clone()) {
                         for c in c {
@@ -141,7 +141,7 @@ impl IC3 {
                     } else {
                         return Some(false);
                     }
-                } else if self.options.ic3.inn && po.frame > 0 {
+                } else if self.cfg.ic3.inn && po.frame > 0 {
                     assert!(!self.solvers[0].solve(&po.lemma, vec![]));
                 } else {
                     self.add_obligation(po.clone());
@@ -160,7 +160,7 @@ impl IC3 {
             let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false, false);
             self.statistic.block_blocked_time += blocked_start.elapsed();
             if blocked {
-                let mic_type = if self.options.ic3.dynamic {
+                let mic_type = if self.cfg.ic3.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
                         let mut act = n.act;
                         for _ in 0..2 {
@@ -192,7 +192,7 @@ impl IC3 {
                         MicType::DropVar(Default::default())
                     }
                 } else {
-                    MicType::from_options(&self.options)
+                    MicType::from_config(&self.cfg)
                 };
                 if self.generalize(po, mic_type) {
                     return None;
@@ -278,7 +278,7 @@ impl IC3 {
                 }
                 for ctp in 0..3 {
                     if self.blocked_with_ordered(frame_idx + 1, &lemma, false, false) {
-                        let core = if self.options.ic3.inn && self.ts.cube_subsume_init(&lemma) {
+                        let core = if self.cfg.ic3.inn && self.ts.cube_subsume_init(&lemma) {
                             lemma.cube().clone()
                         } else {
                             self.solvers[frame_idx].inductive_core()
@@ -294,7 +294,7 @@ impl IC3 {
                         self.statistic.ctp.statistic(ctp > 0);
                         break;
                     }
-                    if !self.options.ic3.ctp {
+                    if !self.cfg.ic3.ctp {
                         break;
                     }
                     let (ctp, _) = self.get_pred(frame_idx + 1, false);
@@ -322,7 +322,7 @@ impl IC3 {
 
     fn base(&mut self) -> bool {
         self.extend();
-        if !self.options.ic3.no_pred_prop {
+        if !self.cfg.ic3.no_pred_prop {
             let bad = self.ts.bad;
             if self.solvers[0].solve_without_bucket(&self.ts.bad.cube(), vec![]) {
                 let (bad, inputs) = self.get_pred(self.solvers.len(), true);
@@ -336,20 +336,20 @@ impl IC3 {
                 return false;
             }
             self.ts.constraints.push(!bad);
-            self.lift = Solver::new(self.options.clone(), None, &self.ts);
+            self.lift = Solver::new(self.cfg.clone(), None, &self.ts);
         }
         true
     }
 }
 
 impl IC3 {
-    pub fn new(mut options: Options, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+    pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         ts.unique_prime();
         ts.simplify();
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
-        if options.ic3.inn {
-            options.ic3.no_pred_prop = true;
+        if cfg.ic3.inn {
+            cfg.ic3.no_pred_prop = true;
             ts = uts.interal_signals();
         }
         let mut bad_input = GHashMap::new();
@@ -361,19 +361,19 @@ impl IC3 {
         let origin_ts = ts.clone();
         let ts = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
-        let statistic = Statistic::new(options.model.to_str().unwrap());
+        let statistic = Statistic::new(cfg.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
-        let lift = Solver::new(options.clone(), None, &ts);
-        let bad_lift = Solver::new(options.clone(), None, &bad_ts);
-        let abs_cst = if options.ic3.abs_cst {
+        let lift = Solver::new(cfg.clone(), None, &ts);
+        let bad_lift = Solver::new(cfg.clone(), None, &bad_ts);
+        let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
         } else {
             ts.constraints.clone()
         };
-        let rng = StdRng::seed_from_u64(options.rseed);
+        let rng = StdRng::seed_from_u64(cfg.rseed);
         Self {
-            options,
+            cfg,
             origin_ts,
             ts,
             activity,

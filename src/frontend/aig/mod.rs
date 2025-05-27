@@ -2,7 +2,7 @@ mod abc;
 pub mod certificate;
 
 use crate::{
-    options::{self, Options},
+    config::{self, Config},
     transys::{Transys, TransysIf},
 };
 use abc::abc_preprocess;
@@ -107,11 +107,9 @@ impl Transys {
     }
 }
 
-pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<Var, Var>) {
+pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, GHashMap<Var, Var>) {
     let (mut aig, mut remap) = aig.coi_refine();
-    if !(options.preprocess.no_abc
-        || matches!(options.engine, options::Engine::IC3) && options.ic3.inn)
-    {
+    if !(cfg.preprocess.no_abc || matches!(cfg.engine, config::Engine::IC3) && cfg.ic3.inn) {
         let mut remap_retain = GHashSet::new();
         remap_retain.insert(Var::CONST);
         for i in aig.inputs.iter() {
@@ -140,13 +138,13 @@ pub fn aig_preprocess(aig: &Aig, options: &options::Options) -> (Aig, GHashMap<V
 
 pub struct AigFrontend {
     origin_aig: Aig,
-    opt: Options,
+    cfg: Config,
     ts: Transys,
 }
 
 impl AigFrontend {
-    pub fn new(opt: &Options) -> Self {
-        let mut origin_aig = Aig::from_file(&opt.model);
+    pub fn new(cfg: &Config) -> Self {
+        let mut origin_aig = Aig::from_file(&cfg.model);
         if !origin_aig.outputs.is_empty() {
             if origin_aig.bads.is_empty() {
                 origin_aig.bads = std::mem::take(&mut origin_aig.outputs);
@@ -167,7 +165,7 @@ impl AigFrontend {
                 );
                 panic!();
             }
-            if opt.certify || opt.certificate.is_some() {
+            if cfg.certify || cfg.certificate.is_some() {
                 error!("rIC3 does not support solving liveness property with certificate");
                 panic!();
             }
@@ -178,12 +176,12 @@ impl AigFrontend {
             }
             if aig.bads.is_empty() {
                 warn!("no property to be checked");
-                if let Some(certificate) = &opt.certificate {
+                if let Some(certificate) = &cfg.certificate {
                     aig.to_file(certificate, true);
                 }
                 exit(20);
             } else if aig.bads.len() > 1 {
-                if opt.certify || opt.certificate.is_some() {
+                if cfg.certify || cfg.certificate.is_some() {
                     error!(
                         "multiple properties detected. cannot compress properties when certification is enabled"
                     );
@@ -195,16 +193,16 @@ impl AigFrontend {
                 aig.compress_property();
             }
         }
-        let (aig, rst) = aig_preprocess(&aig, opt);
+        let (aig, rst) = aig_preprocess(&aig, cfg);
         let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
-        if opt.l2s {
+        if cfg.l2s {
             ts = ts.l2s();
         }
         Self {
             origin_aig,
             ts,
-            opt: opt.clone(),
+            cfg: cfg.clone(),
         }
     }
 

@@ -2,16 +2,16 @@
 #![feature(get_mut_unchecked)]
 
 pub mod bmc;
+pub mod config;
 pub mod frontend;
 mod gipsat;
 pub mod ic3;
 pub mod kind;
-pub mod options;
 pub mod portfolio;
 pub mod transys;
 
+use config::Config;
 use logic_form::LitVec;
-use options::Options;
 use transys::Transys;
 
 #[derive(Clone, Debug, Default)]

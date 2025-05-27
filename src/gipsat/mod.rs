@@ -9,7 +9,7 @@ mod statistic;
 mod vsids;
 
 use crate::transys::TransysIf;
-use crate::{options::Options, transys::TransysCtx};
+use crate::{config::Config, transys::TransysCtx};
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
@@ -55,11 +55,11 @@ pub struct Solver {
     rng: StdRng,
     pub statistic: SolverStatistic,
     #[allow(unused)]
-    options: Options,
+    cfg: Config,
 }
 
 impl Solver {
-    pub fn new(options: Options, id: Option<usize>, ts: &Grc<TransysCtx>) -> Self {
+    pub fn new(cfg: Config, id: Option<usize>, ts: &Grc<TransysCtx>) -> Self {
         let mut solver = Self {
             id,
             ts: ts.clone(),
@@ -84,9 +84,9 @@ impl Solver {
             constraint: Default::default(),
             statistic: Default::default(),
             trivial_unsat: false,
-            rng: StdRng::seed_from_u64(options.rseed),
+            rng: StdRng::seed_from_u64(cfg.rseed),
             mark: Default::default(),
-            options,
+            cfg,
         };
         while solver.num_var() < solver.ts.num_var() {
             solver.new_var();
