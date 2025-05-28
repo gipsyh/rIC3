@@ -8,6 +8,7 @@ mod gipsat;
 pub mod ic3;
 pub mod kind;
 pub mod portfolio;
+pub mod rlive;
 pub mod transys;
 
 use config::Config;
