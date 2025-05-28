@@ -164,7 +164,7 @@ impl Transys {
             inputs: self.input,
             latchs: self.latch,
             init,
-            bad: self.bad,
+            bad: self.bad[0],
             init_map,
             constraints: self.constraint,
             rel: self.rel,

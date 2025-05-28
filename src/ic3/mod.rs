@@ -14,7 +14,7 @@ use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use statistic::Statistic;
-use std::{iter::once, time::Instant};
+use std::time::Instant;
 
 mod activity;
 mod frame;
@@ -357,7 +357,7 @@ impl IC3 {
             bad_input.insert(uts.var_next(l, 1), l);
         }
         let mut bad_ts = uts.compile();
-        bad_ts.constraint.push(!ts.bad);
+        bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
         let origin_ts = ts.clone();
         let ts = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
@@ -458,10 +458,10 @@ impl Engine for IC3 {
             .constraint
             .iter()
             .map(|e| !*e)
-            .chain(once(proof.bad))
+            .chain(proof.bad.iter().copied())
             .collect();
         let constrains = proof.rel.new_or(constrains);
-        proof.bad = proof.rel.new_or([invariants, constrains]);
+        proof.bad = LitVec::from(proof.rel.new_or([invariants, constrains]));
         Proof { proof }
     }
 

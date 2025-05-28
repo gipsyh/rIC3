@@ -29,8 +29,9 @@ impl Transys {
                 self.init.insert(ml, *i);
             }
         }
-        let bad = self.rel.new_or([self.bad, lmap(other.bad)]);
-        self.bad = bad;
+        let mut bad = self.bad.clone();
+        bad.extend(other.bad.map(lmap));
+        self.bad = LitVec::from(self.rel.new_or(bad));
         for &l in other.constraint.iter() {
             self.constraint.push(lmap(l));
         }
@@ -64,7 +65,7 @@ impl Transys {
                 res.init.insert(ml, *i);
             }
         }
-        res.bad = self.bad.map_var(|v| encode_map[&v]);
+        res.bad = self.bad.map(|l| l.map_var(|v| encode_map[&v]));
         res.constraint = self.constraint.map(|l| l.map_var(|v| encode_map[&v]));
         for (f, t) in self.rst.iter() {
             res.rst.insert(encode_map[f], encode_map[t]);

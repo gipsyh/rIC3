@@ -114,7 +114,7 @@ impl Engine for Kind {
         let mut latchs = proof.latch.clone();
         let mut next = proof.next.clone();
         let mut inits = proof.init.clone();
-        let mut bads = vec![proof.bad];
+        let mut bads = proof.bad.clone();
         let mut constrains = proof.constraint.clone();
         for _ in 1..k {
             let offset = proof.max_var();
@@ -124,10 +124,7 @@ impl Engine for Kind {
             proof.new_var_to(map(ts.max_var()));
             let lmap = |x: Lit| Lit::new(map(x.var()), x.polarity());
             for v in Var(1)..=ts.max_var() {
-                let rel: Vec<LitVec> = ts.rel[v]
-                    .iter()
-                    .map(|cls| cls.iter().map(|l| lmap(*l)).collect())
-                    .collect();
+                let rel: Vec<LitVec> = ts.rel[v].iter().map(|cls| cls.map(lmap)).collect();
                 let mv = map(v);
                 proof.rel.add_rel(mv, &rel);
             }
@@ -142,7 +139,7 @@ impl Engine for Kind {
                     inits.insert(ml, *i);
                 }
             }
-            bads.push(lmap(ts.bad));
+            bads.extend(ts.bad.map(lmap));
             for &l in ts.constraint.iter() {
                 constrains.push(lmap(l));
             }
@@ -204,7 +201,7 @@ impl Engine for Kind {
             bads.push(!p);
         }
         bads.push(!aux_latchs[0]);
-        proof.bad = proof.rel.new_or(bads);
+        proof.bad = LitVec::from(proof.rel.new_or(bads));
         assert!(proof.input.len() + proof.latch.len() == sum + k);
         Proof { proof }
     }
