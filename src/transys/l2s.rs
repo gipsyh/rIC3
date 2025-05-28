@@ -1,5 +1,7 @@
 use super::Transys;
 use crate::transys::TransysIf;
+use log::warn;
+use logic_form::LitVec;
 use std::iter::once;
 
 impl Transys {
@@ -30,9 +32,19 @@ impl Transys {
             jlns.push(jln);
             l2s.add_latch(jl, Some(false), jln);
         }
-        l2s.bad = l2s.rel.new_and(jlns.into_iter().chain(once(eqn)));
+        l2s.bad = LitVec::from([l2s.rel.new_and(jlns.into_iter().chain(once(eqn)))]);
         l2s.justice.clear();
         l2s.fairness.clear();
         l2s
+    }
+
+    pub fn check_liveness_and_l2s(self) -> Self {
+        if !self.bad.is_empty() {
+            assert!(self.justice.is_empty());
+            self
+        } else {
+            warn!("liveness property found, converting to safety property");
+            self.l2s()
+        }
     }
 }

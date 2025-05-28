@@ -123,7 +123,7 @@ impl Transys {
             latch: self.latch,
             next: self.next,
             init: self.init,
-            bad: self.bad,
+            bad: self.bad[0],
             constraint: self.constraint,
             rel: self.rel.lower(),
             rst: self.rst,

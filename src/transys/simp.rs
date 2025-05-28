@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
 use logic_form::{Lit, Var};
-use std::{iter::once, mem::take};
+use std::mem::take;
 
 impl Transys {
     pub fn coi_refine(&mut self) {
@@ -10,7 +10,7 @@ impl Transys {
         for v in self
             .constraint
             .iter()
-            .chain(once(&self.bad))
+            .chain(self.bad.iter())
             .map(|l| l.var())
         {
             if !mark.contains(&v) {
@@ -51,7 +51,8 @@ impl Transys {
     }
 
     pub fn rearrange(&mut self) {
-        let mut additional = vec![Var::CONST, self.bad.var()];
+        let mut additional = vec![Var::CONST];
+        additional.extend(self.bad.iter().map(|l| l.var()));
         additional.extend_from_slice(&self.input);
         additional.extend(self.constraint.iter().map(|l| l.var()));
         for l in self.latch.iter() {
@@ -59,17 +60,17 @@ impl Transys {
             additional.push(self.next[l].var());
         }
         let domain_map = self.rel.rearrange(additional.into_iter());
-        let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
+        let map_lit = |l: Lit| Lit::new(domain_map[&l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[v]).collect();
         self.latch = self.latch.iter().map(|v| domain_map[v]).collect();
         self.init = self.init.iter().map(|(v, i)| (domain_map[v], *i)).collect();
         self.next = self
             .next
             .iter()
-            .map(|(v, n)| (domain_map[v], map_lit(n)))
+            .map(|(v, &n)| (domain_map[v], map_lit(n)))
             .collect();
-        self.bad = map_lit(&self.bad);
-        self.constraint = self.constraint.iter().map(map_lit).collect();
+        self.bad = self.bad.map(map_lit);
+        self.constraint = self.constraint.map(map_lit);
         self.rst = self
             .rst
             .iter()
@@ -79,7 +80,8 @@ impl Transys {
 
     pub fn simplify(&mut self) {
         self.coi_refine();
-        let mut frozens = vec![Var::CONST, self.bad.var()];
+        let mut frozens = vec![Var::CONST];
+        frozens.extend(self.bad.iter().map(|l| l.var()));
         frozens.extend_from_slice(&self.input);
         for l in self.latch.iter() {
             frozens.push(*l);

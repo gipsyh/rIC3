@@ -48,10 +48,6 @@ pub struct Config {
     #[arg(long, default_value_t = 0)]
     pub rseed: u64,
 
-    /// liveness to safety
-    #[arg(long, default_value_t = false)]
-    pub l2s: bool,
-
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,

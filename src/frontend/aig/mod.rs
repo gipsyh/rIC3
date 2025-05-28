@@ -50,7 +50,9 @@ impl From<&Transys> for Aig {
             let init = ts.init.get(l).copied();
             aig.add_latch(map[l].node_id(), next, init);
         }
-        aig.bads.push(map_lit(ts.bad));
+        for &b in ts.bad.iter() {
+            aig.bads.push(map_lit(b));
+        }
         for c in ts.constraint() {
             aig.constraints.push(map_lit(c));
         }
@@ -76,10 +78,7 @@ impl Transys {
                 init.insert(lv, i);
             }
         }
-        let bad = aig
-            .bads
-            .first()
-            .map_or(Lit::constant(false), |e| e.to_lit());
+        let bad = aig.bads.iter().map(|c| c.to_lit()).collect();
         let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
         let justice = aig
             .justice
@@ -196,9 +195,6 @@ impl AigFrontend {
         let (aig, rst) = aig_preprocess(&aig, cfg);
         let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
-        if cfg.l2s {
-            ts = ts.l2s();
-        }
         Self {
             origin_aig,
             ts,

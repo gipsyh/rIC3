@@ -96,7 +96,7 @@ pub struct Transys {
     pub latch: Vec<Var>,
     pub next: GHashMap<Var, Lit>,
     pub init: GHashMap<Var, bool>,
-    pub bad: Lit,
+    pub bad: LitVec,
     pub constraint: LitVec,
     pub justice: LitVec,
     pub fairness: LitVec,

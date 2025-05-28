@@ -15,7 +15,8 @@ pub struct BMC {
 }
 
 impl BMC {
-    pub fn new(cfg: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+        ts = ts.check_liveness_and_l2s();
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         ts.simplify();
