@@ -30,7 +30,7 @@ pub fn verify_invariant(ts: &TransysCtx, invariants: &[Lemma]) -> bool {
 }
 
 impl IC3 {
-    pub fn verify(&mut self) {
+    pub(super) fn verify(&mut self) {
         if !self.cfg.certify {
             return;
         }
@@ -59,7 +59,7 @@ impl IC3 {
         solver.solve(&assumps)
     }
 
-    pub fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
+    pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
         let mut uts = TransysUnroll::new(&self.origin_ts);
         uts.unroll_to(b.depth);
         let mut solver: Box<dyn satif::Satif> = Box::new(cadical::Solver::new());

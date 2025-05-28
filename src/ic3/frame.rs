@@ -205,7 +205,7 @@ impl Frames {
 
 impl IC3 {
     #[inline]
-    pub fn add_lemma(
+    pub(super) fn add_lemma(
         &mut self,
         frame: usize,
         lemma: LitVec,
