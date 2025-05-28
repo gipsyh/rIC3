@@ -17,8 +17,8 @@ use transys::Transys;
 
 #[derive(Clone, Debug, Default)]
 pub struct Witness {
-    pub init: LitVec,
-    pub wit: Vec<LitVec>,
+    pub input: Vec<LitVec>,
+    pub state: Vec<LitVec>,
 }
 
 pub struct Proof {
@@ -32,7 +32,7 @@ pub trait Engine {
         panic!("unsupport certifaiger");
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         panic!("unsupport witness");
     }
 

@@ -466,17 +466,9 @@ impl Engine for IC3 {
         Proof { proof }
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         let mut res = Witness::default();
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            for l in uts.ts.latch() {
-                let l = l.lit();
-                if let Some(v) = bmc_solver.sat_value(l)
-                    && let Some(r) = uts.ts.restore(l.not_if(!v))
-                {
-                    res.init.push(r);
-                }
-            }
             for k in 0..=uts.num_unroll {
                 let mut w = LitVec::new();
                 for l in uts.ts.input() {
@@ -488,21 +480,33 @@ impl Engine for IC3 {
                         w.push(r);
                     }
                 }
-                res.wit.push(w);
+                res.input.push(w);
+                let mut w = LitVec::new();
+                for l in uts.ts.latch() {
+                    let l = l.lit();
+                    let kl = uts.lit_next(l, k);
+                    if let Some(v) = bmc_solver.sat_value(kl)
+                        && let Some(r) = uts.ts.restore(l.not_if(!v))
+                    {
+                        w.push(r);
+                    }
+                }
+                res.state.push(w);
             }
             return res;
         }
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
+        res.state.push(LitVec::new());
         for &l in b.lemma.iter() {
             if let Some(r) = self.ts.restore(l) {
-                res.init.push(r);
+                res.state[0].push(r);
             }
         }
         let mut b = Some(b);
         while let Some(bad) = b {
             for i in bad.input.iter() {
-                res.wit
+                res.input
                     .push(i.iter().filter_map(|l| self.ts.restore(*l)).collect());
             }
             b = bad.next.clone();

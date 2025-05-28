@@ -207,16 +207,8 @@ impl Engine for Kind {
         Proof { proof }
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         let mut wit = Witness::default();
-        for l in self.uts.ts.latch() {
-            let l = l.lit();
-            if let Some(v) = self.solver.sat_value(l)
-                && let Some(r) = self.uts.ts.restore(l.not_if(!v))
-            {
-                wit.init.push(r);
-            }
-        }
         for k in 0..=self.uts.num_unroll {
             let mut w = LitVec::new();
             for l in self.uts.ts.input() {
@@ -228,7 +220,18 @@ impl Engine for Kind {
                     w.push(r);
                 }
             }
-            wit.wit.push(w);
+            wit.input.push(w);
+            let mut w = LitVec::new();
+            for l in self.uts.ts.latch() {
+                let l = l.lit();
+                let kl = self.uts.lit_next(l, k);
+                if let Some(v) = self.solver.sat_value(kl)
+                    && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                {
+                    w.push(r);
+                }
+            }
+            wit.state.push(w);
         }
         wit
     }

@@ -30,7 +30,7 @@ impl AigFrontend {
             if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
-            let witness = engine.witness(&origin_ts);
+            let witness = engine.witness();
             let witness = self.witness(witness);
             if self.cfg.witness {
                 println!("{witness}");
@@ -52,7 +52,7 @@ impl AigFrontend {
     fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
         let map: GHashMap<Var, bool> =
-            GHashMap::from_iter(wit.init.iter().map(|l| (l.var(), l.polarity())));
+            GHashMap::from_iter(wit.state[0].iter().map(|l| (l.var(), l.polarity())));
         let mut line = String::new();
         let mut state = Vec::new();
         for l in self.origin_aig.latchs.iter() {
@@ -68,7 +68,7 @@ impl AigFrontend {
         }
         res.push(line);
         let mut simulate = TernarySimulate::new(&self.origin_aig, state);
-        for c in wit.wit.iter() {
+        for c in wit.input.iter() {
             let map: GHashMap<Var, bool> =
                 GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
             let mut line = String::new();
