@@ -1,5 +1,6 @@
 use super::Transys;
 use crate::transys::TransysIf;
+use log::warn;
 use logic_form::LitVec;
 use std::iter::once;
 
@@ -35,5 +36,15 @@ impl Transys {
         l2s.justice.clear();
         l2s.fairness.clear();
         l2s
+    }
+
+    pub fn check_liveness_and_l2s(self) -> Self {
+        if !self.bad.is_empty() {
+            assert!(self.justice.is_empty());
+            self
+        } else {
+            warn!("liveness property found, converting to safety property");
+            self.l2s()
+        }
     }
 }

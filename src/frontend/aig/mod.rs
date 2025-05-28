@@ -195,9 +195,6 @@ impl AigFrontend {
         let (aig, rst) = aig_preprocess(&aig, cfg);
         let mut ts = Transys::from_aig(&aig, true);
         ts.rst = rst;
-        if cfg.l2s {
-            ts = ts.l2s();
-        }
         Self {
             origin_aig,
             ts,

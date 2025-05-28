@@ -344,6 +344,7 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+        ts = ts.check_liveness_and_l2s();
         ts.unique_prime();
         ts.simplify();
         let mut uts = TransysUnroll::new(&ts);
