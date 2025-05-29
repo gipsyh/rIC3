@@ -1,5 +1,5 @@
 use crate::{Config, frontend::aig::certificate::certifaiger_check};
-use log::info;
+use log::{error, info};
 use process_control::{ChildExt, Control};
 use std::{
     env::current_exe,
@@ -52,11 +52,14 @@ impl Portfolio {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
+        let mut id = 0;
         let mut new_engine = |args: &str| {
             let args = args.split(" ");
             let mut engine = Command::new(current_exe().unwrap());
             engine.env("RIC3_TMP_DIR", temp_dir_path);
             engine.env("RUST_LOG", "warn");
+            engine.env("RIC3_WORKER", format!("worker{id}"));
+            id += 1;
             engine.arg(&cfg.model);
             for a in args {
                 engine.arg(a);
@@ -184,7 +187,7 @@ impl Portfolio {
         let mut result = self.state.1.wait(lock).unwrap();
         if let PortfolioState::Checking(np) = result.deref() {
             assert!(*np == 0);
-            info!("all workers unexpectedly exited :(");
+            error!("all workers unexpectedly exited :(");
             return None;
         }
         let (res, config, certificate) = result.result();
