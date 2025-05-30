@@ -38,6 +38,9 @@ pub struct Config {
     pub kind: KindOptions,
 
     #[command(flatten)]
+    pub portfolio: PortfolioOptions,
+
+    #[command(flatten)]
     pub preprocess: PreprocessOptions,
 
     /// step length
@@ -135,6 +138,13 @@ pub struct PreprocessOptions {
     /// disable abc preprocess
     #[arg(long = "no-abc", default_value_t = false)]
     pub no_abc: bool,
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct PortfolioOptions {
+    /// portfolio woker memory limit in GB
+    #[arg(long = "pworker-mem-limit", default_value_t = 16)]
+    pub wmem_limit: usize,
 }
 
 impl Default for Config {
