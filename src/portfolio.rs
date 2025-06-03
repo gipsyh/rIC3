@@ -72,17 +72,17 @@ impl Portfolio {
             }
             engines.push(engine);
         };
-        new_engine("-e ic3");
-        new_engine("-e ic3 --ic3-ctp --rseed 5555");
+        new_engine("-e ic3 --ic3-no-ctg");
+        new_engine("-e ic3 --ic3-no-ctg --ic3-ctp --rseed 5555");
         new_engine("-e ic3 --ic3-dynamic --rseed 55");
-        new_engine("-e ic3 --ic3-ctg");
-        new_engine("-e ic3 --ic3-ctg --ic3-ctg-limit 5");
-        new_engine("-e ic3 --ic3-ctg --ic3-ctg-max 5 --ic3-ctg-limit 15");
-        new_engine("-e ic3 --ic3-ctg --ic3-abs-cst --rseed 55");
-        new_engine("-e ic3 --ic3-ctg --ic3-ctp");
+        new_engine("-e ic3");
+        new_engine("-e ic3 --ic3-ctg-limit 5");
+        new_engine("-e ic3 --ic3-ctg-max 5 --ic3-ctg-limit 15");
+        new_engine("-e ic3 --ic3-abs-cst --rseed 55");
+        new_engine("-e ic3 --ic3-ctp");
+        new_engine("-e ic3 --ic3-no-ctg --ic3-inn");
         new_engine("-e ic3 --ic3-inn");
-        new_engine("-e ic3 --ic3-ctg --ic3-inn");
-        new_engine("-e ic3 --ic3-ctg --ic3-ctg-limit 5 --ic3-inn");
+        new_engine("-e ic3 --ic3-ctg-limit 5 --ic3-inn");
         new_engine("-e bmc --step 1");
         new_engine("-e bmc --step 10");
         new_engine("-e bmc --bmc-kissat --step 70");

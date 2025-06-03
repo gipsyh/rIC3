@@ -1,5 +1,6 @@
 use abc_rs::Abc;
 use aig::Aig;
+use log::warn;
 use std::{env, mem::take, time::Duration};
 
 fn preprocess(f: String) {
@@ -86,7 +87,7 @@ pub fn abc_preprocess(mut aig: Aig) -> Aig {
     if join.join_timeout(Duration::from_secs(5)).is_ok() {
         aig = Aig::from_file(tmpfile.path());
     } else {
-        println!("abc preprocess timeout");
+        warn!("abc preprocess timeout");
         let _ = join.kill();
     }
     drop(tmpfile);

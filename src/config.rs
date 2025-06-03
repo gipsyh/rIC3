@@ -75,8 +75,8 @@ pub struct IC3Options {
     pub dynamic: bool,
 
     /// ic3 counterexample to generalization
-    #[arg(long = "ic3-ctg", default_value_t = false)]
-    pub ctg: bool,
+    #[arg(long = "ic3-no-ctg", default_value_t = false)]
+    pub no_ctg: bool,
 
     /// max number of ctg
     #[arg(long = "ic3-ctg-max", default_value_t = 3)]
