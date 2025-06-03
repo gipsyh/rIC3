@@ -35,7 +35,7 @@ pub enum MicType {
 
 impl MicType {
     pub fn from_config(cfg: &Config) -> Self {
-        let p = if cfg.ic3.ctg {
+        let p = if !cfg.ic3.no_ctg {
             DropVarParameter {
                 limit: cfg.ic3.ctg_limit,
                 max: cfg.ic3.ctg_max,
