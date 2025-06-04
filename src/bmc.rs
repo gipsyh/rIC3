@@ -12,6 +12,7 @@ pub struct BMC {
     uts: TransysUnroll<NoDepTransys>,
     cfg: Config,
     solver: Box<dyn Satif>,
+    solver_k: usize,
 }
 
 impl BMC {
@@ -27,7 +28,20 @@ impl BMC {
             Box::new(cadical::Solver::new())
         };
         ts.load_init(solver.as_mut());
-        Self { uts, cfg, solver }
+        Self {
+            uts,
+            cfg,
+            solver,
+            solver_k: 0,
+        }
+    }
+
+    pub fn load_trans_to(&mut self, k: usize) {
+        while self.solver_k < k + 1 {
+            self.uts
+                .load_trans(self.solver.as_mut(), self.solver_k, true);
+            self.solver_k += 1;
+        }
     }
 
     pub fn reset_solver(&mut self) {
@@ -37,24 +51,18 @@ impl BMC {
             Box::new(cadical::Solver::new())
         };
         self.uts.ts.load_init(self.solver.as_mut());
+        for i in 0..self.solver_k {
+            self.uts.load_trans(self.solver.as_mut(), i, true);
+        }
     }
 }
 
 impl Engine for BMC {
     fn check(&mut self) -> Option<bool> {
         let step = self.cfg.step as usize;
-        let bmc_max_k = self.cfg.bmc.bmc_max_k;
-        for k in (step - 1..=bmc_max_k).step_by(step) {
+        for k in (self.cfg.start..=self.cfg.end).step_by(step) {
             self.uts.unroll_to(k);
-            let last_bound = if self.cfg.bmc.bmc_kissat {
-                self.reset_solver();
-                0
-            } else {
-                k + 1 - step
-            };
-            for s in last_bound..=k {
-                self.uts.load_trans(self.solver.as_mut(), s, true);
-            }
+            self.load_trans_to(k);
             let mut assump = self.uts.lits_next(&self.uts.ts.bad.cube(), k);
             if self.cfg.bmc.bmc_kissat {
                 for b in assump.iter() {
@@ -79,12 +87,11 @@ impl Engine for BMC {
                 info!("bmc found counter-example in depth {k}");
                 return Some(false);
             }
-
-            // for s in last_bound..=k {
-            //     solver.add_clause(&[!self.uts.lit_next(self.uts.ts.bad, s)]);
-            // }
+            if self.cfg.bmc.bmc_kissat {
+                self.reset_solver();
+            }
         }
-        info!("bmc reached bound {bmc_max_k}, stopping search");
+        info!("bmc reached bound {}, stopping search", self.cfg.end);
         None
     }
 

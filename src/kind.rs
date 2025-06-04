@@ -11,6 +11,8 @@ pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
     cfg: Config,
     solver: Box<dyn Satif>,
+    slv_trans_k: usize,
+    slv_bad_k: usize,
 }
 
 impl Kind {
@@ -29,72 +31,97 @@ impl Kind {
         } else {
             Box::new(cadical::Solver::new())
         };
-        Self { uts, cfg, solver }
+        Self {
+            uts,
+            cfg,
+            solver,
+            slv_trans_k: 0,
+            slv_bad_k: 0,
+        }
+    }
+
+    pub fn load_trans_to(&mut self, k: usize) {
+        while self.slv_trans_k < k + 1 {
+            self.uts
+                .load_trans(self.solver.as_mut(), self.slv_trans_k, true);
+            self.slv_trans_k += 1;
+        }
+    }
+
+    pub fn load_bad_to(&mut self, k: usize) {
+        while self.slv_bad_k < k + 1 {
+            self.solver
+                .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), self.slv_bad_k));
+            self.slv_bad_k += 1;
+        }
     }
 
     pub fn reset_solver(&mut self) {
-        self.solver = if self.cfg.kind.kind_kissat {
+        self.solver = if self.cfg.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())
         } else {
             Box::new(cadical::Solver::new())
         };
+        for i in 0..self.slv_trans_k {
+            self.uts.load_trans(self.solver.as_mut(), i, true);
+        }
+        for i in 0..self.slv_bad_k {
+            self.solver
+                .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), i));
+        }
     }
 }
 
 impl Engine for Kind {
     fn check(&mut self) -> Option<bool> {
         let step = self.cfg.step as usize;
-        self.uts.load_trans(self.solver.as_mut(), 0, true);
-        for k in (step..).step_by(step) {
-            let bmc_k = k - 1;
-            let start = k + 1 - step;
-            if self.cfg.kind.kind_kissat {
-                self.reset_solver();
-                for i in 0..start {
-                    self.uts.load_trans(self.solver.as_mut(), i, true);
-                }
-                if bmc_k >= step {
-                    for i in 0..=bmc_k - step {
-                        self.solver
-                            .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), i));
+        for k in (self.cfg.start..=self.cfg.end).step_by(step) {
+            self.uts.unroll_to(k);
+            self.load_trans_to(k);
+            if k > 0 {
+                info!("kind depth: {k}");
+                self.load_bad_to(k - 1);
+                let res = if self.cfg.kind.kind_kissat {
+                    for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
+                        self.solver.add_clause(&[l]);
                     }
+                    self.solver.solve(&[])
+                } else {
+                    self.solver
+                        .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k))
+                };
+                if !res {
+                    info!("k-induction proofed in depth {k}");
+                    return Some(true);
                 }
-            }
-            self.uts.unroll_to(bmc_k);
-            for i in start..=bmc_k {
-                self.uts.load_trans(self.solver.as_mut(), i, true);
+                if self.cfg.kind.kind_kissat {
+                    self.reset_solver();
+                }
             }
             if !self.cfg.kind.no_bmc {
-                let mut assump: LitVec = self.uts.ts.init().collect();
-                assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), bmc_k));
-                info!("kind bmc depth: {bmc_k}");
-                if self.solver.solve(&assump) {
-                    info!("bmc found counter-example in depth {bmc_k}");
+                info!("kind bmc depth: {k}");
+                let res = if self.cfg.kind.kind_kissat {
+                    self.uts.ts.load_init(self.solver.as_mut());
+                    for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
+                        self.solver.add_clause(&[l]);
+                    }
+                    self.solver.solve(&[])
+                } else {
+                    let mut assump: LitVec = self.uts.ts.init().collect();
+                    assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
+                    self.solver.solve(&assump)
+                };
+                if res {
+                    info!("bmc found counter-example in depth {k}");
                     return Some(false);
                 }
             }
-            for i in bmc_k + 1 - step..=bmc_k {
-                self.solver
-                    .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), i));
-            }
-            self.uts.unroll_to(k);
-            self.uts.load_trans(self.solver.as_mut(), k, true);
-            info!("kind depth: {k}");
-            let res = if self.cfg.kind.kind_kissat {
-                for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
-                    self.solver.add_clause(&[l]);
-                }
-                self.solver.solve(&[])
-            } else {
-                self.solver
-                    .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k))
-            };
-            if !res {
-                info!("k-induction proofed in depth {k}");
-                return Some(true);
+            if self.cfg.kind.kind_kissat {
+                self.reset_solver();
             }
         }
-        unreachable!();
+        info!("kind reached bound {}, stopping search", self.cfg.end);
+        None
     }
 
     fn proof(&mut self, ts: &Transys) -> Proof {
