@@ -43,6 +43,14 @@ pub struct Config {
     #[command(flatten)]
     pub preprocess: PreprocessOptions,
 
+    /// start bound
+    #[arg(long = "start", default_value_t = 0)]
+    pub start: usize,
+
+    /// max bound to check
+    #[arg(long = "end", default_value_t = usize::MAX)]
+    pub end: usize,
+
     /// step length
     #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     pub step: u32,
@@ -111,9 +119,6 @@ pub struct BMCOptions {
     /// use kissat solver, otherwise cadical
     #[arg(long = "bmc-kissat", default_value_t = false)]
     pub bmc_kissat: bool,
-    /// Bound to check up until k when bmc (default 0 means no bound)
-    #[arg(long = "bmc-max-k", short = 'k', default_value_t = usize::MAX)]
-    pub bmc_max_k: usize,
 }
 
 #[derive(Args, Clone, Debug)]
