@@ -2,11 +2,11 @@ use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
 use log::{error, info};
-use logic_form::{Lemma, LitVec};
+use logic_form::{LitOrdVec, LitVec};
 use satif::Satif;
 use std::ops::Deref;
 
-pub fn verify_invariant(ts: &TransysCtx, invariants: &[Lemma]) -> bool {
+pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitOrdVec]) -> bool {
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
     for lemma in invariants {

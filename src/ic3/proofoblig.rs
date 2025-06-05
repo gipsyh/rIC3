@@ -1,6 +1,6 @@
 use super::IC3;
 use giputils::grc::Grc;
-use logic_form::{Lemma, LitVec};
+use logic_form::{LitOrdVec, LitVec};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, btree_set};
 use std::fmt::{self, Debug};
@@ -10,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 pub struct ProofObligationInner {
     pub frame: usize,
     pub input: Vec<LitVec>,
-    pub lemma: Lemma,
+    pub lemma: LitOrdVec,
     pub depth: usize,
     pub next: Option<ProofObligation>,
     pub removed: bool,
@@ -71,7 +71,7 @@ pub struct ProofObligation {
 impl ProofObligation {
     pub fn new(
         frame: usize,
-        lemma: Lemma,
+        lemma: LitOrdVec,
         input: Vec<LitVec>,
         depth: usize,
         next: Option<Self>,

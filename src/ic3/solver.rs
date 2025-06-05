@@ -1,6 +1,6 @@
 use super::IC3;
 use giputils::hash::GHashSet;
-use logic_form::{Lemma, LitVec, Var};
+use logic_form::{LitOrdVec, LitVec, Var};
 use rand::seq::SliceRandom;
 use satif::Satif;
 use std::time::Instant;
@@ -41,7 +41,7 @@ impl IC3 {
 
 impl IC3 {
     #[inline]
-    pub fn sat_contained(&mut self, frame: usize, lemma: &Lemma) -> bool {
+    pub fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
         !self.solvers[frame].solve(lemma, vec![])
     }
 
