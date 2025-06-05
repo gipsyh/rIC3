@@ -1,5 +1,4 @@
 use super::{Transys, TransysIf};
-use giputils::hash::GHashMap;
 use logic_form::{Lit, LitVec, Var};
 
 impl Transys {
@@ -35,41 +34,5 @@ impl Transys {
         for &l in other.constraint.iter() {
             self.constraint.push(lmap(l));
         }
-    }
-
-    pub fn reencode(&mut self) {
-        let mut res = Self::new();
-        let mut encode_map = GHashMap::new();
-        encode_map.insert(Var::CONST, Var::CONST);
-        for f in self.input.iter() {
-            let t = res.new_var();
-            encode_map.insert(*f, t);
-        }
-        for f in self.latch.iter() {
-            let t = res.new_var();
-            encode_map.insert(*f, t);
-        }
-        for (f, _) in self.rel.iter() {
-            encode_map.entry(f).or_insert_with(|| res.new_var());
-        }
-        res.rel = self.rel.map(|v| encode_map[&v]);
-        for l in self.input.iter() {
-            res.input.push(encode_map[l]);
-        }
-        for l in self.latch.iter() {
-            let ml = encode_map[l];
-            res.latch.push(ml);
-            res.next
-                .insert(ml, self.next[l].map_var(|v| encode_map[&v]));
-            if let Some(i) = self.init.get(l) {
-                res.init.insert(ml, *i);
-            }
-        }
-        res.bad = self.bad.map(|l| l.map_var(|v| encode_map[&v]));
-        res.constraint = self.constraint.map(|l| l.map_var(|v| encode_map[&v]));
-        for (f, t) in self.rst.iter() {
-            res.rst.insert(encode_map[f], encode_map[t]);
-        }
-        *self = res;
     }
 }

@@ -9,7 +9,7 @@ use abc::abc_preprocess;
 use aig::{Aig, AigEdge};
 use giputils::hash::{GHashMap, GHashSet};
 use log::{error, warn};
-use logic_form::{Lit, LitVec, Var};
+use logic_form::{Lit, LitVec, Var, VarVMap};
 use std::process::exit;
 
 impl From<&Transys> for Aig {
@@ -87,10 +87,6 @@ impl Transys {
             .unwrap_or_default();
         let fairness: LitVec = aig.fairness.iter().map(|f| f.to_lit()).collect();
         let rel = aig.cnf(compact);
-        let mut rst = GHashMap::new();
-        for v in Var::CONST..=rel.max_var() {
-            rst.insert(v, v);
-        }
         Transys {
             input,
             latch,
@@ -101,13 +97,12 @@ impl Transys {
             justice,
             fairness,
             rel,
-            rst,
         }
     }
 }
 
-pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, GHashMap<Var, Var>) {
-    let (mut aig, mut remap) = aig.coi_refine();
+pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, VarVMap) {
+    let (mut aig, mut restore) = aig.coi_refine();
     if !(cfg.preprocess.no_abc || matches!(cfg.engine, config::Engine::IC3) && cfg.ic3.inn) {
         let mut remap_retain = GHashSet::new();
         remap_retain.insert(Var::CONST);
@@ -117,28 +112,21 @@ pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, GHashMap<Var, Va
         for l in aig.latchs.iter() {
             remap_retain.insert(l.input.into());
         }
-        remap.retain(|x, _| remap_retain.contains(x));
+        restore.retain(|x, _| remap_retain.contains(x));
         aig = abc_preprocess(aig);
         let remap2;
         (aig, remap2) = aig.coi_refine();
-        remap = {
-            let mut remap_final = GHashMap::new();
-            for (x, y) in remap2 {
-                if let Some(z) = remap.get(&y) {
-                    remap_final.insert(x, *z);
-                }
-            }
-            remap_final
-        }
+        restore = restore.product(&remap2);
     }
     aig.constraints.retain(|e| !e.is_constant(true));
-    (aig, remap)
+    (aig, restore)
 }
 
 pub struct AigFrontend {
     origin_aig: Aig,
     cfg: Config,
     ts: Transys,
+    rst: VarVMap,
 }
 
 impl AigFrontend {
@@ -193,11 +181,11 @@ impl AigFrontend {
             }
         }
         let (aig, rst) = aig_preprocess(&aig, cfg);
-        let mut ts = Transys::from_aig(&aig, true);
-        ts.rst = rst;
+        let ts = Transys::from_aig(&aig, true);
         Self {
             origin_aig,
             ts,
+            rst,
             cfg: cfg.clone(),
         }
     }

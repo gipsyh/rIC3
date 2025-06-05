@@ -1,10 +1,10 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
-use logic_form::{Lit, Var};
+use logic_form::{Lit, Var, VarVMap};
 use std::mem::take;
 
 impl Transys {
-    pub fn coi_refine(&mut self) {
+    pub fn coi_refine(&mut self, rst: &mut VarVMap) {
         let mut mark = GHashSet::new();
         let mut queue = Vec::new();
         for v in self
@@ -45,12 +45,12 @@ impl Transys {
         for v in Var::CONST + 1..=self.max_var() {
             if !mark.contains(&v) {
                 self.rel.del_rel(v);
-                self.rst.remove(&v);
+                rst.remove(&v);
             }
         }
     }
 
-    pub fn rearrange(&mut self) {
+    pub fn rearrange(&mut self, rst: &mut VarVMap) {
         let mut additional = vec![Var::CONST];
         additional.extend(self.bad.iter().map(|l| l.var()));
         additional.extend_from_slice(&self.input);
@@ -71,15 +71,11 @@ impl Transys {
             .collect();
         self.bad = self.bad.map(map_lit);
         self.constraint = self.constraint.map(map_lit);
-        self.rst = self
-            .rst
-            .iter()
-            .filter_map(|(k, &v)| domain_map.get(k).map(|&dk| (dk, v)))
-            .collect();
+        *rst = domain_map.inverse().product(rst);
     }
 
-    pub fn simplify(&mut self) {
-        self.coi_refine();
+    pub fn simplify(&mut self, rst: &mut VarVMap) {
+        self.coi_refine(rst);
         let mut frozens = vec![Var::CONST];
         frozens.extend(self.bad.iter().map(|l| l.var()));
         frozens.extend_from_slice(&self.input);
@@ -91,6 +87,6 @@ impl Transys {
             frozens.push(c.var());
         }
         self.rel = self.rel.simplify(frozens.iter().copied());
-        self.rearrange();
+        self.rearrange(rst);
     }
 }
