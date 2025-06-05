@@ -195,7 +195,6 @@ impl TransysUnroll<Transys> {
             justice: Default::default(),
             fairness: Default::default(),
             rel,
-            rst: self.ts.rst.clone(),
         }
     }
 
@@ -236,7 +235,6 @@ impl TransysUnroll<Transys> {
             justice: Default::default(),
             fairness: Default::default(),
             rel,
-            rst: self.ts.rst.clone(),
         }
     }
 }

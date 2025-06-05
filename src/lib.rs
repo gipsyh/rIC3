@@ -11,13 +11,26 @@ pub mod portfolio;
 pub mod transys;
 
 use config::Config;
-use logic_form::LitVec;
+use logic_form::{LitVec, Var};
 use transys::Transys;
 
 #[derive(Clone, Debug, Default)]
 pub struct Witness {
     pub init: LitVec,
     pub wit: Vec<LitVec>,
+}
+
+impl Witness {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn map_var(&self, f: impl Fn(Var) -> Var) -> Self {
+        let init = self.init.map_var(&f);
+        let wit = self.wit.iter().map(|w| w.map_var(&f)).collect();
+        Self { init, wit }
+    }
 }
 
 pub struct Proof {
@@ -27,11 +40,11 @@ pub struct Proof {
 pub trait Engine {
     fn check(&mut self) -> Option<bool>;
 
-    fn proof(&mut self, _ts: &Transys) -> Proof {
-        panic!("unsupport certifaiger");
+    fn proof(&mut self) -> Proof {
+        panic!("unsupport proof");
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         panic!("unsupport witness");
     }
 

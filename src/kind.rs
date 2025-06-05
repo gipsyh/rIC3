@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
-use logic_form::{Lit, LitVec, Var};
+use logic_form::{Lit, LitVec, Var, VarVMap};
 use satif::Satif;
 
 pub struct Kind {
@@ -13,14 +13,18 @@ pub struct Kind {
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
+    ots: Transys,
+    rst: VarVMap,
 }
 
 impl Kind {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
+        let ots = ts.clone();
         ts = ts.check_liveness_and_l2s();
+        let mut rst = VarVMap::new_self_map(ts.max_var());
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        ts.simplify();
+        ts.simplify(&mut rst);
         let uts = if cfg.kind.simple_path {
             TransysUnroll::new_with_simple_path(&ts)
         } else {
@@ -37,6 +41,8 @@ impl Kind {
             solver,
             slv_trans_k: 0,
             slv_bad_k: 0,
+            ots,
+            rst,
         }
     }
 
@@ -124,13 +130,13 @@ impl Engine for Kind {
         None
     }
 
-    fn proof(&mut self, ts: &Transys) -> Proof {
+    fn proof(&mut self) -> Proof {
         if self.cfg.kind.simple_path {
             //TODO: support certifaiger with simple path constraint
             error!("k-induction with simple path constraint not support certifaiger");
             panic!();
         }
-        let mut ts = ts.clone();
+        let mut ts = self.ots.clone();
         if !ts.constraint.is_empty() {
             ts.constraint = LitVec::from([ts.rel.new_and(ts.constraint)]);
         }
@@ -234,12 +240,12 @@ impl Engine for Kind {
         Proof { proof }
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         let mut wit = Witness::default();
         for l in self.uts.ts.latch() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l)
-                && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                && let Some(r) = self.rst.lit_map(l.not_if(!v))
             {
                 wit.init.push(r);
             }
@@ -250,7 +256,7 @@ impl Engine for Kind {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
                 if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
                 {
                     w.push(r);
                 }

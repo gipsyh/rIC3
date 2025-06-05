@@ -7,7 +7,7 @@ pub mod unroll;
 
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
-use logic_form::{DagCnf, Lit, LitVec, LitVvec, Var};
+use logic_form::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap};
 use satif::Satif;
 
 pub trait TransysIf {
@@ -38,7 +38,7 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
-    fn restore(&self, lit: Lit) -> Option<Lit>;
+    // fn restore(&self, lit: Lit) -> Option<Lit>;
 
     #[inline]
     fn var_next(&self, var: Var) -> Var {
@@ -101,7 +101,6 @@ pub struct Transys {
     pub justice: LitVec,
     pub fairness: LitVec,
     pub rel: DagCnf,
-    pub rst: GHashMap<Var, Var>,
 }
 
 impl TransysIf for Transys {
@@ -146,13 +145,6 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn restore(&self, lit: Lit) -> Option<Lit> {
-        self.rst
-            .get(&lit.var())
-            .map(|v| v.lit().not_if(!lit.polarity()))
-    }
-
-    #[inline]
     fn add_latch(&mut self, latch: Var, init: Option<bool>, next: Lit) {
         self.latch.push(latch);
         self.next.insert(latch, next);
@@ -167,7 +159,7 @@ impl Transys {
         Self::default()
     }
 
-    pub fn unique_prime(&mut self) {
+    pub fn unique_prime(&mut self, rst: &mut VarVMap) {
         let mut unique = GHashSet::new();
         unique.insert(Var::CONST);
         for l in self.latch.clone() {
@@ -176,8 +168,8 @@ impl Transys {
                 let u = self.rel.new_var().lit();
                 self.rel.add_rel(u.var(), &LitVvec::cnf_assign(u, n));
                 self.next.insert(l, u);
-                if let Some(&r) = self.rst.get(&n.var()) {
-                    self.rst.insert(u.var(), r);
+                if let Some(&r) = rst.get(&n.var()) {
+                    rst.insert(u.var(), r);
                 }
                 n = u;
             }

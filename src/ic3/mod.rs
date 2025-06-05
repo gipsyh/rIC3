@@ -8,7 +8,7 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap};
 use log::{debug, info};
-use logic_form::{LitOrdVec, LitVec, Var};
+use logic_form::{LitOrdVec, LitVec, Var, VarVMap};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
@@ -41,7 +41,8 @@ pub struct IC3 {
     pre_lemmas: Vec<LitVec>,
     abs_cst: LitVec,
     bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll<Transys>)>,
-
+    ots: Transys,
+    rst: VarVMap,
     auxiliary_var: Vec<Var>,
     rng: StdRng,
 }
@@ -344,9 +345,11 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+        let ots = ts.clone();
         ts = ts.check_liveness_and_l2s();
-        ts.unique_prime();
-        ts.simplify();
+        let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts.unique_prime(&mut rst);
+        ts.simplify(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
@@ -390,6 +393,8 @@ impl IC3 {
             abs_cst,
             pre_lemmas,
             auxiliary_var: Vec::new(),
+            ots,
+            rst,
             bmc_solver: None,
             rng,
         }
@@ -444,12 +449,12 @@ impl Engine for IC3 {
         }
     }
 
-    fn proof(&mut self, ts: &Transys) -> Proof {
+    fn proof(&mut self) -> Proof {
         let invariants = self.frame.invariant();
         let invariants = invariants
             .iter()
-            .map(|l| LitVec::from_iter(l.iter().filter_map(|l| self.ts.restore(*l))));
-        let mut proof = ts.clone();
+            .map(|l| LitVec::from_iter(l.iter().filter_map(|l| self.rst.lit_map(*l))));
+        let mut proof = self.ots.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {
             certifaiger_dnf.push(proof.rel.new_and(cube));
@@ -466,13 +471,13 @@ impl Engine for IC3 {
         Proof { proof }
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         let mut res = Witness::default();
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
             for l in uts.ts.latch() {
                 let l = l.lit();
                 if let Some(v) = bmc_solver.sat_value(l)
-                    && let Some(r) = uts.ts.restore(l.not_if(!v))
+                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
                 {
                     res.init.push(r);
                 }
@@ -483,7 +488,7 @@ impl Engine for IC3 {
                     let l = l.lit();
                     let kl = uts.lit_next(l, k);
                     if let Some(v) = bmc_solver.sat_value(kl)
-                        && let Some(r) = uts.ts.restore(l.not_if(!v))
+                        && let Some(r) = self.rst.lit_map(l.not_if(!v))
                     {
                         w.push(r);
                     }
@@ -495,7 +500,7 @@ impl Engine for IC3 {
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         for &l in b.lemma.iter() {
-            if let Some(r) = self.ts.restore(l) {
+            if let Some(r) = self.rst.lit_map(l) {
                 res.init.push(r);
             }
         }
@@ -503,7 +508,7 @@ impl Engine for IC3 {
         while let Some(bad) = b {
             for i in bad.input.iter() {
                 res.wit
-                    .push(i.iter().filter_map(|l| self.ts.restore(*l)).collect());
+                    .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
             }
             b = bad.next.clone();
         }

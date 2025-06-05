@@ -1,5 +1,4 @@
 use super::{Transys, TransysIf};
-use giputils::hash::GHashMap;
 use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Clone, Default, Debug)]
@@ -15,7 +14,6 @@ pub struct TransysCtx {
     next_map: LitMap<Lit>,
     prev_map: LitMap<Lit>,
     pub max_latch: Var,
-    pub rst: GHashMap<Var, Var>,
 }
 
 impl TransysIf for TransysCtx {
@@ -62,13 +60,6 @@ impl TransysIf for TransysCtx {
     #[inline]
     fn trans(&self) -> impl Iterator<Item = &LitVec> {
         self.rel.clause()
-    }
-
-    #[inline]
-    fn restore(&self, lit: Lit) -> Option<Lit> {
-        self.rst
-            .get(&lit.var())
-            .map(|v| v.lit().not_if(!lit.polarity()))
     }
 }
 
@@ -172,7 +163,6 @@ impl Transys {
             next_map,
             prev_map,
             max_latch,
-            rst: self.rst,
         }
     }
 }

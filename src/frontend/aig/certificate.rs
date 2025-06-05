@@ -4,17 +4,16 @@ use log::{debug, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, config::Config, transys::Transys};
+use crate::{Engine, Proof, Witness, config::Config, transys::TransysIf};
 use std::{fs::File, io::Write, path::Path, process::Command};
 
 impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
-        let origin_ts = Transys::from_aig(&self.origin_aig, false);
         if res {
             if self.cfg.certificate.is_none() && !self.cfg.certify {
                 return;
             }
-            let proof = engine.proof(&origin_ts);
+            let proof = engine.proof();
             let certifaiger = self.proof(proof);
             if let Some(certificate_path) = &self.cfg.certificate {
                 certifaiger.to_file(certificate_path.to_str().unwrap(), true);
@@ -30,7 +29,7 @@ impl AigFrontend {
             if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
-            let witness = engine.witness(&origin_ts);
+            let witness = engine.witness().map_var(|v: Var| self.rst[&v]);
             let witness = self.witness(witness);
             if self.cfg.witness {
                 println!("{witness}");
@@ -105,17 +104,15 @@ impl AigFrontend {
         let mut certifaiger = Aig::from(&proof.proof);
         certifaiger = certifaiger.reencode();
         certifaiger.symbols.clear();
-        for i in 0..self.origin_aig.inputs.len() {
-            certifaiger.set_symbol(
-                certifaiger.inputs[i],
-                &format!("= {}", self.origin_aig.inputs[i] * 2),
-            );
+        for (i, v) in proof.proof.input().enumerate() {
+            if let Some(r) = self.rst.get(&v) {
+                certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (**r) * 2));
+            }
         }
-        for i in 0..self.origin_aig.latchs.len() {
-            certifaiger.set_symbol(
-                certifaiger.latchs[i].input,
-                &format!("= {}", self.origin_aig.latchs[i].input * 2),
-            );
+        for (i, v) in proof.proof.latch().enumerate() {
+            if let Some(r) = self.rst.get(&v) {
+                certifaiger.set_symbol(certifaiger.latchs[i].input, &format!("= {}", (**r) * 2));
+            }
         }
         certifaiger
     }

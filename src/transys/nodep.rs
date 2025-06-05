@@ -1,6 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logic_form::{Cnf, Lit, LitVec, Var};
+use logic_form::{Cnf, Lit, LitVec, Var, VarVMap};
 use satif::Satif;
 use std::mem::take;
 
@@ -13,7 +13,6 @@ pub struct NoDepTransys {
     pub bad: Lit,
     pub constraint: LitVec,
     pub rel: Cnf,
-    pub rst: GHashMap<Var, Var>,
 }
 
 impl NoDepTransys {
@@ -23,7 +22,7 @@ impl NoDepTransys {
         }
     }
 
-    pub fn simplify(&mut self) {
+    pub fn simplify(&mut self, rst: &mut VarVMap) {
         let mut simp_solver = cadical::Solver::new();
         simp_solver.new_var_to(self.max_var());
         for c in self.trans() {
@@ -59,11 +58,7 @@ impl NoDepTransys {
             .collect();
         self.bad = map_lit(&self.bad);
         self.constraint = self.constraint.iter().map(map_lit).collect();
-        self.rst = self
-            .rst
-            .iter()
-            .filter_map(|(k, &v)| domain_map.get(k).map(|&dk| (dk, v)))
-            .collect();
+        *rst = domain_map.inverse().product(rst);
     }
 }
 
@@ -107,13 +102,6 @@ impl TransysIf for NoDepTransys {
     fn trans(&self) -> impl Iterator<Item = &LitVec> {
         self.rel.iter()
     }
-
-    #[inline]
-    fn restore(&self, lit: Lit) -> Option<Lit> {
-        self.rst
-            .get(&lit.var())
-            .map(|v| v.lit().not_if(!lit.polarity()))
-    }
 }
 
 impl Transys {
@@ -126,7 +114,6 @@ impl Transys {
             bad: self.bad[0],
             constraint: self.constraint,
             rel: self.rel.lower(),
-            rst: self.rst,
         }
     }
 }

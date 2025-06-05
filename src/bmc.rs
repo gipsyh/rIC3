@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
-use logic_form::LitVec;
+use logic_form::{LitVec, VarVMap};
 use satif::Satif;
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ pub struct BMC {
     cfg: Config,
     solver: Box<dyn Satif>,
     solver_k: usize,
+    rst: VarVMap,
 }
 
 impl BMC {
@@ -20,7 +21,8 @@ impl BMC {
         ts = ts.check_liveness_and_l2s();
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        ts.simplify();
+        let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts.simplify(&mut rst);
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if cfg.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())
@@ -33,6 +35,7 @@ impl BMC {
             cfg,
             solver,
             solver_k: 0,
+            rst,
         }
     }
 
@@ -95,12 +98,12 @@ impl Engine for BMC {
         None
     }
 
-    fn witness(&mut self, _ts: &Transys) -> Witness {
+    fn witness(&mut self) -> Witness {
         let mut wit = Witness::default();
         for l in self.uts.ts.latch() {
             let l = l.lit();
             if let Some(v) = self.solver.sat_value(l)
-                && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                && let Some(r) = self.rst.lit_map(l.not_if(!v))
             {
                 wit.init.push(r);
             }
@@ -111,7 +114,7 @@ impl Engine for BMC {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
                 if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.uts.ts.restore(l.not_if(!v))
+                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
                 {
                     w.push(r);
                 }
