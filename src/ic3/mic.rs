@@ -1,7 +1,7 @@
 use super::IC3;
 use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
-use logic_form::{Lit, LitOrdVec, LitVec};
+use logic_form::{Lemma, Lit, LitVec};
 use satif::Satif;
 use std::time::Instant;
 
@@ -56,7 +56,7 @@ impl IC3 {
         keep: &GHashSet<Lit>,
         full: &LitVec,
         constraint: &[LitVec],
-        cex: &mut Vec<(LitOrdVec, LitOrdVec)>,
+        cex: &mut Vec<(Lemma, Lemma)>,
     ) -> Option<LitVec> {
         let mut cube = cube.clone();
         self.statistic.num_down += 1;
@@ -64,7 +64,7 @@ impl IC3 {
             if self.ts.cube_subsume_init(&cube) {
                 return None;
             }
-            let lemma = LitOrdVec::new(cube.clone());
+            let lemma = Lemma::new(cube.clone());
             if cex
                 .iter()
                 .any(|(s, t)| !lemma.subsume(s) && lemma.subsume(t))
@@ -111,7 +111,7 @@ impl IC3 {
                     t.push(l.not_if(!v));
                 }
             }
-            cex.push((LitOrdVec::new(s), LitOrdVec::new(t)));
+            cex.push((Lemma::new(s), Lemma::new(t)));
             if ret {
                 return None;
             }
@@ -155,7 +155,7 @@ impl IC3 {
                 && !self.ts.cube_subsume_init(&model)
                 && self.trivial_block(
                     frame - 1,
-                    LitOrdVec::new(model.clone()),
+                    Lemma::new(model.clone()),
                     &[!full.clone()],
                     parameter.sub_level(),
                 )

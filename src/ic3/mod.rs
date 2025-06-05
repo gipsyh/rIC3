@@ -8,7 +8,7 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap};
 use log::{debug, info};
-use logic_form::{LitOrdVec, LitVec, Var};
+use logic_form::{Lemma, LitVec, Var};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
@@ -201,7 +201,7 @@ impl IC3 {
                 let (model, inputs) = self.get_pred(po.frame, true);
                 self.add_obligation(ProofObligation::new(
                     po.frame - 1,
-                    LitOrdVec::new(model),
+                    Lemma::new(model),
                     vec![inputs],
                     po.depth + 1,
                     Some(po.clone()),
@@ -216,7 +216,7 @@ impl IC3 {
     fn trivial_block_rec(
         &mut self,
         frame: usize,
-        lemma: LitOrdVec,
+        lemma: Lemma,
         constraint: &[LitVec],
         limit: &mut usize,
         parameter: DropVarParameter,
@@ -248,7 +248,7 @@ impl IC3 {
                 if *limit == 0 {
                     return false;
                 }
-                let model = LitOrdVec::new(self.get_pred(frame, false).0);
+                let model = Lemma::new(self.get_pred(frame, false).0);
                 if !self.trivial_block_rec(frame - 1, model, constraint, limit, parameter) {
                     return false;
                 }
@@ -259,7 +259,7 @@ impl IC3 {
     fn trivial_block(
         &mut self,
         frame: usize,
-        lemma: LitOrdVec,
+        lemma: Lemma,
         constraint: &[LitVec],
         parameter: DropVarParameter,
     ) -> bool {
@@ -328,7 +328,7 @@ impl IC3 {
                 let (bad, inputs) = self.get_pred(self.solvers.len(), true);
                 self.add_obligation(ProofObligation::new(
                     0,
-                    LitOrdVec::new(bad),
+                    Lemma::new(bad),
                     vec![inputs],
                     0,
                     None,
@@ -417,7 +417,7 @@ impl Engine for IC3 {
                     _ => (),
                 }
                 if let Some((bad, inputs, depth)) = self.get_bad() {
-                    let bad = LitOrdVec::new(bad);
+                    let bad = Lemma::new(bad);
                     self.add_obligation(ProofObligation::new(
                         self.level(),
                         bad,

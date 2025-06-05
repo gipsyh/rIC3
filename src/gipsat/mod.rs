@@ -16,7 +16,7 @@ use cdb::{CREF_NONE, CRef, ClauseDB};
 use domain::Domain;
 use giputils::{grc::Grc, gvec::Gvec};
 use logic_form::Lbool;
-use logic_form::{Lit, LitOrdVec, LitSet, LitVec, Var, VarMap};
+use logic_form::{Lemma, Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
@@ -175,17 +175,17 @@ impl Solver {
     // }
 
     #[allow(unused)]
-    pub fn lemmas(&mut self) -> Vec<LitOrdVec> {
+    pub fn lemmas(&mut self) -> Vec<Lemma> {
         self.reset();
         let mut lemmas = Vec::new();
         for t in self.trail.iter() {
             if self.ts.is_latch(t.var()) {
-                lemmas.push(LitOrdVec::new(LitVec::from([!*t])));
+                lemmas.push(Lemma::new(LitVec::from([!*t])));
             }
         }
         for l in self.cdb.lemmas.iter() {
             let lemma = LitVec::from_iter(self.cdb.get(*l).slice().iter().map(|l| !*l));
-            lemmas.push(LitOrdVec::new(lemma));
+            lemmas.push(Lemma::new(lemma));
         }
         lemmas
     }
