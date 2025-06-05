@@ -2,7 +2,7 @@ use super::Solver;
 use bitfield_struct::bitfield;
 use giputils::gvec::Gvec;
 use giputils::hash::GHashMap;
-use logic_form::{Lit, LitOrdVec};
+use logic_form::{Lemma, Lit};
 use std::{
     mem::take,
     ops::{AddAssign, Index, MulAssign},
@@ -404,13 +404,13 @@ impl Solver {
         if self.simplify.lazy_remove.len() as u32 * 10 <= self.cdb.num_lemma() {
             return;
         }
-        let mut lazy_remove_map: GHashMap<LitOrdVec, u32> = GHashMap::new();
+        let mut lazy_remove_map: GHashMap<Lemma, u32> = GHashMap::new();
         for mut lr in take(&mut self.simplify.lazy_remove) {
             if lr.iter().any(|l| self.value.v(*l).is_false()) {
                 continue;
             }
             lr.retain(|l| !self.value.v(*l).is_true());
-            let lr = LitOrdVec::new(lr);
+            let lr = Lemma::new(lr);
             let entry = lazy_remove_map.entry(lr).or_default();
             *entry += 1;
         }
@@ -418,7 +418,7 @@ impl Solver {
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
         for cref in take(&mut self.cdb.lemmas) {
             let cls = self.cdb.get(cref);
-            let lemma = LitOrdVec::new(!logic_form::LitVec::from(cls.slice()));
+            let lemma = Lemma::new(!logic_form::LitVec::from(cls.slice()));
             if let Some(r) = lazy_remove_map.get_mut(&lemma) {
                 *r -= 1;
                 if *r == 0 {

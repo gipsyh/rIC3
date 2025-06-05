@@ -3,7 +3,7 @@ use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use log::trace;
-use logic_form::{Lit, LitOrdVec, LitSet, LitVec};
+use logic_form::{Lemma, Lit, LitSet, LitVec};
 use satif::Satif;
 use std::{
     fmt::Write,
@@ -12,14 +12,14 @@ use std::{
 
 #[derive(Clone)]
 pub struct FrameLemma {
-    lemma: LitOrdVec,
+    lemma: Lemma,
     pub po: Option<ProofObligation>,
     pub _ctp: Option<LitVec>,
 }
 
 impl FrameLemma {
     #[inline]
-    pub fn new(lemma: LitOrdVec, po: Option<ProofObligation>, ctp: Option<LitVec>) -> Self {
+    pub fn new(lemma: Lemma, po: Option<ProofObligation>, ctp: Option<LitVec>) -> Self {
         Self {
             lemma,
             po,
@@ -29,7 +29,7 @@ impl FrameLemma {
 }
 
 impl Deref for FrameLemma {
-    type Target = LitOrdVec;
+    type Target = Lemma;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -91,7 +91,7 @@ impl Frames {
     pub fn trivial_contained<'a>(
         &'a mut self,
         frame: usize,
-        lemma: &LitOrdVec,
+        lemma: &Lemma,
     ) -> Option<(usize, &'a mut Option<ProofObligation>)> {
         for l in lemma.iter() {
             self.tmp_lit_set.insert(*l);
@@ -108,7 +108,7 @@ impl Frames {
         None
     }
 
-    pub fn invariant(&self) -> Vec<LitOrdVec> {
+    pub fn invariant(&self) -> Vec<Lemma> {
         let invariant = self.iter().position(|frame| frame.is_empty()).unwrap();
         let mut invariants = Vec::new();
         for i in invariant..self.len() {
@@ -120,7 +120,7 @@ impl Frames {
         invariants
     }
 
-    pub fn _parent_lemma(&self, lemma: &LitOrdVec, frame: usize) -> Option<LitOrdVec> {
+    pub fn _parent_lemma(&self, lemma: &Lemma, frame: usize) -> Option<Lemma> {
         if frame == 1 {
             return None;
         }
@@ -132,7 +132,7 @@ impl Frames {
         None
     }
 
-    pub fn _parent_lemmas(&self, lemma: &LitOrdVec, frame: usize) -> Vec<LitOrdVec> {
+    pub fn _parent_lemmas(&self, lemma: &Lemma, frame: usize) -> Vec<Lemma> {
         let mut res = Vec::new();
         if frame == 1 {
             return res;
@@ -212,7 +212,7 @@ impl IC3 {
         contained_check: bool,
         po: Option<ProofObligation>,
     ) -> bool {
-        let lemma = LitOrdVec::new(lemma);
+        let lemma = Lemma::new(lemma);
         trace!("add lemma: frame:{frame}, {lemma}");
         if frame == 0 {
             assert!(self.frame.len() == 1);
@@ -278,7 +278,7 @@ impl IC3 {
     }
 
     // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {
-    //     let lemmas: GHashSet<LitOrdVec> = GHashSet::from_iter(lemmas.into_iter().map(LitOrdVec::new));
+    //     let lemmas: GHashSet<Lemma> = GHashSet::from_iter(lemmas.into_iter().map(Lemma::new));
     //     for i in (1..=frame).rev() {
     //         let mut j = 0;
     //         while j < self.frame[i].len() {

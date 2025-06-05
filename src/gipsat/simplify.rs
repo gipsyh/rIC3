@@ -4,7 +4,7 @@ use super::{
 };
 use crate::transys::TransysIf;
 use giputils::gvec::Gvec;
-use logic_form::{LitMap, LitOrdVec, LitVec};
+use logic_form::{Lemma, LitMap, LitVec};
 use std::mem::take;
 
 pub struct Simplify {
@@ -82,11 +82,11 @@ impl Solver {
     }
 
     fn simplify_subsume(&mut self, clauses: Gvec<CRef>) -> Gvec<CRef> {
-        let mut clauses: Vec<(CRef, LitOrdVec)> = clauses
+        let mut clauses: Vec<(CRef, Lemma)> = clauses
             .into_iter()
             .map(|cref| {
                 let cls = self.cdb.get(cref);
-                let lemma = LitOrdVec::new(LitVec::from(cls.slice()));
+                let lemma = Lemma::new(LitVec::from(cls.slice()));
                 (cref, lemma)
             })
             .collect();
@@ -126,7 +126,7 @@ impl Solver {
                             self.detach_clause(clauses[*subsumed].0);
                             self.strengthen_clause(clauses[cls_idx].0, diff);
                             let strengthen = self.cdb.get(clauses[cls_idx].0);
-                            clauses[cls_idx].1 = LitOrdVec::new(LitVec::from(strengthen.slice()));
+                            clauses[cls_idx].1 = Lemma::new(LitVec::from(strengthen.slice()));
                         } else {
                             // println!("{}", lemma);
                             // println!("{}", clauses[*subsumed].1);
@@ -135,7 +135,7 @@ impl Solver {
                     } else {
                         self.strengthen_clause(clauses[*subsumed].0, !diff);
                         let strengthen = self.cdb.get(clauses[*subsumed].0);
-                        clauses[*subsumed].1 = LitOrdVec::new(LitVec::from(strengthen.slice()));
+                        clauses[*subsumed].1 = Lemma::new(LitVec::from(strengthen.slice()));
                     }
                 }
             }
