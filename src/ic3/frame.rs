@@ -116,7 +116,6 @@ impl Frames {
                 invariants.push(cube.cube().clone());
             }
         }
-        invariants.sort();
         invariants
     }
 

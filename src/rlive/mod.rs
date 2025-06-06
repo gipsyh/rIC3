@@ -12,9 +12,9 @@ pub struct Rlive {
     #[allow(unused)]
     cfg: Config,
     ts: Transys,
-    rcfg: Config, // reach check config
-    rts: Transys, // reach check ts
-    rts_bv: Var,  // base var
+    rcfg: Config,  // reach check config
+    rts: Transys,  // reach check ts
+    base_var: Var, // base var
     trace: Vec<LitOrdVec>,
     witness: Vec<Witness>,
     shoals: Vec<LitVec>,
@@ -44,8 +44,10 @@ impl Rlive {
     }
 
     fn add_shoal(&mut self, shoal: Vec<LitVec>) {
-        for mut s in shoal {
-            s.retain(|l| l.var() != self.rts_bv);
+        for s in shoal {
+            if s.iter().any(|l| l.var() == self.base_var) {
+                continue;
+            }
             let c = !self.rts.rel.new_and(s.clone());
             self.rts.constraint.push(c);
             let c = !self.ts.rel.new_and(s.clone());
@@ -63,6 +65,7 @@ impl Rlive {
     fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, Witness> {
         let mut rts = self.rts.clone();
         for l in s {
+            assert!(l.var() != self.base_var);
             rts.init.insert(l.var(), l.polarity());
         }
         let mut ic3 = IC3::new(self.rcfg.clone(), rts, vec![]);
@@ -72,7 +75,7 @@ impl Rlive {
         let mut wit = ic3.witness();
         assert!(wit.input.len() > 1);
         for s in wit.state.iter_mut() {
-            s.retain(|l| l.var() != self.rts_bv);
+            s.retain(|l| l.var() != self.base_var);
         }
         Err(wit)
     }
@@ -110,24 +113,26 @@ impl Rlive {
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts.simplify(&mut rst);
         assert!(ts.justice.len() == 1);
+        let base_var = ts.new_var();
+        ts.add_latch(base_var, Some(false), Lit::constant(true));
         let mut rts = ts.clone();
         rts.init.clear();
+        rts.init.insert(base_var, false);
         rts.bad = take(&mut rts.justice);
-        let rts_bv = rts.new_var();
-        rts.add_latch(rts_bv, Some(false), Lit::constant(true));
-        let bvc = rts.rel.new_imply(!rts_bv.lit(), rts.bad[0]);
+        let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);
-        rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], rts_bv.lit()]));
+        rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
         let mut rcfg = cfg.clone();
         rcfg.engine = config::Engine::IC3;
         rcfg.ic3.no_pred_prop = true;
         rcfg.ic3.full_bad = true;
+        rcfg.certify = false;
         Self {
             cfg,
             ts,
             rcfg,
             rts,
-            rts_bv,
+            base_var,
             trace: Vec::new(),
             witness: Vec::new(),
             shoals: Vec::new(),
