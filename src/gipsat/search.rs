@@ -2,34 +2,7 @@ use super::{
     Solver,
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
-use logic_form::{Lbool, Lit, Var, VarMap};
-
-#[derive(Default)]
-pub struct Value {
-    data: VarMap<Lbool>,
-}
-
-impl Value {
-    #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.data.reserve(var)
-    }
-
-    #[inline]
-    pub fn v(&self, lit: Lit) -> Lbool {
-        Lbool(self.data[lit].0 ^ (!lit.polarity() as u8))
-    }
-
-    #[inline]
-    pub fn set(&mut self, lit: Lit) {
-        self.data[lit] = Lbool(lit.polarity() as u8)
-    }
-
-    #[inline]
-    pub fn set_none(&mut self, var: Var) {
-        self.data[var] = Lbool::NONE
-    }
-}
+use logic_form::{Lbool, Lit};
 
 impl Solver {
     #[inline]

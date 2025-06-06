@@ -1,8 +1,8 @@
-use super::{Solver, search::Value};
+use super::Solver;
 use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
-use logic_form::{Var, VarSet};
+use logic_form::{Var, VarAssign, VarSet};
 use std::ops::{Deref, DerefMut};
 
 pub struct Domain {
@@ -22,7 +22,7 @@ impl Domain {
         self.domain.reserve(var);
     }
 
-    pub fn calculate_constrain(&mut self, ts: &Grc<TransysCtx>, value: &Value) {
+    pub fn calculate_constrain(&mut self, ts: &Grc<TransysCtx>, value: &VarAssign) {
         let mut marked = GHashSet::new();
         let mut queue = Vec::new();
         for c in ts.constraints.iter() {
@@ -59,7 +59,7 @@ impl Domain {
         &mut self,
         domain: impl Iterator<Item = Var>,
         ts: &Grc<TransysCtx>,
-        _value: &Value,
+        _value: &VarAssign,
     ) {
         self.reset();
         for r in domain {

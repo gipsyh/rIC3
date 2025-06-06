@@ -15,12 +15,11 @@ pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
 use domain::Domain;
 use giputils::{grc::Grc, gvec::Gvec};
-use logic_form::Lbool;
+use logic_form::{Lbool, VarAssign};
 use logic_form::{Lit, LitOrdVec, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
-use search::Value;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
 use vsids::Vsids;
@@ -29,7 +28,7 @@ pub struct Solver {
     id: Option<usize>,
     cdb: ClauseDB,
     watchers: Watchers,
-    value: Value,
+    value: VarAssign,
     trail: Gvec<Lit>,
     pos_in_trail: Vec<u32>,
     level: VarMap<u32>,
