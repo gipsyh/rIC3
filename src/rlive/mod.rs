@@ -4,7 +4,7 @@ use crate::{
     ic3::IC3,
     transys::{Transys, TransysIf},
 };
-use log::{error, warn};
+use log::{debug, error, warn};
 use logic_form::{Lit, LitOrdVec, LitVec, Var, VarVMap};
 use std::mem::take;
 
@@ -43,17 +43,21 @@ impl Rlive {
         true
     }
 
-    fn add_shoal(&mut self, shoal: Vec<LitVec>) {
-        for s in shoal {
-            if s.iter().any(|l| l.var() == self.base_var) {
-                continue;
-            }
-            let c = !self.rts.rel.new_and(s.clone());
-            self.rts.constraint.push(c);
-            let c = !self.ts.rel.new_and(s.clone());
-            self.ts.constraint.push(c);
-            self.shoals.push(s);
-        }
+    fn add_shoal(&mut self, mut shoal: Vec<LitVec>) {
+        shoal.retain(|s| s.iter().all(|l| l.var() != self.base_var));
+        let ors: Vec<_> = shoal
+            .iter()
+            .map(|s| self.rts.rel.new_and(s.clone()))
+            .collect();
+        let c = self.rts.rel.new_or(ors);
+        self.rts.constraint.push(c);
+        let ors: Vec<_> = shoal
+            .iter()
+            .map(|s| self.ts.rel.new_and(s.clone()))
+            .collect();
+        let c = self.ts.rel.new_or(ors);
+        self.ts.constraint.push(c);
+        self.shoals.extend(shoal);
     }
 
     #[inline]
@@ -82,6 +86,7 @@ impl Rlive {
 
     fn block(&mut self) -> bool {
         loop {
+            debug!("rlive block at level {}", self.level());
             let s = self.trace.last().unwrap().clone();
             match self.check_reach(s.cube().clone()) {
                 Ok(inv) => {

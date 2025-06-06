@@ -15,7 +15,7 @@ impl AigFrontend {
             }
             if !self.is_safety() {
                 error!("rIC3 does not support certificate generation for safe liveness properties");
-                return;
+                panic!();
             }
             let proof = engine.proof();
             let certifaiger = self.proof(proof);
