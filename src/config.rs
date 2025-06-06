@@ -41,7 +41,7 @@ pub struct Config {
     pub portfolio: PortfolioOptions,
 
     #[command(flatten)]
-    pub preprocess: PreprocessOptions,
+    pub preproc: PreprocessOptions,
 
     /// start bound
     #[arg(long = "start", default_value_t = 0)]
@@ -142,6 +142,10 @@ pub struct KindOptions {
 
 #[derive(Args, Clone, Debug)]
 pub struct PreprocessOptions {
+    /// disable preprocess
+    #[arg(long = "no-preproc", default_value_t = false)]
+    pub no_preproc: bool,
+
     /// sec preprocess
     #[arg(long = "sec", default_value_t = false)]
     pub sec: bool,

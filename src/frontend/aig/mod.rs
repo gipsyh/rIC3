@@ -99,7 +99,7 @@ impl Transys {
 
 pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, VarVMap) {
     let (mut aig, mut restore) = aig.coi_refine();
-    if !(cfg.preprocess.no_abc || matches!(cfg.engine, config::Engine::IC3) && cfg.ic3.inn) {
+    if !(cfg.preproc.no_abc || matches!(cfg.engine, config::Engine::IC3) && cfg.ic3.inn) {
         let mut remap_retain = GHashSet::new();
         remap_retain.insert(Var::CONST);
         for i in aig.inputs.iter() {

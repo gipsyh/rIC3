@@ -64,10 +64,10 @@ impl Portfolio {
             for a in args {
                 engine.arg(a);
             }
-            if cfg.preprocess.sec {
+            if cfg.preproc.sec {
                 engine.arg("--sec");
             }
-            if cfg.preprocess.no_abc {
+            if cfg.preproc.no_abc {
                 engine.arg("--no-abc");
             }
             engines.push(engine);
