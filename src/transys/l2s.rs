@@ -1,7 +1,7 @@
 use super::Transys;
 use crate::transys::TransysIf;
 use log::warn;
-use logic_form::LitVec;
+use logic_form::{LitVec, VarVMap};
 use std::iter::once;
 
 impl Transys {
@@ -25,7 +25,7 @@ impl Transys {
         let encounter_next = l2s.rel.new_or([eq, encounter.lit()]);
         l2s.add_latch(encounter, Some(false), encounter_next);
         let mut jlns = Vec::new();
-        for &j in self.justice.iter().chain(self.fairness.iter()) {
+        for &j in self.justice.iter() {
             let jl = l2s.new_var();
             let jln = l2s.rel.new_and([encounter_next, j]);
             let jln = l2s.rel.new_or([jl.lit(), jln]);
@@ -34,11 +34,10 @@ impl Transys {
         }
         l2s.bad = LitVec::from([l2s.rel.new_and(jlns.into_iter().chain(once(eqn)))]);
         l2s.justice.clear();
-        l2s.fairness.clear();
         l2s
     }
 
-    pub fn check_liveness_and_l2s(self) -> Self {
+    pub fn check_liveness_and_l2s(self, _rst: &mut VarVMap) -> Self {
         if !self.bad.is_empty() {
             assert!(self.justice.is_empty());
             self

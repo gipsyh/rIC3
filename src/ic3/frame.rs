@@ -108,12 +108,12 @@ impl Frames {
         None
     }
 
-    pub fn invariant(&self) -> Vec<LitOrdVec> {
+    pub fn invariant(&self) -> Vec<LitVec> {
         let invariant = self.iter().position(|frame| frame.is_empty()).unwrap();
         let mut invariants = Vec::new();
         for i in invariant..self.len() {
             for cube in self[i].iter() {
-                invariants.push(cube.deref().clone());
+                invariants.push(cube.cube().clone());
             }
         }
         invariants.sort();
@@ -213,7 +213,7 @@ impl Frames {
 
 impl IC3 {
     #[inline]
-    pub fn add_lemma(
+    pub(super) fn add_lemma(
         &mut self,
         frame: usize,
         lemma: LitVec,

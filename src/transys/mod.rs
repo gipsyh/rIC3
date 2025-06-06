@@ -99,7 +99,6 @@ pub struct Transys {
     pub bad: LitVec,
     pub constraint: LitVec,
     pub justice: LitVec,
-    pub fairness: LitVec,
     pub rel: DagCnf,
 }
 

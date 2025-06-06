@@ -1,15 +1,16 @@
 use super::IC3;
 use giputils::hash::GHashSet;
 use logic_form::{LitOrdVec, LitVec, Var};
-use rand::seq::SliceRandom;
+use rand::{Rng, seq::SliceRandom};
 use satif::Satif;
 use std::time::Instant;
 
 impl IC3 {
-    pub fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
+    pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
         if !self.cfg.ic3.no_pred_prop {
+            assert!(!self.cfg.ic3.full_bad);
             let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
             self.statistic.block_get_bad_time += start.elapsed();
             res.then(|| {
@@ -33,19 +34,26 @@ impl IC3 {
                 .unwrap()
                 .solve_without_bucket(&self.ts.bad.cube(), vec![]);
             self.statistic.block_get_bad_time += start.elapsed();
-            res.then(|| self.get_pred(self.solvers.len(), true))
-                .map(|(s, i)| (s, vec![i], 0))
+            res.then(|| {
+                if self.cfg.ic3.full_bad {
+                    self.get_full_pred(self.solvers.len())
+                } else {
+                    self.get_pred(self.solvers.len(), true)
+                }
+            })
+            .map(|(s, i)| (s, vec![i], 0))
         }
     }
 }
 
 impl IC3 {
     #[inline]
-    pub fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
+    #[allow(unused)]
+    pub(super) fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
         !self.solvers[frame].solve(lemma, vec![])
     }
 
-    pub fn blocked_with_ordered(
+    pub(super) fn blocked_with_ordered(
         &mut self,
         frame: usize,
         cube: &LitVec,
@@ -57,7 +65,7 @@ impl IC3 {
         self.solvers[frame - 1].inductive(&ordered_cube, strengthen)
     }
 
-    pub fn blocked_with_ordered_with_constrain(
+    pub(super) fn blocked_with_ordered_with_constrain(
         &mut self,
         frame: usize,
         cube: &LitVec,
@@ -70,7 +78,7 @@ impl IC3 {
         self.solvers[frame - 1].inductive_with_constrain(&ordered_cube, strengthen, constraint)
     }
 
-    pub fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, LitVec) {
+    pub(super) fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, LitVec) {
         let start = Instant::now();
         let solver = &mut self.solvers[frame - 1];
         let mut cls: LitVec = solver.get_last_assump().clone();
@@ -133,7 +141,31 @@ impl IC3 {
         (latchs, inputs)
     }
 
-    pub fn new_var(&mut self) -> Var {
+    pub(super) fn get_full_pred(&mut self, frame: usize) -> (LitVec, LitVec) {
+        let solver = &mut self.solvers[frame - 1];
+        let mut inputs = LitVec::new();
+        for input in self.ts.inputs.iter() {
+            let lit = input.lit();
+            if let Some(v) = solver.sat_value(lit) {
+                inputs.push(lit.not_if(!v));
+            } else {
+                inputs.push(lit.not_if(self.rng.random_bool(0.5)));
+            }
+        }
+        let mut latchs = LitVec::new();
+        for latch in self.ts.latchs.iter() {
+            let lit = latch.lit();
+            if let Some(v) = solver.sat_value(lit) {
+                latchs.push(lit.not_if(!v));
+            } else {
+                latchs.push(lit.not_if(self.rng.random_bool(0.5)));
+            }
+        }
+        (latchs, inputs)
+    }
+
+    #[allow(unused)]
+    pub(super) fn new_var(&mut self) -> Var {
         let var = self.ts.new_var();
         for s in self.solvers.iter_mut() {
             assert!(var == s.new_var());

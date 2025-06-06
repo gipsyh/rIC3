@@ -10,15 +10,16 @@ use rIC3::{
     ic3::IC3,
     kind::Kind,
     portfolio::portfolio_main,
+    rlive::Rlive,
 };
 use std::{
-    env, fs,
+    env, error, fs,
     mem::{self, transmute},
     process::exit,
     ptr,
 };
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn error::Error>> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
     }
@@ -56,6 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, vec![])),
         config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
         config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
+        config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),
         config::Engine::Portfolio => unreachable!(),
     };
     if cfg.interrupt_statistic {

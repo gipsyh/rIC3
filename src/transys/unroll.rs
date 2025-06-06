@@ -183,8 +183,8 @@ impl TransysUnroll<Transys> {
             .iter()
             .map(|(v, n)| (*v, self.lit_next(*n, self.num_unroll)))
             .collect();
+        assert!(self.ts.justice.is_empty());
         let bad = self.lits_next(&self.ts.bad, self.num_unroll);
-        assert!(self.ts.justice.is_empty() && self.ts.fairness.is_empty());
         Transys {
             input,
             latch: self.ts.latch.clone(),
@@ -193,7 +193,6 @@ impl TransysUnroll<Transys> {
             bad,
             constraint,
             justice: Default::default(),
-            fairness: Default::default(),
             rel,
         }
     }
@@ -224,7 +223,7 @@ impl TransysUnroll<Transys> {
 
         // TODO: EXTEND INIT
 
-        assert!(self.ts.justice.is_empty() && self.ts.fairness.is_empty());
+        assert!(self.ts.justice.is_empty());
         Transys {
             input: self.ts.input.clone(),
             latch,
@@ -233,7 +232,6 @@ impl TransysUnroll<Transys> {
             bad: self.ts.bad.clone(),
             constraint: self.ts.constraint.clone(),
             justice: Default::default(),
-            fairness: Default::default(),
             rel,
         }
     }
