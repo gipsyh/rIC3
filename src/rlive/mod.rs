@@ -5,7 +5,7 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use log::{error, warn};
-use logic_form::{Lit, LitOrdVec, LitVec, Var};
+use logic_form::{Lit, LitOrdVec, LitVec, Var, VarVMap};
 use std::mem::take;
 
 pub struct Rlive {
@@ -18,6 +18,7 @@ pub struct Rlive {
     trace: Vec<LitOrdVec>,
     witness: Vec<Witness>,
     shoals: Vec<LitVec>,
+    rst: VarVMap,
 }
 
 impl Rlive {
@@ -100,12 +101,14 @@ impl Rlive {
 }
 
 impl Rlive {
-    pub fn new(cfg: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys) -> Self {
         warn!("rlive is unstable, use with caution");
         if ts.justice.is_empty() {
             error!("rlive requires justice property");
             panic!();
         }
+        let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts.simplify(&mut rst);
         assert!(ts.justice.len() == 1);
         let mut rts = ts.clone();
         rts.init.clear();
@@ -128,6 +131,7 @@ impl Rlive {
             trace: Vec::new(),
             witness: Vec::new(),
             shoals: Vec::new(),
+            rst,
         }
     }
 }
@@ -151,6 +155,7 @@ impl Engine for Rlive {
     }
 
     fn witness(&mut self) -> Witness {
-        Witness::concat(self.witness.clone())
+        let witness = Witness::concat(self.witness.clone());
+        witness.filter_map_var(|v| self.rst.get(&v).copied())
     }
 }

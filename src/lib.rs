@@ -33,6 +33,12 @@ impl Witness {
         Self { input, state }
     }
 
+    pub fn filter_map_var(&self, f: impl Fn(Var) -> Option<Var>) -> Self {
+        let input = self.input.iter().map(|w| w.filter_map_var(&f)).collect();
+        let state = self.state.iter().map(|w| w.filter_map_var(&f)).collect();
+        Self { input, state }
+    }
+
     pub fn concat(iter: impl IntoIterator<Item = Witness>) -> Self {
         let mut res = Self::new();
         for witness in iter {

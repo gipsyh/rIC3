@@ -11,6 +11,7 @@ impl Transys {
             .constraint
             .iter()
             .chain(self.bad.iter())
+            .chain(self.justice.iter())
             .map(|l| l.var())
         {
             if !mark.contains(&v) {
@@ -52,9 +53,14 @@ impl Transys {
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {
         let mut additional = vec![Var::CONST];
-        additional.extend(self.bad.iter().map(|l| l.var()));
         additional.extend_from_slice(&self.input);
-        additional.extend(self.constraint.iter().map(|l| l.var()));
+        additional.extend(
+            self.constraint
+                .iter()
+                .chain(self.bad.iter())
+                .chain(self.justice.iter())
+                .map(|l| l.var()),
+        );
         for l in self.latch.iter() {
             additional.push(*l);
             additional.push(self.next[l].var());
@@ -71,20 +77,24 @@ impl Transys {
             .collect();
         self.bad = self.bad.map(map_lit);
         self.constraint = self.constraint.map(map_lit);
+        self.justice = self.justice.map(map_lit);
         *rst = domain_map.inverse().product(rst);
     }
 
     pub fn simplify(&mut self, rst: &mut VarVMap) {
         self.coi_refine(rst);
         let mut frozens = vec![Var::CONST];
-        frozens.extend(self.bad.iter().map(|l| l.var()));
+        frozens.extend(
+            self.bad
+                .iter()
+                .chain(self.constraint.iter())
+                .chain(self.justice.iter())
+                .map(|l| l.var()),
+        );
         frozens.extend_from_slice(&self.input);
         for l in self.latch.iter() {
             frozens.push(*l);
             frozens.push(self.next[l].var());
-        }
-        for c in self.constraint.iter() {
-            frozens.push(c.var());
         }
         self.rel = self.rel.simplify(frozens.iter().copied());
         self.rearrange(rst);

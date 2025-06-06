@@ -34,5 +34,8 @@ impl Transys {
         for &l in other.constraint.iter() {
             self.constraint.push(lmap(l));
         }
+        for &l in other.justice.iter() {
+            self.justice.push(lmap(l));
+        }
     }
 }
