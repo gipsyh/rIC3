@@ -112,7 +112,7 @@ pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, VarVMap) {
         aig = abc_preprocess(aig);
         let remap2;
         (aig, remap2) = aig.coi_refine();
-        restore = restore.product(&remap2);
+        restore = remap2.product(&restore);
     }
     aig.constraints.retain(|e| !e.is_constant(true));
     (aig, restore)
