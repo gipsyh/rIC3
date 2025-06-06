@@ -57,9 +57,6 @@ impl From<&Transys> for Aig {
             aig.constraints.push(map_lit(c));
         }
         aig.justice = vec![ts.justice.iter().map(|&j| map_lit(j)).collect()];
-        for &f in ts.fairness.iter() {
-            aig.fairness.push(map_lit(f));
-        }
         aig
     }
 }
@@ -80,12 +77,12 @@ impl Transys {
         }
         let bad = aig.bads.iter().map(|c| c.to_lit()).collect();
         let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
-        let justice = aig
+        let mut justice: LitVec = aig
             .justice
             .first()
             .map(|j| j.iter().map(|e| e.to_lit()).collect())
             .unwrap_or_default();
-        let fairness: LitVec = aig.fairness.iter().map(|f| f.to_lit()).collect();
+        justice.extend(aig.fairness.iter().map(|f| f.to_lit()));
         let rel = aig.cnf(compact);
         Transys {
             input,
@@ -95,7 +92,6 @@ impl Transys {
             bad,
             constraint,
             justice,
-            fairness,
             rel,
         }
     }
@@ -152,10 +148,6 @@ impl AigFrontend {
                 );
                 panic!();
             }
-            if cfg.certify || cfg.certificate.is_some() {
-                error!("rIC3 does not support solving liveness property with certificate");
-                panic!();
-            }
         } else {
             if !aig.fairness.is_empty() {
                 warn!("fairness constraints are ignored when solving the safety property");
@@ -187,6 +179,15 @@ impl AigFrontend {
             ts,
             rst,
             cfg: cfg.clone(),
+        }
+    }
+
+    pub fn is_safety(&self) -> bool {
+        if !self.origin_aig.bads.is_empty() {
+            true
+        } else {
+            assert!(!self.ts.justice.is_empty());
+            false
         }
     }
 

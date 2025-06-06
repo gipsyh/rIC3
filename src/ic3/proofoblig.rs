@@ -99,11 +99,6 @@ impl ProofObligation {
         }
         self.frame = frame;
     }
-
-    #[inline]
-    pub fn set(&mut self, other: &ProofObligation) {
-        self.inner = other.inner.clone();
-    }
 }
 
 impl Deref for ProofObligation {
@@ -210,19 +205,8 @@ impl ProofObligationQueue {
 }
 
 impl IC3 {
-    pub fn add_obligation(&mut self, po: ProofObligation) {
+    pub(super) fn add_obligation(&mut self, po: ProofObligation) {
         self.statistic.avg_po_cube_len += po.lemma.len();
         self.obligations.add(po)
-    }
-
-    pub fn witness(&mut self) -> Vec<ProofObligation> {
-        let mut witness = Vec::new();
-        let mut bad = self.obligations.pop(0).unwrap();
-        witness.push(bad.clone());
-        while bad.next.is_some() {
-            bad = bad.next.clone().unwrap();
-            witness.push(bad.clone());
-        }
-        witness
     }
 }

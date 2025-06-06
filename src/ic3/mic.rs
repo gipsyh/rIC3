@@ -29,6 +29,7 @@ impl DropVarParameter {
 
 #[derive(Clone, Copy, Debug)]
 pub enum MicType {
+    #[allow(unused)]
     NoMic,
     DropVar(DropVarParameter),
 }
@@ -198,7 +199,7 @@ impl IC3 {
         (new_cube, new_i)
     }
 
-    pub fn mic_by_drop_var(
+    fn mic_by_drop_var(
         &mut self,
         frame: usize,
         mut cube: LitVec,
@@ -260,7 +261,7 @@ impl IC3 {
         cube
     }
 
-    pub fn mic(
+    pub(super) fn mic(
         &mut self,
         frame: usize,
         cube: LitVec,

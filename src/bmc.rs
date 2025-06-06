@@ -18,10 +18,10 @@ pub struct BMC {
 
 impl BMC {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
-        ts = ts.check_liveness_and_l2s();
+        let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts = ts.check_liveness_and_l2s(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        let mut rst = VarVMap::new_self_map(ts.max_var());
         ts.simplify(&mut rst);
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if cfg.bmc.bmc_kissat {
@@ -100,14 +100,6 @@ impl Engine for BMC {
 
     fn witness(&mut self) -> Witness {
         let mut wit = Witness::default();
-        for l in self.uts.ts.latch() {
-            let l = l.lit();
-            if let Some(v) = self.solver.sat_value(l)
-                && let Some(r) = self.rst.lit_map(l.not_if(!v))
-            {
-                wit.init.push(r);
-            }
-        }
         for k in 0..=self.uts.num_unroll {
             let mut w = LitVec::new();
             for l in self.uts.ts.input() {
@@ -119,7 +111,18 @@ impl Engine for BMC {
                     w.push(r);
                 }
             }
-            wit.wit.push(w);
+            wit.input.push(w);
+            let mut w = LitVec::new();
+            for l in self.uts.ts.latch() {
+                let l = l.lit();
+                let kl = self.uts.lit_next(l, k);
+                if let Some(v) = self.solver.sat_value(kl)
+                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
+                {
+                    w.push(r);
+                }
+            }
+            wit.state.push(w);
         }
         wit
     }

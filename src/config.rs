@@ -72,6 +72,8 @@ pub enum Engine {
     Kind,
     /// bmc
     BMC,
+    /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
+    Rlive,
     /// portfolio
     Portfolio,
 }
@@ -109,6 +111,10 @@ pub struct IC3Options {
     /// ic3 without predicate property
     #[arg(long = "ic3-no-pred-prop", default_value_t = false)]
     pub no_pred_prop: bool,
+
+    /// ic3 full assignment of last bad (used in rlive)
+    #[arg(long = "ic3-full-bad", default_value_t = false)]
+    pub full_bad: bool,
 }
 
 #[derive(Args, Clone, Debug)]

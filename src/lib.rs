@@ -8,6 +8,7 @@ mod gipsat;
 pub mod ic3;
 pub mod kind;
 pub mod portfolio;
+pub mod rlive;
 pub mod transys;
 
 use config::Config;
@@ -16,8 +17,8 @@ use transys::Transys;
 
 #[derive(Clone, Debug, Default)]
 pub struct Witness {
-    pub init: LitVec,
-    pub wit: Vec<LitVec>,
+    pub input: Vec<LitVec>,
+    pub state: Vec<LitVec>,
 }
 
 impl Witness {
@@ -27,9 +28,24 @@ impl Witness {
     }
 
     pub fn map_var(&self, f: impl Fn(Var) -> Var) -> Self {
-        let init = self.init.map_var(&f);
-        let wit = self.wit.iter().map(|w| w.map_var(&f)).collect();
-        Self { init, wit }
+        let input = self.input.iter().map(|w| w.map_var(&f)).collect();
+        let state = self.state.iter().map(|w| w.map_var(&f)).collect();
+        Self { input, state }
+    }
+
+    pub fn filter_map_var(&self, f: impl Fn(Var) -> Option<Var>) -> Self {
+        let input = self.input.iter().map(|w| w.filter_map_var(&f)).collect();
+        let state = self.state.iter().map(|w| w.filter_map_var(&f)).collect();
+        Self { input, state }
+    }
+
+    pub fn concat(iter: impl IntoIterator<Item = Witness>) -> Self {
+        let mut res = Self::new();
+        for witness in iter {
+            res.input.extend(witness.input);
+            res.state.extend(witness.state);
+        }
+        res
     }
 }
 

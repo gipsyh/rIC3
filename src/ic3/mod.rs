@@ -325,6 +325,7 @@ impl IC3 {
 
     fn base(&mut self) -> bool {
         self.extend();
+        assert!(self.level() == 0);
         if !self.cfg.ic3.no_pred_prop {
             let bad = self.ts.bad;
             if self.solvers[0].solve_without_bucket(&self.ts.bad.cube(), vec![]) {
@@ -348,8 +349,8 @@ impl IC3 {
 impl IC3 {
     pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         let ots = ts.clone();
-        ts = ts.check_liveness_and_l2s();
         let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts = ts.check_liveness_and_l2s(&mut rst);
         ts.unique_prime(&mut rst);
         ts.simplify(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
@@ -401,6 +402,14 @@ impl IC3 {
             rng,
             filog: Default::default(),
         }
+    }
+
+    pub fn invariant(&self) -> Vec<LitVec> {
+        self.frame
+            .invariant()
+            .iter()
+            .map(|l| l.map_var(|l| self.rst[&l]))
+            .collect()
     }
 }
 
@@ -476,14 +485,6 @@ impl Engine for IC3 {
     fn witness(&mut self) -> Witness {
         let mut res = Witness::default();
         if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            for l in uts.ts.latch() {
-                let l = l.lit();
-                if let Some(v) = bmc_solver.sat_value(l)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    res.init.push(r);
-                }
-            }
             for k in 0..=uts.num_unroll {
                 let mut w = LitVec::new();
                 for l in uts.ts.input() {
@@ -495,21 +496,33 @@ impl Engine for IC3 {
                         w.push(r);
                     }
                 }
-                res.wit.push(w);
+                res.input.push(w);
+                let mut w = LitVec::new();
+                for l in uts.ts.latch() {
+                    let l = l.lit();
+                    let kl = uts.lit_next(l, k);
+                    if let Some(v) = bmc_solver.sat_value(kl)
+                        && let Some(r) = self.rst.lit_map(l.not_if(!v))
+                    {
+                        w.push(r);
+                    }
+                }
+                res.state.push(w);
             }
             return res;
         }
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
-        for &l in b.lemma.iter() {
-            if let Some(r) = self.rst.lit_map(l) {
-                res.init.push(r);
-            }
-        }
         let mut b = Some(b);
         while let Some(bad) = b {
+            res.state.push(
+                bad.lemma
+                    .iter()
+                    .filter_map(|l| self.rst.lit_map(*l))
+                    .collect(),
+            );
             for i in bad.input.iter() {
-                res.wit
+                res.input
                     .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
             }
             b = bad.next.clone();

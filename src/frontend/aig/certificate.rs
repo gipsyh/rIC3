@@ -1,6 +1,6 @@
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
-use log::{debug, info};
+use log::{debug, error, info};
 use logic_form::{Lbool, Var};
 
 use super::AigFrontend;
@@ -11,6 +11,10 @@ impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
         if res {
             if self.cfg.certificate.is_none() && !self.cfg.certify {
+                return;
+            }
+            if !self.is_safety() {
+                error!("rIC3 does not support certificate generation for safe liveness properties");
                 return;
             }
             let proof = engine.proof();
@@ -51,7 +55,7 @@ impl AigFrontend {
     fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
         let map: GHashMap<Var, bool> =
-            GHashMap::from_iter(wit.init.iter().map(|l| (l.var(), l.polarity())));
+            GHashMap::from_iter(wit.state[0].iter().map(|l| (l.var(), l.polarity())));
         let mut line = String::new();
         let mut state = Vec::new();
         for l in self.origin_aig.latchs.iter() {
@@ -67,7 +71,7 @@ impl AigFrontend {
         }
         res.push(line);
         let mut simulate = TernarySimulate::new(&self.origin_aig, state);
-        for c in wit.wit.iter() {
+        for c in wit.input.iter() {
             let map: GHashMap<Var, bool> =
                 GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
             let mut line = String::new();
@@ -84,10 +88,7 @@ impl AigFrontend {
             res.push(line);
             simulate.simulate(input);
         }
-        if self.origin_aig.bads.is_empty() {
-            assert!(!self.origin_aig.justice.is_empty());
-            res[1] = "j0".to_string();
-        } else {
+        if self.is_safety() {
             let p = self
                 .origin_aig
                 .bads
@@ -95,6 +96,8 @@ impl AigFrontend {
                 .position(|b| simulate.value(*b).is_true())
                 .unwrap();
             res[1] = format!("b{p}");
+        } else {
+            res[1] = "j0".to_string();
         }
         res.push(".\n".to_string());
         res.join("\n")
