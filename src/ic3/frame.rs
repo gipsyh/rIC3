@@ -171,9 +171,17 @@ impl Frames {
     }
 
     #[inline]
-    pub fn statistic(&self) -> String {
+    pub fn statistic(&self, compact: bool) -> String {
         let mut s = String::new();
-        for f in self.frames.iter() {
+        let total = self.frames.len();
+        s.write_fmt(format_args!("frames [{total}]: ")).unwrap();
+        let frames_iter: Box<dyn Iterator<Item = &Frame>> = if compact && total > 50 {
+            s.push_str("... ");
+            Box::new(self.frames.iter().skip(total - 50))
+        } else {
+            Box::new(self.frames.iter())
+        };
+        for f in frames_iter {
             s.write_fmt(format_args!("{} ", f.len())).unwrap();
         }
         s

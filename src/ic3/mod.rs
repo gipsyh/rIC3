@@ -6,8 +6,8 @@ use crate::{
 };
 use activity::Activity;
 use frame::{Frame, Frames};
-use giputils::{grc::Grc, hash::GHashMap};
-use log::{debug, info};
+use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
+use log::{Level, debug, info};
 use logic_form::{LitOrdVec, LitVec, Var, VarVMap};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -45,6 +45,8 @@ pub struct IC3 {
     rst: VarVMap,
     auxiliary_var: Vec<Var>,
     rng: StdRng,
+
+    filog: IntervalLogger,
 }
 
 impl IC3 {
@@ -155,7 +157,7 @@ impl IC3 {
                 self.add_obligation(po);
                 continue;
             }
-            debug!("{}", self.frame.statistic());
+            debug!("{}", self.frame.statistic(false));
             po.bump_act();
             let blocked_start = Instant::now();
             let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false, false);
@@ -397,6 +399,7 @@ impl IC3 {
             rst,
             bmc_solver: None,
             rng,
+            filog: Default::default(),
         }
     }
 }
@@ -435,8 +438,7 @@ impl Engine for IC3 {
                 }
             }
             let blocked_time = start.elapsed();
-            info!("{}", self.frame.statistic());
-            info!("frame: {}, time: {:?}", self.level(), blocked_time,);
+            self.filog.log(Level::Info, self.frame.statistic(true));
             self.statistic.overall_block_time += blocked_time;
             self.extend();
             let start = Instant::now();
@@ -518,7 +520,7 @@ impl Engine for IC3 {
     fn statistic(&mut self) {
         self.statistic.num_auxiliary_var = self.auxiliary_var.len();
         info!("{}", self.obligations.statistic());
-        info!("{}", self.frame.statistic());
+        info!("{}", self.frame.statistic(false));
         let mut statistic = SolverStatistic::default();
         for s in self.solvers.iter() {
             statistic += s.statistic;

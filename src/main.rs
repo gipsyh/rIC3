@@ -25,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     procspawn::init();
     env_logger::Builder::from_default_env()
         .format_timestamp(None)
+        .format_target(false)
         .init();
     fs::create_dir_all("/tmp/rIC3")?;
     let mut cfg = Config::parse();
