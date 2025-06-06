@@ -111,6 +111,7 @@ impl Rlive {
             panic!();
         }
         let mut rst = VarVMap::new_self_map(ts.max_var());
+        ts.normalize_justice();
         ts.simplify(&mut rst);
         assert!(ts.justice.len() == 1);
         let base_var = ts.new_var();

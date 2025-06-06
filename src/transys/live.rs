@@ -2,7 +2,7 @@ use super::Transys;
 use crate::transys::TransysIf;
 use log::warn;
 use logic_form::{LitVec, VarVMap};
-use std::iter::once;
+use std::{iter::once, mem::take};
 
 impl Transys {
     pub fn l2s(&self) -> Self {
@@ -45,5 +45,30 @@ impl Transys {
             warn!("liveness property found, converting to safety property");
             self.l2s()
         }
+    }
+
+    pub fn normalize_justice(&mut self) {
+        assert!(!self.justice.is_empty());
+        if self.justice.len() == 1 {
+            return;
+        }
+        let justice = take(&mut self.justice);
+        let mut ljs = Vec::new();
+        let mut ljns = Vec::new();
+        for &j in justice.iter() {
+            let lj = self.new_var();
+            ljs.push(lj);
+            let ljn = self.rel.new_or([lj.lit(), j]);
+            ljns.push(ljn);
+        }
+        let accept = self.rel.new_and(ljns.clone());
+        let ni = self.new_var();
+        self.add_input(ni);
+        let reset = self.rel.new_or([ni.lit(), accept]);
+        for (&lj, &ljn) in ljs.iter().zip(ljns.iter()) {
+            let ljn = self.rel.new_and([ljn, !reset]);
+            self.add_latch(lj, Some(false), ljn);
+        }
+        self.justice.push(accept);
     }
 }

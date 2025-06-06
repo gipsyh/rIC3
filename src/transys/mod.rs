@@ -1,5 +1,5 @@
 mod ctx;
-mod l2s;
+mod live;
 pub mod nodep;
 mod others;
 mod simp;
@@ -84,7 +84,10 @@ pub trait TransysIf {
         println!("num constraint: {}", self.constraint().count());
     }
 
-    #[inline]
+    fn add_input(&mut self, _input: Var) {
+        panic!("Error: add input not support");
+    }
+
     fn add_latch(&mut self, _latch: Var, _init: Option<bool>, _next: Lit) {
         panic!("Error: add latch not support");
     }
@@ -141,6 +144,11 @@ impl TransysIf for Transys {
     #[inline]
     fn trans(&self) -> impl Iterator<Item = &LitVec> {
         self.rel.clause()
+    }
+
+    #[inline]
+    fn add_input(&mut self, input: Var) {
+        self.input.push(input);
     }
 
     #[inline]
