@@ -22,7 +22,9 @@ impl BMC {
         ts = ts.check_liveness_and_l2s(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        ts.simplify(&mut rst);
+        if !cfg.preproc.no_preproc {
+            ts.simplify(&mut rst);
+        }
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if cfg.bmc.bmc_kissat {
             Box::new(kissat::Solver::new())

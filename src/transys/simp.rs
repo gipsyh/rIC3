@@ -19,6 +19,14 @@ impl Transys {
                 queue.push(v);
             }
         }
+        if !self.justice.is_empty() {
+            for v in self.latch.iter() {
+                if !mark.contains(v) {
+                    mark.insert(*v);
+                    queue.push(*v);
+                }
+            }
+        }
         while let Some(v) = queue.pop() {
             if let Some(n) = self.next.get(&v) {
                 let nv = n.var();

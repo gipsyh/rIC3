@@ -352,7 +352,9 @@ impl IC3 {
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
         ts.unique_prime(&mut rst);
-        ts.simplify(&mut rst);
+        if !cfg.preproc.no_preproc {
+            ts.simplify(&mut rst);
+        }
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {

@@ -1,10 +1,11 @@
 use crate::{
     Engine, Witness,
-    config::{self, Config},
+    config::Config,
     ic3::IC3,
     transys::{Transys, TransysIf},
 };
-use log::{error, warn};
+use clap::Parser;
+use log::{debug, error, warn};
 use logic_form::{Lit, LitOrdVec, LitVec, Var, VarVMap};
 use std::mem::take;
 
@@ -30,6 +31,9 @@ impl Rlive {
 
     #[inline]
     fn add_trace(&mut self, mut w: Witness) -> bool {
+        for s in w.state.iter_mut().chain(w.input.iter_mut()) {
+            s.retain(|l| l.var() != self.base_var);
+        }
         let s = LitOrdVec::new(w.state.pop().unwrap());
         w.input.pop();
         self.witness.push(w);
@@ -43,17 +47,21 @@ impl Rlive {
         true
     }
 
-    fn add_shoal(&mut self, shoal: Vec<LitVec>) {
-        for s in shoal {
-            if s.iter().any(|l| l.var() == self.base_var) {
-                continue;
-            }
-            let c = !self.rts.rel.new_and(s.clone());
-            self.rts.constraint.push(c);
-            let c = !self.ts.rel.new_and(s.clone());
-            self.ts.constraint.push(c);
-            self.shoals.push(s);
-        }
+    fn add_shoal(&mut self, mut shoal: Vec<LitVec>) {
+        shoal.retain(|s| s.iter().all(|l| l.var() != self.base_var));
+        let ors: Vec<_> = shoal
+            .iter()
+            .map(|s| self.rts.rel.new_and(s.clone()))
+            .collect();
+        let c = self.rts.rel.new_or(ors);
+        self.rts.constraint.push(c);
+        let ors: Vec<_> = shoal
+            .iter()
+            .map(|s| self.ts.rel.new_and(s.clone()))
+            .collect();
+        let c = self.ts.rel.new_or(ors);
+        self.ts.constraint.push(c);
+        self.shoals.extend(shoal);
     }
 
     #[inline]
@@ -72,16 +80,14 @@ impl Rlive {
         if ic3.check().unwrap() {
             return Ok(ic3.invariant());
         }
-        let mut wit = ic3.witness();
+        let wit = ic3.witness();
         assert!(wit.input.len() > 1);
-        for s in wit.state.iter_mut() {
-            s.retain(|l| l.var() != self.base_var);
-        }
         Err(wit)
     }
 
     fn block(&mut self) -> bool {
         loop {
+            debug!("rlive block at level {}", self.level());
             let s = self.trace.last().unwrap().clone();
             match self.check_reach(s.cube().clone()) {
                 Ok(inv) => {
@@ -112,7 +118,9 @@ impl Rlive {
         }
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts.normalize_justice();
-        ts.simplify(&mut rst);
+        if !cfg.preproc.no_preproc {
+            ts.simplify(&mut rst);
+        }
         assert!(ts.justice.len() == 1);
         let base_var = ts.new_var();
         ts.add_latch(base_var, Some(false), Lit::constant(true));
@@ -123,11 +131,8 @@ impl Rlive {
         let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
-        let mut rcfg = cfg.clone();
-        rcfg.engine = config::Engine::IC3;
-        rcfg.ic3.no_pred_prop = true;
-        rcfg.ic3.full_bad = true;
-        rcfg.certify = false;
+        let rcfg =
+            Config::parse_from("-e ic3 --ic3-no-pred-prop --ic3-full-bad --no-preproc".split(' '));
         Self {
             cfg,
             ts,

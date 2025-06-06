@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     };
     let ts = aig.ts();
-    if cfg.preprocess.sec {
+    if cfg.preproc.sec {
         panic!("Error: sec not support");
     }
     let mut engine: Box<dyn Engine> = match cfg.engine {
