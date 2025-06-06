@@ -4,6 +4,7 @@ use crate::{
     ic3::IC3,
     transys::{Transys, TransysIf},
 };
+use log::{error, warn};
 use logic_form::{Lit, LitOrdVec, LitVec, Var};
 use std::mem::take;
 
@@ -100,6 +101,11 @@ impl Rlive {
 
 impl Rlive {
     pub fn new(cfg: Config, ts: Transys) -> Self {
+        warn!("rlive is unstable, use with caution");
+        if ts.justice.is_empty() {
+            error!("rlive requires justice property");
+            panic!();
+        }
         assert!(ts.justice.len() == 1);
         let mut rts = ts.clone();
         rts.init.clear();
