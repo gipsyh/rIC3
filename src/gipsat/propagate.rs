@@ -52,7 +52,7 @@ impl Watchers {
 impl Solver {
     #[inline]
     fn propagate_full(&mut self) -> CRef {
-        while self.propagated < self.trail.len() {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
@@ -99,7 +99,7 @@ impl Solver {
 
     #[inline]
     fn propagate_domain(&mut self) -> CRef {
-        while self.propagated < self.trail.len() {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;

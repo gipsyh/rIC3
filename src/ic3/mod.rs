@@ -534,7 +534,7 @@ impl Engine for IC3 {
 
     fn statistic(&mut self) {
         self.statistic.num_auxiliary_var = self.auxiliary_var.len();
-        info!("{}", self.obligations.statistic());
+        info!("obligations: {}", self.obligations.statistic());
         info!("{}", self.frame.statistic(false));
         let mut statistic = SolverStatistic::default();
         for s in self.solvers.iter() {

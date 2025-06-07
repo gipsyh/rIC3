@@ -299,13 +299,13 @@ impl ClauseDB {
 
     #[inline]
     #[allow(unused)]
-    pub fn num_leanrt(&self) -> u32 {
+    pub fn num_leanrt(&self) -> usize {
         self.learnt.len()
     }
 
     #[inline]
     #[allow(unused)]
-    pub fn num_lemma(&self) -> u32 {
+    pub fn num_lemma(&self) -> usize {
         self.lemmas.len()
     }
 }
@@ -401,7 +401,7 @@ impl Solver {
 
     #[allow(unused)]
     pub fn simplify_lazy_removed(&mut self) {
-        if self.simplify.lazy_remove.len() as u32 * 10 <= self.cdb.num_lemma() {
+        if self.simplify.lazy_remove.len() * 10 <= self.cdb.num_lemma() {
             return;
         }
         let mut lazy_remove_map: GHashMap<LitOrdVec, u32> = GHashMap::new();

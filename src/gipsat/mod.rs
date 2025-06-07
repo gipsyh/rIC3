@@ -237,7 +237,7 @@ impl Solver {
             }
         }
         self.statistic.avg_decide_var +=
-            self.domain.len() as f64 / (self.ts.num_var() - self.trail.len() as usize) as f64;
+            self.domain.len() as f64 / (self.ts.num_var() - self.trail.len()) as f64;
         true
     }
 

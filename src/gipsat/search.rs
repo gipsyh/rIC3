@@ -29,7 +29,7 @@ impl Solver {
 
     #[inline]
     pub fn new_level(&mut self) {
-        self.pos_in_trail.push(self.trail.len())
+        self.pos_in_trail.push(self.trail.len() as u32)
     }
 
     #[inline]
@@ -37,7 +37,7 @@ impl Solver {
         if self.highest_level() <= level {
             return;
         }
-        while self.trail.len() > self.pos_in_trail[level] {
+        while self.trail.len() as u32 > self.pos_in_trail[level] {
             let bt = self.trail.pop().unwrap();
             self.value.set_none(bt.var());
             if vsids {

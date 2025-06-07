@@ -168,7 +168,7 @@ impl Solver {
             return;
         }
         self.analyze.see(p);
-        for i in (self.pos_in_trail[0]..self.trail.len()).rev() {
+        for i in (self.pos_in_trail[0]..self.trail.len() as u32).rev() {
             p = self.trail[i];
             if self.analyze.seen(p) {
                 if self.reason[p] != CREF_NONE {

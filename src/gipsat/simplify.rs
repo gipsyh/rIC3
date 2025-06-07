@@ -8,10 +8,10 @@ use logic_form::{LitMap, LitOrdVec, LitVec};
 use std::mem::take;
 
 pub struct Simplify {
-    pub last_num_assign: u32,
+    pub last_num_assign: usize,
     pub last_simplify: usize,
     pub lazy_remove: Vec<LitVec>,
-    pub last_num_lemma: u32,
+    pub last_num_lemma: usize,
 }
 
 impl Default for Simplify {
