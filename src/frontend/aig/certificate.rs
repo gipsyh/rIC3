@@ -10,7 +10,7 @@ use std::{fs::File, io::Write, path::Path, process::Command};
 impl AigFrontend {
     pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
         if res {
-            if self.cfg.certificate.is_none() && !self.cfg.certify {
+            if self.cfg.unsat_certificate.is_none() && !self.cfg.certify {
                 return;
             }
             if !self.is_safety() {
@@ -19,7 +19,7 @@ impl AigFrontend {
             }
             let proof = engine.proof();
             let certifaiger = self.proof(proof);
-            if let Some(certificate_path) = &self.cfg.certificate {
+            if let Some(certificate_path) = &self.cfg.unsat_certificate {
                 certifaiger.to_file(certificate_path.to_str().unwrap(), true);
             }
             if !self.cfg.certify {
@@ -30,7 +30,7 @@ impl AigFrontend {
             certifaiger.to_file(certificate_path, true);
             certifaiger_check(&self.cfg, certificate_path);
         } else {
-            if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
+            if self.cfg.sat_certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
             let witness = engine.witness().map_var(|v: Var| self.rst[&v]);
@@ -38,7 +38,7 @@ impl AigFrontend {
             if self.cfg.witness {
                 println!("{witness}");
             }
-            if let Some(certificate_path) = &self.cfg.certificate {
+            if let Some(certificate_path) = &self.cfg.sat_certificate {
                 let mut file: File = File::create(certificate_path).unwrap();
                 file.write_all(witness.as_bytes()).unwrap();
             }

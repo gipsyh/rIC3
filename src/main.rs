@@ -21,7 +21,7 @@ use std::{
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", "info") };
+        unsafe { env::set_var("RUST_LOG", "error") };
     }
     procspawn::init();
     env_logger::Builder::from_default_env()

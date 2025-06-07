@@ -10,7 +10,7 @@ use std::path::PathBuf;
 )]
 pub struct Config {
     /// model checking engine
-    #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
+    #[arg(short, long, value_enum, default_value_t = Engine::IC3)]
     pub engine: Engine,
 
     /// model file in aiger format or in btor2 format.
@@ -18,7 +18,9 @@ pub struct Config {
     pub model: PathBuf,
 
     /// certificate path
-    pub certificate: Option<PathBuf>,
+    pub sat_certificate: Option<PathBuf>,
+
+    pub unsat_certificate: Option<PathBuf>,
 
     /// certify with certifaiger
     #[arg(long, default_value_t = false)]
