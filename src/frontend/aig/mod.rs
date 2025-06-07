@@ -56,7 +56,9 @@ impl From<&Transys> for Aig {
         for c in ts.constraint() {
             aig.constraints.push(map_lit(c));
         }
-        aig.justice = vec![ts.justice.iter().map(|&j| map_lit(j)).collect()];
+        if !ts.justice.is_empty() {
+            aig.justice = vec![ts.justice.iter().map(|&j| map_lit(j)).collect()];
+        }
         aig
     }
 }
@@ -158,6 +160,7 @@ impl AigFrontend {
                 if let Some(certificate) = &cfg.certificate {
                     aig.to_file(certificate, true);
                 }
+                println!("RESULT: UNSAT");
                 exit(20);
             } else if aig.bads.len() > 1 {
                 if cfg.certify || cfg.certificate.is_some() {

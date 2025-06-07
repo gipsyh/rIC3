@@ -1,7 +1,7 @@
 use crate::{
     Engine, Proof, Witness,
     config::Config,
-    gipsat::{Solver, SolverStatistic},
+    gipsat::{SolverStatistic, TransysSolver},
     transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
 };
 use activity::Activity;
@@ -28,11 +28,11 @@ pub struct IC3 {
     cfg: Config,
     origin_ts: Transys,
     ts: Grc<TransysCtx>,
-    solvers: Vec<Solver>,
-    lift: Solver,
+    solvers: Vec<TransysSolver>,
+    lift: TransysSolver,
     bad_ts: Grc<TransysCtx>,
     bad_solver: cadical::Solver,
-    bad_lift: Solver,
+    bad_lift: TransysSolver,
     bad_input: GHashMap<Var, Var>,
     frame: Frames,
     obligations: ProofObligationQueue,
@@ -60,7 +60,7 @@ impl IC3 {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
         }
-        let mut solver = Solver::new(self.cfg.clone(), Some(self.frame.len()), &self.ts);
+        let mut solver = TransysSolver::new(Some(self.frame.len()), &self.ts, self.cfg.rseed);
         for v in self.auxiliary_var.iter() {
             solver.add_domain(*v, true);
         }
@@ -145,7 +145,7 @@ impl IC3 {
                         return Some(false);
                     }
                 } else if self.cfg.ic3.inn && po.frame > 0 {
-                    assert!(!self.solvers[0].solve(&po.lemma, vec![]));
+                    assert!(!self.solvers[0].solve(&po.lemma));
                 } else {
                     self.add_obligation(po.clone());
                     assert!(po.frame == 0);
@@ -340,7 +340,7 @@ impl IC3 {
                 return false;
             }
             self.ts.constraints.push(!bad);
-            self.lift = Solver::new(self.cfg.clone(), None, &self.ts);
+            self.lift = TransysSolver::new(None, &self.ts, self.cfg.rseed);
         }
         true
     }
@@ -353,7 +353,7 @@ impl IC3 {
         ts = ts.check_liveness_and_l2s(&mut rst);
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
-            ts.frts(&mut rst);
+            // ts.frts(&cfg, &mut rst);
         }
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
@@ -373,8 +373,8 @@ impl IC3 {
         let statistic = Statistic::new(cfg.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
-        let lift = Solver::new(cfg.clone(), None, &ts);
-        let bad_lift = Solver::new(cfg.clone(), None, &bad_ts);
+        let lift = TransysSolver::new(None, &ts, cfg.rseed);
+        let bad_lift = TransysSolver::new(None, &bad_ts, cfg.rseed);
         let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
         } else {
@@ -538,7 +538,7 @@ impl Engine for IC3 {
         info!("{}", self.frame.statistic(false));
         let mut statistic = SolverStatistic::default();
         for s in self.solvers.iter() {
-            statistic += s.statistic;
+            statistic += *s.statistic();
         }
         info!("{statistic:#?}");
         info!("{:#?}", self.statistic);

@@ -286,18 +286,18 @@ pub fn portfolio_main(cfg: Config) {
     let res = engine.check();
     match res {
         Some(true) => {
-            println!("result: safe");
+            println!("RESULT: UNSAT");
             if cfg.witness {
                 println!("0");
             }
             certificate(&mut engine, &cfg, true)
         }
         Some(false) => {
-            println!("result: unsafe");
+            println!("RESULT: SAT");
             certificate(&mut engine, &cfg, false)
         }
         _ => {
-            println!("result: unknown");
+            println!("RESULT: UNKNOWN");
             if cfg.witness {
                 println!("2");
             }

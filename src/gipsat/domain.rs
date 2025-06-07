@@ -1,8 +1,5 @@
-use super::Solver;
-use crate::transys::TransysCtx;
-use giputils::grc::Grc;
-use giputils::hash::GHashSet;
-use logic_form::{Var, VarAssign, VarSet};
+use super::DagCnfSolver;
+use logic_form::{DagCnf, Var, VarAssign, VarSet};
 use std::ops::{Deref, DerefMut};
 
 pub struct Domain {
@@ -22,31 +19,6 @@ impl Domain {
         self.domain.reserve(var);
     }
 
-    pub fn calculate_constrain(&mut self, ts: &Grc<TransysCtx>, value: &VarAssign) {
-        let mut marked = GHashSet::new();
-        let mut queue = Vec::new();
-        for c in ts.constraints.iter() {
-            if !marked.contains(&c.var()) {
-                marked.insert(c.var());
-                queue.push(c.var());
-            }
-        }
-        while let Some(v) = queue.pop() {
-            for d in ts.rel.dep[v].iter() {
-                if !marked.contains(d) {
-                    marked.insert(*d);
-                    queue.push(*d);
-                }
-            }
-        }
-        for v in marked.iter() {
-            if value.v(v.lit()).is_none() {
-                self.domain.insert(*v);
-            }
-        }
-        self.fixed = self.domain.len();
-    }
-
     #[inline]
     pub fn reset(&mut self) {
         while self.domain.len() > self.fixed {
@@ -58,7 +30,7 @@ impl Domain {
     pub fn enable_local(
         &mut self,
         domain: impl Iterator<Item = Var>,
-        ts: &Grc<TransysCtx>,
+        dc: &DagCnf,
         _value: &VarAssign,
     ) {
         self.reset();
@@ -71,7 +43,7 @@ impl Domain {
         while now < self.domain.len() {
             let v = self.domain[now];
             now += 1;
-            for d in ts.rel.dep[v].iter() {
+            for d in dc.dep[v].iter() {
                 // if value.v(d.lit()).is_none() {
                 self.domain.insert(*d);
                 // }
@@ -106,7 +78,7 @@ impl DerefMut for Domain {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     pub fn add_domain(&mut self, var: Var, deps: bool) {
         assert!(self.highest_level() == 0);
@@ -116,13 +88,13 @@ impl Solver {
         self.domain.reset();
         self.domain.domain.insert(var);
         if deps {
-            let mut queue = self.ts.rel.dep[var].clone();
+            let mut queue = self.dc.dep[var].clone();
             while let Some(d) = queue.pop() {
                 if self.domain.has(d) {
                     continue;
                 }
                 self.domain.domain.insert(d);
-                for dd in self.ts.rel.dep[d].iter() {
+                for dd in self.dc.dep[d].iter() {
                     queue.push(*dd);
                 }
             }

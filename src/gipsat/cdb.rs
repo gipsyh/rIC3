@@ -1,4 +1,4 @@
-use super::Solver;
+use super::DagCnfSolver;
 use bitfield_struct::bitfield;
 use giputils::gvec::Gvec;
 use giputils::hash::GHashMap;
@@ -323,7 +323,7 @@ impl Default for ClauseDB {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     pub fn clause_satisfied(&self, cls: CRef) -> bool {
         let cls = self.cdb.get(cls);

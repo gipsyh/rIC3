@@ -1,4 +1,4 @@
-use super::{Solver, cdb::CREF_NONE};
+use super::{DagCnfSolver, cdb::CREF_NONE};
 use giputils::{OptionU32, gvec::Gvec};
 use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
@@ -307,7 +307,7 @@ impl Bucket {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     pub fn decide(&mut self) -> bool {
         while let Some(decide) = self.vsids.pop() {

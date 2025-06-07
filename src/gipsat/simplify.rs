@@ -1,8 +1,7 @@
 use super::{
-    Solver,
+    DagCnfSolver,
     cdb::{CREF_NONE, CRef},
 };
-use crate::transys::TransysIf;
 use giputils::gvec::Gvec;
 use logic_form::{LitMap, LitOrdVec, LitVec};
 use std::mem::take;
@@ -25,7 +24,7 @@ impl Default for Simplify {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     pub fn simplify(&mut self) {
         assert!(self.highest_level() == 0);
         assert!(self.propagate() == CREF_NONE);
@@ -91,7 +90,7 @@ impl Solver {
             })
             .collect();
         clauses.sort_by_key(|(_, l)| l.len());
-        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.ts.max_var());
+        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.dc.max_var());
         for (i, cls) in clauses.iter().enumerate() {
             for l in cls.1.iter() {
                 occurs[*l].push(i);

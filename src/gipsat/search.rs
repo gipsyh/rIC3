@@ -1,10 +1,10 @@
 use super::{
-    Solver,
+    DagCnfSolver,
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
 use logic_form::{Lbool, Lit};
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     pub fn highest_level(&self) -> usize {
         self.pos_in_trail.len()

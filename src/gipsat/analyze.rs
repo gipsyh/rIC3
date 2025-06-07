@@ -1,5 +1,5 @@
 use super::{
-    Solver,
+    DagCnfSolver,
     cdb::{CREF_NONE, CRef},
 };
 use logic_form::{Lit, LitVec, Var, VarMap};
@@ -65,7 +65,7 @@ impl DerefMut for Analyze {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     fn lit_redundant(&mut self, lit: Lit) -> bool {
         debug_assert!(matches!(self.analyze[lit], Mark::Unseen | Mark::Seen));
         if self.reason[lit] == CREF_NONE {
