@@ -12,7 +12,6 @@ pub struct TransysCtx {
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
-    prev_map: LitMap<Lit>,
     pub max_latch: Var,
 }
 
@@ -48,11 +47,6 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
-    fn prev(&self, lit: Lit) -> Lit {
-        self.prev_map[lit]
-    }
-
-    #[inline]
     fn constraint(&self) -> impl Iterator<Item = Lit> {
         self.constraints.iter().copied()
     }
@@ -74,7 +68,6 @@ impl TransysCtx {
         let max_var = self.rel.new_var();
         self.init_map.reserve(max_var);
         self.next_map.reserve(max_var);
-        self.prev_map.reserve(max_var);
         self.is_latch.reserve(max_var);
         max_var
     }
@@ -88,8 +81,6 @@ impl TransysCtx {
         self.is_latch[state] = true;
         self.next_map[lit] = next;
         self.next_map[!lit] = !next;
-        self.prev_map[next] = lit;
-        self.prev_map[!next] = !lit;
         if let Some(i) = init {
             self.init.push(lit.not_if(!i));
         }
@@ -161,7 +152,6 @@ impl Transys {
             rel: self.rel,
             is_latch,
             next_map,
-            prev_map,
             max_latch,
         }
     }

@@ -46,6 +46,7 @@ pub struct Solver {
 
     ts: Grc<TransysCtx>,
 
+    relind: LitVec,
     assump: LitVec,
     constraint: Vec<LitVec>,
 
@@ -79,6 +80,7 @@ impl Solver {
             temporary_domain: Default::default(),
             prepared_vsids: false,
             constrain_act: Var(0),
+            relind: Default::default(),
             assump: Default::default(),
             constraint: Default::default(),
             statistic: Default::default(),
@@ -298,6 +300,7 @@ impl Solver {
         strengthen: bool,
         mut constraint: Vec<LitVec>,
     ) -> bool {
+        self.relind = LitVec::from(cube);
         let assump = self.ts.lits_next(cube);
         if strengthen {
             constraint.push(LitVec::from_iter(cube.iter().map(|l| !*l)));
@@ -311,24 +314,23 @@ impl Solver {
 
     pub fn inductive_core(&mut self) -> LitVec {
         let mut ans = LitVec::new();
-        for l in self.assump.iter() {
-            if self.unsat_has(*l) {
-                ans.push(self.ts.prev(*l));
+        for &l in self.relind.iter() {
+            let nl = self.ts.next(l);
+            if self.unsat_has(nl) {
+                ans.push(l);
             }
         }
         if self.ts.cube_subsume_init(&ans) {
             ans = LitVec::new();
             let new = self
-                .assump
+                .relind
                 .iter()
-                .find(|l| {
-                    let l = self.ts.prev(**l);
-                    self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity())
-                })
+                .find(|&&l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
                 .unwrap();
-            for l in self.assump.iter() {
-                if self.unsat_has(*l) || l.eq(new) {
-                    ans.push(self.ts.prev(*l));
+            for &l in self.relind.iter() {
+                let nl = self.ts.next(l);
+                if self.unsat_has(nl) || l.eq(new) {
+                    ans.push(l);
                 }
             }
             assert!(!self.ts.cube_subsume_init(&ans));
