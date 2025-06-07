@@ -11,8 +11,8 @@ impl Transys {
             let sv = sim[v].clone();
             simval.entry(sv).or_default().push(v);
         }
-        let solver = DagCnfSolver::new(&self.rel, cfg.rseed);
-        for vs in simval.values().filter(|vs| vs.len() > 1) {}
+        let _solver = DagCnfSolver::new(&self.rel, cfg.rseed);
+        for _vs in simval.values().filter(|vs| vs.len() > 1) {}
         dbg!(simval);
         dbg!(&sim);
     }
