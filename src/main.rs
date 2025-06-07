@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     match res {
         Some(true) => {
             if env::var("RIC3_WORKER").is_err() {
-                println!("result: safe");
+                println!("RESULT: UNSAT");
             }
             if cfg.witness {
                 println!("0");
@@ -89,13 +89,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
         Some(false) => {
             if env::var("RIC3_WORKER").is_err() {
-                println!("result: unsafe");
+                println!("RESULT: SAT");
             }
             aig.certificate(&mut engine, false)
         }
         _ => {
             if env::var("RIC3_WORKER").is_err() {
-                println!("result: unknown");
+                println!("RESULT: UNKNOWN");
             }
             if cfg.witness {
                 println!("2");

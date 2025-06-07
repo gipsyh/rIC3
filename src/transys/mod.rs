@@ -1,4 +1,5 @@
 mod ctx;
+pub mod frts;
 mod live;
 pub mod nodep;
 mod others;
@@ -28,17 +29,11 @@ pub trait TransysIf {
 
     fn next(&self, lit: Lit) -> Lit;
 
-    fn prev(&self, _lit: Lit) -> Lit {
-        panic!("prev not supported");
-    }
-
     fn init(&self) -> impl Iterator<Item = Lit>;
 
     fn constraint(&self) -> impl Iterator<Item = Lit>;
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
-
-    // fn restore(&self, lit: Lit) -> Option<Lit>;
 
     #[inline]
     fn var_next(&self, var: Var) -> Var {
@@ -48,11 +43,6 @@ pub trait TransysIf {
     #[inline]
     fn lits_next<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
         lits.into_iter().map(|l| self.next(*l)).collect()
-    }
-
-    #[inline]
-    fn lits_prev<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
-        lits.into_iter().map(|l| self.prev(*l)).collect()
     }
 
     #[inline]

@@ -49,6 +49,7 @@ impl Witness {
     }
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct Proof {
     pub proof: Transys,
 }

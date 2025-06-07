@@ -50,7 +50,7 @@ impl IC3 {
     #[inline]
     #[allow(unused)]
     pub(super) fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
-        !self.solvers[frame].solve(lemma, vec![])
+        !self.solvers[frame].solve(lemma)
     }
 
     pub(super) fn blocked_with_ordered(
@@ -81,7 +81,7 @@ impl IC3 {
     pub(super) fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, LitVec) {
         let start = Instant::now();
         let solver = &mut self.solvers[frame - 1];
-        let mut cls: LitVec = solver.get_last_assump().clone();
+        let mut cls: LitVec = solver.get_assump().clone();
         cls.extend_from_slice(&self.abs_cst);
         if cls.is_empty() {
             return (LitVec::new(), LitVec::new());
@@ -99,7 +99,7 @@ impl IC3 {
         let mut latchs = LitVec::new();
         for latch in self.ts.latchs.iter() {
             let lit = latch.lit();
-            if self.lift.domain.has(lit.var())
+            if self.lift.domain_has(lit.var())
                 && let Some(v) = solver.sat_value(lit)
                 && (in_cls.contains(latch) || !solver.flip_to_none(*latch))
             {

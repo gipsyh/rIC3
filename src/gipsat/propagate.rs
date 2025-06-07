@@ -1,5 +1,5 @@
 use super::{
-    Solver,
+    DagCnfSolver,
     cdb::{CREF_NONE, CRef, Clause},
 };
 use giputils::gvec::Gvec;
@@ -49,10 +49,10 @@ impl Watchers {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     fn propagate_full(&mut self) -> CRef {
-        while self.propagated < self.trail.len() {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
@@ -99,7 +99,7 @@ impl Solver {
 
     #[inline]
     fn propagate_domain(&mut self) -> CRef {
-        while self.propagated < self.trail.len() {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
@@ -147,7 +147,7 @@ impl Solver {
     }
 
     #[inline]
-    pub fn propagate(&mut self) -> CRef {
+    pub(super) fn propagate(&mut self) -> CRef {
         if self.highest_level() == 0 {
             self.propagate_full()
         } else {

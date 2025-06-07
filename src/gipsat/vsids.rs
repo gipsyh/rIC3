@@ -1,4 +1,4 @@
-use super::{Solver, cdb::CREF_NONE};
+use super::{DagCnfSolver, cdb::CREF_NONE};
 use giputils::{OptionU32, gvec::Gvec};
 use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
@@ -48,11 +48,11 @@ impl BinaryHeap {
         let v = self.heap[idx];
         loop {
             let left = (idx << 1) + 1;
-            if left >= self.heap.len() {
+            if left >= self.heap.len() as u32 {
                 break;
             }
             let right = left + 1;
-            let child = if right < self.heap.len()
+            let child = if right < self.heap.len() as u32
                 && activity[self.heap[right]] > activity[self.heap[left]]
             {
                 right
@@ -75,7 +75,7 @@ impl BinaryHeap {
         if self.pos[var].is_some() {
             return;
         }
-        let idx = self.heap.len();
+        let idx = self.heap.len() as u32;
         self.heap.push(var);
         *self.pos[var] = idx;
         self.up(var, activity);
@@ -86,9 +86,9 @@ impl BinaryHeap {
         if self.heap.is_empty() {
             return None;
         }
-        let value = self.heap[0];
-        self.heap[0] = self.heap[self.heap.len() - 1];
-        *self.pos[self.heap[0]] = 0;
+        let value = self.heap[0u32];
+        self.heap[0u32] = self.heap[self.heap.len() - 1];
+        *self.pos[self.heap[0u32]] = 0;
         self.pos[value] = OptionU32::NONE;
         self.heap.pop();
         if self.heap.len() > 1 {
@@ -126,7 +126,8 @@ impl Activity {
         let act = unsafe { &mut *(self as *mut Activity) };
         if self.bucket_heap.pos[var].is_none() {
             self.bucket_heap.push(var, act);
-            let b = 32 - (self.bucket_table.len() - 1).leading_zeros();
+            let b = self.bucket_table.len() - 1;
+            let b = size_of_val(&b) as u32 * 8 - b.leading_zeros();
             *self.bucket_table.last_mut().unwrap() = b;
             self.bucket_table.push(b + 1);
         }
@@ -185,7 +186,6 @@ impl Default for Activity {
 
 pub struct Vsids {
     pub activity: Activity,
-
     pub heap: BinaryHeap,
     pub bucket: Bucket,
     pub enable_bucket: bool,
@@ -223,7 +223,7 @@ impl Vsids {
         }
         self.bucket
             .buckets
-            .reserve(self.activity.bucket_table[self.activity.bucket_table.len() - 1] + 1);
+            .reserve(self.activity.bucket_table[self.activity.bucket_table.len() - 1] as usize + 1);
     }
 
     #[inline]
@@ -281,7 +281,7 @@ impl Bucket {
 
     #[inline]
     pub fn pop(&mut self) -> Option<Var> {
-        while self.head < self.buckets.len() {
+        while self.head < self.buckets.len() as u32 {
             if !self.buckets[self.head].is_empty() {
                 let var = self.buckets[self.head].pop().unwrap();
                 self.in_bucket[var] = false;
@@ -294,7 +294,7 @@ impl Bucket {
 
     #[inline]
     pub fn clear(&mut self) {
-        while self.head < self.buckets.len() {
+        while self.head < self.buckets.len() as u32 {
             while let Some(var) = self.buckets[self.head].pop() {
                 self.in_bucket[var] = false;
             }
@@ -307,7 +307,7 @@ impl Bucket {
     }
 }
 
-impl Solver {
+impl DagCnfSolver {
     #[inline]
     pub fn decide(&mut self) -> bool {
         while let Some(decide) = self.vsids.pop() {
@@ -317,7 +317,7 @@ impl Solver {
                 } else {
                     Lit::new(decide, self.phase_saving[decide] != Lbool::FALSE)
                 };
-                self.pos_in_trail.push(self.trail.len());
+                self.pos_in_trail.push(self.trail.len() as u32);
                 self.assign(decide, CREF_NONE);
                 return true;
             }
