@@ -158,6 +158,11 @@ impl AigFrontend {
             if aig.bads.is_empty() {
                 warn!("no property to be checked");
                 if let Some(certificate) = &cfg.certificate {
+                    let mut map = aig.inputs.clone();
+                    map.extend(aig.latchs.iter().map(|l| l.input));
+                    for x in map {
+                        aig.set_symbol(x, &format!("= {}", x * 2));
+                    }
                     aig.to_file(certificate, true);
                 }
                 println!("RESULT: UNSAT");
