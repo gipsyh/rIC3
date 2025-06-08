@@ -239,7 +239,7 @@ impl DagCnfSolver {
         self.search_with_restart(assump)
     }
 
-    pub fn solve(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
+    fn solve(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
         self.solve_inner(assump, constraint, true)
     }
 

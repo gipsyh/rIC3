@@ -43,7 +43,7 @@ impl Domain {
         while now < self.domain.len() {
             let v = self.domain[now];
             now += 1;
-            for d in dc.dep[v].iter() {
+            for d in dc.dep(v).iter() {
                 // if value.v(d.lit()).is_none() {
                 self.domain.insert(*d);
                 // }
@@ -88,13 +88,13 @@ impl DagCnfSolver {
         self.domain.reset();
         self.domain.domain.insert(var);
         if deps {
-            let mut queue = self.dc.dep[var].clone();
+            let mut queue = self.dc.dep(var).to_vec();
             while let Some(d) = queue.pop() {
                 if self.domain.has(d) {
                     continue;
                 }
                 self.domain.domain.insert(d);
-                for dd in self.dc.dep[d].iter() {
+                for dd in self.dc.dep(d).iter() {
                     queue.push(*dd);
                 }
             }

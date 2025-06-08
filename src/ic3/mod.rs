@@ -353,7 +353,7 @@ impl IC3 {
         ts = ts.check_liveness_and_l2s(&mut rst);
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
-            // ts.frts(&cfg, &mut rst);
+            ts.frts(&cfg, &mut rst);
         }
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
