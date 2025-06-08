@@ -33,7 +33,9 @@ impl AigFrontend {
             if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
-            let witness = engine.witness().map_var(|v: Var| self.rst[&v]);
+            let witness = engine
+                .witness()
+                .filter_map_var(|v: Var| self.rst.get(&v).copied());
             let witness = self.witness(witness);
             if self.cfg.witness {
                 println!("{witness}");
