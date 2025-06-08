@@ -60,7 +60,7 @@ impl AigFrontend {
         let mut state = Vec::new();
         for l in self.origin_aig.latchs.iter() {
             let r = if let Some(r) = l.init {
-                r
+                r.to_constant()
             } else if let Some(r) = map.get(&Var::new(l.input)) {
                 *r
             } else {

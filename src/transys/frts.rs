@@ -1,8 +1,4 @@
-use crate::{
-    config::Config,
-    gipsat::DagCnfSolver,
-    transys::{Transys, TransysIf},
-};
+use crate::{config::Config, gipsat::DagCnfSolver, transys::Transys};
 use giputils::hash::GHashMap;
 use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
