@@ -359,7 +359,7 @@ impl IC3 {
         uts.unroll();
         if cfg.ic3.inn {
             cfg.ic3.no_pred_prop = true;
-            ts = uts.interal_signals();
+            // ts = uts.interal_signals();
         }
         let mut bad_input = GHashMap::new();
         for &l in ts.input.iter() {
