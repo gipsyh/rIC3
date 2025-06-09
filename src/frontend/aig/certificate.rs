@@ -33,7 +33,9 @@ impl AigFrontend {
             if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
                 return;
             }
-            let witness = engine.witness().map_var(|v: Var| self.rst[&v]);
+            let witness = engine
+                .witness()
+                .filter_map_var(|v: Var| self.rst.get(&v).copied());
             let witness = self.witness(witness);
             if self.cfg.witness {
                 println!("{witness}");
@@ -59,10 +61,12 @@ impl AigFrontend {
         let mut line = String::new();
         let mut state = Vec::new();
         for l in self.origin_aig.latchs.iter() {
-            let r = if let Some(r) = l.init {
-                r
-            } else if let Some(r) = map.get(&Var::new(l.input)) {
+            let r = if let Some(r) = map.get(&Var::new(l.input)) {
                 *r
+            } else if let Some(r) = l.init
+                && let Some(r) = r.try_to_constant()
+            {
+                r
             } else {
                 true
             };

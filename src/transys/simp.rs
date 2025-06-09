@@ -35,7 +35,7 @@ impl Transys {
                     queue.push(nv);
                 }
             }
-            for &d in self.rel.dep[v].iter() {
+            for &d in self.rel.dep(v).iter() {
                 if !mark.contains(&d) {
                     mark.insert(d);
                     queue.push(d);
