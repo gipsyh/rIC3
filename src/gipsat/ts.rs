@@ -40,11 +40,6 @@ impl TransysSolver {
     }
 
     #[inline]
-    pub fn solve_without_bucket(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.dcs.solve_without_bucket(assump, constraint)
-    }
-
-    #[inline]
     pub fn minimal_pred(
         &mut self,
         inputs: &[Lit],

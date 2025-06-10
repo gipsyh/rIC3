@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{
     config::Config,
     gipsat::DagCnfSolver,
@@ -9,9 +7,11 @@ use giputils::hash::GHashMap;
 use log::info;
 use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
+use std::time::{Duration, Instant};
 
 impl Transys {
     pub fn frts(&mut self, cfg: &Config, rst: &mut VarVMap) {
+        let start = Instant::now();
         let sim = DagCnfSimulation::new(1, &self.rel);
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
         for v in self.rel.var_iter() {
@@ -49,9 +49,10 @@ impl Transys {
         let before = self.max_var();
         self.replace(&replace, rst);
         info!(
-            "frts eliminates {} out of {} vars.",
+            "frts eliminates {} out of {} vars in {:.2}s.",
             *before - *self.max_var(),
-            *before
+            *before,
+            start.elapsed().as_secs_f32()
         );
     }
 }

@@ -328,7 +328,7 @@ impl IC3 {
         assert!(self.level() == 0);
         if !self.cfg.ic3.no_pred_prop {
             let bad = self.ts.bad;
-            if self.solvers[0].solve_without_bucket(&self.ts.bad.cube(), vec![]) {
+            if self.solvers[0].solve(&self.ts.bad.cube()) {
                 let (bad, inputs) = self.get_pred(self.solvers.len(), true);
                 self.add_obligation(ProofObligation::new(
                     0,

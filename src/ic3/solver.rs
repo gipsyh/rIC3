@@ -28,11 +28,7 @@ impl IC3 {
                 (s, input, 1)
             })
         } else {
-            let res = self
-                .solvers
-                .last_mut()
-                .unwrap()
-                .solve_without_bucket(&self.ts.bad.cube(), vec![]);
+            let res = self.solvers.last_mut().unwrap().solve(&self.ts.bad.cube());
             self.statistic.block_get_bad_time += start.elapsed();
             res.then(|| {
                 if self.cfg.ic3.full_bad {

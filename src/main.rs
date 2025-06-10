@@ -23,7 +23,6 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
     }
-    procspawn::init();
     env_logger::Builder::from_default_env()
         .format_timestamp(None)
         .format_target(false)
