@@ -67,9 +67,6 @@ impl Portfolio {
             if cfg.preproc.sec {
                 engine.arg("--sec");
             }
-            if cfg.preproc.no_abc {
-                engine.arg("--no-abc");
-            }
             engines.push(engine);
         };
         new_engine("-e ic3 --ic3-no-ctg");

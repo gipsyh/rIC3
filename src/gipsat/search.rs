@@ -3,6 +3,7 @@ use super::{
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
 use logic_form::{Lbool, Lit};
+use std::time::{Duration, Instant};
 
 impl DagCnfSolver {
     #[inline]
@@ -49,9 +50,19 @@ impl DagCnfSolver {
         self.pos_in_trail.truncate(level);
     }
 
-    pub fn search_with_restart(&mut self, assumption: &[Lit]) -> bool {
+    pub fn search_with_restart(
+        &mut self,
+        assumption: &[Lit],
+        limit: Option<Duration>,
+    ) -> Option<bool> {
         let mut restarts = 0;
+        let start = Instant::now();
         loop {
+            if let Some(limit) = limit
+                && start.elapsed() > limit
+            {
+                return None;
+            }
             if restarts > 10 && self.vsids.enable_bucket {
                 self.vsids.enable_bucket = false;
                 self.vsids.heap.clear();
@@ -66,7 +77,7 @@ impl DagCnfSolver {
                 None => {
                     restarts += 1;
                 }
-                Some(r) => return r,
+                Some(r) => return Some(r),
             }
         }
     }

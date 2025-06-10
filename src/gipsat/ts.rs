@@ -52,7 +52,10 @@ impl TransysSolver {
         target_constrain: &LitVec,
     ) -> Option<LitVec> {
         let assump = LitVec::from_iter(inputs.iter().chain(latchs.iter()).copied());
-        if self.dcs.solve(&assump, vec![target_constrain.clone()]) {
+        if self
+            .dcs
+            .solve_with_constraint(&assump, vec![target_constrain.clone()])
+        {
             return None;
         }
         Some(
@@ -139,7 +142,7 @@ impl TransysSolver {
         if strengthen {
             constraint.push(LitVec::from_iter(cube.iter().map(|l| !*l)));
         }
-        !self.dcs.solve(&assump, constraint.clone())
+        !self.dcs.solve_with_constraint(&assump, constraint.clone())
     }
 
     pub fn inductive(&mut self, cube: &[Lit], strengthen: bool) -> bool {
@@ -222,7 +225,7 @@ impl Satif for TransysSolver {
 
     #[inline]
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.dcs.solve(assumps, vec![])
+        self.dcs.solve(assumps)
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
