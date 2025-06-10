@@ -6,6 +6,7 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use giputils::hash::GHashMap;
+use log::info;
 use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
 
@@ -45,8 +46,12 @@ impl Transys {
         // for c in self.constraint.iter() {
         //     dbg!(replace.map_lit(*c));
         // }
-        dbg!(&self.max_var());
+        let before = self.max_var();
         self.replace(&replace, rst);
-        dbg!(&self.max_var());
+        info!(
+            "frts eliminates {} out of {} vars.",
+            *before - *self.max_var(),
+            *before
+        );
     }
 }
