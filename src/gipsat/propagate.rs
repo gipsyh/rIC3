@@ -107,7 +107,7 @@ impl DagCnfSolver {
                 let watchers = &mut self.watchers.wtrs[p];
                 let blocker = watchers[w].blocker;
                 let v = self.value.v(blocker);
-                if v == Lbool::TRUE || (v != Lbool::FALSE && !self.domain.has(blocker.var())) {
+                if v == Lbool::TRUE || !self.domain.has(blocker.var()) {
                     w += 1;
                     continue;
                 }
@@ -119,7 +119,7 @@ impl DagCnfSolver {
                 debug_assert!(cref[1] == !p);
                 if cref[0] != blocker {
                     let v = self.value.v(cref[0]);
-                    if v == Lbool::TRUE || (v != Lbool::FALSE && !self.domain.has(cref[0].var())) {
+                    if v == Lbool::TRUE || !self.domain.has(cref[0].var()) {
                         watchers[w].blocker = cref[0];
                         w += 1;
                         continue;
