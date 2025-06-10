@@ -1,5 +1,4 @@
 use std::time::{Duration, Instant};
-
 use crate::{
     config::Config,
     gipsat::DagCnfSolver,
@@ -50,7 +49,7 @@ impl Transys {
         let before = self.max_var();
         self.replace(&replace, rst);
         info!(
-            "frts eliminates {} out of {} vars in {:2}s.",
+            "frts eliminates {} out of {} vars in {:.2}s.",
             *before - *self.max_var(),
             *before,
             start.elapsed().as_secs_f32()
