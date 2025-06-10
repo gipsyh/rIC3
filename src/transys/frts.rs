@@ -1,4 +1,3 @@
-use std::time::{Duration, Instant};
 use crate::{
     config::Config,
     gipsat::DagCnfSolver,
@@ -8,6 +7,7 @@ use giputils::hash::GHashMap;
 use log::info;
 use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
+use std::time::{Duration, Instant};
 
 impl Transys {
     pub fn frts(&mut self, cfg: &Config, rst: &mut VarVMap) {
