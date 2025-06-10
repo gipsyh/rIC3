@@ -8,6 +8,8 @@ mod statistic;
 mod ts;
 mod vsids;
 
+use std::time::Duration;
+
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
@@ -196,12 +198,18 @@ impl DagCnfSolver {
         true
     }
 
-    fn solve_inner(&mut self, assump: &[Lit], constraint: Vec<LitVec>, bucket: bool) -> bool {
+    fn solve_inner(
+        &mut self,
+        assump: &[Lit],
+        constraint: Vec<LitVec>,
+        bucket: bool,
+        limit: Option<Duration>,
+    ) -> Option<bool> {
         self.assump = assump.into();
         self.constraint = constraint.clone();
         if self.trivial_unsat {
             self.unsat_core.clear();
-            return false;
+            return Some(false);
         }
         assert!(!assump.is_empty());
         self.statistic.num_solve += 1;
@@ -209,7 +217,7 @@ impl DagCnfSolver {
         if self.propagate() != CREF_NONE {
             self.trivial_unsat = true;
             self.unsat_core.clear();
-            return false;
+            return Some(false);
         }
         let assump = if !constraint.is_empty() {
             assumption = LitVec::new();
@@ -227,7 +235,7 @@ impl DagCnfSolver {
                 bucket,
             ) {
                 self.unsat_core.clear();
-                return false;
+                return Some(false);
             };
             &assumption
         } else {
@@ -236,15 +244,11 @@ impl DagCnfSolver {
         };
         self.clean_leanrt(true);
         self.simplify();
-        self.search_with_restart(assump)
-    }
-
-    fn solve(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assump, constraint, true)
+        self.search_with_restart(assump, limit)
     }
 
     pub fn solve_without_bucket(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assump, constraint, false)
+        self.solve_inner(assump, constraint, false, None).unwrap()
     }
 
     #[allow(unused)]
@@ -333,11 +337,15 @@ impl Satif for DagCnfSolver {
     }
 
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.solve_inner(assumps, vec![], true)
+        self.solve_inner(assumps, vec![], true, None).unwrap()
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assumps, constraint, true)
+        self.solve_inner(assumps, constraint, true, None).unwrap()
+    }
+
+    fn solve_with_limit(&mut self, assumps: &[Lit], limit: Duration) -> Option<bool> {
+        self.solve_inner(assumps, vec![], true, Some(limit))
     }
 
     #[inline]

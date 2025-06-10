@@ -1,4 +1,10 @@
-use crate::{config::Config, gipsat::DagCnfSolver, transys::Transys};
+use std::time::Duration;
+
+use crate::{
+    config::Config,
+    gipsat::DagCnfSolver,
+    transys::{Transys, TransysIf},
+};
 use giputils::hash::GHashMap;
 use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
@@ -21,21 +27,26 @@ impl Transys {
         }
         let mut replace = VarLMap::new();
         let mut solver = DagCnfSolver::new(&self.rel, cfg.rseed);
-        for &c in self.constraint.iter() {
-            solver.add_clause(&[c]);
-        }
+        // for &c in self.constraint.iter() {
+        //     solver.add_clause(&[c]);
+        // }
         for vs in simval.values().filter(|vs| vs.len() > 1) {
             let m = vs[0];
             for &s in &vs[1..] {
                 // dbg!(m, s);
-                if !solver.solve(&[m, !s]) && !solver.solve(&[!m, s]) {
+                if let Some(false) = solver.solve_with_limit(&[m, !s], Duration::from_secs(3))
+                    && let Some(false) = solver.solve_with_limit(&[!m, s], Duration::from_secs(3))
+                {
                     // dbg!("can replace");
                     replace.insert_lit(s, m);
                 }
             }
         }
-        // dbg!(&self.max_var());
+        // for c in self.constraint.iter() {
+        //     dbg!(replace.map_lit(*c));
+        // }
+        dbg!(&self.max_var());
         self.replace(&replace, rst);
-        // dbg!(&self.max_var());
+        dbg!(&self.max_var());
     }
 }
