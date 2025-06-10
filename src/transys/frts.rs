@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::{
     config::Config,
@@ -12,6 +12,7 @@ use satif::Satif;
 
 impl Transys {
     pub fn frts(&mut self, cfg: &Config, rst: &mut VarVMap) {
+        let start = Instant::now();
         let sim = DagCnfSimulation::new(1, &self.rel);
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
         for v in self.rel.var_iter() {
@@ -49,9 +50,10 @@ impl Transys {
         let before = self.max_var();
         self.replace(&replace, rst);
         info!(
-            "frts eliminates {} out of {} vars.",
+            "frts eliminates {} out of {} vars in {:2}s.",
             *before - *self.max_var(),
-            *before
+            *before,
+            start.elapsed().as_secs_f32()
         );
     }
 }
