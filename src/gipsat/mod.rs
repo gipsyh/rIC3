@@ -202,7 +202,6 @@ impl DagCnfSolver {
         &mut self,
         assump: &[Lit],
         constraint: Vec<LitVec>,
-        bucket: bool,
         limit: Option<Duration>,
     ) -> Option<bool> {
         self.assump = assump.into();
@@ -232,23 +231,19 @@ impl DagCnfSolver {
             if !self.new_round(
                 assump.iter().chain(cc.iter()).map(|l| l.var()),
                 constraint,
-                bucket,
+                true,
             ) {
                 self.unsat_core.clear();
                 return Some(false);
             };
             &assumption
         } else {
-            assert!(self.new_round(assump.iter().map(|l| l.var()), vec![], bucket));
+            assert!(self.new_round(assump.iter().map(|l| l.var()), vec![], true));
             assump
         };
         self.clean_leanrt(true);
         self.simplify();
         self.search_with_restart(assump, limit)
-    }
-
-    pub fn solve_without_bucket(&mut self, assump: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assump, constraint, false, None).unwrap()
     }
 
     #[allow(unused)]
@@ -337,15 +332,15 @@ impl Satif for DagCnfSolver {
     }
 
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.solve_inner(assumps, vec![], true, None).unwrap()
+        self.solve_inner(assumps, vec![], None).unwrap()
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assumps, constraint, true, None).unwrap()
+        self.solve_inner(assumps, constraint, None).unwrap()
     }
 
     fn solve_with_limit(&mut self, assumps: &[Lit], limit: Duration) -> Option<bool> {
-        self.solve_inner(assumps, vec![], true, Some(limit))
+        self.solve_inner(assumps, vec![], Some(limit))
     }
 
     #[inline]
