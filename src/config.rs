@@ -149,10 +149,6 @@ pub struct PreprocessOptions {
     /// sec preprocess
     #[arg(long = "sec", default_value_t = false)]
     pub sec: bool,
-
-    /// disable abc preprocess
-    #[arg(long = "no-abc", default_value_t = false)]
-    pub no_abc: bool,
 }
 
 #[derive(Args, Clone, Debug)]

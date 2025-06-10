@@ -1,13 +1,11 @@
-mod abc;
 pub mod certificate;
 
 use crate::{
-    config::{self, Config},
+    config::Config,
     transys::{Transys, TransysIf},
 };
-use abc::abc_preprocess;
 use aig::{Aig, AigEdge};
-use giputils::hash::{GHashMap, GHashSet};
+use giputils::hash::GHashMap;
 use log::{error, warn};
 use logic_form::{Lit, LitVec, Var, VarVMap};
 use std::process::exit;
@@ -99,24 +97,9 @@ impl Transys {
     }
 }
 
-pub fn aig_preprocess(aig: &Aig, cfg: &config::Config) -> (Aig, VarVMap) {
-    let (mut aig, mut restore) = aig.coi_refine();
+pub fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
+    let (mut aig, restore) = aig.coi_refine();
     aig.gate_init_to_constraint();
-    if !(cfg.preproc.no_abc || matches!(cfg.engine, config::Engine::IC3) && cfg.ic3.inn) {
-        let mut remap_retain = GHashSet::new();
-        remap_retain.insert(Var::CONST);
-        for i in aig.inputs.iter() {
-            remap_retain.insert((*i).into());
-        }
-        for l in aig.latchs.iter() {
-            remap_retain.insert(l.input.into());
-        }
-        restore.retain(|x, _| remap_retain.contains(x));
-        aig = abc_preprocess(aig);
-        let remap2;
-        (aig, remap2) = aig.coi_refine();
-        restore = remap2.product(&restore);
-    }
     aig.constraints.retain(|e| !e.is_constant(true));
     (aig, restore)
 }
@@ -181,7 +164,7 @@ impl AigFrontend {
                 aig.compress_property();
             }
         }
-        let (aig, rst) = aig_preprocess(&aig, cfg);
+        let (aig, rst) = aig_preprocess(&aig);
         let ts = Transys::from_aig(&aig, true);
         Self {
             origin_aig,
