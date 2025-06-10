@@ -24,7 +24,6 @@ bitfield-struct = "0.11.0"
 tempfile = "3.10.1"
 process_control = "5.0.0"
 nix = { version = "0.30.1", features = ["signal"] }
-procspawn = "1.0.0"
 env_logger = "0.11.8"
 log = "0.4.27"
 
