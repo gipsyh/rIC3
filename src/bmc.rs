@@ -77,9 +77,9 @@ impl Engine for BMC {
             }
             info!("bmc depth: {k}");
             let r = if let Some(limit) = self.cfg.bmc.time_limit {
-                let Some(r) = self
-                    .solver
-                    .solve_with_limit(&assump, Duration::from_secs(limit))
+                let Some(r) =
+                    self.solver
+                        .solve_with_limit(&assump, vec![], Duration::from_secs(limit))
                 else {
                     info!("bmc solve timeout in depth {k}");
                     continue;

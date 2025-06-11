@@ -8,8 +8,6 @@ mod statistic;
 mod ts;
 mod vsids;
 
-use std::time::Duration;
-
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
@@ -22,6 +20,7 @@ use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
+use std::time::Duration;
 pub use ts::*;
 use vsids::Vsids;
 
@@ -210,7 +209,6 @@ impl DagCnfSolver {
             self.unsat_core.clear();
             return Some(false);
         }
-        assert!(!assump.is_empty());
         self.statistic.num_solve += 1;
         let mut assumption;
         if self.propagate() != CREF_NONE {
@@ -339,8 +337,13 @@ impl Satif for DagCnfSolver {
         self.solve_inner(assumps, constraint, None).unwrap()
     }
 
-    fn solve_with_limit(&mut self, assumps: &[Lit], limit: Duration) -> Option<bool> {
-        self.solve_inner(assumps, vec![], Some(limit))
+    fn solve_with_limit(
+        &mut self,
+        assumps: &[Lit],
+        constraint: Vec<LitVec>,
+        limit: Duration,
+    ) -> Option<bool> {
+        self.solve_inner(assumps, constraint, Some(limit))
     }
 
     #[inline]
