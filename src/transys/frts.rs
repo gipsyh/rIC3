@@ -5,7 +5,7 @@ use crate::{
 };
 use giputils::hash::GHashMap;
 use log::info;
-use logic_form::{VarLMap, VarVMap, simulate::DagCnfSimulation};
+use logic_form::{LitVec, VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
 use std::time::{Duration, Instant};
 
@@ -31,13 +31,16 @@ impl Transys {
         // for &c in self.constraint.iter() {
         //     solver.add_clause(&[c]);
         // }
+        let limit = Duration::from_millis(500);
         for vs in simval.values().filter(|vs| vs.len() > 1) {
             let m = vs[0];
             for &s in &vs[1..] {
                 // dbg!(m, s);
-                if let Some(false) = solver.solve_with_limit(&[m, !s], Duration::from_secs(3))
-                    && let Some(false) = solver.solve_with_limit(&[!m, s], Duration::from_secs(3))
-                {
+                if let Some(false) = solver.solve_with_limit(
+                    &[],
+                    vec![LitVec::from([m, s]), LitVec::from([!m, !s])],
+                    limit,
+                ) {
                     // dbg!("can replace");
                     replace.insert_lit(s, m);
                 }
