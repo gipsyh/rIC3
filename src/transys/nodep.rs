@@ -47,14 +47,18 @@ impl NoDepTransys {
         trans.push(LitVec::from([Lit::constant(true)]));
         self.rel.set_cls(trans);
         let domain_map = self.rel.rearrange(frozens.into_iter());
-        let map_lit = |l: &Lit| Lit::new(domain_map[&l.var()], l.polarity());
-        self.input = self.input.iter().map(|v| domain_map[v]).collect();
-        self.latch = self.latch.iter().map(|v| domain_map[v]).collect();
-        self.init = self.init.iter().map(|(v, i)| (domain_map[v], *i)).collect();
+        let map_lit = |l: &Lit| Lit::new(domain_map[l.var()], l.polarity());
+        self.input = self.input.iter().map(|&v| domain_map[v]).collect();
+        self.latch = self.latch.iter().map(|&v| domain_map[v]).collect();
+        self.init = self
+            .init
+            .iter()
+            .map(|(v, i)| (domain_map[*v], *i))
+            .collect();
         self.next = self
             .next
             .iter()
-            .map(|(v, n)| (domain_map[v], map_lit(n)))
+            .map(|(v, n)| (domain_map[*v], map_lit(n)))
             .collect();
         self.bad = map_lit(&self.bad);
         self.constraint = self.constraint.iter().map(map_lit).collect();

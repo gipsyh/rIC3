@@ -12,15 +12,16 @@ use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
 use domain::Domain;
+use giputils::bitvec::BitVec;
 use giputils::gvec::Gvec;
 use logic_form::{DagCnf, Lbool, VarAssign};
 use logic_form::{Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
+use rand::Rng;
 use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
-use std::time::Duration;
 pub use ts::*;
 use vsids::Vsids;
 
@@ -202,7 +203,7 @@ impl DagCnfSolver {
         &mut self,
         assump: &[Lit],
         constraint: Vec<LitVec>,
-        limit: Option<Duration>,
+        limit: Option<usize>,
     ) -> Option<bool> {
         self.assump = assump.into();
         self.constraint = constraint.clone();
@@ -243,6 +244,15 @@ impl DagCnfSolver {
         self.clean_leanrt(true);
         self.simplify();
         self.search_with_restart(assump, limit)
+    }
+
+    pub fn solve_with_restart_limit(
+        &mut self,
+        assumps: &[Lit],
+        constraint: Vec<LitVec>,
+        limit: usize,
+    ) -> Option<bool> {
+        self.solve_inner(assumps, constraint, Some(limit))
     }
 
     #[allow(unused)]
@@ -295,6 +305,19 @@ impl DagCnfSolver {
     pub fn statistic(&self) -> &SolverStatistic {
         &self.statistic
     }
+
+    #[allow(unused)]
+    pub fn sat_bitvet(&mut self) -> BitVec {
+        let mut res = BitVec::new();
+        for v in Var::CONST..=self.max_var() {
+            if let Some(v) = self.sat_value(v.lit()) {
+                res.push(v);
+            } else {
+                res.push(self.rng.random_bool(0.5));
+            }
+        }
+        res
+    }
 }
 
 impl Satif for DagCnfSolver {
@@ -336,15 +359,6 @@ impl Satif for DagCnfSolver {
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
         self.solve_inner(assumps, constraint, None).unwrap()
-    }
-
-    fn solve_with_limit(
-        &mut self,
-        assumps: &[Lit],
-        constraint: Vec<LitVec>,
-        limit: Duration,
-    ) -> Option<bool> {
-        self.solve_inner(assumps, constraint, Some(limit))
     }
 
     #[inline]

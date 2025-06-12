@@ -17,7 +17,5 @@ impl Transys {
         self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
         self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
         rst.retain(|k, _| !map.contains_key(*k));
-        self.coi_refine(rst);
-        self.rearrange(rst);
     }
 }

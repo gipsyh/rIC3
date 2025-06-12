@@ -1,61 +1,130 @@
 use crate::{
-    config::Config,
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf},
 };
 use giputils::hash::GHashMap;
 use log::info;
-use logic_form::{LitVec, VarLMap, VarVMap, simulate::DagCnfSimulation};
+use logic_form::{LitVec, Var, VarLMap, VarVMap, simulate::DagCnfSimulation};
 use satif::Satif;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-impl Transys {
-    pub fn frts(&mut self, cfg: &Config, rst: &mut VarVMap) {
-        let start = Instant::now();
-        let sim = DagCnfSimulation::new(1, &self.rel);
+pub struct FrTs {
+    ts: Transys,
+    sim: DagCnfSimulation,
+    map: VarLMap,
+    solver: DagCnfSolver,
+    rseed: u64,
+    rst: VarVMap,
+}
+
+impl FrTs {
+    pub fn new(ts: Transys, rseed: u64, rst: VarVMap) -> Self {
+        let sim = DagCnfSimulation::new(1000, &ts.rel);
+        let solver = DagCnfSolver::new(&ts.rel, rseed);
+        Self {
+            ts,
+            sim,
+            map: VarLMap::new(),
+            solver,
+            rseed,
+            rst,
+        }
+    }
+
+    fn setup_candicate(&mut self) {
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
-        for v in self.rel.var_iter() {
+        self.map.clear();
+        for v in self.ts.rel.var_iter() {
             let lv = v.lit();
-            let slv = sim.val(lv);
-            let snlv = sim.val(!lv);
+            let slv = self.sim.val(lv);
+            let snlv = self.sim.val(!lv);
             if let Some(e) = simval.get_mut(&slv) {
                 e.push(lv);
+                self.map.insert_lit(lv, e[0]);
             } else if let Some(e) = simval.get_mut(&snlv) {
                 e.push(!lv);
+                self.map.insert_lit(!lv, e[0]);
             } else {
                 simval.insert(slv, vec![lv]);
             }
         }
+    }
+
+    pub fn restart(&mut self) {
+        self.solver = DagCnfSolver::new(&self.ts.rel, self.rseed);
+    }
+
+    pub fn fr(mut self) -> (Transys, VarVMap) {
+        let start = Instant::now();
+        let before = self.ts.max_var();
+        const NUM_RESTART: usize = 10000;
+        self.setup_candicate();
         let mut replace = VarLMap::new();
-        let mut solver = DagCnfSolver::new(&self.rel, cfg.rseed);
-        // for &c in self.constraint.iter() {
-        //     solver.add_clause(&[c]);
-        // }
-        let limit = Duration::from_millis(500);
-        for vs in simval.values().filter(|vs| vs.len() > 1) {
-            let m = vs[0];
-            for &s in &vs[1..] {
-                // dbg!(m, s);
-                if let Some(false) = solver.solve_with_limit(
-                    &[],
-                    vec![LitVec::from([m, s]), LitVec::from([!m, !s])],
-                    limit,
-                ) {
+        // let mut num_timeout = 0;
+        let mut num_replace = 0;
+        let mut v = Var(1);
+        let mut cadical = cadical::Solver::new();
+        // let mut solver = DagCnfSolver::new(&self.ts.rel, self.rseed);
+        for cls in self.ts.rel.clause() {
+            cadical.add_clause(cls);
+        }
+        while v <= self.ts.max_var() {
+            let Some(m) = self.map.map(v) else {
+                v += 1;
+                continue;
+            };
+            let lv = v.lit();
+            // dbg!(m, v);
+            let res = cadical.solve(&[!m, lv]) || cadical.solve(&[m, !lv]);
+            // let res2 = solver.solve(&[!m, lv]) || cadical.solve(&[m, !lv]);
+            match self.solver.solve_with_restart_limit(
+                &[],
+                vec![LitVec::from([m, lv]), LitVec::from([!m, !lv])],
+                15,
+            ) {
+                Some(true) => {
+                    // dbg!(res);
+                    // dbg!(res2);
+                    assert!(res);
+                    // assert!(res2);
+                    // self.sim.add(self.solver.sat_bitvet());
+                    // num_cex += 1;
+                    // if num_cex == 64 {
+                    //     num_cex = 0;
+                    //     self.sim.simulate(&self.ts.rel);
+                    //     self.setup_candicate();
+                    // }
+                }
+                Some(false) => {
+                    assert!(!res);
+                    // assert!(!res2);
                     // dbg!("can replace");
-                    replace.insert_lit(s, m);
+                    replace.insert_lit(lv, m);
+                    num_replace += 1;
+                    if num_replace >= NUM_RESTART {
+                        num_replace = 0;
+                        // num_timeout = 0;
+                        // dbg!("restart");
+                        // self.ts.replace(&replace, &mut self.rst);
+                        // self.restart();
+                    }
+                }
+                None => {
+                    // num_timeout += 1;
+                    // dbg!(num_timeout);
                 }
             }
+            v += 1;
         }
-        // for c in self.constraint.iter() {
-        //     dbg!(replace.map_lit(*c));
-        // }
-        let before = self.max_var();
-        self.replace(&replace, rst);
+        self.ts.replace(&replace, &mut self.rst);
+        self.ts.coi_refine(&mut self.rst);
+        self.ts.rearrange(&mut self.rst);
         info!(
             "frts eliminates {} out of {} vars in {:.2}s.",
-            *before - *self.max_var(),
+            *before - *self.ts.max_var(),
             *before,
             start.elapsed().as_secs_f32()
         );
+        (self.ts, self.rst)
     }
 }

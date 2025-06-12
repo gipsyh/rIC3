@@ -3,6 +3,7 @@ use super::{
     cdb::{CREF_NONE, CRef},
 };
 use giputils::gvec::Gvec;
+use log::debug;
 use logic_form::{LitMap, LitOrdVec, LitVec};
 use std::mem::take;
 
@@ -71,6 +72,7 @@ impl DagCnfSolver {
         if self.simplify.last_num_assign >= self.trail.len() {
             return;
         }
+        debug!("simplify statisfied");
         let lemmas = take(&mut self.cdb.lemmas);
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
         let learnt = take(&mut self.cdb.learnt);
@@ -81,6 +83,7 @@ impl DagCnfSolver {
     }
 
     fn simplify_subsume(&mut self, clauses: Gvec<CRef>) -> Gvec<CRef> {
+        debug!("simplify subsume");
         let mut clauses: Vec<(CRef, LitOrdVec)> = clauses
             .into_iter()
             .map(|cref| {

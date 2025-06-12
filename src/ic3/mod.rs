@@ -2,7 +2,7 @@ use crate::{
     Engine, Proof, Witness,
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
-    transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll},
+    transys::{Transys, TransysCtx, TransysIf, frts::FrTs, unroll::TransysUnroll},
 };
 use activity::Activity;
 use frame::{Frame, Frames};
@@ -353,7 +353,8 @@ impl IC3 {
         ts = ts.check_liveness_and_l2s(&mut rst);
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
-            ts.frts(&cfg, &mut rst);
+            let frts = FrTs::new(ts, cfg.rseed, rst);
+            (ts, rst) = frts.fr();
         }
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
@@ -410,7 +411,7 @@ impl IC3 {
         self.frame
             .invariant()
             .iter()
-            .map(|l| l.map_var(|l| self.rst[&l]))
+            .map(|l| l.map_var(|l| self.rst[l]))
             .collect()
     }
 }
