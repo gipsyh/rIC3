@@ -351,6 +351,10 @@ impl DagCnfSolver {
         while let Some(t) = self.cdb.temporary.pop() {
             self.detach_clause(t);
         }
+        if !self.value.v(self.constrain_act.lit()).is_none() {
+            self.trail.retain(|l| l.var() != self.constrain_act);
+            self.value.set_none(self.constrain_act);
+        }
     }
 
     #[inline]

@@ -20,15 +20,6 @@ impl DagCnfSolver {
     }
 
     #[inline]
-    pub fn assign_full(&mut self, lit: Lit, reason: CRef) -> bool {
-        if self.highest_level() == 0 && lit.var() == self.constrain_act {
-            return false;
-        }
-        self.assign(lit, reason);
-        true
-    }
-
-    #[inline]
     pub fn new_level(&mut self) {
         self.pos_in_trail.push(self.trail.len() as u32)
     }
@@ -96,10 +87,7 @@ impl DagCnfSolver {
                 self.backtrack(btl, true);
                 if learnt.len() == 1 {
                     debug_assert!(btl == 0);
-                    if !self.assign_full(learnt[0], CREF_NONE) {
-                        self.unsat_core.clear();
-                        return Some(false);
-                    }
+                    self.assign(learnt[0], CREF_NONE);
                 } else {
                     let mut kind = ClauseKind::Learnt;
                     for l in learnt.iter() {

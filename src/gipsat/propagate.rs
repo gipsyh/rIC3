@@ -88,10 +88,7 @@ impl DagCnfSolver {
                     return cid;
                 }
                 let assign = cref[0];
-                if !self.assign_full(assign, cid) {
-                    self.propagated -= 1;
-                    return cid;
-                }
+                self.assign(assign, cid);
                 w += 1;
             }
         }

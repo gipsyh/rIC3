@@ -55,15 +55,16 @@ pub struct DagCnfSolver {
 
 impl DagCnfSolver {
     pub fn new(dc: &DagCnf, rseed: u64) -> Self {
+        let constrain_act = Var::CONST;
         let mut solver = Self {
             dc: dc.clone(),
             cdb: Default::default(),
             watchers: Default::default(),
-            value: Default::default(),
+            value: VarAssign::new_with(constrain_act),
             trail: Default::default(),
             pos_in_trail: Default::default(),
-            level: Default::default(),
-            reason: Default::default(),
+            level: VarMap::new_with(constrain_act),
+            reason: VarMap::new_with(constrain_act),
             propagated: Default::default(),
             vsids: Default::default(),
             phase_saving: Default::default(),
@@ -73,7 +74,7 @@ impl DagCnfSolver {
             domain: Domain::new(),
             temporary_domain: Default::default(),
             prepared_vsids: false,
-            constrain_act: Var(0),
+            constrain_act,
             assump: Default::default(),
             constraint: Default::default(),
             statistic: Default::default(),
