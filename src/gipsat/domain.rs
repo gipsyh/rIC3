@@ -9,10 +9,9 @@ pub struct Domain {
 
 impl Domain {
     pub fn new() -> Self {
-        Self {
-            domain: Default::default(),
-            fixed: 0,
-        }
+        let mut domain = VarSet::new_with(Var::CONST);
+        domain.insert(Var::CONST);
+        Self { domain, fixed: 1 }
     }
 
     pub fn reserve(&mut self, var: Var) {
