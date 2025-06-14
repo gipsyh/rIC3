@@ -44,6 +44,7 @@ impl DerefMut for FrameLemma {
     }
 }
 
+#[derive(Default)]
 pub struct Frame {
     lemmas: Vec<FrameLemma>,
 }
@@ -72,6 +73,7 @@ impl DerefMut for Frame {
 
 pub struct Frames {
     frames: Vec<Frame>,
+    pub inf: Frame,
     pub early: usize,
     pub tmp_lit_set: LitSet,
 }
@@ -82,6 +84,7 @@ impl Frames {
         tmp_lit_set.reserve(ts.max_latch);
         Self {
             frames: Default::default(),
+            inf: Default::default(),
             early: 1,
             tmp_lit_set,
         }
@@ -90,18 +93,26 @@ impl Frames {
     #[inline]
     pub fn trivial_contained<'a>(
         &'a mut self,
-        frame: usize,
+        frame: Option<usize>,
         lemma: &LitOrdVec,
-    ) -> Option<(usize, &'a mut Option<ProofObligation>)> {
+    ) -> Option<(Option<usize>, &'a mut Option<ProofObligation>)> {
         for l in lemma.iter() {
             self.tmp_lit_set.insert(*l);
         }
-        for (i, fi) in self.frames.iter_mut().enumerate().skip(frame) {
-            for j in 0..fi.len() {
-                if fi[j].lemma.subsume_set(lemma, &self.tmp_lit_set) {
-                    self.tmp_lit_set.clear();
-                    return Some((i, &mut fi[j].po));
+        if let Some(frame) = frame {
+            for (i, fi) in self.frames.iter_mut().enumerate().skip(frame) {
+                for j in 0..fi.len() {
+                    if fi[j].lemma.subsume_set(lemma, &self.tmp_lit_set) {
+                        self.tmp_lit_set.clear();
+                        return Some((Some(i), &mut fi[j].po));
+                    }
                 }
+            }
+        }
+        for j in 0..self.inf.len() {
+            if self.inf[j].lemma.subsume_set(lemma, &self.tmp_lit_set) {
+                self.tmp_lit_set.clear();
+                return Some((None, &mut self.inf[j].po));
             }
         }
         self.tmp_lit_set.clear();
@@ -116,6 +127,7 @@ impl Frames {
                 invariants.push(cube.cube().clone());
             }
         }
+        invariants.extend(self.inf.iter().map(|c| c.cube()).cloned());
         invariants
     }
 
@@ -172,7 +184,7 @@ impl Frames {
     #[inline]
     pub fn statistic(&self, compact: bool) -> String {
         let mut s = String::new();
-        let total = self.frames.len();
+        let total = self.frames.len() + 1;
         s.write_fmt(format_args!("frames [{total}]: ")).unwrap();
         let frames_iter: Box<dyn Iterator<Item = &Frame>> = if compact && total > 50 {
             s.push_str("... ");
@@ -183,6 +195,7 @@ impl Frames {
         for f in frames_iter {
             s.write_fmt(format_args!("{} ", f.len())).unwrap();
         }
+        s.write_fmt(format_args!("{} ", self.inf.len())).unwrap();
         s
     }
 }
@@ -230,7 +243,7 @@ impl IC3 {
             self.frame[0].push(FrameLemma::new(lemma, po, None));
             return false;
         }
-        if contained_check && self.frame.trivial_contained(frame, &lemma).is_some() {
+        if contained_check && self.frame.trivial_contained(Some(frame), &lemma).is_some() {
             return false;
         }
         if self.ts.cube_subsume_init(lemma.cube()) {
@@ -277,11 +290,26 @@ impl IC3 {
             self.solvers[i].add_lemma(&clause);
         }
         if !self.cfg.ic3.no_pred_prop && self.level() == frame {
-            self.bad_solver.add_clause(&!lemma.cube());
+            self.bad_solver.add_clause(&clause);
         }
         self.frame[frame].push(FrameLemma::new(lemma, po, None));
         self.frame.early = self.frame.early.min(begin);
         inv_found
+    }
+
+    pub(super) fn add_inf_lemma(&mut self, lemma: LitVec) {
+        let lemma = LitOrdVec::new(lemma);
+        assert!(self.frame.trivial_contained(None, &lemma).is_none());
+        if self.ts.cube_subsume_init(lemma.cube()) {
+            assert!(self.cfg.ic3.inn);
+        }
+        let lastf = self.frame.last_mut().unwrap();
+        let olen = lastf.len();
+        lastf.retain(|l| !l.eq(&lemma));
+        assert!(lastf.len() + 1 == olen);
+        let clause = !lemma.cube();
+        self.inf_solver.add_lemma(&clause);
+        self.frame.inf.push(FrameLemma::new(lemma, None, None));
     }
 
     // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {

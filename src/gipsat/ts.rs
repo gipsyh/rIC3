@@ -9,7 +9,6 @@ use satif::Satif;
 
 pub struct TransysSolver {
     dcs: DagCnfSolver,
-    _id: Option<usize>,
     ts: Grc<TransysCtx>,
 
     relind: LitVec,
@@ -17,16 +16,15 @@ pub struct TransysSolver {
 }
 
 impl TransysSolver {
-    pub fn new(id: Option<usize>, ts: &Grc<TransysCtx>, rseed: u64) -> Self {
+    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool, rseed: u64) -> Self {
         let mut dcs = DagCnfSolver::new(&ts.rel, rseed);
-        if id.is_some() {
+        if assert_cst {
             for c in ts.constraints.iter() {
                 dcs.add_clause(&[*c]);
             }
         }
         dcs.simplify_satisfied();
         Self {
-            _id: id,
             dcs,
             ts: ts.clone(),
             relind: Default::default(),

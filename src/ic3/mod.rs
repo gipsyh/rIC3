@@ -29,6 +29,7 @@ pub struct IC3 {
     origin_ts: Transys,
     ts: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
+    inf_solver: TransysSolver,
     lift: TransysSolver,
     bad_ts: Grc<TransysCtx>,
     bad_solver: cadical::Solver,
@@ -59,8 +60,14 @@ impl IC3 {
         if !self.cfg.ic3.no_pred_prop {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
+            for lemma in self.frame.inf.iter() {
+                self.bad_solver.add_clause(&!lemma.cube());
+            }
         }
-        let mut solver = TransysSolver::new(Some(self.frame.len()), &self.ts, self.cfg.rseed);
+        let mut solver = TransysSolver::new(&self.ts, true, self.cfg.rseed);
+        for lemma in self.frame.inf.iter() {
+            solver.add_lemma(&!lemma.cube());
+        }
         for v in self.auxiliary_var.iter() {
             solver.add_domain(*v, true);
         }
@@ -152,9 +159,11 @@ impl IC3 {
                     return Some(false);
                 }
             }
-            if let Some((bf, _)) = self.frame.trivial_contained(po.frame, &po.lemma) {
-                po.push_to(bf + 1);
-                self.add_obligation(po);
+            if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.lemma) {
+                if let Some(bf) = bf {
+                    po.push_to(bf + 1);
+                    self.add_obligation(po);
+                }
                 continue;
             }
             debug!("{}", self.frame.statistic(false));
@@ -271,8 +280,9 @@ impl IC3 {
     }
 
     fn propagate(&mut self, from: Option<usize>) -> bool {
+        let level = self.level();
         let from = from.unwrap_or(self.frame.early).max(1);
-        for frame_idx in from..self.level() {
+        for frame_idx in from..level {
             self.frame[frame_idx].sort_by_key(|x| x.len());
             let frame = self.frame[frame_idx].clone();
             for mut lemma in frame {
@@ -319,6 +329,19 @@ impl IC3 {
                 return true;
             }
         }
+        self.frame[level].sort_by_key(|x| x.len());
+        let lastf = self.frame[level].clone();
+        for mut lemma in lastf {
+            if self.frame[level].iter().all(|l| l.ne(&lemma)) {
+                continue;
+            }
+            if self.inf_solver.inductive(&lemma, true) {
+                if let Some(po) = &mut lemma.po {
+                    self.obligations.remove(po);
+                }
+                self.add_inf_lemma(lemma.cube().clone());
+            }
+        }
         self.frame.early = self.level();
         false
     }
@@ -340,7 +363,7 @@ impl IC3 {
                 return false;
             }
             self.ts.constraints.push(!bad);
-            self.lift = TransysSolver::new(None, &self.ts, self.cfg.rseed);
+            self.lift = TransysSolver::new(&self.ts, false, self.cfg.rseed);
         }
         true
     }
@@ -374,8 +397,9 @@ impl IC3 {
         let bad_ts = Grc::new(bad_ts.ctx());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
-        let lift = TransysSolver::new(None, &ts, cfg.rseed);
-        let bad_lift = TransysSolver::new(None, &bad_ts, cfg.rseed);
+        let inf_solver = TransysSolver::new(&ts, true, cfg.rseed);
+        let lift = TransysSolver::new(&ts, false, cfg.rseed);
+        let bad_lift = TransysSolver::new(&bad_ts, false, cfg.rseed);
         let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
         } else {
@@ -388,6 +412,7 @@ impl IC3 {
             ts,
             activity,
             solvers: Vec::new(),
+            inf_solver,
             bad_ts,
             bad_solver: cadical::Solver::new(),
             bad_lift,
@@ -423,6 +448,7 @@ impl Engine for IC3 {
         }
         loop {
             let start = Instant::now();
+            debug!("blocking phase begin");
             loop {
                 match self.block() {
                     Some(false) => {
@@ -437,6 +463,7 @@ impl Engine for IC3 {
                     _ => (),
                 }
                 if let Some((bad, inputs, depth)) = self.get_bad() {
+                    debug!("bad state found in last frame");
                     let bad = LitOrdVec::new(bad);
                     self.add_obligation(ProofObligation::new(
                         self.level(),
@@ -449,6 +476,7 @@ impl Engine for IC3 {
                     break;
                 }
             }
+            debug!("blocking phase end");
             let blocked_time = start.elapsed();
             self.filog.log(Level::Info, self.frame.statistic(true));
             self.statistic.overall_block_time += blocked_time;
