@@ -3,7 +3,6 @@ use super::{
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
 use logic_form::{Lbool, Lit};
-use std::time::{Duration, Instant};
 
 impl DagCnfSolver {
     #[inline]
@@ -44,13 +43,12 @@ impl DagCnfSolver {
     pub fn search_with_restart(
         &mut self,
         assumption: &[Lit],
-        limit: Option<Duration>,
+        limit: Option<usize>,
     ) -> Option<bool> {
         let mut restarts = 0;
-        let start = Instant::now();
         loop {
             if let Some(limit) = limit
-                && start.elapsed() > limit
+                && restarts > limit as u32
             {
                 return None;
             }

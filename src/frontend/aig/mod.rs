@@ -24,7 +24,7 @@ impl From<&Transys> for Aig {
             map.insert(f, AigEdge::new(t, false));
         }
         for (v, rel) in ts.rel.iter() {
-            if ts.rel.has_rel(v) {
+            if ts.rel.has_rel(v) && !v.is_constant() {
                 assert!(!map.contains_key(&v));
                 let mut r = Vec::new();
                 for rel in rel {
