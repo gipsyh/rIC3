@@ -274,27 +274,6 @@ impl DagCnfSolver {
     }
 
     #[inline]
-    pub fn domain_has(&self, var: Var) -> bool {
-        self.domain.has(var)
-    }
-
-    pub fn set_domain(&mut self, domain: impl IntoIterator<Item = Lit>) {
-        self.reset();
-        self.temporary_domain = true;
-        self.domain
-            .enable_local(domain.into_iter().map(|l| l.var()), &self.dc, &self.value);
-        assert!(!self.domain.has(self.constrain_act));
-        self.domain.insert(self.constrain_act);
-        self.vsids.enable_bucket = true;
-        self.vsids.bucket.clear();
-        self.push_to_vsids();
-    }
-
-    pub fn unset_domain(&mut self) {
-        self.temporary_domain = false;
-    }
-
-    #[inline]
     #[allow(unused)]
     pub fn assert_value(&mut self, lit: Lit) -> Option<bool> {
         self.reset();
@@ -307,7 +286,7 @@ impl DagCnfSolver {
     }
 
     #[allow(unused)]
-    pub fn sat_bitvet(&mut self) -> BitVec {
+    pub fn sat_value_bitvet(&mut self) -> BitVec {
         let mut res = BitVec::new();
         for v in Var::CONST..=self.max_var() {
             if let Some(v) = self.sat_value(v.lit()) {
@@ -317,6 +296,12 @@ impl DagCnfSolver {
             }
         }
         res
+    }
+
+    #[allow(unused)]
+    pub fn sat_value_iter(&self) -> impl Iterator<Item = &'_ Lit> {
+        let constrain_act = self.constrain_act;
+        self.trail.iter().filter(move |l| l.var() != constrain_act)
     }
 }
 

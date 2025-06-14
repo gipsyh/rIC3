@@ -351,6 +351,7 @@ impl IC3 {
         let ots = ts.clone();
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
+        let statistic = Statistic::new(cfg.model.to_str().unwrap());
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
             let frts = FrTs::new(ts, cfg.rseed, rst);
@@ -371,7 +372,6 @@ impl IC3 {
         let origin_ts = ts.clone();
         let ts = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
-        let statistic = Statistic::new(cfg.model.to_str().unwrap());
         let activity = Activity::new(&ts);
         let frame = Frames::new(&ts);
         let lift = TransysSolver::new(None, &ts, cfg.rseed);

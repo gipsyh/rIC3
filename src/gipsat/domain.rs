@@ -1,5 +1,5 @@
 use super::DagCnfSolver;
-use logic_form::{DagCnf, Var, VarAssign, VarSet};
+use logic_form::{DagCnf, Lit, Var, VarAssign, VarSet};
 use std::ops::{Deref, DerefMut};
 
 pub struct Domain {
@@ -99,6 +99,27 @@ impl DagCnfSolver {
             }
         }
         self.domain.fixed = self.domain.len();
+    }
+
+    #[inline]
+    pub fn domain_has(&self, var: Var) -> bool {
+        self.domain.has(var)
+    }
+
+    pub fn set_domain(&mut self, domain: impl IntoIterator<Item = Lit>) {
+        self.reset();
+        self.temporary_domain = true;
+        self.domain
+            .enable_local(domain.into_iter().map(|l| l.var()), &self.dc, &self.value);
+        assert!(!self.domain.has(self.constrain_act));
+        self.domain.insert(self.constrain_act);
+        self.vsids.enable_bucket = true;
+        self.vsids.bucket.clear();
+        self.push_to_vsids();
+    }
+
+    pub fn unset_domain(&mut self) {
+        self.temporary_domain = false;
     }
 
     #[inline]
