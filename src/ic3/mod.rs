@@ -11,7 +11,7 @@ use log::{Level, debug, info};
 use logic_form::{LitOrdVec, LitVec, Var, VarVMap};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use satif::Satif;
 use statistic::Statistic;
 use std::time::Instant;
@@ -329,7 +329,7 @@ impl IC3 {
                 return true;
             }
         }
-        self.frame[level].sort_by_key(|x| x.len());
+        self.frame[level].shuffle(&mut self.rng);
         let lastf = self.frame[level].clone();
         for mut lemma in lastf {
             if self.frame[level].iter().all(|l| l.ne(&lemma)) {
