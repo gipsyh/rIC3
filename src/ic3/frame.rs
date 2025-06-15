@@ -131,12 +131,13 @@ impl Frames {
         invariants
     }
 
-    pub fn _parent_lemma(&self, lemma: &LitOrdVec, frame: usize) -> Option<LitOrdVec> {
+    pub fn parent_lemma(&self, lemma: &[Lit], frame: usize) -> Option<LitOrdVec> {
         if frame == 1 {
             return None;
         }
+        let lemma = LitOrdVec::new(LitVec::from(lemma));
         for c in self.frames[frame - 1].iter() {
-            if c.subsume(lemma) {
+            if c.subsume(&lemma) {
                 return Some(c.lemma.clone());
             }
         }
