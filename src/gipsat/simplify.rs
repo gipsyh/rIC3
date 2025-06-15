@@ -4,7 +4,7 @@ use super::{
 };
 use giputils::gvec::Gvec;
 use log::debug;
-use logic_form::{LitMap, LitOrdVec, LitVec};
+use logic_form::{LitOrdVec, LitVec, VarMap};
 use std::mem::take;
 
 pub struct Simplify {
@@ -93,10 +93,10 @@ impl DagCnfSolver {
             })
             .collect();
         clauses.sort_by_key(|(_, l)| l.len());
-        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.dc.max_var());
+        let mut occurs: VarMap<Vec<usize>> = VarMap::new_with(self.dc.max_var());
         for (i, cls) in clauses.iter().enumerate() {
             for l in cls.1.iter() {
-                occurs[*l].push(i);
+                occurs[l.var()].push(i);
             }
         }
         for cls_idx in 0..clauses.len() {
