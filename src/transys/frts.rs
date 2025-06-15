@@ -6,6 +6,7 @@ use giputils::hash::GHashMap;
 use log::info;
 use logic_form::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simulate::DagCnfSimulation};
 use rand::{SeedableRng, rngs::StdRng};
+use satif::Satif;
 use std::time::Instant;
 
 #[allow(unused)]
@@ -15,15 +16,19 @@ pub struct FrTs {
     map: VarLMap,
     eqc: VarVMap,
     solver: DagCnfSolver,
+    constraint: Vec<LitVec>,
     rseed: u64,
     rng: StdRng,
     rst: VarVMap,
 }
 
 impl FrTs {
-    pub fn new(ts: Transys, rseed: u64, rst: VarVMap) -> Self {
+    pub fn new(ts: Transys, rseed: u64, rst: VarVMap, constraint: Vec<LitVec>) -> Self {
         let sim = DagCnfSimulation::new(1000, &ts.rel);
-        let solver = DagCnfSolver::new(&ts.rel, rseed);
+        let mut solver = DagCnfSolver::new(&ts.rel, rseed);
+        for cls in constraint.iter() {
+            solver.add_clause(cls);
+        }
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
@@ -54,6 +59,7 @@ impl FrTs {
             map,
             eqc,
             solver,
+            constraint,
             rseed,
             rst,
             rng,

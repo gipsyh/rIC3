@@ -377,7 +377,7 @@ impl IC3 {
         let statistic = Statistic::new(cfg.model.to_str().unwrap());
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
-            let frts = FrTs::new(ts, cfg.rseed, rst);
+            let frts = FrTs::new(ts, cfg.rseed, rst, vec![]);
             (ts, rst) = frts.fr();
         }
         let mut uts = TransysUnroll::new(&ts);
