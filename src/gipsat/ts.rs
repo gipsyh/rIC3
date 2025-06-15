@@ -3,6 +3,7 @@ use crate::{
     transys::{TransysCtx, TransysIf},
 };
 use giputils::grc::Grc;
+use log::error;
 use logic_form::{Lit, LitVec, Var};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use satif::Satif;
@@ -65,7 +66,6 @@ impl TransysSolver {
         &self.dcs.assump
     }
 
-    #[allow(unused)]
     pub fn get_pred(
         &mut self,
         solver: &impl Satif,
@@ -101,7 +101,17 @@ impl TransysSolver {
             }
             latchs.shuffle(&mut self.rng);
             let olen = latchs.len();
-            latchs = self.minimal_pred(&inputs, &latchs, &cls).unwrap();
+            if let Some(n) = self.minimal_pred(&inputs, &latchs, &cls) {
+                latchs = n;
+            } else {
+                let fail = target
+                    .iter()
+                    .chain(self.ts.constraints.iter())
+                    .find(|l| !self.sat_value(**l).unwrap())
+                    .unwrap();
+                error!("assert {fail} failed in lift, please report this bug");
+                panic!();
+            };
             if latchs.len() == olen || !strengthen {
                 break;
             }

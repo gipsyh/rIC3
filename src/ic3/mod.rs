@@ -2,6 +2,7 @@ use crate::{
     Engine, Proof, Witness,
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
+    ic3::frame::FrameLemma,
     transys::{Transys, TransysCtx, TransysIf, frts::FrTs, unroll::TransysUnroll},
 };
 use activity::Activity;
@@ -329,21 +330,54 @@ impl IC3 {
                 return true;
             }
         }
-        self.frame[level].shuffle(&mut self.rng);
-        let lastf = self.frame[level].clone();
-        for mut lemma in lastf {
-            if self.frame[level].iter().all(|l| l.ne(&lemma)) {
-                continue;
-            }
+        self.frame.early = self.level();
+        false
+    }
+
+    fn propagete_to_inf_rec(&mut self, lastf: &mut Vec<FrameLemma>, ctp: LitVec) -> bool {
+        let ctp = LitOrdVec::new(ctp);
+        let Some(lidx) = lastf.iter().position(|l| l.subsume(&ctp)) else {
+            return false;
+        };
+        let mut lemma = lastf.swap_remove(lidx);
+        loop {
             if self.inf_solver.inductive(&lemma, true) {
                 if let Some(po) = &mut lemma.po {
                     self.obligations.remove(po);
                 }
                 self.add_inf_lemma(lemma.cube().clone());
+                return true;
+            } else {
+                let target = self.ts.lits_next(lemma.cube());
+                let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
+                if !self.propagete_to_inf_rec(lastf, ctp) {
+                    return false;
+                }
             }
         }
-        self.frame.early = self.level();
-        false
+    }
+
+    fn propagete_to_inf(&mut self) {
+        let level = self.level();
+        self.frame[level].shuffle(&mut self.rng);
+        let mut lastf = self.frame[level].clone();
+        while let Some(mut lemma) = lastf.pop() {
+            loop {
+                if self.inf_solver.inductive(&lemma, true) {
+                    if let Some(po) = &mut lemma.po {
+                        self.obligations.remove(po);
+                    }
+                    self.add_inf_lemma(lemma.cube().clone());
+                    break;
+                } else {
+                    let target = self.ts.lits_next(lemma.cube());
+                    let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
+                    if !self.propagete_to_inf_rec(&mut lastf, ctp) {
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     fn base(&mut self) -> bool {
@@ -364,6 +398,7 @@ impl IC3 {
             }
             self.ts.constraints.push(!bad);
             self.lift = TransysSolver::new(&self.ts, false, self.cfg.rseed);
+            self.inf_solver = TransysSolver::new(&self.ts, true, self.cfg.rseed);
         }
         true
     }
@@ -488,6 +523,7 @@ impl Engine for IC3 {
                 self.verify();
                 return Some(true);
             }
+            self.propagete_to_inf();
         }
     }
 
