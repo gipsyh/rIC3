@@ -24,7 +24,6 @@ impl TransysSolver {
                 dcs.add_clause(&[*c]);
             }
         }
-        dcs.simplify_satisfied();
         Self {
             dcs,
             ts: ts.clone(),

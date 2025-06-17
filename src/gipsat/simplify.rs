@@ -5,7 +5,7 @@ use super::{
 use giputils::gvec::Gvec;
 use log::debug;
 use logic_form::{LitOrdVec, LitVec, VarMap};
-use std::mem::take;
+use std::{mem::take, time::Instant};
 
 pub struct Simplify {
     pub last_num_assign: usize,
@@ -29,18 +29,17 @@ impl DagCnfSolver {
     pub fn simplify(&mut self) {
         assert!(self.highest_level() == 0);
         assert!(self.propagate() == CREF_NONE);
-        if self.statistic.num_solve > self.simplify.last_simplify + 1000 {
+        if self.statistic.num_solve > self.simplify.last_simplify + 100 {
             if self.simplify.last_num_assign < self.trail.len() {
                 self.simplify_satisfied();
-                self.simplify.last_simplify = self.statistic.num_solve;
             }
             if self.simplify.last_num_lemma + 1000 < self.cdb.lemmas.len() {
-                self.simplify_satisfied();
                 let lemmas = take(&mut self.cdb.lemmas);
                 self.cdb.lemmas = self.simplify_subsume(lemmas);
                 self.simplify.last_num_lemma = self.cdb.lemmas.len();
             }
             self.garbage_collect();
+            self.simplify.last_simplify = self.statistic.num_solve;
         }
     }
 
@@ -72,7 +71,7 @@ impl DagCnfSolver {
         if self.simplify.last_num_assign >= self.trail.len() {
             return;
         }
-        debug!("simplify statisfied");
+        let start = Instant::now();
         let lemmas = take(&mut self.cdb.lemmas);
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
         let learnt = take(&mut self.cdb.learnt);
@@ -80,6 +79,10 @@ impl DagCnfSolver {
         let trans = take(&mut self.cdb.trans);
         self.cdb.trans = self.simplify_satisfied_clauses(trans);
         self.simplify.last_num_assign = self.trail.len();
+        debug!(
+            "gipsat simplifies statisfied clauses in {:?}",
+            start.elapsed()
+        );
     }
 
     fn simplify_subsume(&mut self, clauses: Gvec<CRef>) -> Gvec<CRef> {
