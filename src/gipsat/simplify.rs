@@ -4,7 +4,7 @@ use super::{
 };
 use giputils::gvec::Gvec;
 use log::debug;
-use logic_form::{LitOrdVec, LitVec, VarMap};
+use logic_form::{Lbool, LitOrdVec, LitVec, VarMap};
 use std::{mem::take, time::Instant};
 
 #[derive(Clone)]
@@ -46,21 +46,24 @@ impl DagCnfSolver {
 
     pub fn simplify_satisfied_clauses(&mut self, mut clauses: Gvec<CRef>) -> Gvec<CRef> {
         let mut i = 0;
-        while i < clauses.len() {
+        'm: while i < clauses.len() {
             let cid = clauses[i];
-            if self.clause_satisfied(cid) {
-                clauses.swap_remove(i);
-                self.detach_clause(cid);
-                continue;
-            }
-            let mut j = 2;
             let mut cls = self.cdb.get(cid);
+            let mut j = 0;
             while j < cls.len() {
-                if self.value.v(cls[j]).is_false() {
-                    cls.swap_remove(j);
-                    continue;
+                match self.value.v(cls[j]) {
+                    Lbool::TRUE => {
+                        clauses.swap_remove(i);
+                        self.detach_clause(cid);
+                        continue 'm;
+                    }
+                    Lbool::FALSE => {
+                        cls.swap_remove(j);
+                    }
+                    _ => {
+                        j += 1;
+                    }
                 }
-                j += 1;
             }
             i += 1;
         }

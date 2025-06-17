@@ -326,17 +326,6 @@ impl Default for ClauseDB {
 }
 
 impl DagCnfSolver {
-    #[inline]
-    pub fn clause_satisfied(&self, cls: CRef) -> bool {
-        let cls = self.cdb.get(cls);
-        for i in 0..cls.len() {
-            if self.value.v(cls[i]).is_true() {
-                return true;
-            }
-        }
-        false
-    }
-
     pub fn attach_clause(&mut self, clause: &[Lit], kind: ClauseKind) -> CRef {
         debug_assert!(clause.len() > 1);
         let id = self.cdb.alloc(clause, kind);
