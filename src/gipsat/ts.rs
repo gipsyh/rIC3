@@ -8,6 +8,7 @@ use logic_form::{Lit, LitVec, Var};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use satif::Satif;
 
+#[derive(Clone)]
 pub struct TransysSolver {
     dcs: DagCnfSolver,
     ts: Grc<TransysCtx>,

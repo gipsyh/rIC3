@@ -14,7 +14,7 @@ pub enum Mark {
     Failed,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Analyze {
     mark: VarMap<Mark>,
     clear: Vec<Lit>,

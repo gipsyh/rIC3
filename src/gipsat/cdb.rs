@@ -139,6 +139,7 @@ impl From<usize> for CRef {
     }
 }
 
+#[derive(Clone)]
 struct Allocator {
     data: Vec<Data>,
     wasted: usize,
@@ -237,6 +238,7 @@ pub enum ClauseKind {
     Temporary,
 }
 
+#[derive(Clone)]
 pub struct ClauseDB {
     allocator: Allocator,
     pub lemmas: Gvec<CRef>,
@@ -367,9 +369,6 @@ impl DagCnfSolver {
         if (full && self.cdb.learnt.len() * 15 >= self.cdb.trans.len())
             || self.cdb.learnt.len() >= self.cdb.trans.len()
         {
-            // dbg!(self.highest_level());
-            // dbg!(self.cdb.learnt.len());
-            // dbg!(self.cdb.trans.len());
             self.cdb.learnt.sort_unstable_by(|a, b| {
                 self.cdb
                     .allocator
@@ -389,7 +388,6 @@ impl DagCnfSolver {
                 }
             }
             self.garbage_collect();
-            // dbg!(self.cdb.learnt.len());
         }
     }
 

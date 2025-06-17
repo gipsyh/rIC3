@@ -7,6 +7,7 @@ use log::debug;
 use logic_form::{LitOrdVec, LitVec, VarMap};
 use std::{mem::take, time::Instant};
 
+#[derive(Clone)]
 pub struct Simplify {
     pub last_num_assign: usize,
     pub last_simplify: usize,
@@ -72,15 +73,22 @@ impl DagCnfSolver {
             return;
         }
         let start = Instant::now();
+        let mut simplified = 0;
         let lemmas = take(&mut self.cdb.lemmas);
+        simplified += lemmas.len();
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
+        simplified -= self.cdb.lemmas.len();
         let learnt = take(&mut self.cdb.learnt);
+        simplified += learnt.len();
         self.cdb.learnt = self.simplify_satisfied_clauses(learnt);
+        simplified -= self.cdb.learnt.len();
         let trans = take(&mut self.cdb.trans);
+        simplified += trans.len();
         self.cdb.trans = self.simplify_satisfied_clauses(trans);
+        simplified -= self.cdb.trans.len();
         self.simplify.last_num_assign = self.trail.len();
         debug!(
-            "gipsat simplifies statisfied clauses in {:?}",
+            "gipsat simplifies {simplified} statisfied clauses in {:?}",
             start.elapsed()
         );
     }

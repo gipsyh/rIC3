@@ -4,7 +4,7 @@ use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
 use std::ops::{Index, MulAssign};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct BinaryHeap {
     heap: Gvec<Var>,
     pos: VarMap<OptionU32>,
@@ -98,6 +98,7 @@ impl BinaryHeap {
     }
 }
 
+#[derive(Clone)]
 pub struct Activity {
     activity: VarMap<f64>,
     act_inc: f64,
@@ -184,6 +185,7 @@ impl Default for Activity {
     }
 }
 
+#[derive(Clone)]
 pub struct Vsids {
     pub activity: Activity,
     pub heap: BinaryHeap,
@@ -243,6 +245,7 @@ impl Default for Vsids {
     }
 }
 
+#[derive(Clone)]
 pub struct Bucket {
     buckets: Gvec<Gvec<Var>>,
     in_bucket: VarMap<bool>,

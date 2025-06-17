@@ -49,7 +49,10 @@ impl DagCnfSolver {
         let mut restarts = 0;
         loop {
             if restarts > 0 && restarts % 10 == 0 {
-                debug!("gipsat restarted {restarts} times");
+                debug!(
+                    "gipsat restarted {restarts} times with {} learnt clauses",
+                    self.cdb.num_leanrt()
+                );
             }
             if let Some(limit) = limit
                 && restarts > limit as u32

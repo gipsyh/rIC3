@@ -26,6 +26,7 @@ use std::time::Instant;
 pub use ts::*;
 use vsids::Vsids;
 
+#[derive(Clone)]
 pub struct DagCnfSolver {
     cdb: ClauseDB,
     watchers: Watchers,
