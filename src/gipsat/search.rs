@@ -2,6 +2,7 @@ use super::{
     DagCnfSolver,
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
+use log::debug;
 use logic_form::{Lbool, Lit};
 
 impl DagCnfSolver {
@@ -47,6 +48,9 @@ impl DagCnfSolver {
     ) -> Option<bool> {
         let mut restarts = 0;
         loop {
+            if restarts > 0 && restarts % 10 == 0 {
+                debug!("gipsat restarted {restarts} times");
+            }
             if let Some(limit) = limit
                 && restarts > limit as u32
             {

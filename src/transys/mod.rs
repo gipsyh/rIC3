@@ -68,11 +68,15 @@ pub trait TransysIf {
     }
 
     #[inline]
-    fn print_info(&self) {
-        println!("num input: {}", self.input().count());
-        println!("num latch: {}", self.latch().count());
-        println!("trans size: {}", self.trans().flatten().count());
-        println!("num constraint: {}", self.constraint().count());
+    fn statistic(&self) -> String {
+        format!(
+            "{} vars, {} inputs, {} latches, {} clauses, {} constraints",
+            self.max_var(),
+            self.input().count(),
+            self.latch().count(),
+            self.trans().count(),
+            self.constraint().count(),
+        )
     }
 
     fn add_input(&mut self, _input: Var) {

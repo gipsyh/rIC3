@@ -11,6 +11,7 @@ use rIC3::{
     kind::Kind,
     portfolio::portfolio_main,
     rlive::Rlive,
+    transys::TransysIf,
 };
 use std::{
     env, error, fs,
@@ -49,6 +50,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     };
     let ts = aig.ts();
+    info!("origin ts has {}", ts.statistic());
     if cfg.preproc.sec {
         panic!("Error: sec not support");
     }
