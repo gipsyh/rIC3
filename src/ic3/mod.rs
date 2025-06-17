@@ -67,7 +67,7 @@ impl IC3 {
         }
         let mut solver = TransysSolver::new(&self.ts, true, self.cfg.rseed);
         for lemma in self.frame.inf.iter() {
-            solver.add_lemma(&!lemma.cube());
+            solver.add_clause(&!lemma.cube());
         }
         for v in self.auxiliary_var.iter() {
             solver.add_domain(*v, true);

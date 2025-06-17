@@ -34,11 +34,6 @@ impl TransysSolver {
     }
 
     #[inline]
-    pub fn add_lemma(&mut self, lemma: &[Lit]) {
-        self.dcs.add_clause(lemma);
-    }
-
-    #[inline]
     pub fn minimal_pred(
         &mut self,
         inputs: &[Lit],
@@ -221,9 +216,8 @@ impl Satif for TransysSolver {
     }
 
     #[inline]
-    fn add_clause(&mut self, _clause: &[Lit]) {
-        todo!();
-        // self.dcs.add_clause(clause);
+    fn add_clause(&mut self, clause: &[Lit]) {
+        self.dcs.add_clause(clause);
     }
 
     #[inline]
