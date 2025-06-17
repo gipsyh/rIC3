@@ -1,5 +1,6 @@
 use super::IC3;
 use giputils::hash::GHashSet;
+use log::debug;
 use logic_form::{LitOrdVec, LitVec, Var};
 use rand::{Rng, seq::SliceRandom};
 use satif::Satif;
@@ -7,6 +8,7 @@ use std::time::Instant;
 
 impl IC3 {
     pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
+        debug!("getting bad state in last frame");
         self.statistic.num_get_bad += 1;
         let start = Instant::now();
         if !self.cfg.ic3.no_pred_prop {
