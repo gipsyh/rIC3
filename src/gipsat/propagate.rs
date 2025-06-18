@@ -18,7 +18,7 @@ impl Watcher {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Watchers {
     pub wtrs: LitMap<Gvec<Watcher>>,
 }

@@ -22,9 +22,11 @@ use rand::{SeedableRng, rngs::StdRng};
 use satif::Satif;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
+use std::time::Instant;
 pub use ts::*;
 use vsids::Vsids;
 
+#[derive(Clone)]
 pub struct DagCnfSolver {
     cdb: ClauseDB,
     watchers: Watchers,
@@ -212,10 +214,12 @@ impl DagCnfSolver {
             return Some(false);
         }
         self.statistic.num_solve += 1;
+        let start = Instant::now();
         let mut assumption;
         if self.propagate() != CREF_NONE {
             self.trivial_unsat = true;
             self.unsat_core.clear();
+            self.statistic.avg_solve_time += start.elapsed();
             return Some(false);
         }
         let assump = if !constraint.is_empty() {
@@ -234,6 +238,7 @@ impl DagCnfSolver {
                 true,
             ) {
                 self.unsat_core.clear();
+                self.statistic.avg_solve_time += start.elapsed();
                 return Some(false);
             };
             &assumption
@@ -243,7 +248,9 @@ impl DagCnfSolver {
         };
         self.clean_leanrt(true);
         self.simplify();
-        self.search_with_restart(assump, limit)
+        let res = self.search_with_restart(assump, limit);
+        self.statistic.avg_solve_time += start.elapsed();
+        res
     }
 
     pub fn solve_with_restart_limit(

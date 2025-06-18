@@ -139,6 +139,7 @@ impl From<usize> for CRef {
     }
 }
 
+#[derive(Clone)]
 struct Allocator {
     data: Vec<Data>,
     wasted: usize,
@@ -237,6 +238,7 @@ pub enum ClauseKind {
     Temporary,
 }
 
+#[derive(Clone)]
 pub struct ClauseDB {
     allocator: Allocator,
     pub lemmas: Gvec<CRef>,
@@ -324,17 +326,6 @@ impl Default for ClauseDB {
 }
 
 impl DagCnfSolver {
-    #[inline]
-    pub fn clause_satisfied(&self, cls: CRef) -> bool {
-        let cls = self.cdb.get(cls);
-        for i in 0..cls.len() {
-            if self.value.v(cls[i]).is_true() {
-                return true;
-            }
-        }
-        false
-    }
-
     pub fn attach_clause(&mut self, clause: &[Lit], kind: ClauseKind) -> CRef {
         debug_assert!(clause.len() > 1);
         let id = self.cdb.alloc(clause, kind);
@@ -367,9 +358,6 @@ impl DagCnfSolver {
         if (full && self.cdb.learnt.len() * 15 >= self.cdb.trans.len())
             || self.cdb.learnt.len() >= self.cdb.trans.len()
         {
-            // dbg!(self.highest_level());
-            // dbg!(self.cdb.learnt.len());
-            // dbg!(self.cdb.trans.len());
             self.cdb.learnt.sort_unstable_by(|a, b| {
                 self.cdb
                     .allocator
@@ -389,7 +377,6 @@ impl DagCnfSolver {
                 }
             }
             self.garbage_collect();
-            // dbg!(self.cdb.learnt.len());
         }
     }
 

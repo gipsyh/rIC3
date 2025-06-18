@@ -220,6 +220,11 @@ impl IC3 {
         self.statistic.num_mic += 1;
         let mut cex = Vec::new();
         self.activity.sort_by_activity(&mut cube, true);
+        let parent = self.frame.parent_lemma(&cube, frame);
+        if let Some(parent) = parent {
+            let parent = GHashSet::from_iter(parent);
+            cube.sort_by_key(|x| parent.contains(x));
+        }
         let mut keep = GHashSet::new();
         let mut i = 0;
         while i < cube.len() {

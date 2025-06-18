@@ -4,9 +4,10 @@ use super::{
 };
 use giputils::gvec::Gvec;
 use log::debug;
-use logic_form::{LitMap, LitOrdVec, LitVec};
-use std::mem::take;
+use logic_form::{Lbool, LitOrdVec, LitVec, VarMap};
+use std::{mem::take, time::Instant};
 
+#[derive(Clone)]
 pub struct Simplify {
     pub last_num_assign: usize,
     pub last_simplify: usize,
@@ -29,38 +30,40 @@ impl DagCnfSolver {
     pub fn simplify(&mut self) {
         assert!(self.highest_level() == 0);
         assert!(self.propagate() == CREF_NONE);
-        if self.statistic.num_solve > self.simplify.last_simplify + 1000 {
+        if self.statistic.num_solve > self.simplify.last_simplify + 100 {
             if self.simplify.last_num_assign < self.trail.len() {
                 self.simplify_satisfied();
-                self.simplify.last_simplify = self.statistic.num_solve;
             }
             if self.simplify.last_num_lemma + 1000 < self.cdb.lemmas.len() {
-                self.simplify_satisfied();
                 let lemmas = take(&mut self.cdb.lemmas);
                 self.cdb.lemmas = self.simplify_subsume(lemmas);
                 self.simplify.last_num_lemma = self.cdb.lemmas.len();
             }
             self.garbage_collect();
+            self.simplify.last_simplify = self.statistic.num_solve;
         }
     }
 
     pub fn simplify_satisfied_clauses(&mut self, mut clauses: Gvec<CRef>) -> Gvec<CRef> {
         let mut i = 0;
-        while i < clauses.len() {
+        'm: while i < clauses.len() {
             let cid = clauses[i];
-            if self.clause_satisfied(cid) {
-                clauses.swap_remove(i);
-                self.detach_clause(cid);
-                continue;
-            }
-            let mut j = 2;
             let mut cls = self.cdb.get(cid);
+            let mut j = 0;
             while j < cls.len() {
-                if self.value.v(cls[j]).is_false() {
-                    cls.swap_remove(j);
-                    continue;
+                match self.value.v(cls[j]) {
+                    Lbool::TRUE => {
+                        clauses.swap_remove(i);
+                        self.detach_clause(cid);
+                        continue 'm;
+                    }
+                    Lbool::FALSE => {
+                        cls.swap_remove(j);
+                    }
+                    _ => {
+                        j += 1;
+                    }
                 }
-                j += 1;
             }
             i += 1;
         }
@@ -72,14 +75,25 @@ impl DagCnfSolver {
         if self.simplify.last_num_assign >= self.trail.len() {
             return;
         }
-        debug!("simplify statisfied");
+        let start = Instant::now();
+        let mut simplified = 0;
         let lemmas = take(&mut self.cdb.lemmas);
+        simplified += lemmas.len();
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
+        simplified -= self.cdb.lemmas.len();
         let learnt = take(&mut self.cdb.learnt);
+        simplified += learnt.len();
         self.cdb.learnt = self.simplify_satisfied_clauses(learnt);
+        simplified -= self.cdb.learnt.len();
         let trans = take(&mut self.cdb.trans);
+        simplified += trans.len();
         self.cdb.trans = self.simplify_satisfied_clauses(trans);
+        simplified -= self.cdb.trans.len();
         self.simplify.last_num_assign = self.trail.len();
+        debug!(
+            "gipsat simplifies {simplified} statisfied clauses in {:?}",
+            start.elapsed()
+        );
     }
 
     fn simplify_subsume(&mut self, clauses: Gvec<CRef>) -> Gvec<CRef> {
@@ -93,10 +107,10 @@ impl DagCnfSolver {
             })
             .collect();
         clauses.sort_by_key(|(_, l)| l.len());
-        let mut occurs: LitMap<Vec<usize>> = LitMap::new_with(self.dc.max_var());
+        let mut occurs: VarMap<Vec<usize>> = VarMap::new_with(self.dc.max_var());
         for (i, cls) in clauses.iter().enumerate() {
             for l in cls.1.iter() {
-                occurs[*l].push(i);
+                occurs[l.var()].push(i);
             }
         }
         for cls_idx in 0..clauses.len() {

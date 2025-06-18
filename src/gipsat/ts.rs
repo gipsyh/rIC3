@@ -3,10 +3,12 @@ use crate::{
     transys::{TransysCtx, TransysIf},
 };
 use giputils::grc::Grc;
+use log::error;
 use logic_form::{Lit, LitVec, Var};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use satif::Satif;
 
+#[derive(Clone)]
 pub struct TransysSolver {
     dcs: DagCnfSolver,
     ts: Grc<TransysCtx>,
@@ -23,18 +25,12 @@ impl TransysSolver {
                 dcs.add_clause(&[*c]);
             }
         }
-        dcs.simplify_satisfied();
         Self {
             dcs,
             ts: ts.clone(),
             relind: Default::default(),
             rng: StdRng::seed_from_u64(rseed),
         }
-    }
-
-    #[inline]
-    pub fn add_lemma(&mut self, lemma: &[Lit]) {
-        self.dcs.add_clause(lemma);
     }
 
     #[inline]
@@ -65,7 +61,6 @@ impl TransysSolver {
         &self.dcs.assump
     }
 
-    #[allow(unused)]
     pub fn get_pred(
         &mut self,
         solver: &impl Satif,
@@ -101,7 +96,17 @@ impl TransysSolver {
             }
             latchs.shuffle(&mut self.rng);
             let olen = latchs.len();
-            latchs = self.minimal_pred(&inputs, &latchs, &cls).unwrap();
+            if let Some(n) = self.minimal_pred(&inputs, &latchs, &cls) {
+                latchs = n;
+            } else {
+                let fail = target
+                    .iter()
+                    .chain(self.ts.constraints.iter())
+                    .find(|l| !self.sat_value(**l).unwrap())
+                    .unwrap();
+                error!("assert {fail} failed in lift, please report this bug");
+                panic!();
+            };
             if latchs.len() == olen || !strengthen {
                 break;
             }
@@ -211,9 +216,8 @@ impl Satif for TransysSolver {
     }
 
     #[inline]
-    fn add_clause(&mut self, _clause: &[Lit]) {
-        todo!();
-        // self.dcs.add_clause(clause);
+    fn add_clause(&mut self, clause: &[Lit]) {
+        self.dcs.add_clause(clause);
     }
 
     #[inline]

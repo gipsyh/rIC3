@@ -2,6 +2,7 @@ use super::DagCnfSolver;
 use logic_form::{DagCnf, Lit, Var, VarAssign, VarSet};
 use std::ops::{Deref, DerefMut};
 
+#[derive(Clone)]
 pub struct Domain {
     domain: VarSet,
     pub fixed: u32,
