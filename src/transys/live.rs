@@ -1,7 +1,7 @@
 use super::Transys;
 use crate::transys::TransysIf;
 use log::warn;
-use logic_form::{LitVec, VarVMap};
+use logicrs::{LitVec, VarVMap};
 use std::{iter::once, mem::take};
 
 impl Transys {

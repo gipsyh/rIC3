@@ -9,7 +9,7 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
 use log::{Level, debug, info};
-use logic_form::{LitOrdVec, LitVec, Var, VarVMap};
+use logicrs::{LitOrdVec, LitVec, Var, VarVMap, satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
@@ -42,7 +42,7 @@ pub struct IC3 {
     statistic: Statistic,
     pre_lemmas: Vec<LitVec>,
     abs_cst: LitVec,
-    bmc_solver: Option<(Box<dyn satif::Satif>, TransysUnroll<Transys>)>,
+    bmc_solver: Option<(Box<dyn Satif>, TransysUnroll<Transys>)>,
     ots: Transys,
     rst: VarVMap,
     auxiliary_var: Vec<Var>,

@@ -2,8 +2,7 @@ use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
 use log::{error, info};
-use logic_form::LitVec;
-use satif::Satif;
+use logicrs::{LitVec, satif::Satif};
 
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
@@ -61,7 +60,7 @@ impl IC3 {
     pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
         let mut uts = TransysUnroll::new(&self.origin_ts);
         uts.unroll_to(b.depth);
-        let mut solver: Box<dyn satif::Satif> = Box::new(cadical::Solver::new());
+        let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         for k in 0..=b.depth {
             uts.load_trans(solver.as_mut(), k, false);
         }

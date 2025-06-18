@@ -1,6 +1,6 @@
 use super::{DagCnfSolver, cdb::CREF_NONE};
 use giputils::{OptionU32, gvec::Gvec};
-use logic_form::{Lbool, Lit, LitVec, Var, VarMap};
+use logicrs::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
 use std::ops::{Index, MulAssign};
 

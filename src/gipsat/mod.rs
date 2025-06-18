@@ -14,12 +14,12 @@ use cdb::{CREF_NONE, CRef, ClauseDB};
 use domain::Domain;
 use giputils::bitvec::BitVec;
 use giputils::gvec::Gvec;
-use logic_form::{DagCnf, Lbool, VarAssign};
-use logic_form::{Lit, LitSet, LitVec, Var, VarMap};
+use logicrs::satif::Satif;
+use logicrs::{DagCnf, Lbool, VarAssign};
+use logicrs::{Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::Rng;
 use rand::{SeedableRng, rngs::StdRng};
-use satif::Satif;
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
 use std::time::Instant;
@@ -95,9 +95,9 @@ impl DagCnfSolver {
         solver
     }
 
-    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logic_form::LitVec> {
+    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logicrs::LitVec> {
         assert!(self.highest_level() == 0);
-        let mut clause = logic_form::LitVec::new();
+        let mut clause = logicrs::LitVec::new();
         for l in cls.iter() {
             assert!(l.var() < self.num_var() + 1);
             match self.value.v(*l) {

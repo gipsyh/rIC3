@@ -4,9 +4,10 @@ use crate::{
 };
 use giputils::hash::GHashMap;
 use log::info;
-use logic_form::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simulate::DagCnfSimulation};
+use logicrs::{
+    Lit, LitVec, Var, VarLMap, VarMap, VarVMap, satif::Satif, simulate::DagCnfSimulation,
+};
 use rand::{SeedableRng, rngs::StdRng};
-use satif::Satif;
 use std::time::Instant;
 
 #[allow(unused)]

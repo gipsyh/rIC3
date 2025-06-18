@@ -1,8 +1,7 @@
 use super::IC3;
 use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
-use logic_form::{Lit, LitOrdVec, LitVec};
-use satif::Satif;
+use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]

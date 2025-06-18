@@ -1,7 +1,7 @@
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
 use log::{debug, error, info};
-use logic_form::{Lbool, Var};
+use logicrs::{Lbool, Var};
 
 use super::AigFrontend;
 use crate::{Engine, Proof, Witness, config::Config, transys::TransysIf};

@@ -1,6 +1,6 @@
 use super::IC3;
 use giputils::grc::Grc;
-use logic_form::{LitOrdVec, LitVec};
+use logicrs::{LitOrdVec, LitVec};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, btree_set};
 use std::fmt::{self, Debug};

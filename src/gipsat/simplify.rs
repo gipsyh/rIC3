@@ -4,7 +4,7 @@ use super::{
 };
 use giputils::gvec::Gvec;
 use log::debug;
-use logic_form::{Lbool, LitOrdVec, LitVec, VarMap};
+use logicrs::{Lbool, LitOrdVec, LitVec, VarMap};
 use std::{mem::take, time::Instant};
 
 #[derive(Clone)]

@@ -3,7 +3,7 @@ use super::{
     cdb::{CREF_NONE, CRef, Clause},
 };
 use giputils::gvec::Gvec;
-use logic_form::{Lbool, Lit, LitMap, Var};
+use logicrs::{Lbool, Lit, LitMap, Var};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Watcher {

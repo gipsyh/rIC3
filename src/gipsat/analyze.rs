@@ -2,7 +2,7 @@ use super::{
     DagCnfSolver,
     cdb::{CREF_NONE, CRef},
 };
-use logic_form::{Lit, LitVec, Var, VarMap};
+use logicrs::{Lit, LitVec, Var, VarMap};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Default)]

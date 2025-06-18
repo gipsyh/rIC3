@@ -7,7 +7,7 @@ use crate::{
 use aig::{Aig, AigEdge};
 use giputils::hash::GHashMap;
 use log::{error, warn};
-use logic_form::{Lit, LitVec, Var, VarVMap};
+use logicrs::{Lit, LitVec, Var, VarVMap};
 use std::process::exit;
 
 impl From<&Transys> for Aig {

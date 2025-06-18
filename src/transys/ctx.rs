@@ -1,5 +1,5 @@
 use super::{Transys, TransysIf};
-use logic_form::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
+use logicrs::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Clone, Default, Debug)]
 pub struct TransysCtx {

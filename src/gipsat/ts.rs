@@ -4,9 +4,8 @@ use crate::{
 };
 use giputils::grc::Grc;
 use log::error;
-use logic_form::{Lit, LitVec, Var};
+use logicrs::{Lit, LitVec, Var, satif::Satif};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
-use satif::Satif;
 
 #[derive(Clone)]
 pub struct TransysSolver {

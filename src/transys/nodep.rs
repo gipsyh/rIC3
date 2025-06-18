@@ -1,7 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logic_form::{Cnf, Lit, LitVec, Var, VarVMap};
-use satif::Satif;
+use logicrs::{Cnf, Lit, LitVec, Var, VarVMap, satif::Satif};
 use std::mem::take;
 
 #[derive(Default, Debug, Clone)]

@@ -1,7 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logic_form::{Lit, LitMap, LitVec, LitVvec, Var};
-use satif::Satif;
+use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
 
 #[derive(Debug)]
 pub struct TransysUnroll<T: TransysIf> {

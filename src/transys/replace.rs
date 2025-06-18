@@ -1,5 +1,5 @@
 use crate::transys::Transys;
-use logic_form::{VarLMap, VarVMap};
+use logicrs::{VarLMap, VarVMap};
 
 impl Transys {
     pub fn replace(&mut self, map: &VarLMap, rst: &mut VarVMap) {
