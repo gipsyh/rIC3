@@ -26,8 +26,8 @@ mod verify;
 
 pub struct IC3 {
     cfg: Config,
-    origin_ts: Transys,
-    ts: Grc<TransysCtx>,
+    ts: Transys,
+    tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
     lift: TransysSolver,
@@ -64,7 +64,7 @@ impl IC3 {
                 self.bad_solver.add_clause(&!lemma.cube());
             }
         }
-        let mut solver = TransysSolver::new(&self.ts, true, self.cfg.rseed);
+        let mut solver = TransysSolver::new(&self.tsctx, true, self.cfg.rseed);
         for lemma in self.frame.inf.iter() {
             solver.add_clause(&!lemma.cube());
         }
@@ -74,12 +74,12 @@ impl IC3 {
         self.solvers.push(solver);
         self.frame.push(Frame::new());
         if self.level() == 0 {
-            for init in self.ts.init.clone() {
+            for init in self.tsctx.init.clone() {
                 self.add_lemma(0, LitVec::from([!init]), true, None);
             }
             let mut init = LitVec::new();
-            for l in self.ts.latchs.iter() {
-                if self.ts.init_map[*l].is_none()
+            for l in self.tsctx.latch.iter() {
+                if self.tsctx.init_map[*l].is_none()
                     && let Some(v) = self.solvers[0].sat_value(l.lit())
                 {
                     let l = l.lit().not_if(!v);
@@ -87,7 +87,7 @@ impl IC3 {
                 }
             }
             for i in init {
-                self.ts.add_init(i.var(), Some(i.polarity()));
+                self.tsctx.add_init(i.var(), Some(i.polarity()));
             }
         } else if self.level() == 1 {
             for cls in self.pre_lemmas.clone().iter() {
@@ -110,7 +110,7 @@ impl IC3 {
     }
 
     fn generalize(&mut self, mut po: ProofObligation, mic_type: MicType) -> bool {
-        if self.cfg.ic3.inn && self.ts.cube_subsume_init(&po.lemma) {
+        if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&po.lemma) {
             po.frame += 1;
             self.add_obligation(po.clone());
             return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
@@ -132,7 +132,7 @@ impl IC3 {
             if po.removed {
                 continue;
             }
-            if self.ts.cube_subsume_init(&po.lemma) {
+            if self.tsctx.cube_subsume_init(&po.lemma) {
                 if self.cfg.ic3.abs_cst {
                     self.add_obligation(po.clone());
                     if let Some(c) = self.check_witness_by_bmc(po.clone()) {
@@ -236,7 +236,7 @@ impl IC3 {
         if frame == 0 {
             return false;
         }
-        if self.ts.cube_subsume_init(&lemma) {
+        if self.tsctx.cube_subsume_init(&lemma) {
             return false;
         }
         if *limit == 0 {
@@ -291,7 +291,7 @@ impl IC3 {
                 }
                 for ctp in 0..3 {
                     if self.blocked_with_ordered(frame_idx + 1, &lemma, false, false) {
-                        let core = if self.cfg.ic3.inn && self.ts.cube_subsume_init(&lemma) {
+                        let core = if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&lemma) {
                             lemma.cube().clone()
                         } else {
                             self.solvers[frame_idx].inductive_core()
@@ -311,7 +311,7 @@ impl IC3 {
                         break;
                     }
                     let (ctp, _) = self.get_pred(frame_idx + 1, false);
-                    if !self.ts.cube_subsume_init(&ctp)
+                    if !self.tsctx.cube_subsume_init(&ctp)
                         && self.solvers[frame_idx - 1].inductive(&ctp, true)
                     {
                         let core = self.solvers[frame_idx - 1].inductive_core();
@@ -347,7 +347,7 @@ impl IC3 {
                 self.add_inf_lemma(lemma.cube().clone());
                 return true;
             } else {
-                let target = self.ts.lits_next(lemma.cube());
+                let target = self.tsctx.lits_next(lemma.cube());
                 let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
                 if !self.propagete_to_inf_rec(lastf, ctp) {
                     return false;
@@ -369,7 +369,7 @@ impl IC3 {
                     self.add_inf_lemma(lemma.cube().clone());
                     break;
                 } else {
-                    let target = self.ts.lits_next(lemma.cube());
+                    let target = self.tsctx.lits_next(lemma.cube());
                     let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
                     if !self.propagete_to_inf_rec(&mut lastf, ctp) {
                         break;
@@ -383,8 +383,8 @@ impl IC3 {
         self.extend();
         assert!(self.level() == 0);
         if !self.cfg.ic3.no_pred_prop {
-            let bad = self.ts.bad;
-            if self.solvers[0].solve(&self.ts.bad.cube()) {
+            let bad = self.tsctx.bad;
+            if self.solvers[0].solve(&self.tsctx.bad.cube()) {
                 let (bad, inputs) = self.get_pred(self.solvers.len(), true);
                 self.add_obligation(ProofObligation::new(
                     0,
@@ -395,9 +395,10 @@ impl IC3 {
                 ));
                 return false;
             }
-            self.ts.constraints.push(!bad);
-            self.lift = TransysSolver::new(&self.ts, false, self.cfg.rseed);
-            self.inf_solver = TransysSolver::new(&self.ts, true, self.cfg.rseed);
+            self.tsctx.constraint.push(!bad);
+            self.ts.constraint.push(!bad);
+            self.lift = TransysSolver::new(&self.tsctx, false, self.cfg.rseed);
+            self.inf_solver = TransysSolver::new(&self.tsctx, true, self.cfg.rseed);
         }
         true
     }
@@ -438,13 +439,13 @@ impl IC3 {
         let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
         } else {
-            ts.constraints.clone()
+            ts.constraint.clone()
         };
         let rng = StdRng::seed_from_u64(cfg.rseed);
         Self {
             cfg,
-            origin_ts,
-            ts,
+            ts: origin_ts,
+            tsctx: ts,
             activity,
             solvers: Vec::new(),
             inf_solver,

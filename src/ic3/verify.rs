@@ -33,7 +33,7 @@ impl IC3 {
             return;
         }
         let invariants = self.frame.invariant();
-        if !verify_invariant(&self.ts, &invariants) {
+        if !verify_invariant(&self.tsctx, &invariants) {
             error!("invariant varify failed");
             panic!();
         }
@@ -58,7 +58,7 @@ impl IC3 {
     }
 
     pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
-        let mut uts = TransysUnroll::new(&self.origin_ts);
+        let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll_to(b.depth);
         let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         for k in 0..=b.depth {

@@ -3,12 +3,12 @@ use logicrs::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Clone, Default, Debug)]
 pub struct TransysCtx {
-    pub inputs: Vec<Var>,
-    pub latchs: Vec<Var>,
+    pub input: Vec<Var>,
+    pub latch: Vec<Var>,
     pub init: LitVec,
     pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
-    pub constraints: LitVec,
+    pub constraint: LitVec,
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
@@ -28,12 +28,12 @@ impl TransysIf for TransysCtx {
 
     #[inline]
     fn input(&self) -> impl Iterator<Item = Var> {
-        self.inputs.iter().copied()
+        self.input.iter().copied()
     }
 
     #[inline]
     fn latch(&self) -> impl Iterator<Item = Var> {
-        self.latchs.iter().copied()
+        self.latch.iter().copied()
     }
 
     #[inline]
@@ -48,7 +48,7 @@ impl TransysIf for TransysCtx {
 
     #[inline]
     fn constraint(&self) -> impl Iterator<Item = Lit> {
-        self.constraints.iter().copied()
+        self.constraint.iter().copied()
     }
 
     #[inline]
@@ -75,7 +75,7 @@ impl TransysCtx {
     #[inline]
     pub fn add_latch(&mut self, state: Var, init: Option<bool>, trans: Vec<LitVec>) {
         let next = self.rel.new_var().lit();
-        self.latchs.push(state);
+        self.latch.push(state);
         let lit = state.lit();
         self.init_map[state] = init;
         self.is_latch[state] = true;
@@ -143,12 +143,12 @@ impl Transys {
             is_latch[v] = true;
         }
         TransysCtx {
-            inputs: self.input,
-            latchs: self.latch,
+            input: self.input,
+            latch: self.latch,
             init,
             bad: self.bad[0],
             init_map,
-            constraints: self.constraint,
+            constraint: self.constraint,
             rel: self.rel,
             is_latch,
             next_map,
