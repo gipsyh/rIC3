@@ -8,12 +8,11 @@ use std::time::Instant;
 impl IC3 {
     pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         debug!("getting bad state in last frame");
-        self.statistic.num_get_bad += 1;
         let start = Instant::now();
         if !self.cfg.ic3.no_pred_prop {
             assert!(!self.cfg.ic3.full_bad);
             let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
-            self.statistic.block_get_bad_time += start.elapsed();
+            self.statistic.block.get_bad_time += start.elapsed();
             res.then(|| {
                 let (s, i) =
                     self.bad_lift
@@ -30,7 +29,7 @@ impl IC3 {
             })
         } else {
             let res = self.solvers.last_mut().unwrap().solve(&self.ts.bad.cube());
-            self.statistic.block_get_bad_time += start.elapsed();
+            self.statistic.block.get_bad_time += start.elapsed();
             res.then(|| {
                 if self.cfg.ic3.full_bad {
                     self.get_full_pred(self.solvers.len())
@@ -134,7 +133,7 @@ impl IC3 {
             }
         }
         self.lift.unset_domain();
-        self.statistic.block_get_predecessor_time += start.elapsed();
+        self.statistic.block.get_pred_time += start.elapsed();
         (latchs, inputs)
     }
 

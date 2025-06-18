@@ -105,7 +105,7 @@ impl IC3 {
                 return (i, cube);
             }
         }
-        self.statistic.block_push_time += start.elapsed();
+        self.statistic.block.push_time += start.elapsed();
         (self.level() + 1, cube)
     }
 
@@ -170,7 +170,7 @@ impl IC3 {
             po.bump_act();
             let blocked_start = Instant::now();
             let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false, false);
-            self.statistic.block_blocked_time += blocked_start.elapsed();
+            self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
                 let mic_type = if self.cfg.ic3.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
@@ -408,7 +408,7 @@ impl IC3 {
         let ots = ts.clone();
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
-        let statistic = Statistic::new(cfg.model.to_str().unwrap());
+        let statistic = Statistic::default();
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
             let frts = FrTs::new(ts, cfg.rseed, rst, vec![]);
@@ -487,11 +487,11 @@ impl Engine for IC3 {
             loop {
                 match self.block() {
                     Some(false) => {
-                        self.statistic.overall_block_time += start.elapsed();
+                        self.statistic.block.overall_time += start.elapsed();
                         return Some(false);
                     }
                     None => {
-                        self.statistic.overall_block_time += start.elapsed();
+                        self.statistic.block.overall_time += start.elapsed();
                         self.verify();
                         return Some(true);
                     }
@@ -514,7 +514,7 @@ impl Engine for IC3 {
             debug!("blocking phase end");
             let blocked_time = start.elapsed();
             self.filog.log(Level::Info, self.frame.statistic(true));
-            self.statistic.overall_block_time += blocked_time;
+            self.statistic.block.overall_time += blocked_time;
             self.extend();
             let start = Instant::now();
             let propagate = self.propagate(None);
