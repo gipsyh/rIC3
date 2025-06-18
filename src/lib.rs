@@ -12,7 +12,7 @@ pub mod rlive;
 pub mod transys;
 
 use config::Config;
-use logic_form::{LitVec, Var};
+use logicrs::{LitVec, Var};
 use transys::Transys;
 
 #[derive(Clone, Debug, Default)]

@@ -3,8 +3,7 @@ use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use log::trace;
-use logic_form::{Lit, LitOrdVec, LitSet, LitVec};
-use satif::Satif;
+use logicrs::{Lit, LitOrdVec, LitSet, LitVec, satif::Satif};
 use std::{
     fmt::Write,
     ops::{Deref, DerefMut},

@@ -1,5 +1,5 @@
 use super::DagCnfSolver;
-use logic_form::{DagCnf, Lit, Var, VarAssign, VarSet};
+use logicrs::{DagCnf, Lit, Var, VarAssign, VarSet};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]

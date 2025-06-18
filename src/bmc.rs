@@ -4,8 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
-use logic_form::{LitVec, VarVMap};
-use satif::Satif;
+use logicrs::{LitVec, VarVMap, satif::Satif};
 use std::time::Duration;
 
 pub struct BMC {

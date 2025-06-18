@@ -1,18 +1,15 @@
 [submodule "deps/aig-rs"]
 	path = deps/aig-rs
 	url = https://github.com/gipsyh/aig-rs.git
-[submodule "deps/logic-form"]
-	path = deps/logic-form
-	url = https://github.com/gipsyh/logic-form.git
 [submodule "deps/giputils"]
 	path = deps/giputils
 	url = https://github.com/gipsyh/giputils.git
-[submodule "deps/satif"]
-	path = deps/satif
-	url = https://github.com/gipsyh/satif.git
 [submodule "deps/cadical-rs"]
 	path = deps/cadical-rs
 	url = https://github.com/gipsyh/cadical-rs.git
 [submodule "deps/kissat-rs"]
 	path = deps/kissat-rs
 	url = https://github.com/gipsyh/kissat-rs.git
+[submodule "deps/logicrs"]
+	path = deps/logicrs
+	url = https://github.com/gipsyh/logicrs

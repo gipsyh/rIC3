@@ -3,7 +3,7 @@ use super::{
     cdb::{CREF_NONE, CRef, ClauseKind},
 };
 use log::debug;
-use logic_form::{Lbool, Lit};
+use logicrs::{Lbool, Lit};
 
 impl DagCnfSolver {
     #[inline]

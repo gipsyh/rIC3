@@ -9,8 +9,7 @@ pub mod unroll;
 
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
-use logic_form::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap};
-use satif::Satif;
+use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 
 pub trait TransysIf {
     fn max_var(&self) -> Var;

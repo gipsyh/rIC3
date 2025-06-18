@@ -11,12 +11,11 @@ license = "GPL-3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aig = { path = "./deps/aig-rs", version = "0.4.2" }
-cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.1.11" }
-kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.4.8" }
-logic-form = { path = "./deps/logic-form", version = "0.4.0" }
+aig = { path = "./deps/aig-rs", version = "0.4.3" }
+cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.0" }
+kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.0" }
+logicrs = { path = "./deps/logicrs", version = "0.5.0" }
 giputils = { path = "./deps/giputils", version = "0.3.2" }
-satif = { path = "./deps/satif", version = "0.2.1" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }

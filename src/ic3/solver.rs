@@ -1,9 +1,8 @@
 use super::IC3;
 use giputils::hash::GHashSet;
 use log::debug;
-use logic_form::{LitOrdVec, LitVec, Var};
+use logicrs::{LitOrdVec, LitVec, Var, satif::Satif};
 use rand::{Rng, seq::SliceRandom};
-use satif::Satif;
 use std::time::Instant;
 
 impl IC3 {

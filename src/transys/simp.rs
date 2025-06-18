@@ -1,6 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
-use logic_form::{Lit, Var, VarVMap};
+use logicrs::{Lit, Var, VarVMap};
 use std::mem::take;
 
 impl Transys {

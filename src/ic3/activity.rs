@@ -1,5 +1,5 @@
 use crate::transys::TransysCtx;
-use logic_form::{Lit, LitVec, Var, VarMap};
+use logicrs::{Lit, LitVec, Var, VarMap};
 use std::ops::MulAssign;
 
 pub struct Activity {

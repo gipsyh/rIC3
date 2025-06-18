@@ -1,5 +1,5 @@
 use super::{Transys, TransysIf};
-use logic_form::{Lit, LitVec, Var};
+use logicrs::{Lit, LitVec, Var};
 
 impl Transys {
     pub fn merge(&mut self, other: &Self) {

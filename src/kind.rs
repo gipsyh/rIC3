@@ -4,8 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
-use logic_form::{Lit, LitVec, Var, VarVMap};
-use satif::Satif;
+use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,

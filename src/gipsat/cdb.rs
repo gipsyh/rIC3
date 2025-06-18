@@ -2,7 +2,7 @@ use super::DagCnfSolver;
 use bitfield_struct::bitfield;
 use giputils::gvec::Gvec;
 use giputils::hash::GHashMap;
-use logic_form::{Lit, LitOrdVec};
+use logicrs::{Lit, LitOrdVec};
 use std::{
     mem::take,
     ops::{AddAssign, Index, MulAssign},
@@ -409,7 +409,7 @@ impl DagCnfSolver {
         self.cdb.lemmas = self.simplify_satisfied_clauses(lemmas);
         for cref in take(&mut self.cdb.lemmas) {
             let cls = self.cdb.get(cref);
-            let lemma = LitOrdVec::new(!logic_form::LitVec::from(cls.slice()));
+            let lemma = LitOrdVec::new(!logicrs::LitVec::from(cls.slice()));
             if let Some(r) = lazy_remove_map.get_mut(&lemma) {
                 *r -= 1;
                 if *r == 0 {

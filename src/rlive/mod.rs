@@ -6,7 +6,7 @@ use crate::{
 };
 use clap::Parser;
 use log::{debug, error, warn};
-use logic_form::{Lit, LitOrdVec, LitVec, Var, VarVMap};
+use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap};
 use std::mem::take;
 
 pub struct Rlive {
