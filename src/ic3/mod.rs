@@ -9,11 +9,10 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
 use log::{Level, debug, info};
-use logicrs::{LitOrdVec, LitVec, Var, VarVMap, satif};
+use logicrs::{LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
-use satif::Satif;
 use statistic::Statistic;
 use std::time::Instant;
 
