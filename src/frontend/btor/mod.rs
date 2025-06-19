@@ -5,9 +5,14 @@ use super::Frontend;
 use crate::{Proof, Witness, config::Config, transys as bl, wl::transys::WlTransys};
 use btor::Btor;
 use giputils::{bitvec::BitVec, hash::GHashMap};
-use log::{error, warn};
+use log::{debug, error, warn};
 use logicrs::Var;
-use std::{fmt::Display, path::Path, process::exit};
+use std::{
+    collections::BTreeMap,
+    fmt::Display,
+    path::Path,
+    process::{Command, exit},
+};
 
 pub struct BtorFrontend {
     _btor: Btor,
@@ -74,7 +79,7 @@ impl Frontend for BtorFrontend {
     fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), "b0".to_string()];
         let num_input = self.owts.input.len();
-        let mut init = GHashMap::new();
+        let mut init = BTreeMap::new();
         for i in witness.state[0].iter() {
             let (w, b) = self.bb_rst[&i.var()];
             let lid = w - num_input;
@@ -84,14 +89,12 @@ impl Frontend for BtorFrontend {
         }
         if !init.is_empty() {
             res.push("#0".to_string());
-            let mut init = init.into_iter().collect::<Vec<_>>();
-            init.sort_by_key(|(i, _)| *i);
-            for (i, v) in init.iter() {
+            for (i, v) in init {
                 res.push(format!("{i} {v}"));
             }
         }
         for (t, x) in witness.input.into_iter().enumerate() {
-            let mut input = GHashMap::new();
+            let mut input = BTreeMap::new();
             for i in x {
                 let (w, b) = self.bb_rst[&i.var()];
                 input
@@ -100,9 +103,7 @@ impl Frontend for BtorFrontend {
                     .set(b, i.polarity());
             }
             res.push(format!("@{t}"));
-            let mut input = input.into_iter().collect::<Vec<_>>();
-            input.sort_by_key(|(i, _)| *i);
-            for (i, v) in input.iter() {
+            for (i, v) in input {
                 res.push(format!("{i} {v}"));
             }
         }
@@ -110,8 +111,8 @@ impl Frontend for BtorFrontend {
         Box::new(res.join("\n"))
     }
 
-    fn certify(&mut self, _model: &Path, _cert: &Path) -> bool {
-        todo!()
+    fn certify(&mut self, model: &Path, cert: &Path) -> bool {
+        certobor_check(model, cert)
     }
 }
 
@@ -136,5 +137,37 @@ impl WlTransys {
             constraint: btor.constraint.clone(),
             justice: Default::default(),
         }
+    }
+}
+
+pub fn certobor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
+    let certificate = certificate.as_ref();
+    let output = Command::new("docker")
+        .args([
+            "run",
+            "--rm",
+            "--pull=never",
+            "-v",
+            &format!("{}:{}", model.as_ref().display(), model.as_ref().display()),
+            "-v",
+            &format!("{}:{}", certificate.display(), certificate.display()),
+            "ghcr.io/gipsyh/cerbotor:latest",
+        ])
+        .arg(model.as_ref())
+        .arg(certificate)
+        .output()
+        .unwrap();
+    if output.status.success() {
+        true
+    } else {
+        debug!("{}", String::from_utf8_lossy(&output.stdout));
+        debug!("{}", String::from_utf8_lossy(&output.stderr));
+        match output.status.code() {
+            Some(1) => (),
+            _ => error!(
+                "cerbotor maybe not avaliable, please `docker pull ghcr.io/gipsyh/cerbotor:latest`"
+            ),
+        }
+        false
     }
 }
