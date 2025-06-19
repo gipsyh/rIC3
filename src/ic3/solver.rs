@@ -1,4 +1,5 @@
 use super::IC3;
+use crate::gipsat::TransysSolver;
 use giputils::hash::GHashSet;
 use log::debug;
 use logicrs::{LitOrdVec, LitVec, Var, satif::Satif};
@@ -172,5 +173,15 @@ impl IC3 {
         }
         assert!(var == self.lift.new_var());
         var
+    }
+
+    pub(super) fn reconstruct_solver(&mut self) {
+        // let level = self.level();
+        // self.solvers.clear();
+        // for i in 0..=level {
+        //     let solver = TransysSolver::new(&self.tsctx, true, self.rng.random());
+        //     self.solvers.push(solver);
+        // }
+        todo!();
     }
 }

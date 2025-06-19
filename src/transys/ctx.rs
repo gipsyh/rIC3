@@ -119,17 +119,17 @@ impl TransysCtx {
 }
 
 impl Transys {
-    pub fn ctx(mut self) -> TransysCtx {
-        self.latch.sort();
-        let primes: Vec<Lit> = self.latch.iter().map(|l| self.next(l.lit())).collect();
+    pub fn ctx(&self) -> TransysCtx {
+        let mut latch = self.latch.clone();
+        latch.sort();
+        let primes: Vec<Lit> = latch.iter().map(|l| self.next(l.lit())).collect();
         let max_var = self.rel.max_var();
-        let max_latch = *self.latch.iter().max().unwrap_or(&Var::CONST);
+        let max_latch = *latch.iter().max().unwrap_or(&Var::CONST);
         let mut init_map = VarMap::new_with(max_latch);
         let mut is_latch = VarMap::new_with(max_var);
         let mut init = LitVec::new();
         let mut next_map = LitMap::new_with(max_latch);
-        let mut prev_map = LitMap::new_with(max_var);
-        for (v, p) in self.latch.iter().cloned().zip(primes.iter().cloned()) {
+        for (v, p) in latch.iter().cloned().zip(primes.iter().cloned()) {
             let l = v.lit();
             let i = self.init.get(&v).cloned();
             if let Some(i) = i {
@@ -138,18 +138,16 @@ impl Transys {
             }
             next_map[l] = p;
             next_map[!l] = !p;
-            prev_map[p] = l;
-            prev_map[!p] = !l;
             is_latch[v] = true;
         }
         TransysCtx {
-            input: self.input,
-            latch: self.latch,
+            input: self.input.clone(),
+            latch: self.latch.clone(),
             init,
             bad: self.bad[0],
             init_map,
-            constraint: self.constraint,
-            rel: self.rel,
+            constraint: self.constraint.clone(),
+            rel: self.rel.clone(),
             is_latch,
             next_map,
             max_latch,

@@ -17,6 +17,7 @@ use statistic::Statistic;
 use std::time::Instant;
 
 mod activity;
+mod aux;
 mod frame;
 mod mic;
 mod proofoblig;
@@ -87,6 +88,7 @@ impl IC3 {
                 }
             }
             for i in init {
+                self.ts.init.insert(i.var(), i.polarity());
                 self.tsctx.add_init(i.var(), Some(i.polarity()));
             }
         } else if self.level() == 1 {
@@ -428,13 +430,12 @@ impl IC3 {
         }
         let mut bad_ts = uts.compile();
         bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
-        let origin_ts = ts.clone();
-        let ts = Grc::new(ts.ctx());
+        let tsctx = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
-        let activity = Activity::new(&ts);
-        let frame = Frames::new(&ts);
-        let inf_solver = TransysSolver::new(&ts, true, cfg.rseed);
-        let lift = TransysSolver::new(&ts, false, cfg.rseed);
+        let activity = Activity::new(&tsctx);
+        let frame = Frames::new(&tsctx);
+        let inf_solver = TransysSolver::new(&tsctx, true, cfg.rseed);
+        let lift = TransysSolver::new(&tsctx, false, cfg.rseed);
         let bad_lift = TransysSolver::new(&bad_ts, false, cfg.rseed);
         let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
@@ -444,8 +445,8 @@ impl IC3 {
         let rng = StdRng::seed_from_u64(cfg.rseed);
         Self {
             cfg,
-            ts: origin_ts,
-            tsctx: ts,
+            ts,
+            tsctx,
             activity,
             solvers: Vec::new(),
             inf_solver,
