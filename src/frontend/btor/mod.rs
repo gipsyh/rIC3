@@ -2,21 +2,26 @@ mod array;
 mod certificate;
 
 use super::Frontend;
-use crate::{config::Config, transys as bl, wl::transys::WlTransys};
+use crate::{Proof, Witness, config::Config, transys as bl, wl::transys::WlTransys};
 use btor::Btor;
+use giputils::hash::GHashMap;
 use log::{error, warn};
-use std::process::exit;
+use logicrs::Var;
+use std::{fmt::Display, path::Path, process::exit};
 
 pub struct BtorFrontend {
-    origin_btor: Btor,
-    origin_ts: WlTransys,
+    btor: Btor,
+    wts: WlTransys,
     cfg: Config,
+    // wordlevel restore
+    wl_rst: GHashMap<usize, usize>,
+    // bitblast restore
+    bb_rst: GHashMap<Var, (usize, usize)>,
 }
 
 impl BtorFrontend {
     pub fn new(cfg: &Config) -> Self {
-        let origin_btor = Btor::from_file(&cfg.model);
-        let btor = origin_btor.clone();
+        let btor = Btor::from_file(&cfg.model);
         if btor.bad.is_empty() {
             warn!("no property to be checked");
             if let Some(certificate) = &cfg.certificate {
@@ -33,48 +38,43 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let origin_ts = WlTransys::from_btor(&origin_btor);
+        let wts = WlTransys::from_btor(&btor);
+        let wl_rst = GHashMap::from_iter((0..wts.input.len() + wts.latch.len()).map(|i| (i, i)));
         Self {
-            origin_btor,
-            origin_ts,
+            btor,
+            wts,
             cfg: cfg.clone(),
+            wl_rst,
+            bb_rst: GHashMap::new(),
         }
     }
 }
 
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> bl::Transys {
-        let mut ts = self.origin_ts.clone();
-        if self.cfg.ic3.abs_array {
-            ts = ts.abs_array();
-        }
-        ts.coi_refine();
-        dbg!(&ts);
-        for _ in 0..3 {
-            ts.coi_refine();
-            ts.simplify();
-            // ts.print_info();
-        }
-        let mut bitblast = ts.bitblast();
-        for _ in 0..3 {
-            bitblast.coi_refine();
-            bitblast.simplify();
-            // bitblast.print_info();
-        }
-        bitblast.to_bit_level()
+        let mut wts = self.wts.clone();
+        wts.coi_refine(&mut self.wl_rst);
+        wts.simplify();
+        wts.coi_refine(&mut self.wl_rst);
+        let (bitblast, bb_rst) = wts.bitblast();
+        self.bb_rst = GHashMap::from_iter(
+            bb_rst
+                .into_iter()
+                .map(|(i, (j, k))| (Var::new(i + 1), (self.wl_rst[&j], k))),
+        );
+
+        bitblast.lower_to_ts()
     }
 
-    fn certificate_safe(&mut self, _engine: &mut dyn crate::Engine) {
-        if self.cfg.certificate.is_none() && !self.cfg.certify {
-            return;
-        }
+    fn safe_certificate(&mut self, _proof: Proof) -> Box<dyn Display> {
         todo!()
     }
 
-    fn certificate_unsafe(&mut self, _engine: &mut dyn crate::Engine) {
-        if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
-            return;
-        }
+    fn unsafe_certificate(&mut self, _witness: Witness) -> Box<dyn Display> {
+        todo!()
+    }
+
+    fn certify(&mut self, _model: &Path, _cert: &Path) -> bool {
         todo!()
     }
 }

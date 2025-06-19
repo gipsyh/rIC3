@@ -74,20 +74,20 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let res = engine.check();
     engine.statistic();
     match res {
-        Some(true) => {
-            if env::var("RIC3_WORKER").is_err() {
-                println!("RESULT: UNSAT");
+        Some(res) => {
+            if res {
+                if env::var("RIC3_WORKER").is_err() {
+                    println!("RESULT: UNSAT");
+                }
+                if cfg.witness {
+                    println!("0");
+                }
+            } else {
+                if env::var("RIC3_WORKER").is_err() {
+                    println!("RESULT: SAT");
+                }
             }
-            if cfg.witness {
-                println!("0");
-            }
-            frontend.certificate_safe(&mut *engine);
-        }
-        Some(false) => {
-            if env::var("RIC3_WORKER").is_err() {
-                println!("RESULT: SAT");
-            }
-            frontend.certificate_unsafe(&mut *engine);
+            certificate(&cfg, frontend.as_mut(), engine.as_mut(), res);
         }
         _ => {
             if env::var("RIC3_WORKER").is_err() {
@@ -103,5 +103,33 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         exit(if res { 20 } else { 10 })
     } else {
         exit(30)
+    }
+}
+
+pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn Engine, res: bool) {
+    if cfg.certificate.is_none() && !cfg.certify && (!cfg.witness || res) {
+        return;
+    }
+    let certificate = if res {
+        frontend.safe_certificate(engien.proof())
+    } else {
+        frontend.unsafe_certificate(engien.witness())
+    };
+    if cfg.witness && !res {
+        println!("{certificate}");
+    }
+    if let Some(cert_path) = &cfg.certificate {
+        fs::write(cert_path, format!("{certificate}")).unwrap();
+    }
+    if cfg.certify {
+        let certificate_file = tempfile::NamedTempFile::new().unwrap();
+        let cert = certificate_file.path();
+        fs::write(cert, format!("{certificate}")).unwrap();
+        if frontend.certify(&cfg.model, cert) {
+            info!("certificate verification passed");
+        } else {
+            error!("certificate verification failed");
+            panic!();
+        }
     }
 }

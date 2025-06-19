@@ -1,4 +1,4 @@
-use crate::{Config, frontend::aig::certificate::certifaiger_check};
+use crate::{Config, frontend::aig::certifaiger_check};
 use log::{error, info};
 use process_control::{ChildExt, Control};
 use std::{
@@ -266,7 +266,7 @@ fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
         return;
     }
     certifaiger_check(
-        cfg,
+        &cfg.model,
         engine
             .certificate
             .as_ref()

@@ -224,6 +224,7 @@ impl Satif for TransysSolver {
         self.dcs.solve(assumps)
     }
 
+    #[inline]
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
         self.dcs.solve_with_constraint(assumps, constraint)
     }

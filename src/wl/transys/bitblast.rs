@@ -11,15 +11,28 @@ use logicrs::{
 };
 
 impl WlTransys {
-    pub fn bitblast(&self) -> Self {
+    pub fn bitblast(&self) -> (Self, GHashMap<usize, (usize, usize)>) {
+        let mut rst = GHashMap::new();
         let mut tm = TermManager::new();
         let mut map = GHashMap::new();
-        let input: Vec<Term> = bitblast_terms(self.input.iter(), &mut tm, &mut map)
-            .flatten()
-            .collect();
-        let latch: Vec<Term> = bitblast_terms(self.latch.iter(), &mut tm, &mut map)
-            .flatten()
-            .collect();
+        let onum_input = self.input.len();
+        let mut input = Vec::new();
+        for (i, x) in self.input.iter().enumerate() {
+            let bb = x.bitblast(&mut tm, &mut map);
+            for (j, b) in bb.into_iter().enumerate() {
+                rst.insert(input.len(), (i, j));
+                input.push(b);
+            }
+        }
+        let mut latch = Vec::new();
+        for (mut i, x) in self.latch.iter().enumerate() {
+            i += onum_input;
+            let bb = x.bitblast(&mut tm, &mut map);
+            for (j, b) in bb.into_iter().enumerate() {
+                rst.insert(latch.len() + input.len(), (i, j));
+                latch.push(b);
+            }
+        }
         let mut init = GHashMap::new();
         for l in self.latch.iter() {
             let Some(i) = self.init.get(l) else {
@@ -56,19 +69,22 @@ impl WlTransys {
         let justice: Vec<Term> = bitblast_terms(self.justice.iter(), &mut tm, &mut map)
             .flatten()
             .collect();
-        Self {
-            tm,
-            input,
-            latch,
-            init,
-            next,
-            bad,
-            constraint,
-            justice,
-        }
+        (
+            Self {
+                tm,
+                input,
+                latch,
+                init,
+                next,
+                bad,
+                constraint,
+                justice,
+            },
+            rst,
+        )
     }
 
-    pub fn to_bit_level(&self) -> blts::Transys {
+    pub fn lower_to_ts(&self) -> blts::Transys {
         let mut dc = DagCnf::new();
         let mut map = GHashMap::new();
         let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
