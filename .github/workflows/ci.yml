@@ -33,10 +33,12 @@ jobs:
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
+          docker pull ghcr.io/gipsyh/cerbotor:latest
       - name: Test examples
         run: |
           cargo r -- ./examples/counter/counter_s0.aig --certify || [ $? -eq 10 ]
           cargo r -- -e ic3 ./examples/counter/counter_s0.aig --certify || [ $? -eq 10 ]
+          cargo r -- -e ic3 ./examples/counter/counter_s0.btor --certify || [ $? -eq 10 ]
           cargo r -- -e bmc ./examples/counter/counter_s0.aig --certify || [ $? -eq 10 ]
           cargo r -- -e ic3 ./examples/counter/counter_l1.aig || [ $? -eq 20 ]
           cargo r -- -e ic3 ./examples/counter/counter_l0.aig --certify || [ $? -eq 10 ]
