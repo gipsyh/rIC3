@@ -64,9 +64,6 @@ impl Portfolio {
             for a in args {
                 engine.arg(a);
             }
-            if cfg.preproc.sec {
-                engine.arg("--sec");
-            }
             engines.push(engine);
         };
         new_engine("-e ic3 --ic3-no-ctg");
@@ -141,12 +138,11 @@ impl Portfolio {
             self.engine_pids.push(child.id() as i32);
             let state = self.state.clone();
             spawn(move || {
-                let mut config = engine
+                let config = engine
                     .get_args()
-                    .skip(4)
+                    .skip(1)
                     .map(|cstr| cstr.to_str().unwrap())
                     .collect::<Vec<&str>>();
-                config.pop();
                 let config = config.join(" ");
                 info!("start engine: {config}");
                 #[cfg(target_os = "linux")]
