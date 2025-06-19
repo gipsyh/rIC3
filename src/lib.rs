@@ -10,6 +10,7 @@ pub mod kind;
 pub mod portfolio;
 pub mod rlive;
 pub mod transys;
+pub mod wl;
 
 use config::Config;
 use logicrs::{LitVec, Var};

@@ -13,3 +13,6 @@
 [submodule "deps/logicrs"]
 	path = deps/logicrs
 	url = https://github.com/gipsyh/logicrs
+[submodule "deps/btor-rs"]
+	path = deps/btor-rs
+	url = https://github.com/gipsyh/btor-rs.git

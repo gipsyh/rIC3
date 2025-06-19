@@ -6,7 +6,7 @@ use rIC3::{
     Engine,
     bmc::BMC,
     config::{self, Config},
-    frontend::aig::AigFrontend,
+    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend},
     ic3::IC3,
     kind::Kind,
     portfolio::portfolio_main,
@@ -36,20 +36,15 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         portfolio_main(cfg);
         unreachable!();
     }
-    let mut aig = match cfg.model.extension() {
-        Some(ext) if (ext == "btor") | (ext == "btor2") => {
-            error!(
-                "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
-            );
-            exit(1);
-        }
-        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&cfg),
+    let mut frontend: Box<dyn Frontend> = match cfg.model.extension() {
+        Some(ext) if (ext == "aig") | (ext == "aag") => Box::new(AigFrontend::new(&cfg)),
+        Some(ext) if (ext == "btor") | (ext == "btor2") => Box::new(BtorFrontend::new(&cfg)),
         _ => {
             error!("Error: unsupported file format");
             exit(1);
         }
     };
-    let ts = aig.ts();
+    let ts = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     if cfg.preproc.sec {
         panic!("Error: sec not support");
@@ -79,20 +74,18 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let res = engine.check();
     engine.statistic();
     match res {
-        Some(true) => {
-            if env::var("RIC3_WORKER").is_err() {
-                println!("RESULT: UNSAT");
-            }
-            if cfg.witness {
-                println!("0");
-            }
-            aig.certificate(&mut engine, true)
-        }
-        Some(false) => {
-            if env::var("RIC3_WORKER").is_err() {
+        Some(res) => {
+            if res {
+                if env::var("RIC3_WORKER").is_err() {
+                    println!("RESULT: UNSAT");
+                }
+                if cfg.witness {
+                    println!("0");
+                }
+            } else if env::var("RIC3_WORKER").is_err() {
                 println!("RESULT: SAT");
             }
-            aig.certificate(&mut engine, false)
+            certificate(&cfg, frontend.as_mut(), engine.as_mut(), res);
         }
         _ => {
             if env::var("RIC3_WORKER").is_err() {
@@ -108,5 +101,33 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         exit(if res { 20 } else { 10 })
     } else {
         exit(30)
+    }
+}
+
+pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn Engine, res: bool) {
+    if cfg.certificate.is_none() && !cfg.certify && (!cfg.witness || res) {
+        return;
+    }
+    let certificate = if res {
+        frontend.safe_certificate(engien.proof())
+    } else {
+        frontend.unsafe_certificate(engien.witness())
+    };
+    if cfg.witness && !res {
+        println!("{certificate}");
+    }
+    if let Some(cert_path) = &cfg.certificate {
+        fs::write(cert_path, format!("{certificate}")).unwrap();
+    }
+    if cfg.certify {
+        let certificate_file = tempfile::NamedTempFile::new().unwrap();
+        let cert = certificate_file.path();
+        fs::write(cert, format!("{certificate}")).unwrap();
+        if frontend.certify(&cfg.model, cert) {
+            info!("certificate verification passed");
+        } else {
+            error!("certificate verification failed");
+            panic!();
+        }
     }
 }
