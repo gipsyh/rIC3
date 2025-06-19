@@ -6,7 +6,7 @@ use rIC3::{
     Engine,
     bmc::BMC,
     config::{self, Config},
-    frontend::aig::AigFrontend,
+    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend},
     ic3::IC3,
     kind::Kind,
     portfolio::portfolio_main,
@@ -36,20 +36,15 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         portfolio_main(cfg);
         unreachable!();
     }
-    let mut aig = match cfg.model.extension() {
-        Some(ext) if (ext == "btor") | (ext == "btor2") => {
-            error!(
-                "rIC3 currently does not support parsing BTOR2 files. Please use btor2aiger (https://github.com/hwmcc/btor2tools) to first convert them to AIG format."
-            );
-            exit(1);
-        }
-        Some(ext) if (ext == "aig") | (ext == "aag") => AigFrontend::new(&cfg),
+    let mut frontend: Box<dyn Frontend> = match cfg.model.extension() {
+        Some(ext) if (ext == "aig") | (ext == "aag") => Box::new(AigFrontend::new(&cfg)),
+        Some(ext) if (ext == "btor") | (ext == "btor2") => Box::new(BtorFrontend::new(&cfg)),
         _ => {
             error!("Error: unsupported file format");
             exit(1);
         }
     };
-    let ts = aig.ts();
+    let ts = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     if cfg.preproc.sec {
         panic!("Error: sec not support");
@@ -86,13 +81,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             if cfg.witness {
                 println!("0");
             }
-            aig.certificate(&mut engine, true)
+            frontend.certificate_safe(&mut *engine);
         }
         Some(false) => {
             if env::var("RIC3_WORKER").is_err() {
                 println!("RESULT: SAT");
             }
-            aig.certificate(&mut engine, false)
+            frontend.certificate_unsafe(&mut *engine);
         }
         _ => {
             if env::var("RIC3_WORKER").is_err() {

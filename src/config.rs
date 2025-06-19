@@ -13,7 +13,8 @@ pub struct Config {
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
     pub engine: Engine,
 
-    /// model file in aiger format or in btor2 format.
+    /// model file in aiger format or in btor2 format
+    /// for aiger model, the file name should be suffixed with .aig or .aag
     /// for btor model, the file name should be suffixed with .btor or .btor2
     pub model: PathBuf,
 
@@ -115,6 +116,10 @@ pub struct IC3Options {
     /// ic3 full assignment of last bad (used in rlive)
     #[arg(long = "ic3-full-bad", default_value_t = false)]
     pub full_bad: bool,
+
+    /// ic3 with abstract array
+    #[arg(long = "ic3-abs-array", default_value_t = false)]
+    pub abs_array: bool,
 }
 
 #[derive(Args, Clone, Debug)]

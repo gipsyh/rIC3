@@ -1,60 +1,14 @@
 use aig::{Aig, TernarySimulate};
 use giputils::hash::GHashMap;
-use log::{debug, error, info};
+use log::{debug, info};
 use logicrs::{Lbool, Var};
 
 use super::AigFrontend;
-use crate::{Engine, Proof, Witness, config::Config, transys::TransysIf};
-use std::{fs::File, io::Write, path::Path, process::Command};
+use crate::{Proof, Witness, config::Config, transys::TransysIf};
+use std::{path::Path, process::Command};
 
 impl AigFrontend {
-    pub fn certificate(&self, engine: &mut Box<dyn Engine>, res: bool) {
-        if res {
-            if self.cfg.certificate.is_none() && !self.cfg.certify {
-                return;
-            }
-            if !self.is_safety() {
-                error!("rIC3 does not support certificate generation for safe liveness properties");
-                panic!();
-            }
-            let proof = engine.proof();
-            let certifaiger = self.proof(proof);
-            if let Some(certificate_path) = &self.cfg.certificate {
-                certifaiger.to_file(certificate_path.to_str().unwrap(), true);
-            }
-            if !self.cfg.certify {
-                return;
-            }
-            let certificate_file = tempfile::NamedTempFile::new().unwrap();
-            let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
-            certifaiger.to_file(certificate_path, true);
-            certifaiger_check(&self.cfg, certificate_path);
-        } else {
-            if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
-                return;
-            }
-            let witness = engine
-                .witness()
-                .filter_map_var(|v: Var| self.rst.get(&v).copied());
-            let witness = self.witness(witness);
-            if self.cfg.witness {
-                println!("{witness}");
-            }
-            if let Some(certificate_path) = &self.cfg.certificate {
-                let mut file: File = File::create(certificate_path).unwrap();
-                file.write_all(witness.as_bytes()).unwrap();
-            }
-            if !self.cfg.certify {
-                return;
-            }
-            let mut wit_file = tempfile::NamedTempFile::new().unwrap();
-            wit_file.write_all(witness.as_bytes()).unwrap();
-            let wit_path = wit_file.path().as_os_str().to_str().unwrap();
-            certifaiger_check(&self.cfg, wit_path);
-        }
-    }
-
-    fn witness(&self, wit: Witness) -> String {
+    pub fn witness(&self, wit: Witness) -> String {
         let mut res = vec!["1".to_string(), "b".to_string()];
         let map: GHashMap<Var, bool> =
             GHashMap::from_iter(wit.state[0].iter().map(|l| (l.var(), l.polarity())));
@@ -107,7 +61,7 @@ impl AigFrontend {
         res.join("\n")
     }
 
-    fn proof(&self, proof: Proof) -> Aig {
+    pub fn proof(&self, proof: Proof) -> Aig {
         let mut certifaiger = Aig::from(&proof.proof);
         certifaiger = certifaiger.reencode();
         certifaiger.symbols.clear();

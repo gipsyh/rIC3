@@ -1,14 +1,17 @@
 pub mod certificate;
 
+use super::Frontend;
 use crate::{
+    Engine,
     config::Config,
+    frontend::aig::certificate::certifaiger_check,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
 use giputils::hash::GHashMap;
 use log::{error, warn};
 use logicrs::{Lit, LitVec, Var, VarVMap};
-use std::process::exit;
+use std::{fs::File, io::Write, process::exit};
 
 impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
@@ -182,8 +185,56 @@ impl AigFrontend {
             false
         }
     }
+}
 
-    pub fn ts(&mut self) -> Transys {
+impl Frontend for AigFrontend {
+    fn ts(&mut self) -> Transys {
         self.ts.clone()
+    }
+
+    fn certificate_safe(&mut self, engine: &mut dyn Engine) {
+        if self.cfg.certificate.is_none() && !self.cfg.certify {
+            return;
+        }
+        if !self.is_safety() {
+            error!("rIC3 does not support certificate generation for safe liveness properties");
+            panic!();
+        }
+        let proof = engine.proof();
+        let certifaiger = self.proof(proof);
+        if let Some(certificate_path) = &self.cfg.certificate {
+            certifaiger.to_file(certificate_path.to_str().unwrap(), true);
+        }
+        if !self.cfg.certify {
+            return;
+        }
+        let certificate_file = tempfile::NamedTempFile::new().unwrap();
+        let certificate_path = certificate_file.path().as_os_str().to_str().unwrap();
+        certifaiger.to_file(certificate_path, true);
+        certifaiger_check(&self.cfg, certificate_path);
+    }
+
+    fn certificate_unsafe(&mut self, engine: &mut dyn Engine) {
+        if self.cfg.certificate.is_none() && !self.cfg.certify && !self.cfg.witness {
+            return;
+        }
+        let witness = engine
+            .witness()
+            .filter_map_var(|v: Var| self.rst.get(&v).copied());
+        let witness = self.witness(witness);
+        if self.cfg.witness {
+            println!("{witness}");
+        }
+        if let Some(certificate_path) = &self.cfg.certificate {
+            let mut file: File = File::create(certificate_path).unwrap();
+            file.write_all(witness.as_bytes()).unwrap();
+        }
+        if !self.cfg.certify {
+            return;
+        }
+        let mut wit_file = tempfile::NamedTempFile::new().unwrap();
+        wit_file.write_all(witness.as_bytes()).unwrap();
+        let wit_path = wit_file.path().as_os_str().to_str().unwrap();
+        certifaiger_check(&self.cfg, wit_path);
     }
 }
