@@ -12,7 +12,7 @@ use log::{Level, debug, info};
 use logicrs::{LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use rand::{Rng, SeedableRng, rngs::StdRng, seq::SliceRandom};
 use statistic::Statistic;
 use std::time::Instant;
 
@@ -65,7 +65,7 @@ impl IC3 {
                 self.bad_solver.add_clause(&!lemma.cube());
             }
         }
-        let mut solver = TransysSolver::new(&self.tsctx, true, self.cfg.rseed);
+        let mut solver = TransysSolver::new(&self.tsctx, true, self.rng.random());
         for lemma in self.frame.inf.iter() {
             solver.add_clause(&!lemma.cube());
         }
@@ -399,8 +399,8 @@ impl IC3 {
             }
             self.tsctx.constraint.push(!bad);
             self.ts.constraint.push(!bad);
-            self.lift = TransysSolver::new(&self.tsctx, false, self.cfg.rseed);
-            self.inf_solver = TransysSolver::new(&self.tsctx, true, self.cfg.rseed);
+            self.lift = TransysSolver::new(&self.tsctx, false, self.rng.random());
+            self.inf_solver = TransysSolver::new(&self.tsctx, true, self.rng.random());
         }
         true
     }
@@ -409,12 +409,13 @@ impl IC3 {
 impl IC3 {
     pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
         let ots = ts.clone();
+        let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
         let statistic = Statistic::default();
         if !cfg.preproc.no_preproc {
             ts.simplify(&mut rst);
-            let frts = FrTs::new(ts, cfg.rseed, rst, vec![]);
+            let frts = FrTs::new(ts, rng.random(), rst, vec![]);
             (ts, rst) = frts.fr();
         }
         info!("simplified ts has {}", ts.statistic());
@@ -434,15 +435,14 @@ impl IC3 {
         let bad_ts = Grc::new(bad_ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
-        let inf_solver = TransysSolver::new(&tsctx, true, cfg.rseed);
-        let lift = TransysSolver::new(&tsctx, false, cfg.rseed);
-        let bad_lift = TransysSolver::new(&bad_ts, false, cfg.rseed);
+        let inf_solver = TransysSolver::new(&tsctx, true, rng.random());
+        let lift = TransysSolver::new(&tsctx, false, rng.random());
+        let bad_lift = TransysSolver::new(&bad_ts, false, rng.random());
         let abs_cst = if cfg.ic3.abs_cst {
             LitVec::new()
         } else {
             ts.constraint.clone()
         };
-        let rng = StdRng::seed_from_u64(cfg.rseed);
         Self {
             cfg,
             ts,
