@@ -12,7 +12,7 @@ use std::{fmt::Display, path::Path, process::exit};
 pub struct BtorFrontend {
     _btor: Btor,
     wts: WlTransys,
-    cfg: Config,
+    _cfg: Config,
     // wordlevel restore
     wl_rst: GHashMap<usize, usize>,
     // bitblast restore
@@ -43,7 +43,7 @@ impl BtorFrontend {
         Self {
             _btor: btor,
             wts,
-            cfg: cfg.clone(),
+            _cfg: cfg.clone(),
             wl_rst,
             bb_rst: GHashMap::new(),
         }
