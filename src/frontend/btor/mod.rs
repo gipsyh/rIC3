@@ -14,6 +14,30 @@ use std::{
     process::{Command, exit},
 };
 
+impl WlTransys {
+    fn from_btor(btor: &Btor) -> Self {
+        let mut latch = Vec::new();
+        let mut input = btor.input.clone();
+        for l in btor.latch.iter() {
+            if btor.next.contains_key(l) {
+                latch.push(l.clone());
+            } else {
+                input.push(l.clone());
+            }
+        }
+        Self {
+            tm: btor.tm.clone(),
+            input,
+            latch,
+            init: btor.init.clone(),
+            next: btor.next.clone(),
+            bad: btor.bad[0].clone(),
+            constraint: btor.constraint.clone(),
+            justice: Default::default(),
+        }
+    }
+}
+
 pub struct BtorFrontend {
     _btor: Btor,
     owts: WlTransys,
@@ -90,7 +114,7 @@ impl Frontend for BtorFrontend {
         if !init.is_empty() {
             res.push("#0".to_string());
             for (i, v) in init {
-                res.push(format!("{i} {v}"));
+                res.push(format!("{i} {v:b}"));
             }
         }
         for (t, x) in witness.input.into_iter().enumerate() {
@@ -104,7 +128,7 @@ impl Frontend for BtorFrontend {
             }
             res.push(format!("@{t}"));
             for (i, v) in input {
-                res.push(format!("{i} {v}"));
+                res.push(format!("{i} {v:b}"));
             }
         }
         res.push(".\n".to_string());
@@ -113,30 +137,6 @@ impl Frontend for BtorFrontend {
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool {
         certobor_check(model, cert)
-    }
-}
-
-impl WlTransys {
-    fn from_btor(btor: &Btor) -> Self {
-        let mut latch = Vec::new();
-        let mut input = btor.input.clone();
-        for l in btor.latch.iter() {
-            if btor.next.contains_key(l) {
-                latch.push(l.clone());
-            } else {
-                input.push(l.clone());
-            }
-        }
-        Self {
-            tm: btor.tm.clone(),
-            input,
-            latch,
-            init: btor.init.clone(),
-            next: btor.next.clone(),
-            bad: btor.bad[0].clone(),
-            constraint: btor.constraint.clone(),
-            justice: Default::default(),
-        }
     }
 }
 
