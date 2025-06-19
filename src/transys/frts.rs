@@ -7,7 +7,7 @@ use log::info;
 use logicrs::{
     Lit, LitVec, Var, VarLMap, VarMap, VarVMap, satif::Satif, simulate::DagCnfSimulation,
 };
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
 #[allow(unused)]
@@ -68,7 +68,7 @@ impl FrTs {
     }
 
     pub fn restart(&mut self) {
-        self.solver = DagCnfSolver::new(&self.ts.rel, self.rseed);
+        self.solver = DagCnfSolver::new(&self.ts.rel, self.rng.random());
     }
 
     pub fn fr(mut self) -> (Transys, VarVMap) {

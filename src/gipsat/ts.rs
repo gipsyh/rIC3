@@ -20,7 +20,7 @@ impl TransysSolver {
     pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool, rseed: u64) -> Self {
         let mut dcs = DagCnfSolver::new(&ts.rel, rseed);
         if assert_cst {
-            for c in ts.constraints.iter() {
+            for c in ts.constraint.iter() {
                 dcs.add_clause(&[*c]);
             }
         }
@@ -67,13 +67,13 @@ impl TransysSolver {
         strengthen: bool,
     ) -> (LitVec, LitVec) {
         let mut cls: LitVec = target.into();
-        cls.extend_from_slice(&self.ts.constraints);
+        cls.extend_from_slice(&self.ts.constraint);
         if cls.is_empty() {
             return (LitVec::new(), LitVec::new());
         }
         let cls = !cls;
         let mut inputs = LitVec::new();
-        for input in self.ts.inputs.iter() {
+        for input in self.ts.input.iter() {
             let lit = input.lit();
             if let Some(v) = solver.sat_value(lit) {
                 inputs.push(lit.not_if(!v));
@@ -81,7 +81,7 @@ impl TransysSolver {
         }
         self.dcs.set_domain(cls.iter().cloned());
         let mut latchs = LitVec::new();
-        for latch in self.ts.latchs.iter() {
+        for latch in self.ts.latch.iter() {
             let lit = latch.lit();
             if self.dcs.domain.has(lit.var())
                 && let Some(v) = solver.sat_value(lit)
@@ -100,7 +100,7 @@ impl TransysSolver {
             } else {
                 let fail = target
                     .iter()
-                    .chain(self.ts.constraints.iter())
+                    .chain(self.ts.constraint.iter())
                     .find(|l| !self.sat_value(**l).unwrap())
                     .unwrap();
                 error!("assert {fail} failed in lift, please report this bug");
@@ -117,7 +117,7 @@ impl TransysSolver {
     #[allow(unused)]
     pub fn trivial_pred(&mut self) -> LitVec {
         let mut latchs = LitVec::new();
-        for latch in self.ts.latchs.iter() {
+        for latch in self.ts.latch.iter() {
             let lit = latch.lit();
             if let Some(v) = self.dcs.sat_value(lit) {
                 // if !self.flip_to_none(*latch) {

@@ -3,12 +3,12 @@ use logicrs::{DagCnf, Lit, LitMap, LitVec, Var, VarMap};
 
 #[derive(Clone, Default, Debug)]
 pub struct TransysCtx {
-    pub inputs: Vec<Var>,
-    pub latchs: Vec<Var>,
+    pub input: Vec<Var>,
+    pub latch: Vec<Var>,
     pub init: LitVec,
     pub bad: Lit,
     pub init_map: VarMap<Option<bool>>,
-    pub constraints: LitVec,
+    pub constraint: LitVec,
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
     next_map: LitMap<Lit>,
@@ -28,12 +28,12 @@ impl TransysIf for TransysCtx {
 
     #[inline]
     fn input(&self) -> impl Iterator<Item = Var> {
-        self.inputs.iter().copied()
+        self.input.iter().copied()
     }
 
     #[inline]
     fn latch(&self) -> impl Iterator<Item = Var> {
-        self.latchs.iter().copied()
+        self.latch.iter().copied()
     }
 
     #[inline]
@@ -48,7 +48,7 @@ impl TransysIf for TransysCtx {
 
     #[inline]
     fn constraint(&self) -> impl Iterator<Item = Lit> {
-        self.constraints.iter().copied()
+        self.constraint.iter().copied()
     }
 
     #[inline]
@@ -75,7 +75,7 @@ impl TransysCtx {
     #[inline]
     pub fn add_latch(&mut self, state: Var, init: Option<bool>, trans: Vec<LitVec>) {
         let next = self.rel.new_var().lit();
-        self.latchs.push(state);
+        self.latch.push(state);
         let lit = state.lit();
         self.init_map[state] = init;
         self.is_latch[state] = true;
@@ -119,17 +119,17 @@ impl TransysCtx {
 }
 
 impl Transys {
-    pub fn ctx(mut self) -> TransysCtx {
-        self.latch.sort();
-        let primes: Vec<Lit> = self.latch.iter().map(|l| self.next(l.lit())).collect();
+    pub fn ctx(&self) -> TransysCtx {
+        let mut latch = self.latch.clone();
+        latch.sort();
+        let primes: Vec<Lit> = latch.iter().map(|l| self.next(l.lit())).collect();
         let max_var = self.rel.max_var();
-        let max_latch = *self.latch.iter().max().unwrap_or(&Var::CONST);
+        let max_latch = *latch.iter().max().unwrap_or(&Var::CONST);
         let mut init_map = VarMap::new_with(max_latch);
         let mut is_latch = VarMap::new_with(max_var);
         let mut init = LitVec::new();
         let mut next_map = LitMap::new_with(max_latch);
-        let mut prev_map = LitMap::new_with(max_var);
-        for (v, p) in self.latch.iter().cloned().zip(primes.iter().cloned()) {
+        for (v, p) in latch.iter().cloned().zip(primes.iter().cloned()) {
             let l = v.lit();
             let i = self.init.get(&v).cloned();
             if let Some(i) = i {
@@ -138,18 +138,16 @@ impl Transys {
             }
             next_map[l] = p;
             next_map[!l] = !p;
-            prev_map[p] = l;
-            prev_map[!p] = !l;
             is_latch[v] = true;
         }
         TransysCtx {
-            inputs: self.input,
-            latchs: self.latch,
+            input: self.input.clone(),
+            latch: self.latch.clone(),
             init,
             bad: self.bad[0],
             init_map,
-            constraints: self.constraint,
-            rel: self.rel,
+            constraint: self.constraint.clone(),
+            rel: self.rel.clone(),
             is_latch,
             next_map,
             max_latch,

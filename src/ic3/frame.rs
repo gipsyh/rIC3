@@ -3,7 +3,7 @@ use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use log::trace;
-use logicrs::{Lit, LitOrdVec, LitSet, LitVec, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
 use std::{
     fmt::Write,
     ops::{Deref, DerefMut},
@@ -87,6 +87,10 @@ impl Frames {
             early: 1,
             tmp_lit_set,
         }
+    }
+
+    pub fn reserve(&mut self, var: Var) {
+        self.tmp_lit_set.reserve(var);
     }
 
     #[inline]
@@ -246,7 +250,7 @@ impl IC3 {
         if contained_check && self.frame.trivial_contained(Some(frame), &lemma).is_some() {
             return false;
         }
-        if self.ts.cube_subsume_init(lemma.cube()) {
+        if self.tsctx.cube_subsume_init(lemma.cube()) {
             assert!(self.cfg.ic3.inn);
         }
         let mut begin = None;
@@ -300,7 +304,7 @@ impl IC3 {
     pub(super) fn add_inf_lemma(&mut self, lemma: LitVec) {
         let lemma = LitOrdVec::new(lemma);
         assert!(self.frame.trivial_contained(None, &lemma).is_none());
-        if self.ts.cube_subsume_init(lemma.cube()) {
+        if self.tsctx.cube_subsume_init(lemma.cube()) {
             assert!(self.cfg.ic3.inn);
         }
         let lastf = self.frame.last_mut().unwrap();

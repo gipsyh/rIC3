@@ -1,3 +1,4 @@
+mod aux;
 mod ctx;
 pub mod frts;
 mod live;

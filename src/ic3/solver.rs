@@ -8,12 +8,11 @@ use std::time::Instant;
 impl IC3 {
     pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         debug!("getting bad state in last frame");
-        self.statistic.num_get_bad += 1;
         let start = Instant::now();
         if !self.cfg.ic3.no_pred_prop {
             assert!(!self.cfg.ic3.full_bad);
             let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
-            self.statistic.block_get_bad_time += start.elapsed();
+            self.statistic.block.get_bad_time += start.elapsed();
             res.then(|| {
                 let (s, i) =
                     self.bad_lift
@@ -29,8 +28,12 @@ impl IC3 {
                 (s, input, 1)
             })
         } else {
-            let res = self.solvers.last_mut().unwrap().solve(&self.ts.bad.cube());
-            self.statistic.block_get_bad_time += start.elapsed();
+            let res = self
+                .solvers
+                .last_mut()
+                .unwrap()
+                .solve(&self.tsctx.bad.cube());
+            self.statistic.block.get_bad_time += start.elapsed();
             res.then(|| {
                 if self.cfg.ic3.full_bad {
                     self.get_full_pred(self.solvers.len())
@@ -86,7 +89,7 @@ impl IC3 {
         let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let cls = !cls;
         let mut inputs = LitVec::new();
-        for input in self.ts.inputs.iter() {
+        for input in self.tsctx.input.iter() {
             let lit = input.lit();
             if let Some(v) = solver.sat_value(lit) {
                 inputs.push(lit.not_if(!v));
@@ -94,7 +97,7 @@ impl IC3 {
         }
         self.lift.set_domain(cls.iter().cloned());
         let mut latchs = LitVec::new();
-        for latch in self.ts.latchs.iter() {
+        for latch in self.tsctx.latch.iter() {
             let lit = latch.lit();
             if self.lift.domain_has(lit.var())
                 && let Some(v) = solver.sat_value(lit)
@@ -134,14 +137,14 @@ impl IC3 {
             }
         }
         self.lift.unset_domain();
-        self.statistic.block_get_predecessor_time += start.elapsed();
+        self.statistic.block.get_pred_time += start.elapsed();
         (latchs, inputs)
     }
 
     pub(super) fn get_full_pred(&mut self, frame: usize) -> (LitVec, LitVec) {
         let solver = &mut self.solvers[frame - 1];
         let mut inputs = LitVec::new();
-        for input in self.ts.inputs.iter() {
+        for input in self.tsctx.input.iter() {
             let lit = input.lit();
             if let Some(v) = solver.sat_value(lit) {
                 inputs.push(lit.not_if(!v));
@@ -150,7 +153,7 @@ impl IC3 {
             }
         }
         let mut latchs = LitVec::new();
-        for latch in self.ts.latchs.iter() {
+        for latch in self.tsctx.latch.iter() {
             let lit = latch.lit();
             if let Some(v) = solver.sat_value(lit) {
                 latchs.push(lit.not_if(!v));
@@ -163,7 +166,7 @@ impl IC3 {
 
     #[allow(unused)]
     pub(super) fn new_var(&mut self) -> Var {
-        let var = self.ts.new_var();
+        let var = self.tsctx.new_var();
         for s in self.solvers.iter_mut() {
             assert!(var == s.new_var());
         }

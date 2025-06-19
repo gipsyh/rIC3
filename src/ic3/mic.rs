@@ -61,7 +61,7 @@ impl IC3 {
         let mut cube = cube.clone();
         self.statistic.num_down += 1;
         loop {
-            if self.ts.cube_subsume_init(&cube) {
+            if self.tsctx.cube_subsume_init(&cube) {
                 return None;
             }
             let lemma = LitOrdVec::new(cube.clone());
@@ -106,7 +106,7 @@ impl IC3 {
                 {
                     s.push(l.not_if(!v));
                 }
-                let lt = self.ts.next(*l);
+                let lt = self.tsctx.next(*l);
                 if let Some(v) = self.solvers[frame - 1].sat_value(lt) {
                     t.push(l.not_if(!v));
                 }
@@ -130,7 +130,7 @@ impl IC3 {
         self.statistic.num_down += 1;
         let mut ctg = 0;
         loop {
-            if self.ts.cube_subsume_init(&cube) {
+            if self.tsctx.cube_subsume_init(&cube) {
                 return None;
             }
             self.statistic.num_down_sat += 1;
@@ -152,7 +152,7 @@ impl IC3 {
             }
             if ctg < parameter.max
                 && frame > 1
-                && !self.ts.cube_subsume_init(&model)
+                && !self.tsctx.cube_subsume_init(&model)
                 && self.trivial_block(
                     frame - 1,
                     LitOrdVec::new(model.clone()),
@@ -208,7 +208,7 @@ impl IC3 {
         let start = Instant::now();
         if parameter.level == 0 {
             self.solvers[frame - 1].set_domain(
-                self.ts
+                self.tsctx
                     .lits_next(&cube)
                     .iter()
                     .copied()
@@ -244,7 +244,7 @@ impl IC3 {
                 if parameter.level == 0 {
                     self.solvers[frame - 1].unset_domain();
                     self.solvers[frame - 1].set_domain(
-                        self.ts
+                        self.tsctx
                             .lits_next(&cube)
                             .iter()
                             .copied()
@@ -261,7 +261,7 @@ impl IC3 {
             self.solvers[frame - 1].unset_domain();
         }
         self.activity.bump_cube_activity(&cube);
-        self.statistic.block_mic_time += start.elapsed();
+        self.statistic.block.mic_time += start.elapsed();
         cube
     }
 
