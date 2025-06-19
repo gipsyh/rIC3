@@ -3,7 +3,7 @@ use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use log::trace;
-use logicrs::{Lit, LitOrdVec, LitSet, LitVec, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
 use std::{
     fmt::Write,
     ops::{Deref, DerefMut},
@@ -87,6 +87,10 @@ impl Frames {
             early: 1,
             tmp_lit_set,
         }
+    }
+
+    pub fn reserve(&mut self, var: Var) {
+        self.tmp_lit_set.reserve(var);
     }
 
     #[inline]
