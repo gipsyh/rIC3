@@ -3,7 +3,7 @@ use logicrs::fol::op::Ite;
 
 impl WlTransys {
     pub fn remove_reset(&mut self) {
-        if self.constraint.len() > 0 {
+        if !self.constraint.is_empty() {
             return;
         }
         let mut reset = None;

@@ -12,15 +12,15 @@ impl WlTransys {
             match &t.deref() {
                 TermType::Const(_) => (),
                 TermType::Var(_) => {
-                    if let Some(n) = self.next.get(&t) {
-                        if touch.insert(n.clone()) {
-                            queue.push(n.clone());
-                        }
+                    if let Some(n) = self.next.get(&t)
+                        && touch.insert(n.clone())
+                    {
+                        queue.push(n.clone());
                     }
-                    if let Some(i) = self.init.get(&t) {
-                        if touch.insert(i.clone()) {
-                            queue.push(i.clone());
-                        }
+                    if let Some(i) = self.init.get(&t)
+                        && touch.insert(i.clone())
+                    {
+                        queue.push(i.clone());
                     }
                 }
                 TermType::Op(op) => {

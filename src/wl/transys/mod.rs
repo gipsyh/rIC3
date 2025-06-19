@@ -26,7 +26,7 @@ impl WlTransys {
 
     #[inline]
     pub fn next(&self, term: &Term) -> Term {
-        self.next.get(&term).unwrap().clone()
+        self.next.get(term).unwrap().clone()
     }
 }
 

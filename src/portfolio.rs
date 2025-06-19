@@ -123,7 +123,6 @@ impl Portfolio {
     }
 
     fn check_inner(&mut self) -> Option<bool> {
-        let wmem = self.cfg.portfolio.wmem_limit * 1024 * 1024 * 1024;
         let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
             let certificate =
@@ -151,7 +150,7 @@ impl Portfolio {
                 #[cfg(target_os = "linux")]
                 let status = child
                     .controlled()
-                    .memory_limit(wmem)
+                    .memory_limit(self.cfg.portfolio.wmem_limit * 1024 * 1024 * 1024)
                     .wait()
                     .unwrap()
                     .unwrap();

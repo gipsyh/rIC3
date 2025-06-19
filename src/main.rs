@@ -82,10 +82,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 if cfg.witness {
                     println!("0");
                 }
-            } else {
-                if env::var("RIC3_WORKER").is_err() {
-                    println!("RESULT: SAT");
-                }
+            } else if env::var("RIC3_WORKER").is_err() {
+                println!("RESULT: SAT");
             }
             certificate(&cfg, frontend.as_mut(), engine.as_mut(), res);
         }

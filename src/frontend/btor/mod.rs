@@ -10,7 +10,7 @@ use logicrs::Var;
 use std::{fmt::Display, path::Path, process::exit};
 
 pub struct BtorFrontend {
-    btor: Btor,
+    _btor: Btor,
     wts: WlTransys,
     cfg: Config,
     // wordlevel restore
@@ -41,7 +41,7 @@ impl BtorFrontend {
         let wts = WlTransys::from_btor(&btor);
         let wl_rst = GHashMap::from_iter((0..wts.input.len() + wts.latch.len()).map(|i| (i, i)));
         Self {
-            btor,
+            _btor: btor,
             wts,
             cfg: cfg.clone(),
             wl_rst,
@@ -84,7 +84,7 @@ impl WlTransys {
         let mut latch = Vec::new();
         let mut input = btor.input.clone();
         for l in btor.latch.iter() {
-            if btor.next.contains_key(&l) {
+            if btor.next.contains_key(l) {
                 latch.push(l.clone());
             } else {
                 input.push(l.clone());
