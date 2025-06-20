@@ -25,26 +25,38 @@ use std::{
 };
 
 impl WlTransys {
-    fn from_btor(btor: &Btor) -> Self {
+    fn from_btor(btor: &Btor) -> (Self, GHashMap<usize, usize>) {
+        let mut rst = GHashMap::new();
         let mut latch = Vec::new();
         let mut input = btor.input.clone();
-        for l in btor.latch.iter() {
-            if btor.next.contains_key(l) {
-                latch.push(l.clone());
-            } else {
+        for i in 0..btor.input.len() {
+            rst.insert(i, i);
+        }
+        for (i, l) in btor.latch.iter().enumerate() {
+            if !btor.next.contains_key(l) {
+                rst.insert(input.len(), i + btor.input.len());
                 input.push(l.clone());
             }
         }
-        Self {
-            tm: btor.tm.clone(),
-            input,
-            latch,
-            init: btor.init.clone(),
-            next: btor.next.clone(),
-            bad: btor.bad.clone(),
-            constraint: btor.constraint.clone(),
-            justice: Default::default(),
+        for (i, l) in btor.latch.iter().enumerate() {
+            if btor.next.contains_key(l) {
+                rst.insert(input.len() + latch.len(), i + btor.input.len());
+                latch.push(l.clone());
+            }
         }
+        (
+            Self {
+                tm: btor.tm.clone(),
+                input,
+                latch,
+                init: btor.init.clone(),
+                next: btor.next.clone(),
+                bad: btor.bad.clone(),
+                constraint: btor.constraint.clone(),
+                justice: Default::default(),
+            },
+            rst,
+        )
     }
 }
 
@@ -63,12 +75,12 @@ impl Into<Btor> for WlTransys {
 }
 
 pub struct BtorFrontend {
-    _btor: Btor,
+    btor: Btor,
     owts: WlTransys,
     wts: WlTransys,
     _cfg: Config,
     // wordlevel restore
-    wl_rst: GHashMap<usize, usize>,
+    wb_rst: GHashMap<usize, usize>,
     // bitblast restore
     bb_rst: GHashMap<Var, (usize, usize)>,
 }
@@ -92,19 +104,19 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let wts = WlTransys::from_btor(&btor);
-        let wl_rst = GHashMap::from_iter((0..wts.input.len() + wts.latch.len()).map(|i| (i, i)));
+        let (wts, wb_rst) = WlTransys::from_btor(&btor);
+        dbg!(&wb_rst);
         Self {
-            _btor: btor,
+            btor: btor,
             owts: wts.clone(),
             wts,
             _cfg: cfg.clone(),
-            wl_rst,
+            wb_rst,
             bb_rst: GHashMap::new(),
         }
     }
 
-    pub fn raise_from_ts(&self, ts: &Transys) -> WlTransys {
+    pub fn btor_certifate(&self, ts: &Transys) -> WlTransys {
         let mut wts = WlTransys::new(self.owts.tm.clone());
         wts.input = self.owts.input.clone();
         wts.latch = self.owts.latch.clone();
@@ -159,21 +171,61 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> bl::Transys {
         let mut wts = self.wts.clone();
-        wts.coi_refine(&mut self.wl_rst);
+        wts.coi_refine(&mut self.wb_rst);
         wts.simplify();
-        wts.coi_refine(&mut self.wl_rst);
+        wts.coi_refine(&mut self.wb_rst);
         let (bitblast, bb_rst) = wts.bitblast();
         self.bb_rst = GHashMap::from_iter(
             bb_rst
                 .into_iter()
-                .map(|(i, (j, k))| (Var::new(i + 1), (self.wl_rst[&j], k))),
+                .map(|(i, (j, k))| (Var::new(i + 1), (self.wb_rst[&j], k))),
         );
         bitblast.lower_to_ts()
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
-        let proof = self.raise_from_ts(&proof.proof);
-        let btor: Btor = proof.into();
+        let ts = proof.proof;
+        let mut btor = self.btor.clone();
+        btor.bad.clear();
+        btor.constraint.clear();
+        let mut map: GHashMap<Var, Term> = GHashMap::new();
+        map.insert(Var::CONST, btor.tm.bool_const(false));
+        for i in ts.input() {
+            let (w, b) = self.bb_rst[&i];
+            map.insert(i, btor.input[w].slice(b, b));
+        }
+        for l in ts.latch() {
+            let (mut w, b) = self.bb_rst[&l];
+            w -= ts.input.len();
+            map.insert(l, btor.latch[w].slice(b, b));
+        }
+        for (v, rel) in ts.rel.iter() {
+            if ts.rel.has_rel(v) && !v.is_constant() {
+                assert!(!map.contains_key(&v));
+                let mut r = Vec::new();
+                for rel in rel {
+                    let last = rel.last();
+                    assert!(last.var() == v);
+                    if last.polarity() {
+                        let mut rel = !rel;
+                        rel.pop();
+                        r.push(btor.tm.new_op_term(
+                            And,
+                            rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
+                        ));
+                    }
+                }
+                let n = btor.tm.new_op_term(Or, r);
+                map.insert(v, n);
+            }
+        }
+        let map_lit = |l: Lit| map[&l.var()].not_if(!l.polarity());
+        for &b in ts.bad.iter() {
+            btor.bad.push(map_lit(b));
+        }
+        for c in ts.constraint() {
+            btor.constraint.push(map_lit(c));
+        }
         Box::new(btor)
     }
 
