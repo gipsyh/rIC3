@@ -1,5 +1,6 @@
+use crate::transys::Transys;
+
 use super::WlTransys;
-use crate::transys::{self as blts};
 use giputils::hash::GHashMap;
 use logicrs::{DagCnf, LitVec};
 use logicrs::{
@@ -62,7 +63,9 @@ impl WlTransys {
                 next.insert(l.clone(), n.clone());
             }
         }
-        let bad = self.bad.bitblast(&mut tm, &mut map)[0].clone();
+        let bad: Vec<Term> = bitblast_terms(self.bad.iter(), &mut tm, &mut map)
+            .flatten()
+            .collect();
         let constraint: Vec<Term> = bitblast_terms(self.constraint.iter(), &mut tm, &mut map)
             .flatten()
             .collect();
@@ -84,7 +87,7 @@ impl WlTransys {
         )
     }
 
-    pub fn lower_to_ts(&self) -> blts::Transys {
+    pub fn lower_to_ts(&self) -> Transys {
         let mut dc = DagCnf::new();
         let mut map = GHashMap::new();
         let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
@@ -124,8 +127,8 @@ impl WlTransys {
                 }
             }
         }
-        let bad = LitVec::from([self.bad.cnf_encode(&mut dc, &mut map)]);
-        blts::Transys {
+        let bad: LitVec = cnf_encode_terms(self.bad.iter(), &mut dc, &mut map).collect();
+        Transys {
             input,
             latch,
             bad,

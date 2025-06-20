@@ -12,12 +12,25 @@ pub struct WlTransys {
     pub latch: Vec<Term>,
     pub init: GHashMap<Term, Term>,
     pub next: GHashMap<Term, Term>,
-    pub bad: Term,
+    pub bad: Vec<Term>,
     pub constraint: Vec<Term>,
     pub justice: Vec<Term>,
 }
 
 impl WlTransys {
+    pub fn new(tm: TermManager) -> Self {
+        Self {
+            tm,
+            input: Vec::new(),
+            latch: Vec::new(),
+            init: GHashMap::new(),
+            next: GHashMap::new(),
+            bad: Vec::new(),
+            constraint: Vec::new(),
+            justice: Vec::new(),
+        }
+    }
+
     pub fn print_info(&self) {
         println!("num input: {}", self.input.len());
         println!("num latch: {}", self.latch.len());
@@ -27,6 +40,12 @@ impl WlTransys {
     #[inline]
     pub fn next(&self, term: &Term) -> Term {
         self.next.get(term).unwrap().clone()
+    }
+}
+
+impl Default for WlTransys {
+    fn default() -> Self {
+        Self::new(TermManager::default())
     }
 }
 
