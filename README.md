@@ -18,10 +18,13 @@ To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or dow
 ### Publications
 - [CAV2025] [The rIC3 Hardware Model Checker](https://arxiv.org/abs/2502.13605)
 - [CAV2025] [Deeply Optimizing the SAT Solver for the IC3 Algorithm](https://arxiv.org/abs/2501.18612)
+- [DAC2024] [Predicting Lemmas in Generalization of IC3](http://doi.org/10.1145/3649329.3655970)
 - [arXiv] [Extended CTG Generalization and Dynamic Adjustment of Generalization Strategies in IC3](https://arxiv.org/abs/2501.02480)
 
 ### rIC3 Tool Flow
-![Image of rIC3 toolflow](./images/toolflow.jpg)
+<p align="center">
+	<img width="500" height="auto" src="./images/toolflow.jpg" style="display:inline-block;">
+</p>
 
 ### Install From Crates.io
 ```cargo install rIC3```

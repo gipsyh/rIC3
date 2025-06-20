@@ -1,5 +1,4 @@
 mod array;
-mod certificate;
 
 use super::Frontend;
 use crate::{Proof, Witness, config::Config, transys as bl, wl::transys::WlTransys};
@@ -96,7 +95,8 @@ impl Frontend for BtorFrontend {
         bitblast.lower_to_ts()
     }
 
-    fn safe_certificate(&mut self, _proof: Proof) -> Box<dyn Display> {
+    fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
+        dbg!(proof);
         todo!()
     }
 
