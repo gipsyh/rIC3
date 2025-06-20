@@ -50,8 +50,8 @@ impl From<&Transys> for Aig {
         let map_lit = |l: Lit| map[&l.var()].not_if(!l.polarity());
         for l in ts.latch.iter() {
             let next = map_lit(ts.next[l]);
-            let init = ts.init.get(l).copied();
-            aig.add_latch(map[l].node_id(), next, init.map(AigEdge::from_lit));
+            let init = ts.init.get(l).map(|&l| map_lit(l));
+            aig.add_latch(map[l].node_id(), next, init);
         }
         for &b in ts.bad.iter() {
             aig.bads.push(map_lit(b));
