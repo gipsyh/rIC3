@@ -50,7 +50,7 @@ impl From<&Transys> for Aig {
         for l in ts.latch.iter() {
             let next = map_lit(ts.next[l]);
             let init = ts.init.get(l).copied();
-            aig.add_latch(map[l].node_id(), next, init.map(AigEdge::constant));
+            aig.add_latch(map[l].node_id(), next, init.map(AigEdge::from_lit));
         }
         for &b in ts.bad.iter() {
             aig.bads.push(map_lit(b));
@@ -76,7 +76,7 @@ impl Transys {
             latch.push(lv);
             next.insert(lv, l.next.to_lit());
             if let Some(i) = l.init {
-                init.insert(lv, i.to_constant());
+                init.insert(lv, i.to_lit());
             }
         }
         let bad = aig.bads.iter().map(|c| c.to_lit()).collect();
@@ -103,7 +103,6 @@ impl Transys {
 
 pub fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
     let (mut aig, restore) = aig.coi_refine();
-    aig.gate_init_to_constraint();
     aig.constraints.retain(|e| !e.is_constant(true));
     (aig, restore)
 }

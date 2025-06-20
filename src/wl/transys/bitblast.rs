@@ -1,15 +1,11 @@
-use crate::transys::Transys;
-
 use super::WlTransys;
+use crate::transys::Transys;
 use giputils::hash::GHashMap;
-use logicrs::{DagCnf, LitVec};
-use logicrs::{
-    Lit,
-    fol::{
-        Term, TermManager,
-        bitblast::{bitblast_terms, cnf_encode_terms},
-    },
+use logicrs::fol::{
+    Term, TermManager,
+    bitblast::{bitblast_terms, cnf_encode_terms},
 };
+use logicrs::{DagCnf, LitVec};
 
 impl WlTransys {
     pub fn bitblast(&self) -> (Self, GHashMap<usize, (usize, usize)>) {
@@ -93,7 +89,7 @@ impl WlTransys {
         let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
             .map(|i| i.var())
             .collect();
-        let mut latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
+        let latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
             .map(|l| l.var())
             .collect();
         let mut next = GHashMap::new();
@@ -103,28 +99,15 @@ impl WlTransys {
             let n = n.cnf_encode(&mut dc, &mut map);
             next.insert(l, n);
         }
-        let mut constraint: LitVec =
+        let constraint: LitVec =
             cnf_encode_terms(self.constraint.iter(), &mut dc, &mut map).collect();
         let justice: LitVec = cnf_encode_terms(self.justice.iter(), &mut dc, &mut map).collect();
         let mut init = GHashMap::new();
-        let mut reset = None;
         for l in self.latch.iter() {
             if let Some(i) = self.init.get(l) {
                 let l = l.cnf_encode(&mut dc, &mut map).var();
                 let i = i.cnf_encode(&mut dc, &mut map);
-                if i.is_constant(false) || i.is_constant(true) {
-                    init.insert(l, i.is_constant(true));
-                } else {
-                    if reset.is_none() {
-                        let r = dc.new_var();
-                        latch.push(r);
-                        init.insert(r, true);
-                        next.insert(r, Lit::constant(false));
-                        reset = Some(r);
-                    }
-                    let eq = dc.new_xnor(l.lit(), i);
-                    constraint.push(dc.new_imply(reset.unwrap().lit(), eq));
-                }
+                init.insert(l, i);
             }
         }
         let bad: LitVec = cnf_encode_terms(self.bad.iter(), &mut dc, &mut map).collect();

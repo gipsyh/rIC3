@@ -8,7 +8,7 @@ pub struct NoDepTransys {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,
     pub next: GHashMap<Var, Lit>,
-    pub init: GHashMap<Var, bool>,
+    pub init: GHashMap<Var, Lit>,
     pub bad: Lit,
     pub constraint: LitVec,
     pub rel: Cnf,
@@ -92,8 +92,8 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
-    fn init(&self) -> impl Iterator<Item = Lit> {
-        self.init.iter().map(|(v, i)| Lit::new(*v, *i))
+    fn init(&self, latch: Var) -> Option<Lit> {
+        self.init.get(&latch).copied()
     }
 
     #[inline]

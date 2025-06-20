@@ -74,7 +74,7 @@ impl Rlive {
         let mut rts = self.rts.clone();
         for l in s {
             assert!(l.var() != self.base_var);
-            rts.init.insert(l.var(), l.polarity());
+            rts.init.insert(l.var(), Lit::constant(l.polarity()));
         }
         let mut ic3 = IC3::new(self.rcfg.clone(), rts, vec![]);
         if ic3.check().unwrap() {
@@ -123,10 +123,10 @@ impl Rlive {
         }
         assert!(ts.justice.len() == 1);
         let base_var = ts.new_var();
-        ts.add_latch(base_var, Some(false), Lit::constant(true));
+        ts.add_latch(base_var, Some(Lit::constant(false)), Lit::constant(true));
         let mut rts = ts.clone();
         rts.init.clear();
-        rts.init.insert(base_var, false);
+        rts.add_init(base_var, Lit::constant(false));
         rts.bad = take(&mut rts.justice);
         let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);

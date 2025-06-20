@@ -159,7 +159,11 @@ impl TransysSolver {
             let new = self
                 .relind
                 .iter()
-                .find(|&&l| self.ts.init_map[l.var()].is_some_and(|i| i != l.polarity()))
+                .find(|&&l| {
+                    self.ts.init_map[l.var()]
+                        .and_then(|l| l.try_constant())
+                        .is_some_and(|i| i != l.polarity())
+                })
                 .unwrap();
             for &l in self.relind.iter() {
                 let nl = self.ts.next(l);

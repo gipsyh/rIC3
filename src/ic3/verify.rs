@@ -7,12 +7,14 @@ use logicrs::{LitVec, satif::Satif};
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
+    ts.load_init(&mut solver);
     for lemma in invariants {
-        let assump: LitVec = ts.init.iter().chain(lemma.iter()).copied().collect();
-        if solver.solve(&assump) {
+        if solver.solve(lemma) {
             return false;
         }
     }
+    let mut solver = Solver::new();
+    ts.load_trans(&mut solver, true);
     for lemma in invariants {
         solver.add_clause(&!lemma);
     }

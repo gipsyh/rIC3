@@ -9,7 +9,7 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
 use log::{Level, debug, info};
-use logicrs::{LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{Rng, SeedableRng, rngs::StdRng, seq::SliceRandom};
@@ -76,7 +76,7 @@ impl IC3 {
         self.frame.push(Frame::new());
         if self.level() == 0 {
             for init in self.tsctx.init.clone() {
-                self.add_lemma(0, LitVec::from([!init]), true, None);
+                self.add_lemma(0, !init, true, None);
             }
             let mut init = LitVec::new();
             for l in self.tsctx.latch.iter() {
@@ -88,8 +88,8 @@ impl IC3 {
                 }
             }
             for i in init {
-                self.ts.init.insert(i.var(), i.polarity());
-                self.tsctx.add_init(i.var(), Some(i.polarity()));
+                self.ts.add_init(i.var(), Lit::constant(i.polarity()));
+                self.tsctx.add_init(i.var(), Lit::constant(i.polarity()));
             }
         } else if self.level() == 1 {
             for cls in self.pre_lemmas.clone().iter() {

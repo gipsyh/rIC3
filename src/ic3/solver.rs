@@ -1,3 +1,5 @@
+use crate::transys::TransysIf;
+
 use super::IC3;
 use giputils::hash::GHashSet;
 use log::debug;

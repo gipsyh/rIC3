@@ -10,7 +10,7 @@ use std::path::PathBuf;
 )]
 pub struct Config {
     /// model checking engine
-    #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
+    #[arg(short, long, value_enum, default_value_t = Engine::IC3)]
     pub engine: Engine,
 
     /// model file in aiger format or in btor2 format
@@ -134,9 +134,6 @@ pub struct BMCOptions {
 
 #[derive(Args, Clone, Debug)]
 pub struct KindOptions {
-    /// no bmc check in kind
-    #[arg(long = "kind-no-bmc", default_value_t = false)]
-    pub no_bmc: bool,
     /// use kissat solver, otherwise cadical
     #[arg(long = "kind-kissat", default_value_t = false)]
     pub kind_kissat: bool,
