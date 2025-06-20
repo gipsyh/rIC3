@@ -584,15 +584,41 @@ impl Engine for IC3 {
         assert!(b.frame == 0);
         let mut b = Some(b);
         while let Some(bad) = b {
-            res.state.push(
-                bad.lemma
-                    .iter()
-                    .filter_map(|l| self.rst.lit_map(*l))
-                    .collect(),
-            );
-            for i in bad.input.iter() {
+            if bad.frame == 0 {
+                let mut init = LitVec::new();
+                let mut input = LitVec::new();
+                let mut assump = bad.lemma.cube().clone();
+                assump.extend(bad.input[0].iter().copied());
+                assert!(self.solvers[0].solve(&assump));
+                for l in self.ts.latch() {
+                    if let Some(a) = self.solvers[0].sat_value(l.lit()) {
+                        init.push(l.lit().not_if(!a));
+                    }
+                }
+                for i in self.ts.input() {
+                    if let Some(a) = self.solvers[0].sat_value(i.lit()) {
+                        input.push(i.lit().not_if(!a));
+                    }
+                }
+                res.state
+                    .push(init.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
                 res.input
-                    .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                    .push(input.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                for i in bad.input[1..].iter() {
+                    res.input
+                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                }
+            } else {
+                res.state.push(
+                    bad.lemma
+                        .iter()
+                        .filter_map(|l| self.rst.lit_map(*l))
+                        .collect(),
+                );
+                for i in bad.input.iter() {
+                    res.input
+                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                }
             }
             b = bad.next.clone();
         }

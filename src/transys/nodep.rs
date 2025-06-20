@@ -32,6 +32,9 @@ impl NoDepTransys {
         for &l in self.latch.iter() {
             frozens.push(l);
             frozens.push(self.var_next(l));
+            if let Some(i) = self.init(l) {
+                frozens.push(i.var());
+            }
         }
         for c in self.constraint.iter() {
             frozens.push(c.var());
@@ -52,7 +55,7 @@ impl NoDepTransys {
         self.init = self
             .init
             .iter()
-            .map(|(v, i)| (domain_map[*v], *i))
+            .map(|(v, i)| (domain_map[*v], map_lit(i)))
             .collect();
         self.next = self
             .next

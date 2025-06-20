@@ -78,26 +78,6 @@ impl TransysCtx {
         Into::<usize>::into(self.max_var()) + 1
     }
 
-    // #[inline]
-    // pub fn add_latch(&mut self, state: Var, init: Option<bool>, trans: Vec<LitVec>) {
-    //     let next = self.rel.new_var().lit();
-    //     self.latch.push(state);
-    //     let lit = state.lit();
-    //     self.init_map[state] = init;
-    //     self.is_latch[state] = true;
-    //     self.next_map[lit] = next;
-    //     self.next_map[!lit] = !next;
-    //     if let Some(i) = init {
-    //         self.init.push(lit.not_if(!i));
-    //     }
-    //     self.rel.add_rel(state, &trans);
-    //     let next_trans: Vec<_> = trans
-    //         .iter()
-    //         .map(|c| c.iter().map(|l| self.next(*l)).collect())
-    //         .collect();
-    //     self.rel.add_rel(next.var(), &next_trans);
-    // }
-
     #[inline]
     pub fn cube_subsume_init(&self, x: &[Lit]) -> bool {
         for x in x {

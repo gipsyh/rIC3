@@ -7,6 +7,7 @@ use crate::{
 use aig::{Aig, AigEdge, TernarySimulate};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
+use logicrs::satif::Satif;
 use logicrs::{Lbool, Lit, LitVec, Var, VarVMap};
 use std::{
     fmt::Display,
@@ -108,27 +109,28 @@ pub fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
 }
 
 pub struct AigFrontend {
-    origin_aig: Aig,
+    oaig: Aig,
+    ots: Transys,
     ts: Transys,
     rst: VarVMap,
 }
 
 impl AigFrontend {
     pub fn new(cfg: &Config) -> Self {
-        let mut origin_aig = Aig::from_file(&cfg.model);
-        if !origin_aig.outputs.is_empty() {
-            if origin_aig.bads.is_empty() {
-                origin_aig.bads = std::mem::take(&mut origin_aig.outputs);
+        let mut oaig = Aig::from_file(&cfg.model);
+        if !oaig.outputs.is_empty() {
+            if oaig.bads.is_empty() {
+                oaig.bads = std::mem::take(&mut oaig.outputs);
                 warn!(
                     "property not found, moved {} outputs to bad properties",
-                    origin_aig.bads.len()
+                    oaig.bads.len()
                 );
             } else {
                 warn!("outputs in aiger are ignored");
-                origin_aig.outputs.clear();
+                oaig.outputs.clear();
             }
         }
-        let mut aig = origin_aig.clone();
+        let mut aig = oaig.clone();
         if !aig.justice.is_empty() {
             if !aig.bads.is_empty() {
                 error!(
@@ -166,17 +168,14 @@ impl AigFrontend {
                 aig.compress_property();
             }
         }
+        let ots = Transys::from_aig(&aig, true);
         let (aig, rst) = aig_preprocess(&aig);
         let ts = Transys::from_aig(&aig, true);
-        Self {
-            origin_aig,
-            ts,
-            rst,
-        }
+        Self { oaig, ots, ts, rst }
     }
 
     pub fn is_safety(&self) -> bool {
-        if !self.origin_aig.bads.is_empty() {
+        if !self.oaig.bads.is_empty() {
             true
         } else {
             assert!(!self.ts.justice.is_empty());
@@ -214,31 +213,36 @@ impl Frontend for AigFrontend {
     fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
         let wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string(), "b".to_string()];
-        let map: GHashMap<Var, bool> =
-            GHashMap::from_iter(wit.state[0].iter().map(|l| (l.var(), l.polarity())));
-        let mut line = String::new();
         let mut state = Vec::new();
-        for l in self.origin_aig.latchs.iter() {
-            let r = if let Some(r) = map.get(&Var::new(l.input)) {
-                *r
-            } else if let Some(r) = l.init
-                && let Some(r) = r.try_to_constant()
-            {
-                r
-            } else {
-                true
-            };
+        let mut solver = cadical::Solver::new();
+        self.ots.load_init(&mut solver);
+        self.ots.load_trans(&mut solver, true);
+        let mut assump = wit.state[0].clone();
+        assump.extend(wit.input[0].iter().copied());
+        assert!(solver.solve(&assump));
+        let mut line = String::new();
+        for l in self.ots.latch() {
+            let r = solver.sat_value(l.lit()).unwrap();
             state.push(Lbool::from(r));
             line.push(if r { '1' } else { '0' })
         }
         res.push(line);
-        let mut simulate = TernarySimulate::new(&self.origin_aig, state);
-        for c in wit.input.iter() {
+        let mut simulate = TernarySimulate::new(&self.oaig, state);
+        let mut input = Vec::new();
+        let mut line = String::new();
+        for i in self.ots.input() {
+            let r = solver.sat_value(i.lit()).unwrap();
+            input.push(Lbool::from(r));
+            line.push(if r { '1' } else { '0' })
+        }
+        res.push(line);
+        simulate.simulate(input);
+        for c in wit.input[1..].iter() {
             let map: GHashMap<Var, bool> =
                 GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
             let mut line = String::new();
             let mut input = Vec::new();
-            for l in self.origin_aig.inputs.iter() {
+            for l in self.oaig.inputs.iter() {
                 let r = if let Some(r) = map.get(&Var::new(*l)) {
                     *r
                 } else {
@@ -252,7 +256,7 @@ impl Frontend for AigFrontend {
         }
         if self.is_safety() {
             let p = self
-                .origin_aig
+                .oaig
                 .bads
                 .iter()
                 .position(|b| simulate.value(*b).is_true())
