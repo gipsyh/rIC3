@@ -60,20 +60,6 @@ impl WlTransys {
     }
 }
 
-impl Into<Btor> for WlTransys {
-    fn into(self) -> Btor {
-        Btor {
-            tm: self.tm,
-            input: self.input,
-            latch: self.latch,
-            init: self.init,
-            next: self.next,
-            bad: self.bad,
-            constraint: self.constraint,
-        }
-    }
-}
-
 pub struct BtorFrontend {
     btor: Btor,
     owts: WlTransys,
@@ -107,7 +93,7 @@ impl BtorFrontend {
         let (wts, wb_rst) = WlTransys::from_btor(&btor);
         dbg!(&wb_rst);
         Self {
-            btor: btor,
+            btor,
             owts: wts.clone(),
             wts,
             _cfg: cfg.clone(),
@@ -209,13 +195,13 @@ impl Frontend for BtorFrontend {
                     if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(btor.tm.new_op_term(
+                        r.push(btor.tm.new_op_terms_fold(
                             And,
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = btor.tm.new_op_term(Or, r);
+                let n = btor.tm.new_op_terms_fold(Or, r);
                 map.insert(v, n);
             }
         }
