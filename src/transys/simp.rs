@@ -34,6 +34,13 @@ impl Transys {
                     mark.insert(nv);
                     queue.push(nv);
                 }
+                if let Some(i) = self.init.get(&v) {
+                    let iv = i.var();
+                    if !mark.contains(&iv) {
+                        mark.insert(iv);
+                        queue.push(iv);
+                    }
+                }
             }
             for &d in self.rel.dep(v).iter() {
                 if !mark.contains(&d) {
@@ -72,6 +79,9 @@ impl Transys {
         for l in self.latch.iter() {
             additional.push(*l);
             additional.push(self.next[l].var());
+            if let Some(i) = self.init.get(l) {
+                additional.push(i.var());
+            }
         }
         let domain_map = self.rel.rearrange(additional.into_iter());
         let map_lit = |l: Lit| Lit::new(domain_map[l.var()], l.polarity());
@@ -80,7 +90,7 @@ impl Transys {
         self.init = self
             .init
             .iter()
-            .map(|(v, i)| (domain_map[*v], *i))
+            .map(|(v, i)| (domain_map[*v], map_lit(*i)))
             .collect();
         self.next = self
             .next
@@ -107,6 +117,9 @@ impl Transys {
         for l in self.latch.iter() {
             frozens.push(*l);
             frozens.push(self.next[l].var());
+            if let Some(i) = self.init.get(l) {
+                frozens.push(i.var());
+            }
         }
         self.rel = self.rel.simplify(frozens.iter().copied());
         self.rearrange(rst);

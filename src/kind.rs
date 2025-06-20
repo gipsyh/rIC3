@@ -3,7 +3,7 @@ use crate::{
     config::Config,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
-use log::{error, info};
+use log::{error, info, warn};
 use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
 
 pub struct Kind {
@@ -18,6 +18,9 @@ pub struct Kind {
 
 impl Kind {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
+        warn!(
+            "Kind does not currently detect counter-example. Please run BMC separately or use the portfolio mode if needed."
+        );
         let ots = ts.clone();
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
@@ -105,27 +108,27 @@ impl Engine for Kind {
                     self.reset_solver();
                 }
             }
-            if !self.cfg.kind.no_bmc {
-                info!("kind bmc depth: {k}");
-                let res = if self.cfg.kind.kind_kissat {
-                    self.uts.ts.load_init(self.solver.as_mut());
-                    for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
-                        self.solver.add_clause(&[l]);
-                    }
-                    self.solver.solve(&[])
-                } else {
-                    let mut assump: LitVec = self.uts.ts.init().collect();
-                    assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
-                    self.solver.solve(&assump)
-                };
-                if res {
-                    info!("bmc found counter-example in depth {k}");
-                    return Some(false);
-                }
-            }
-            if self.cfg.kind.kind_kissat {
-                self.reset_solver();
-            }
+            // if !self.cfg.kind.no_bmc {
+            // info!("kind bmc depth: {k}");
+            // let res = if self.cfg.kind.kind_kissat {
+            //     self.uts.ts.load_init(self.solver.as_mut());
+            //     for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
+            //         self.solver.add_clause(&[l]);
+            //     }
+            //     self.solver.solve(&[])
+            // } else {
+            //     let mut assump: LitVec = self.uts.ts.init().collect();
+            //     assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
+            //     self.solver.solve(&assump)
+            // };
+            // if res {
+            //     info!("bmc found counter-example in depth {k}");
+            //     return Some(false);
+            // }
+            // if self.cfg.kind.kind_kissat {
+            //     self.reset_solver();
+            // }
+            // }
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
         None
@@ -190,9 +193,9 @@ impl Engine for Kind {
             let aux = proof.new_var().lit();
             aux_latchs.push(aux);
             let (next, init) = if i == 0 {
-                (aux, Some(true))
+                (aux, Some(Lit::constant(true)))
             } else {
-                (aux_latchs[i - 1], Some(false))
+                (aux_latchs[i - 1], Some(Lit::constant(false)))
             };
             proof.add_latch(aux.var(), init, next);
         }
@@ -218,8 +221,9 @@ impl Engine for Kind {
             let mut eqs = Vec::new();
             let mut init = Vec::new();
             for j in 0..nl {
-                if let Some(linit) = inits.get(&latchs[j]) {
-                    init.push(Lit::new(latchs[(i - 1) * nl + j], *linit))
+                if let Some(&linit) = inits.get(&latchs[j]) {
+                    init.push(LitVec::from([latchs[(i - 1) * nl + j].lit(), !linit]));
+                    init.push(LitVec::from([!latchs[(i - 1) * nl + j].lit(), linit]));
                 }
                 eqs.push(
                     proof
@@ -230,6 +234,7 @@ impl Engine for Kind {
             let p = proof.rel.new_and(eqs);
             let p = proof.rel.new_imply(al, p);
             bads.push(!p);
+            let init: Vec<_> = init.into_iter().map(|cls| proof.rel.new_or(cls)).collect();
             let init = proof.rel.new_and(init);
             let p = proof.rel.new_and([!al, al_next]);
             let p = proof.rel.new_imply(p, init);

@@ -30,7 +30,7 @@ pub trait TransysIf {
 
     fn next(&self, lit: Lit) -> Lit;
 
-    fn init(&self) -> impl Iterator<Item = Lit>;
+    fn init(&self, latch: Var) -> Option<Lit>;
 
     fn constraint(&self) -> impl Iterator<Item = Lit>;
 
@@ -49,8 +49,15 @@ pub trait TransysIf {
     #[inline]
     fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
         satif.new_var_to(self.max_var());
-        for i in self.init() {
-            satif.add_clause(&[i]);
+        for l in self.latch() {
+            if let Some(i) = self.init(l) {
+                if let Some(i) = i.try_constant() {
+                    satif.add_clause(&[l.lit().not_if(!i)]);
+                } else {
+                    satif.add_clause(&[l.lit(), !i]);
+                    satif.add_clause(&[!l.lit(), i]);
+                }
+            }
         }
     }
 
@@ -83,8 +90,12 @@ pub trait TransysIf {
         panic!("Error: add input not support");
     }
 
-    fn add_latch(&mut self, _latch: Var, _init: Option<bool>, _next: Lit) {
+    fn add_latch(&mut self, _latch: Var, _init: Option<Lit>, _next: Lit) {
         panic!("Error: add latch not support");
+    }
+
+    fn add_init(&mut self, _latch: Var, _init: Lit) {
+        panic!("Error: add init not support");
     }
 }
 
@@ -93,7 +104,7 @@ pub struct Transys {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,
     pub next: GHashMap<Var, Lit>,
-    pub init: GHashMap<Var, bool>,
+    pub init: GHashMap<Var, Lit>,
     pub bad: LitVec,
     pub constraint: LitVec,
     pub justice: LitVec,
@@ -126,9 +137,8 @@ impl TransysIf for Transys {
         self.next[&lit.var()].not_if(!lit.polarity())
     }
 
-    #[inline]
-    fn init(&self) -> impl Iterator<Item = Lit> {
-        self.init.iter().map(|(v, i)| Lit::new(*v, *i))
+    fn init(&self, latch: Var) -> Option<Lit> {
+        self.init.get(&latch).copied()
     }
 
     #[inline]
@@ -147,12 +157,17 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn add_latch(&mut self, latch: Var, init: Option<bool>, next: Lit) {
+    fn add_latch(&mut self, latch: Var, init: Option<Lit>, next: Lit) {
         self.latch.push(latch);
         self.next.insert(latch, next);
         if let Some(i) = init {
             self.init.insert(latch, i);
         }
+    }
+
+    #[inline]
+    fn add_init(&mut self, latch: Var, init: Lit) {
+        self.init.insert(latch, init);
     }
 }
 

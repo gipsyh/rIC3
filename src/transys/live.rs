@@ -1,7 +1,7 @@
 use super::Transys;
 use crate::transys::TransysIf;
 use log::warn;
-use logicrs::{LitVec, VarVMap};
+use logicrs::{Lit, LitVec, VarVMap};
 use std::{iter::once, mem::take};
 
 impl Transys {
@@ -23,14 +23,14 @@ impl Transys {
         let eqn = l2s.rel.new_and(eqns);
         let encounter = l2s.new_var();
         let encounter_next = l2s.rel.new_or([eq, encounter.lit()]);
-        l2s.add_latch(encounter, Some(false), encounter_next);
+        l2s.add_latch(encounter, Some(Lit::constant(false)), encounter_next);
         let mut jlns = Vec::new();
         for &j in self.justice.iter() {
             let jl = l2s.new_var();
             let jln = l2s.rel.new_and([encounter_next, j]);
             let jln = l2s.rel.new_or([jl.lit(), jln]);
             jlns.push(jln);
-            l2s.add_latch(jl, Some(false), jln);
+            l2s.add_latch(jl, Some(Lit::constant(false)), jln);
         }
         l2s.bad = LitVec::from([l2s.rel.new_and(jlns.into_iter().chain(once(eqn)))]);
         l2s.justice.clear();
@@ -67,7 +67,7 @@ impl Transys {
         let reset = self.rel.new_or([ni.lit(), accept]);
         for (&lj, &ljn) in ljs.iter().zip(ljns.iter()) {
             let ljn = self.rel.new_and([ljn, !reset]);
-            self.add_latch(lj, Some(false), ljn);
+            self.add_latch(lj, Some(Lit::constant(false)), ljn);
         }
         self.justice.push(accept);
     }

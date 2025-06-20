@@ -25,7 +25,7 @@ impl Transys {
             self.latch.push(ml);
             self.next.insert(ml, lmap(other.next[&l]));
             if let Some(i) = other.init.get(&l) {
-                self.init.insert(ml, *i);
+                self.init.insert(ml, lmap(*i));
             }
         }
         let mut bad = self.bad.clone();

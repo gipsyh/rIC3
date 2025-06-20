@@ -6,7 +6,7 @@ use std::{mem::take, ops::Deref};
 impl WlTransys {
     pub fn coi_refine(&mut self, rst: &mut GHashMap<usize, usize>) {
         let mut queue = self.constraint.clone();
-        queue.push(self.bad.clone());
+        queue.extend_from_slice(&self.bad);
         let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
         while let Some(t) = queue.pop() {
             match &t.deref() {
@@ -58,6 +58,8 @@ impl WlTransys {
         for c in self.constraint.iter_mut() {
             *c = c.simplify(&mut self.tm, &mut map);
         }
-        self.bad = self.bad.simplify(&mut self.tm, &mut map);
+        for b in self.bad.iter_mut() {
+            *b = b.simplify(&mut self.tm, &mut map);
+        }
     }
 }
