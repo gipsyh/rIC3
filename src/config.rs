@@ -19,7 +19,9 @@ pub struct Config {
     pub model: PathBuf,
 
     /// certificate path
-    pub certificate: Option<PathBuf>,
+    pub sat_certificate: Option<PathBuf>,
+
+    pub unsat_certificate: Option<PathBuf>,
 
     /// certify with certifaiger
     #[arg(long, default_value_t = false)]

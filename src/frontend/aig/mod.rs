@@ -145,7 +145,7 @@ impl AigFrontend {
             }
             if aig.bads.is_empty() {
                 warn!("no property to be checked");
-                if let Some(certificate) = &cfg.certificate {
+                if let Some(certificate) = &cfg.unsat_certificate {
                     let mut map = aig.inputs.clone();
                     map.extend(aig.latchs.iter().map(|l| l.input));
                     for x in map {
@@ -156,7 +156,7 @@ impl AigFrontend {
                 println!("RESULT: UNSAT");
                 exit(20);
             } else if aig.bads.len() > 1 {
-                if cfg.certify || cfg.certificate.is_some() {
+                if cfg.certify || cfg.sat_certificate.is_some() || cfg.unsat_certificate.is_some() {
                     error!(
                         "multiple properties detected. cannot compress properties when certification is enabled"
                     );

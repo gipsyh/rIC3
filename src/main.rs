@@ -22,7 +22,7 @@ use std::{
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", "info") };
+        unsafe { env::set_var("RUST_LOG", "error") };
     }
     env_logger::Builder::from_default_env()
         .format_timestamp(None)
@@ -105,7 +105,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn Engine, res: bool) {
-    if cfg.certificate.is_none() && !cfg.certify && (!cfg.witness || res) {
+    if (!res && cfg.sat_certificate.is_none())
+        && (res && cfg.unsat_certificate.is_none())
+        && !cfg.certify
+        && (!cfg.witness || res)
+    {
         return;
     }
     let certificate = if res {
@@ -116,7 +120,10 @@ pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn E
     if cfg.witness && !res {
         println!("{certificate}");
     }
-    if let Some(cert_path) = &cfg.certificate {
+    if res && let Some(cert_path) = &cfg.unsat_certificate {
+        fs::write(cert_path, format!("{certificate}")).unwrap();
+    }
+    if !res && let Some(cert_path) = &cfg.sat_certificate {
         fs::write(cert_path, format!("{certificate}")).unwrap();
     }
     if cfg.certify {
