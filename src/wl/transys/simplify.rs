@@ -4,7 +4,7 @@ use logicrs::fol::{Term, TermType};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
-    pub fn coi_refine(&mut self, rst: &mut GHashMap<usize, usize>) {
+    pub fn coi_refine(&mut self, rst: &mut GHashMap<Term, Term>) {
         let mut queue: Vec<_> = self
             .constraint
             .iter()
@@ -37,17 +37,16 @@ impl WlTransys {
                 }
             };
         }
-        let onum_input = self.input.len();
         let mut nrst = GHashMap::new();
-        for (i, x) in take(&mut self.input).into_iter().enumerate() {
+        for x in take(&mut self.input) {
             if touch.contains(&x) {
-                nrst.insert(self.input.len(), rst[&i]);
+                nrst.insert(x.clone(), rst[&x].clone());
                 self.input.push(x);
             }
         }
-        for (i, x) in take(&mut self.latch).into_iter().enumerate() {
+        for x in take(&mut self.latch) {
             if touch.contains(&x) {
-                nrst.insert(self.input.len() + self.latch.len(), rst[&(i + onum_input)]);
+                nrst.insert(x.clone(), rst[&x].clone());
                 self.latch.push(x);
             }
         }

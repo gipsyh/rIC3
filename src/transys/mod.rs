@@ -49,7 +49,7 @@ pub trait TransysIf {
     #[inline]
     fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
         satif.new_var_to(self.max_var());
-        for l in self.latch() {
+        for l in self.input().chain(self.latch()) {
             if let Some(i) = self.init(l) {
                 if let Some(i) = i.try_constant() {
                     satif.add_clause(&[l.lit().not_if(!i)]);

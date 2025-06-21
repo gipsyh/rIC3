@@ -1,7 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
 use logicrs::{Lit, Var, VarVMap};
-use std::mem::take;
 
 impl Transys {
     pub fn coi_refine(&mut self, rst: &mut VarVMap) {
@@ -49,15 +48,14 @@ impl Transys {
                 }
             }
         }
-        self.input.retain(|i| mark.contains(i));
-        for l in take(&mut self.latch) {
-            if mark.contains(&l) {
-                self.latch.push(l);
-            } else {
-                self.next.remove(&l);
-                self.init.remove(&l);
+        for v in self.input.iter().chain(self.latch.iter()) {
+            if !mark.contains(v) {
+                self.init.remove(v);
+                self.next.remove(v);
             }
         }
+        self.input.retain(|i| mark.contains(i));
+        self.latch.retain(|i| mark.contains(i));
         for v in Var::CONST + 1..=self.max_var() {
             if !mark.contains(&v) {
                 self.rel.del_rel(v);
@@ -68,7 +66,6 @@ impl Transys {
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {
         let mut additional = vec![Var::CONST];
-        additional.extend_from_slice(&self.input);
         additional.extend(
             self.constraint
                 .iter()
@@ -76,12 +73,14 @@ impl Transys {
                 .chain(self.justice.iter())
                 .map(|l| l.var()),
         );
-        for l in self.latch.iter() {
+        for l in self.input.iter().chain(self.latch.iter()) {
             additional.push(*l);
-            additional.push(self.next[l].var());
             if let Some(i) = self.init.get(l) {
                 additional.push(i.var());
             }
+        }
+        for l in self.latch.iter() {
+            additional.push(self.next[l].var());
         }
         let domain_map = self.rel.rearrange(additional.into_iter());
         let map_lit = |l: Lit| Lit::new(domain_map[l.var()], l.polarity());
