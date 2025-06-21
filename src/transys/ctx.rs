@@ -103,9 +103,10 @@ impl Transys {
         latch.sort();
         let max_var = self.rel.max_var();
         let max_latch = *latch.iter().max().unwrap_or(&Var::CONST);
+        let max_input = *input.iter().max().unwrap_or(&Var::CONST);
         let mut is_latch = VarMap::new_with(max_var);
         let mut init = LitVvec::new();
-        let mut init_map = VarMap::new_with(max_latch);
+        let mut init_map = VarMap::new_with(max_input.max(max_latch));
         let mut next_map = LitMap::new_with(max_latch);
         for &v in input.iter().chain(latch.iter()) {
             let l = v.lit();
