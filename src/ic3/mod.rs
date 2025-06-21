@@ -153,11 +153,10 @@ impl IC3 {
                     } else {
                         return Some(false);
                     }
-                } else if self.cfg.ic3.inn && po.frame > 0 {
-                    assert!(!self.solvers[0].solve(&po.lemma));
+                } else if po.frame > 0 {
+                    debug_assert!(!self.solvers[0].solve(&po.lemma));
                 } else {
                     self.add_obligation(po.clone());
-                    assert!(po.frame == 0);
                     return Some(false);
                 }
             }
