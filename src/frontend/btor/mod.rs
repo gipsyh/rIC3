@@ -91,7 +91,6 @@ impl BtorFrontend {
             todo!()
         }
         let (wts, wb_rst) = WlTransys::from_btor(&btor);
-        dbg!(&wb_rst);
         Self {
             btor,
             owts: wts.clone(),
