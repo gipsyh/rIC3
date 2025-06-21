@@ -5,8 +5,13 @@ use std::{mem::take, ops::Deref};
 
 impl WlTransys {
     pub fn coi_refine(&mut self, rst: &mut GHashMap<usize, usize>) {
-        let mut queue = self.constraint.clone();
-        queue.extend_from_slice(&self.bad);
+        let mut queue: Vec<_> = self
+            .constraint
+            .iter()
+            .chain(self.bad.iter())
+            .chain(self.justice.iter())
+            .cloned()
+            .collect();
         let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
         while let Some(t) = queue.pop() {
             match &t.deref() {

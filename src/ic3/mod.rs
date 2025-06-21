@@ -395,6 +395,7 @@ impl IC3 {
                     0,
                     None,
                 ));
+                info!("counter-example found in base checking");
                 return false;
             }
             self.tsctx.constraint.push(!bad);
