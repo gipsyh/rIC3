@@ -32,7 +32,7 @@ impl WlTransys {
             }
         }
         let mut init = GHashMap::new();
-        for l in self.latch.iter() {
+        for l in self.input.iter().chain(self.latch.iter()) {
             let Some(i) = self.init.get(l) else {
                 continue;
             };
@@ -111,7 +111,7 @@ impl WlTransys {
             cnf_encode_terms(self.constraint.iter(), &mut dc, &mut map).collect();
         let justice: LitVec = cnf_encode_terms(self.justice.iter(), &mut dc, &mut map).collect();
         let mut init = GHashMap::new();
-        for l in self.latch.iter() {
+        for l in self.input.iter().chain(self.latch.iter()) {
             if let Some(i) = self.init.get(l) {
                 let l = l.cnf_encode(&mut dc, &mut map).var();
                 let i = i.cnf_encode(&mut dc, &mut map);
