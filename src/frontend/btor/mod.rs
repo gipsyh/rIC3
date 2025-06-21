@@ -250,11 +250,11 @@ impl Frontend for BtorFrontend {
     }
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool {
-        certobor_check(model, cert)
+        cerbotor_check(model, cert)
     }
 }
 
-pub fn certobor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
+pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
     let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([
