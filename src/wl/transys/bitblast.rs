@@ -1,32 +1,33 @@
 use super::WlTransys;
 use crate::transys::Transys;
 use giputils::hash::GHashMap;
-use logicrs::fol::{
-    Term, TermManager,
-    bitblast::{bitblast_terms, cnf_encode_terms},
-};
 use logicrs::{DagCnf, LitVec};
+use logicrs::{
+    Var,
+    fol::{
+        Term, TermManager,
+        bitblast::{bitblast_terms, cnf_encode_terms},
+    },
+};
 
 impl WlTransys {
-    pub fn bitblast(&self) -> (Self, GHashMap<usize, (usize, usize)>) {
+    pub fn bitblast(&self) -> (Self, GHashMap<Term, (Term, usize)>) {
         let mut rst = GHashMap::new();
         let mut tm = TermManager::new();
         let mut map = GHashMap::new();
-        let onum_input = self.input.len();
         let mut input = Vec::new();
-        for (i, x) in self.input.iter().enumerate() {
+        for x in self.input.iter() {
             let bb = x.bitblast(&mut tm, &mut map);
             for (j, b) in bb.into_iter().enumerate() {
-                rst.insert(input.len(), (i, j));
+                rst.insert(b.clone(), (x.clone(), j));
                 input.push(b);
             }
         }
         let mut latch = Vec::new();
-        for (mut i, x) in self.latch.iter().enumerate() {
-            i += onum_input;
+        for x in self.latch.iter() {
             let bb = x.bitblast(&mut tm, &mut map);
             for (j, b) in bb.into_iter().enumerate() {
-                rst.insert(latch.len() + input.len(), (i, j));
+                rst.insert(b.clone(), (x.clone(), j));
                 latch.push(b);
             }
         }
@@ -83,15 +84,22 @@ impl WlTransys {
         )
     }
 
-    pub fn lower_to_ts(&self) -> Transys {
+    pub fn lower_to_ts(&self) -> (Transys, GHashMap<Var, Term>) {
+        let mut rst = GHashMap::new();
         let mut dc = DagCnf::new();
         let mut map = GHashMap::new();
-        let input: Vec<_> = cnf_encode_terms(self.input.iter(), &mut dc, &mut map)
-            .map(|i| i.var())
-            .collect();
-        let latch: Vec<_> = cnf_encode_terms(self.latch.iter(), &mut dc, &mut map)
-            .map(|l| l.var())
-            .collect();
+        let mut input = Vec::new();
+        for x in self.input.iter() {
+            let v = x.cnf_encode(&mut dc, &mut map).var();
+            rst.insert(v, x.clone());
+            input.push(v);
+        }
+        let mut latch = Vec::new();
+        for x in self.latch.iter() {
+            let v = x.cnf_encode(&mut dc, &mut map).var();
+            rst.insert(v, x.clone());
+            latch.push(v);
+        }
         let mut next = GHashMap::new();
         for l in self.latch.iter() {
             let n = self.next.get(l).unwrap();
@@ -111,15 +119,18 @@ impl WlTransys {
             }
         }
         let bad: LitVec = cnf_encode_terms(self.bad.iter(), &mut dc, &mut map).collect();
-        Transys {
-            input,
-            latch,
-            bad,
-            constraint,
-            rel: dc,
-            next,
-            init,
-            justice,
-        }
+        (
+            Transys {
+                input,
+                latch,
+                bad,
+                constraint,
+                rel: dc,
+                next,
+                init,
+                justice,
+            },
+            rst,
+        )
     }
 }
