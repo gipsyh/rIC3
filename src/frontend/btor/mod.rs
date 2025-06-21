@@ -61,7 +61,7 @@ impl WlTransys {
 
 pub struct BtorFrontend {
     btor: Btor,
-    _owts: WlTransys,
+    owts: WlTransys,
     wts: WlTransys,
     _cfg: Config,
     // wordlevel restore
@@ -92,7 +92,7 @@ impl BtorFrontend {
         let (wts, wb_rst) = WlTransys::from_btor(&btor);
         Self {
             btor,
-            _owts: wts.clone(),
+            owts: wts.clone(),
             wts,
             _cfg: cfg.clone(),
             wb_rst,

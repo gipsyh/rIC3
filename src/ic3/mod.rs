@@ -586,25 +586,15 @@ impl Engine for IC3 {
         let mut b = Some(b);
         while let Some(bad) = b {
             if bad.frame == 0 {
-                let mut init = LitVec::new();
-                let mut input = LitVec::new();
-                let mut assump = bad.lemma.cube().clone();
-                assump.extend(bad.input[0].iter().copied());
-                assert!(self.solvers[0].solve(&assump));
-                for l in self.ts.latch() {
-                    if let Some(a) = self.solvers[0].sat_value(l.lit()) {
-                        init.push(l.lit().not_if(!a));
-                    }
-                }
-                for i in self.ts.input() {
-                    if let Some(a) = self.solvers[0].sat_value(i.lit()) {
-                        input.push(i.lit().not_if(!a));
-                    }
-                }
-                res.state
-                    .push(init.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
-                res.input
-                    .push(input.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                let assump: Vec<_> = bad
+                    .lemma
+                    .iter()
+                    .chain(bad.input[0].iter())
+                    .filter_map(|l| self.rst.lit_map(*l))
+                    .collect();
+                let (input, state) = self.ots.exact_init_state(&assump);
+                res.state.push(state);
+                res.input.push(input);
                 for i in bad.input[1..].iter() {
                     res.input
                         .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
