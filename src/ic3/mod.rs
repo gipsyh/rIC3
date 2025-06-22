@@ -424,12 +424,16 @@ impl IC3 {
             cfg.ic3.no_pred_prop = true;
             ts = uts.interal_signals();
         }
-        let mut bad_input = GHashMap::new();
-        for &l in ts.input.iter() {
-            bad_input.insert(uts.var_next(l, 1), l);
-        }
         let mut bad_ts = uts.compile();
         bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
+        let mut bad_input = GHashMap::new();
+        for &l in ts.input.iter().chain(ts.latch.iter()) {
+            if ts.var_next(l).is_none() {
+                let n = uts.var_next(l, 1);
+                bad_input.insert(n, l);
+                bad_ts.input.push(n);
+            }
+        }
         let tsctx = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
         let activity = Activity::new(&tsctx);

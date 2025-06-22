@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use logicrs::{DagCnf, Lit, LitMap, LitVec, LitVvec, Var, VarMap};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TransysCtx {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,
