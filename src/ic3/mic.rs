@@ -79,7 +79,7 @@ impl IC3 {
                 true,
                 constraint.to_vec(),
             ) {
-                return Some(self.solvers[frame - 1].inductive_core());
+                return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             let mut ret = false;
             let mut cube_new = LitVec::new();
@@ -135,7 +135,7 @@ impl IC3 {
             }
             self.statistic.num_down_sat += 1;
             if self.blocked_with_ordered(frame, &cube, false, true) {
-                return Some(self.solvers[frame - 1].inductive_core());
+                return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             for lit in cube.iter() {
                 if keep.contains(lit) && !self.solvers[frame - 1].sat_value(*lit).is_some_and(|v| v)

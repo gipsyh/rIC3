@@ -102,7 +102,7 @@ impl IC3 {
         let start = Instant::now();
         for i in frame + 1..=self.level() {
             if self.solvers[i - 1].inductive(&cube, true) {
-                cube = self.solvers[i - 1].inductive_core();
+                cube = self.solvers[i - 1].inductive_core().unwrap_or(cube);
             } else {
                 return (i, cube);
             }
@@ -112,12 +112,12 @@ impl IC3 {
     }
 
     fn generalize(&mut self, mut po: ProofObligation, mic_type: MicType) -> bool {
-        if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&po.lemma) {
+        let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
+            assert!(self.tsctx.cube_subsume_init(&po.lemma));
             po.frame += 1;
             self.add_obligation(po.clone());
             return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
-        }
-        let mut mic = self.solvers[po.frame - 1].inductive_core();
+        };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
         self.statistic.avg_po_cube_len += po.lemma.len();
@@ -252,7 +252,7 @@ impl IC3 {
                 true,
                 constraint.to_vec(),
             ) {
-                let mut mic = self.solvers[frame - 1].inductive_core();
+                let mut mic = self.solvers[frame - 1].inductive_core().unwrap();
                 mic = self.mic(frame, mic, constraint, MicType::DropVar(parameter));
                 let (frame, mic) = self.push_lemma(frame, mic);
                 self.add_lemma(frame - 1, mic, false, None);
@@ -292,11 +292,9 @@ impl IC3 {
                 }
                 for ctp in 0..3 {
                     if self.blocked_with_ordered(frame_idx + 1, &lemma, false, false) {
-                        let core = if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&lemma) {
-                            lemma.cube().clone()
-                        } else {
-                            self.solvers[frame_idx].inductive_core()
-                        };
+                        let core = self.solvers[frame_idx]
+                            .inductive_core()
+                            .unwrap_or(lemma.cube().clone());
                         if let Some(po) = &mut lemma.po
                             && po.frame < frame_idx + 2
                             && self.obligations.remove(po)
@@ -315,7 +313,7 @@ impl IC3 {
                     if !self.tsctx.cube_subsume_init(&ctp)
                         && self.solvers[frame_idx - 1].inductive(&ctp, true)
                     {
-                        let core = self.solvers[frame_idx - 1].inductive_core();
+                        let core = self.solvers[frame_idx - 1].inductive_core().unwrap();
                         let mic =
                             self.mic(frame_idx, core, &[], MicType::DropVar(Default::default()));
                         if self.add_lemma(frame_idx, mic, false, None) {

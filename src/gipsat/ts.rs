@@ -148,7 +148,7 @@ impl TransysSolver {
         self.inductive_with_constrain(cube, strengthen, vec![])
     }
 
-    pub fn inductive_core(&mut self) -> LitVec {
+    pub fn inductive_core(&mut self) -> Option<LitVec> {
         let mut ans = LitVec::new();
         for &l in self.relind.iter() {
             let nl = self.ts.next(l);
@@ -158,15 +158,11 @@ impl TransysSolver {
         }
         if self.ts.cube_subsume_init(&ans) {
             ans = LitVec::new();
-            let new = self
-                .relind
-                .iter()
-                .find(|&&l| {
-                    self.ts.init_map[l.var()]
-                        .and_then(|l| l.try_constant())
-                        .is_some_and(|i| i != l.polarity())
-                })
-                .unwrap();
+            let new = self.relind.iter().find(|&&l| {
+                self.ts.init_map[l.var()]
+                    .and_then(|l| l.try_constant())
+                    .is_some_and(|i| i != l.polarity())
+            })?;
             for &l in self.relind.iter() {
                 let nl = self.ts.next(l);
                 if self.dcs.unsat_has(nl) || l.eq(new) {
@@ -175,7 +171,7 @@ impl TransysSolver {
             }
             assert!(!self.ts.cube_subsume_init(&ans));
         }
-        ans
+        Some(ans)
     }
 
     #[inline]
