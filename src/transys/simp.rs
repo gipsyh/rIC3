@@ -71,16 +71,17 @@ impl Transys {
                 .iter()
                 .chain(self.bad.iter())
                 .chain(self.justice.iter())
-                .map(|l| l.var()),
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
         );
-        for l in self.input.iter().chain(self.latch.iter()) {
-            additional.push(*l);
+        for l in self.latch.iter() {
             if let Some(i) = self.init.get(l) {
                 additional.push(i.var());
             }
-        }
-        for l in self.latch.iter() {
-            additional.push(self.next[l].var());
+            if let Some(n) = self.next.get(l) {
+                additional.push(n.var());
+            }
         }
         let domain_map = self.rel.rearrange(additional.into_iter());
         let map_lit = |l: Lit| Lit::new(domain_map[l.var()], l.polarity());
@@ -119,7 +120,9 @@ impl Transys {
             }
         }
         for l in self.latch.iter() {
-            frozens.push(self.next[l].var());
+            if let Some(n) = self.next.get(l) {
+                frozens.push(n.var());
+            }
         }
         self.rel = self.rel.simplify(frozens.iter().copied());
         self.rearrange(rst);

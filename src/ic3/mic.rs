@@ -106,8 +106,9 @@ impl IC3 {
                 {
                     s.push(l.not_if(!v));
                 }
-                let lt = self.tsctx.next(*l);
-                if let Some(v) = self.solvers[frame - 1].sat_value(lt) {
+                if let Some(lt) = self.tsctx.next(*l)
+                    && let Some(v) = self.solvers[frame - 1].sat_value(lt)
+                {
                     t.push(l.not_if(!v));
                 }
             }

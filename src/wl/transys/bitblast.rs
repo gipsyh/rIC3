@@ -32,32 +32,30 @@ impl WlTransys {
             }
         }
         let mut init = GHashMap::new();
-        for l in self.input.iter().chain(self.latch.iter()) {
-            let Some(i) = self.init.get(l) else {
-                continue;
-            };
-            let s = l.sort();
-            let l = l.bitblast(&mut tm, &mut map);
-            let mut i = i.bitblast(&mut tm, &mut map);
-            if s.is_array() {
-                assert!(l.len() % i.len() == 0);
-                let ext = i[0..i.len()].to_vec();
-                while i.len() < l.len() {
-                    i.extend_from_slice(&ext);
-                }
-            }
-            assert!(l.len() == i.len());
-            for (l, i) in l.iter().zip(i.iter()) {
-                init.insert(l.clone(), i.clone());
-            }
-        }
         let mut next = GHashMap::new();
         for l in self.latch.iter() {
-            let n = self.next.get(l).unwrap();
-            let l = l.bitblast(&mut tm, &mut map);
-            let n = n.bitblast(&mut tm, &mut map);
-            for (l, n) in l.iter().zip(n.iter()) {
-                next.insert(l.clone(), n.clone());
+            if let Some(n) = self.next.get(l) {
+                let l = l.bitblast(&mut tm, &mut map);
+                let n = n.bitblast(&mut tm, &mut map);
+                for (l, n) in l.iter().zip(n.iter()) {
+                    next.insert(l.clone(), n.clone());
+                }
+            }
+            if let Some(i) = self.init.get(l) {
+                let s = l.sort();
+                let l = l.bitblast(&mut tm, &mut map);
+                let mut i = i.bitblast(&mut tm, &mut map);
+                if s.is_array() {
+                    assert!(l.len() % i.len() == 0);
+                    let ext = i[0..i.len()].to_vec();
+                    while i.len() < l.len() {
+                        i.extend_from_slice(&ext);
+                    }
+                }
+                assert!(l.len() == i.len());
+                for (l, i) in l.iter().zip(i.iter()) {
+                    init.insert(l.clone(), i.clone());
+                }
             }
         }
         let bad: Vec<Term> = bitblast_terms(self.bad.iter(), &mut tm, &mut map)
@@ -102,16 +100,17 @@ impl WlTransys {
         }
         let mut next = GHashMap::new();
         for l in self.latch.iter() {
-            let n = self.next.get(l).unwrap();
-            let l = l.cnf_encode(&mut dc, &mut map).var();
-            let n = n.cnf_encode(&mut dc, &mut map);
-            next.insert(l, n);
+            if let Some(n) = self.next.get(l) {
+                let l = l.cnf_encode(&mut dc, &mut map).var();
+                let n = n.cnf_encode(&mut dc, &mut map);
+                next.insert(l, n);
+            }
         }
         let constraint: LitVec =
             cnf_encode_terms(self.constraint.iter(), &mut dc, &mut map).collect();
         let justice: LitVec = cnf_encode_terms(self.justice.iter(), &mut dc, &mut map).collect();
         let mut init = GHashMap::new();
-        for l in self.input.iter().chain(self.latch.iter()) {
+        for l in self.latch.iter() {
             if let Some(i) = self.init.get(l) {
                 let l = l.cnf_encode(&mut dc, &mut map).var();
                 let i = i.cnf_encode(&mut dc, &mut map);

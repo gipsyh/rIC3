@@ -151,8 +151,9 @@ impl TransysSolver {
     pub fn inductive_core(&mut self) -> Option<LitVec> {
         let mut ans = LitVec::new();
         for &l in self.relind.iter() {
-            let nl = self.ts.next(l);
-            if self.dcs.unsat_has(nl) {
+            if let Some(nl) = self.ts.next(l)
+                && self.dcs.unsat_has(nl)
+            {
                 ans.push(l);
             }
         }
@@ -164,8 +165,9 @@ impl TransysSolver {
                     .is_some_and(|i| i != l.polarity())
             })?;
             for &l in self.relind.iter() {
-                let nl = self.ts.next(l);
-                if self.dcs.unsat_has(nl) || l.eq(new) {
+                if let Some(nl) = self.ts.next(l)
+                    && (self.dcs.unsat_has(nl) || l.eq(new))
+                {
                     ans.push(l);
                 }
             }

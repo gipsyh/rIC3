@@ -30,24 +30,17 @@ use std::{
 impl WlTransys {
     fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, Term>) {
         let mut rst = GHashMap::new();
-        let mut latch = Vec::new();
-        let mut input = btor.input.clone();
         for i in btor.input.iter() {
             rst.insert(i.clone(), i.clone());
         }
         for l in btor.latch.iter() {
             rst.insert(l.clone(), l.clone());
-            if btor.next.contains_key(l) {
-                latch.push(l.clone());
-            } else {
-                input.push(l.clone());
-            }
         }
         (
             Self {
                 tm: btor.tm.clone(),
-                input,
-                latch,
+                input: btor.input.clone(),
+                latch: btor.latch.clone(),
                 init: btor.init.clone(),
                 next: btor.next.clone(),
                 bad: btor.bad.clone(),

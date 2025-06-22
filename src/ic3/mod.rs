@@ -8,7 +8,7 @@ use crate::{
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
-use log::{Level, debug, info};
+use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -58,6 +58,7 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
+        debug!("extending IC3 to level {}", self.solvers.len());
         if !self.cfg.ic3.no_pred_prop {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
@@ -499,6 +500,7 @@ impl Engine for IC3 {
                 }
                 if let Some((bad, inputs, depth)) = self.get_bad() {
                     debug!("bad state found in last frame");
+                    trace!("bad = {bad}");
                     let bad = LitOrdVec::new(bad);
                     self.add_obligation(ProofObligation::new(
                         self.level(),

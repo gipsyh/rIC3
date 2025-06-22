@@ -30,9 +30,10 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
         for l in ts.latch() {
             let l = l.lit();
-            let next = ts.next(l);
-            next_map[l].push(next);
-            next_map[!l].push(!next);
+            if let Some(next) = ts.next(l) {
+                next_map[l].push(next);
+                next_map[!l].push(!next);
+            }
         }
         Self {
             ts: ts.clone(),
@@ -115,7 +116,7 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
             assert!(self.next_map[l].len() == self.num_unroll + 2);
         }
-        for l in self.ts.latch() {
+        for l in self.ts.latch_had_next() {
             let l = l.lit();
             let next = self.lit_next(self.lit_next(l, 1), self.num_unroll + 1);
             self.next_map[l].push(next);
