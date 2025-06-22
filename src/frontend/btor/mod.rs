@@ -61,6 +61,7 @@ impl WlTransys {
 
 pub struct BtorFrontend {
     btor: Btor,
+    #[allow(unused)]
     owts: WlTransys,
     wts: WlTransys,
     _cfg: Config,

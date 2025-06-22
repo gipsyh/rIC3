@@ -33,12 +33,12 @@ impl Transys {
                     mark.insert(nv);
                     queue.push(nv);
                 }
-                if let Some(i) = self.init.get(&v) {
-                    let iv = i.var();
-                    if !mark.contains(&iv) {
-                        mark.insert(iv);
-                        queue.push(iv);
-                    }
+            }
+            if let Some(i) = self.init.get(&v) {
+                let iv = i.var();
+                if !mark.contains(&iv) {
+                    mark.insert(iv);
+                    queue.push(iv);
                 }
             }
             for &d in self.rel.dep(v).iter() {
@@ -112,13 +112,14 @@ impl Transys {
                 .chain(self.justice.iter())
                 .map(|l| l.var()),
         );
-        frozens.extend_from_slice(&self.input);
-        for l in self.latch.iter() {
+        for l in self.input.iter().chain(self.latch.iter()) {
             frozens.push(*l);
-            frozens.push(self.next[l].var());
             if let Some(i) = self.init.get(l) {
                 frozens.push(i.var());
             }
+        }
+        for l in self.latch.iter() {
+            frozens.push(self.next[l].var());
         }
         self.rel = self.rel.simplify(frozens.iter().copied());
         self.rearrange(rst);

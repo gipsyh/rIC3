@@ -386,11 +386,11 @@ impl IC3 {
         if !self.cfg.ic3.no_pred_prop {
             let bad = self.tsctx.bad;
             if self.solvers[0].solve(&self.tsctx.bad.cube()) {
-                let (bad, inputs) = self.get_pred(self.solvers.len(), true);
+                let (input, bad) = self.solvers[0].trivial_pred();
                 self.add_obligation(ProofObligation::new(
                     0,
                     LitOrdVec::new(bad),
-                    vec![inputs],
+                    vec![input],
                     0,
                     None,
                 ));

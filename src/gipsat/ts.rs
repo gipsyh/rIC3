@@ -114,18 +114,20 @@ impl TransysSolver {
         (latchs, inputs)
     }
 
-    #[allow(unused)]
-    pub fn trivial_pred(&mut self) -> LitVec {
-        let mut latchs = LitVec::new();
-        for latch in self.ts.latch.iter() {
-            let lit = latch.lit();
-            if let Some(v) = self.dcs.sat_value(lit) {
-                // if !self.flip_to_none(*latch) {
-                latchs.push(lit.not_if(!v));
-                // }
+    pub fn trivial_pred(&mut self) -> (LitVec, LitVec) {
+        let mut input = LitVec::new();
+        for i in self.ts.input() {
+            if let Some(v) = self.dcs.sat_value_lit(i) {
+                input.push(v);
             }
         }
-        latchs
+        let mut latch = LitVec::new();
+        for l in self.ts.latch() {
+            if let Some(v) = self.dcs.sat_value_lit(l) {
+                latch.push(v);
+            }
+        }
+        (input, latch)
     }
 
     pub fn inductive_with_constrain(
