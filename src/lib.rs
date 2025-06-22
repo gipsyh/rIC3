@@ -28,6 +28,12 @@ impl Witness {
         Self::default()
     }
 
+    #[allow(clippy::len_without_is_empty)]
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.input.len()
+    }
+
     pub fn map_var(&self, f: impl Fn(Var) -> Var) -> Self {
         let input = self.input.iter().map(|w| w.map_var(&f)).collect();
         let state = self.state.iter().map(|w| w.map_var(&f)).collect();

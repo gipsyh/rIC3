@@ -7,7 +7,6 @@ use crate::{
 use aig::{Aig, AigEdge, TernarySimulate};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
-use logicrs::satif::Satif;
 use logicrs::{Lbool, Lit, LitVec, Var, VarVMap};
 use std::{
     fmt::Display,
@@ -213,30 +212,31 @@ impl Frontend for AigFrontend {
     fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
         let wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string(), "b".to_string()];
-        let mut state = Vec::new();
-        let mut solver = cadical::Solver::new();
-        self.ots.load_init(&mut solver);
-        self.ots.load_trans(&mut solver, true);
-        let mut assump = wit.state[0].clone();
-        assump.extend(wit.input[0].iter().copied());
-        assert!(solver.solve(&assump));
+        let assump: Vec<_> = wit.state[0]
+            .iter()
+            .chain(wit.input[0].iter())
+            .copied()
+            .collect();
+        let (input, state) = self.ots.exact_init_state(&assump);
+
         let mut line = String::new();
-        for l in self.ots.latch() {
-            let r = solver.sat_value(l.lit()).unwrap();
-            state.push(Lbool::from(r));
-            line.push(if r { '1' } else { '0' })
+        let mut lbstate = Vec::new();
+        for l in state.iter() {
+            lbstate.push(Lbool::from(l.polarity()));
+            line.push(if l.polarity() { '1' } else { '0' })
         }
         res.push(line);
-        let mut simulate = TernarySimulate::new(&self.oaig, state);
-        let mut input = Vec::new();
+
+        let mut simulate = TernarySimulate::new(&self.oaig, lbstate);
+        let mut lbinput = Vec::new();
         let mut line = String::new();
-        for i in self.ots.input() {
-            let r = solver.sat_value(i.lit()).unwrap();
-            input.push(Lbool::from(r));
-            line.push(if r { '1' } else { '0' })
+        for i in input.iter() {
+            lbinput.push(Lbool::from(i.polarity()));
+            line.push(if i.polarity() { '1' } else { '0' })
         }
         res.push(line);
-        simulate.simulate(input);
+        simulate.simulate(lbinput);
+
         for c in wit.input[1..].iter() {
             let map: GHashMap<Var, bool> =
                 GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));

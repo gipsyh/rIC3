@@ -28,7 +28,11 @@ pub trait TransysIf {
 
     fn latch(&self) -> impl Iterator<Item = Var>;
 
-    fn next(&self, lit: Lit) -> Lit;
+    fn is_latch(&self, _v: Var) -> bool {
+        panic!("Error: is_latch not support");
+    }
+
+    fn next(&self, lit: Lit) -> Option<Lit>;
 
     fn init(&self, latch: Var) -> Option<Lit>;
 
@@ -36,20 +40,28 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
+    fn latch_had_next(&self) -> impl Iterator<Item = Var> {
+        self.latch().filter(|&v| self.var_next(v).is_some())
+    }
+
+    fn latch_no_next(&self) -> impl Iterator<Item = Var> {
+        self.latch().filter(|&v| self.var_next(v).is_none())
+    }
+
     #[inline]
-    fn var_next(&self, var: Var) -> Var {
-        self.next(var.lit()).var()
+    fn var_next(&self, var: Var) -> Option<Var> {
+        self.next(var.lit()).map(|l| l.var())
     }
 
     #[inline]
     fn lits_next<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
-        lits.into_iter().map(|l| self.next(*l)).collect()
+        lits.into_iter().filter_map(|l| self.next(*l)).collect()
     }
 
     #[inline]
     fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
         satif.new_var_to(self.max_var());
-        for l in self.latch() {
+        for l in self.input().chain(self.latch()) {
             if let Some(i) = self.init(l) {
                 if let Some(i) = i.try_constant() {
                     satif.add_clause(&[l.lit().not_if(!i)]);
@@ -133,8 +145,8 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Lit {
-        self.next[&lit.var()].not_if(!lit.polarity())
+    fn next(&self, lit: Lit) -> Option<Lit> {
+        self.next.get(&lit.var()).map(|l| l.not_if(!lit.polarity()))
     }
 
     fn init(&self, latch: Var) -> Option<Lit> {

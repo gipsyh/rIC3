@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use logicrs::{DagCnf, Lit, LitMap, LitVec, LitVvec, Var, VarMap};
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct TransysCtx {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,
@@ -11,7 +11,7 @@ pub struct TransysCtx {
     pub constraint: LitVec,
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
-    next_map: LitMap<Lit>,
+    next_map: LitMap<Option<Lit>>,
     pub max_latch: Var,
 }
 
@@ -41,12 +41,17 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
+    fn is_latch(&self, var: Var) -> bool {
+        self.is_latch[var]
+    }
+
+    #[inline]
     fn init(&self, latch: Var) -> Option<Lit> {
         self.init_map[latch]
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Lit {
+    fn next(&self, lit: Lit) -> Option<Lit> {
         self.next_map[lit]
     }
 
@@ -61,7 +66,6 @@ impl TransysIf for TransysCtx {
     }
 
     fn add_init(&mut self, latch: Var, init: Lit) {
-        debug_assert!(self.is_latch(latch));
         self.init_map[latch] = Some(init);
         if let Some(i) = init.try_constant() {
             self.init.push(LitVec::from([Lit::new(latch, i)]));
@@ -90,15 +94,11 @@ impl TransysCtx {
         }
         true
     }
-
-    #[inline]
-    pub fn is_latch(&self, var: Var) -> bool {
-        self.is_latch[var]
-    }
 }
 
 impl Transys {
     pub fn ctx(&self) -> TransysCtx {
+        let input = self.input.clone();
         let mut latch = self.latch.clone();
         latch.sort();
         let max_var = self.rel.max_var();
@@ -107,11 +107,14 @@ impl Transys {
         let mut init = LitVvec::new();
         let mut init_map = VarMap::new_with(max_latch);
         let mut next_map = LitMap::new_with(max_latch);
-        let primes: Vec<Lit> = latch.iter().map(|l| self.next(l.lit())).collect();
-        for (v, p) in latch.iter().cloned().zip(primes.iter().cloned()) {
+        for &v in latch.iter() {
             let l = v.lit();
-            let i = self.init.get(&v).copied();
-            if let Some(i) = i {
+            is_latch[v] = true;
+            if let Some(n) = self.next(l) {
+                next_map[l] = Some(n);
+                next_map[!l] = Some(!n);
+            }
+            if let Some(i) = self.init.get(&v).copied() {
                 init_map[v] = Some(i);
                 if let Some(i) = i.try_constant() {
                     init.push(LitVec::from([Lit::new(v, i)]));
@@ -120,13 +123,10 @@ impl Transys {
                     init.push(LitVec::from([!l, i]));
                 }
             }
-            next_map[l] = p;
-            next_map[!l] = !p;
-            is_latch[v] = true;
         }
         TransysCtx {
-            input: self.input.clone(),
-            latch: self.latch.clone(),
+            input,
+            latch,
             init,
             init_map,
             bad: self.bad[0],

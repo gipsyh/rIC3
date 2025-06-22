@@ -1,7 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
 use logicrs::{Lit, Var, VarVMap};
-use std::mem::take;
 
 impl Transys {
     pub fn coi_refine(&mut self, rst: &mut VarVMap) {
@@ -34,12 +33,12 @@ impl Transys {
                     mark.insert(nv);
                     queue.push(nv);
                 }
-                if let Some(i) = self.init.get(&v) {
-                    let iv = i.var();
-                    if !mark.contains(&iv) {
-                        mark.insert(iv);
-                        queue.push(iv);
-                    }
+            }
+            if let Some(i) = self.init.get(&v) {
+                let iv = i.var();
+                if !mark.contains(&iv) {
+                    mark.insert(iv);
+                    queue.push(iv);
                 }
             }
             for &d in self.rel.dep(v).iter() {
@@ -49,15 +48,14 @@ impl Transys {
                 }
             }
         }
-        self.input.retain(|i| mark.contains(i));
-        for l in take(&mut self.latch) {
-            if mark.contains(&l) {
-                self.latch.push(l);
-            } else {
-                self.next.remove(&l);
-                self.init.remove(&l);
+        for v in self.input.iter().chain(self.latch.iter()) {
+            if !mark.contains(v) {
+                self.init.remove(v);
+                self.next.remove(v);
             }
         }
+        self.input.retain(|i| mark.contains(i));
+        self.latch.retain(|i| mark.contains(i));
         for v in Var::CONST + 1..=self.max_var() {
             if !mark.contains(&v) {
                 self.rel.del_rel(v);
@@ -68,19 +66,21 @@ impl Transys {
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {
         let mut additional = vec![Var::CONST];
-        additional.extend_from_slice(&self.input);
         additional.extend(
             self.constraint
                 .iter()
                 .chain(self.bad.iter())
                 .chain(self.justice.iter())
-                .map(|l| l.var()),
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
         );
         for l in self.latch.iter() {
-            additional.push(*l);
-            additional.push(self.next[l].var());
             if let Some(i) = self.init.get(l) {
                 additional.push(i.var());
+            }
+            if let Some(n) = self.next.get(l) {
+                additional.push(n.var());
             }
         }
         let domain_map = self.rel.rearrange(additional.into_iter());
@@ -111,14 +111,16 @@ impl Transys {
                 .iter()
                 .chain(self.constraint.iter())
                 .chain(self.justice.iter())
-                .map(|l| l.var()),
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
         );
-        frozens.extend_from_slice(&self.input);
         for l in self.latch.iter() {
-            frozens.push(*l);
-            frozens.push(self.next[l].var());
             if let Some(i) = self.init.get(l) {
                 frozens.push(i.var());
+            }
+            if let Some(n) = self.next.get(l) {
+                frozens.push(n.var());
             }
         }
         self.rel = self.rel.simplify(frozens.iter().copied());

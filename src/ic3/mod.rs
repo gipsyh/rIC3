@@ -8,7 +8,7 @@ use crate::{
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
-use log::{Level, debug, info};
+use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -58,6 +58,7 @@ impl IC3 {
     }
 
     fn extend(&mut self) {
+        debug!("extending IC3 to level {}", self.solvers.len());
         if !self.cfg.ic3.no_pred_prop {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
@@ -102,7 +103,7 @@ impl IC3 {
         let start = Instant::now();
         for i in frame + 1..=self.level() {
             if self.solvers[i - 1].inductive(&cube, true) {
-                cube = self.solvers[i - 1].inductive_core();
+                cube = self.solvers[i - 1].inductive_core().unwrap_or(cube);
             } else {
                 return (i, cube);
             }
@@ -112,12 +113,12 @@ impl IC3 {
     }
 
     fn generalize(&mut self, mut po: ProofObligation, mic_type: MicType) -> bool {
-        if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&po.lemma) {
+        let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
+            assert!(self.tsctx.cube_subsume_init(&po.lemma));
             po.frame += 1;
             self.add_obligation(po.clone());
             return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
-        }
-        let mut mic = self.solvers[po.frame - 1].inductive_core();
+        };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
         self.statistic.avg_po_cube_len += po.lemma.len();
@@ -153,11 +154,10 @@ impl IC3 {
                     } else {
                         return Some(false);
                     }
-                } else if self.cfg.ic3.inn && po.frame > 0 {
-                    assert!(!self.solvers[0].solve(&po.lemma));
+                } else if po.frame > 0 {
+                    debug_assert!(!self.solvers[0].solve(&po.lemma));
                 } else {
                     self.add_obligation(po.clone());
-                    assert!(po.frame == 0);
                     return Some(false);
                 }
             }
@@ -253,7 +253,7 @@ impl IC3 {
                 true,
                 constraint.to_vec(),
             ) {
-                let mut mic = self.solvers[frame - 1].inductive_core();
+                let mut mic = self.solvers[frame - 1].inductive_core().unwrap();
                 mic = self.mic(frame, mic, constraint, MicType::DropVar(parameter));
                 let (frame, mic) = self.push_lemma(frame, mic);
                 self.add_lemma(frame - 1, mic, false, None);
@@ -293,11 +293,9 @@ impl IC3 {
                 }
                 for ctp in 0..3 {
                     if self.blocked_with_ordered(frame_idx + 1, &lemma, false, false) {
-                        let core = if self.cfg.ic3.inn && self.tsctx.cube_subsume_init(&lemma) {
-                            lemma.cube().clone()
-                        } else {
-                            self.solvers[frame_idx].inductive_core()
-                        };
+                        let core = self.solvers[frame_idx]
+                            .inductive_core()
+                            .unwrap_or(lemma.cube().clone());
                         if let Some(po) = &mut lemma.po
                             && po.frame < frame_idx + 2
                             && self.obligations.remove(po)
@@ -316,7 +314,7 @@ impl IC3 {
                     if !self.tsctx.cube_subsume_init(&ctp)
                         && self.solvers[frame_idx - 1].inductive(&ctp, true)
                     {
-                        let core = self.solvers[frame_idx - 1].inductive_core();
+                        let core = self.solvers[frame_idx - 1].inductive_core().unwrap();
                         let mic =
                             self.mic(frame_idx, core, &[], MicType::DropVar(Default::default()));
                         if self.add_lemma(frame_idx, mic, false, None) {
@@ -387,11 +385,11 @@ impl IC3 {
         if !self.cfg.ic3.no_pred_prop {
             let bad = self.tsctx.bad;
             if self.solvers[0].solve(&self.tsctx.bad.cube()) {
-                let (bad, inputs) = self.get_pred(self.solvers.len(), true);
+                let (input, bad) = self.solvers[0].trivial_pred();
                 self.add_obligation(ProofObligation::new(
                     0,
                     LitOrdVec::new(bad),
-                    vec![inputs],
+                    vec![input],
                     0,
                     None,
                 ));
@@ -426,12 +424,18 @@ impl IC3 {
             cfg.ic3.no_pred_prop = true;
             ts = uts.interal_signals();
         }
-        let mut bad_input = GHashMap::new();
-        for &l in ts.input.iter() {
-            bad_input.insert(uts.var_next(l, 1), l);
-        }
         let mut bad_ts = uts.compile();
         bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
+        let mut bad_input = GHashMap::new();
+        for &l in ts.input.iter() {
+            let n = uts.var_next(l, 1);
+            bad_input.insert(n, l);
+        }
+        for l in ts.latch_no_next() {
+            let n = uts.var_next(l, 1);
+            bad_input.insert(n, l);
+            bad_ts.input.push(n);
+        }
         let tsctx = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
         let activity = Activity::new(&tsctx);
@@ -502,6 +506,7 @@ impl Engine for IC3 {
                 }
                 if let Some((bad, inputs, depth)) = self.get_bad() {
                     debug!("bad state found in last frame");
+                    trace!("bad = {bad}");
                     let bad = LitOrdVec::new(bad);
                     self.add_obligation(ProofObligation::new(
                         self.level(),
@@ -586,29 +591,15 @@ impl Engine for IC3 {
         let mut b = Some(b);
         while let Some(bad) = b {
             if bad.frame == 0 {
-                let mut init = LitVec::new();
-                let mut input = LitVec::new();
-                let mut assump = bad.lemma.cube().clone();
-                assump.extend(bad.input[0].iter().copied());
-                assert!(self.solvers[0].solve(&assump));
-                for l in self.ts.latch() {
-                    if let Some(a) = self.solvers[0].sat_value(l.lit()) {
-                        init.push(l.lit().not_if(!a));
-                    }
-                }
-                for i in self.ts.input() {
-                    if let Some(a) = self.solvers[0].sat_value(i.lit()) {
-                        input.push(i.lit().not_if(!a));
-                    }
-                }
-                res.state
-                    .push(init.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
-                res.input
-                    .push(input.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
-                for i in bad.input[1..].iter() {
-                    res.input
-                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
-                }
+                let assump: Vec<_> = bad
+                    .lemma
+                    .iter()
+                    .chain(bad.input[0].iter())
+                    .filter_map(|l| self.rst.lit_map(*l))
+                    .collect();
+                let (input, state) = self.ots.exact_init_state(&assump);
+                res.state.push(state);
+                res.input.push(input);
             } else {
                 res.state.push(
                     bad.lemma
@@ -616,10 +607,27 @@ impl Engine for IC3 {
                         .filter_map(|l| self.rst.lit_map(*l))
                         .collect(),
                 );
-                for i in bad.input.iter() {
-                    res.input
-                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                res.input.push(
+                    bad.input[0]
+                        .iter()
+                        .filter_map(|l| self.rst.lit_map(*l))
+                        .collect(),
+                );
+            }
+            for i in bad.input[1..].iter() {
+                let mut input = LitVec::new();
+                let mut state = LitVec::new();
+                for i in i.iter() {
+                    if self.bad_ts.is_latch(i.var()) {
+                        if let Some(m) = self.rst.lit_map(*i) {
+                            state.push(m);
+                        }
+                    } else if let Some(m) = self.rst.lit_map(*i) {
+                        input.push(m);
+                    }
                 }
+                res.input.push(input);
+                res.state.push(state);
             }
             b = bad.next.clone();
         }

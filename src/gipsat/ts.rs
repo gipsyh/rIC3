@@ -114,18 +114,20 @@ impl TransysSolver {
         (latchs, inputs)
     }
 
-    #[allow(unused)]
-    pub fn trivial_pred(&mut self) -> LitVec {
-        let mut latchs = LitVec::new();
-        for latch in self.ts.latch.iter() {
-            let lit = latch.lit();
-            if let Some(v) = self.dcs.sat_value(lit) {
-                // if !self.flip_to_none(*latch) {
-                latchs.push(lit.not_if(!v));
-                // }
+    pub fn trivial_pred(&mut self) -> (LitVec, LitVec) {
+        let mut input = LitVec::new();
+        for i in self.ts.input() {
+            if let Some(v) = self.dcs.sat_value_lit(i) {
+                input.push(v);
             }
         }
-        latchs
+        let mut latch = LitVec::new();
+        for l in self.ts.latch() {
+            if let Some(v) = self.dcs.sat_value_lit(l) {
+                latch.push(v);
+            }
+        }
+        (input, latch)
     }
 
     pub fn inductive_with_constrain(
@@ -146,34 +148,35 @@ impl TransysSolver {
         self.inductive_with_constrain(cube, strengthen, vec![])
     }
 
-    pub fn inductive_core(&mut self) -> LitVec {
+    pub fn inductive_core(&mut self) -> Option<LitVec> {
         let mut ans = LitVec::new();
         for &l in self.relind.iter() {
-            let nl = self.ts.next(l);
-            if self.dcs.unsat_has(nl) {
+            if let Some(nl) = self.ts.next(l)
+                && self.dcs.unsat_has(nl)
+            {
                 ans.push(l);
             }
         }
         if self.ts.cube_subsume_init(&ans) {
             ans = LitVec::new();
-            let new = self
-                .relind
-                .iter()
-                .find(|&&l| {
-                    self.ts.init_map[l.var()]
-                        .and_then(|l| l.try_constant())
-                        .is_some_and(|i| i != l.polarity())
-                })
-                .unwrap();
+            let new = self.relind.iter().find(|&&l| {
+                self.ts.init_map[l.var()]
+                    .and_then(|l| l.try_constant())
+                    .is_some_and(|i| i != l.polarity())
+            })?;
             for &l in self.relind.iter() {
-                let nl = self.ts.next(l);
-                if self.dcs.unsat_has(nl) || l.eq(new) {
+                if let Some(nl) = self.ts.next(l)
+                    && (self.dcs.unsat_has(nl))
+                {
+                    ans.push(l);
+                }
+                if l.eq(new) {
                     ans.push(l);
                 }
             }
             assert!(!self.ts.cube_subsume_init(&ans));
         }
-        ans
+        Some(ans)
     }
 
     #[inline]
