@@ -41,6 +41,11 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
+    fn is_latch(&self, var: Var) -> bool {
+        self.is_latch[var]
+    }
+
+    #[inline]
     fn init(&self, latch: Var) -> Option<Lit> {
         self.init_map[latch]
     }
@@ -88,11 +93,6 @@ impl TransysCtx {
             }
         }
         true
-    }
-
-    #[inline]
-    pub fn is_latch(&self, var: Var) -> bool {
-        self.is_latch[var]
     }
 }
 

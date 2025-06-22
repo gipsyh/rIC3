@@ -427,12 +427,14 @@ impl IC3 {
         let mut bad_ts = uts.compile();
         bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
         let mut bad_input = GHashMap::new();
-        for &l in ts.input.iter().chain(ts.latch.iter()) {
-            if ts.var_next(l).is_none() {
-                let n = uts.var_next(l, 1);
-                bad_input.insert(n, l);
-                bad_ts.input.push(n);
-            }
+        for &l in ts.input.iter() {
+            let n = uts.var_next(l, 1);
+            bad_input.insert(n, l);
+        }
+        for l in ts.latch_no_next() {
+            let n = uts.var_next(l, 1);
+            bad_input.insert(n, l);
+            bad_ts.input.push(n);
         }
         let tsctx = Grc::new(ts.ctx());
         let bad_ts = Grc::new(bad_ts.ctx());
@@ -598,10 +600,6 @@ impl Engine for IC3 {
                 let (input, state) = self.ots.exact_init_state(&assump);
                 res.state.push(state);
                 res.input.push(input);
-                for i in bad.input[1..].iter() {
-                    res.input
-                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
-                }
             } else {
                 res.state.push(
                     bad.lemma
@@ -609,10 +607,27 @@ impl Engine for IC3 {
                         .filter_map(|l| self.rst.lit_map(*l))
                         .collect(),
                 );
-                for i in bad.input.iter() {
-                    res.input
-                        .push(i.iter().filter_map(|l| self.rst.lit_map(*l)).collect());
+                res.input.push(
+                    bad.input[0]
+                        .iter()
+                        .filter_map(|l| self.rst.lit_map(*l))
+                        .collect(),
+                );
+            }
+            for i in bad.input[1..].iter() {
+                let mut input = LitVec::new();
+                let mut state = LitVec::new();
+                for i in i.iter() {
+                    if self.bad_ts.is_latch(i.var()) {
+                        if let Some(m) = self.rst.lit_map(*i) {
+                            state.push(m);
+                        }
+                    } else if let Some(m) = self.rst.lit_map(*i) {
+                        input.push(m);
+                    }
                 }
+                res.input.push(input);
+                res.state.push(state);
             }
             b = bad.next.clone();
         }

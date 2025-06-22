@@ -28,6 +28,10 @@ pub trait TransysIf {
 
     fn latch(&self) -> impl Iterator<Item = Var>;
 
+    fn is_latch(&self, _v: Var) -> bool {
+        panic!("Error: is_latch not support");
+    }
+
     fn next(&self, lit: Lit) -> Option<Lit>;
 
     fn init(&self, latch: Var) -> Option<Lit>;
@@ -38,6 +42,10 @@ pub trait TransysIf {
 
     fn latch_had_next(&self) -> impl Iterator<Item = Var> {
         self.latch().filter(|&v| self.var_next(v).is_some())
+    }
+
+    fn latch_no_next(&self) -> impl Iterator<Item = Var> {
+        self.latch().filter(|&v| self.var_next(v).is_none())
     }
 
     #[inline]
