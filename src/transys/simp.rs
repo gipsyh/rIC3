@@ -111,15 +111,14 @@ impl Transys {
                 .iter()
                 .chain(self.constraint.iter())
                 .chain(self.justice.iter())
-                .map(|l| l.var()),
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
         );
-        for l in self.input.iter().chain(self.latch.iter()) {
-            frozens.push(*l);
+        for l in self.latch.iter() {
             if let Some(i) = self.init.get(l) {
                 frozens.push(i.var());
             }
-        }
-        for l in self.latch.iter() {
             if let Some(n) = self.next.get(l) {
                 frozens.push(n.var());
             }
