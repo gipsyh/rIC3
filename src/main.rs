@@ -111,6 +111,8 @@ pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn E
     let certificate = if res {
         frontend.safe_certificate(engien.proof())
     } else {
+        let witness = engien.witness();
+        debug_assert!(witness.state.len() == witness.input.len());
         frontend.unsafe_certificate(engien.witness())
     };
     if cfg.witness && !res {
