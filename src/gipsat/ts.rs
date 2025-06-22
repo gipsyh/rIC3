@@ -166,8 +166,11 @@ impl TransysSolver {
             })?;
             for &l in self.relind.iter() {
                 if let Some(nl) = self.ts.next(l)
-                    && (self.dcs.unsat_has(nl) || l.eq(new))
+                    && (self.dcs.unsat_has(nl))
                 {
+                    ans.push(l);
+                }
+                if l.eq(new) {
                     ans.push(l);
                 }
             }
