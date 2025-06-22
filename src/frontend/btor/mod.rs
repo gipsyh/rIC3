@@ -191,16 +191,28 @@ impl Frontend for BtorFrontend {
         }
         for (t, x) in witness.input.into_iter().enumerate() {
             let mut input = BTreeMap::new();
+            let mut state = BTreeMap::new();
             for i in x {
                 let (w, b) = &self.bb_rst[&i.var()];
                 if !is_input.contains(w) {
-                    continue;
+                    let id = idmap[w];
+                    state
+                        .entry(id)
+                        .or_insert_with(|| BitVec::new_with(w.sort().bv(), false))
+                        .set(*b, i.polarity());
+                } else {
+                    let id = idmap[w];
+                    input
+                        .entry(id)
+                        .or_insert_with(|| BitVec::new_with(w.sort().bv(), false))
+                        .set(*b, i.polarity());
                 }
-                let w = idmap[w];
-                input
-                    .entry(w)
-                    .or_insert_with(|| BitVec::new_with(self.btor.input[w].sort().bv(), false))
-                    .set(*b, i.polarity());
+            }
+            if t > 0 && !state.is_empty() {
+                res.push(format!("#{t}"));
+                for (i, v) in state {
+                    res.push(format!("{i} {v:b}"));
+                }
             }
             res.push(format!("@{t}"));
             for (i, v) in input {
