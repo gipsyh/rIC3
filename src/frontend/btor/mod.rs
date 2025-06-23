@@ -52,6 +52,20 @@ impl WlTransys {
     }
 }
 
+impl From<&WlTransys> for Btor {
+    fn from(wl: &WlTransys) -> Btor {
+        Btor {
+            tm: wl.tm.clone(),
+            input: wl.input.clone(),
+            latch: wl.latch.clone(),
+            init: wl.init.clone(),
+            next: wl.next.clone(),
+            bad: wl.bad.clone(),
+            constraint: wl.constraint.clone(),
+        }
+    }
+}
+
 pub struct BtorFrontend {
     btor: Btor,
     #[allow(unused)]
