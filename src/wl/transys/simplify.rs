@@ -57,13 +57,13 @@ impl WlTransys {
     pub fn simplify(&mut self) {
         let mut map = GHashMap::new();
         for (_, n) in self.next.iter_mut() {
-            *n = n.simplify(&mut self.tm, &mut map);
+            *n = n.simplify(&mut map);
         }
         for c in self.constraint.iter_mut() {
-            *c = c.simplify(&mut self.tm, &mut map);
+            *c = c.simplify(&mut map);
         }
         for b in self.bad.iter_mut() {
-            *b = b.simplify(&mut self.tm, &mut map);
+            *b = b.simplify(&mut map);
         }
     }
 }

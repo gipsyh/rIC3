@@ -38,7 +38,6 @@ impl WlTransys {
         }
         (
             Self {
-                tm: btor.tm.clone(),
                 input: btor.input.clone(),
                 latch: btor.latch.clone(),
                 init: btor.init.clone(),
@@ -49,6 +48,19 @@ impl WlTransys {
             },
             rst,
         )
+    }
+}
+
+impl From<&WlTransys> for Btor {
+    fn from(wl: &WlTransys) -> Btor {
+        Btor {
+            input: wl.input.clone(),
+            latch: wl.latch.clone(),
+            init: wl.init.clone(),
+            next: wl.next.clone(),
+            bad: wl.bad.clone(),
+            constraint: wl.constraint.clone(),
+        }
     }
 }
 
@@ -115,7 +127,7 @@ impl Frontend for BtorFrontend {
         btor.bad.clear();
         btor.constraint.clear();
         let mut map: GHashMap<Var, Term> = GHashMap::new();
-        map.insert(Var::CONST, btor.tm.bool_const(false));
+        map.insert(Var::CONST, Term::bool_const(false));
         for i in ts.input() {
             let (w, b) = &self.bb_rst[&i];
             map.insert(i, w.slice(*b, *b));
@@ -134,13 +146,13 @@ impl Frontend for BtorFrontend {
                     if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(btor.tm.new_op_terms_fold(
+                        r.push(Term::new_op_fold(
                             And,
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = btor.tm.new_op_terms_fold(Or, r);
+                let n = Term::new_op_fold(Or, r);
                 map.insert(v, n);
             }
         }
