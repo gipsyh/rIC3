@@ -12,7 +12,7 @@ impl WlTransys {
             TermType::Op(op_term) => {
                 if op_term.op == op::Read {
                     let (_, e) = op_term.terms[0].sort().array();
-                    let wire = self.tm.new_var(Sort::Bv(e));
+                    let wire = Term::new_var(Sort::Bv(e));
                     self.input.push(wire.clone());
                     wire
                 } else {
@@ -21,7 +21,7 @@ impl WlTransys {
                         .iter()
                         .map(|t| self._term_abs_array(t, map))
                         .collect();
-                    self.tm.new_op_term(op_term.op.clone(), terms.deref())
+                    Term::new_op(op_term.op.clone(), terms.deref())
                 }
             }
             _ => term.clone(),

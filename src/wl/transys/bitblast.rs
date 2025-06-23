@@ -5,7 +5,7 @@ use logicrs::{DagCnf, LitVec};
 use logicrs::{
     Var,
     fol::{
-        Term, TermManager,
+        Term,
         bitblast::{bitblast_terms, cnf_encode_terms},
     },
 };
@@ -13,11 +13,10 @@ use logicrs::{
 impl WlTransys {
     pub fn bitblast(&self) -> (Self, GHashMap<Term, (Term, usize)>) {
         let mut rst = GHashMap::new();
-        let mut tm = TermManager::new();
         let mut map = GHashMap::new();
         let mut input = Vec::new();
         for x in self.input.iter() {
-            let bb = x.bitblast(&mut tm, &mut map);
+            let bb = x.bitblast(&mut map);
             for (j, b) in bb.into_iter().enumerate() {
                 rst.insert(b.clone(), (x.clone(), j));
                 input.push(b);
@@ -25,7 +24,7 @@ impl WlTransys {
         }
         let mut latch = Vec::new();
         for x in self.latch.iter() {
-            let bb = x.bitblast(&mut tm, &mut map);
+            let bb = x.bitblast(&mut map);
             for (j, b) in bb.into_iter().enumerate() {
                 rst.insert(b.clone(), (x.clone(), j));
                 latch.push(b);
@@ -35,16 +34,16 @@ impl WlTransys {
         let mut next = GHashMap::new();
         for l in self.latch.iter() {
             if let Some(n) = self.next.get(l) {
-                let l = l.bitblast(&mut tm, &mut map);
-                let n = n.bitblast(&mut tm, &mut map);
+                let l = l.bitblast(&mut map);
+                let n = n.bitblast(&mut map);
                 for (l, n) in l.iter().zip(n.iter()) {
                     next.insert(l.clone(), n.clone());
                 }
             }
             if let Some(i) = self.init.get(l) {
                 let s = l.sort();
-                let l = l.bitblast(&mut tm, &mut map);
-                let mut i = i.bitblast(&mut tm, &mut map);
+                let l = l.bitblast(&mut map);
+                let mut i = i.bitblast(&mut map);
                 if s.is_array() {
                     assert!(l.len() % i.len() == 0);
                     let ext = i[0..i.len()].to_vec();
@@ -58,18 +57,17 @@ impl WlTransys {
                 }
             }
         }
-        let bad: Vec<Term> = bitblast_terms(self.bad.iter(), &mut tm, &mut map)
+        let bad: Vec<Term> = bitblast_terms(self.bad.iter(), &mut map)
             .flatten()
             .collect();
-        let constraint: Vec<Term> = bitblast_terms(self.constraint.iter(), &mut tm, &mut map)
+        let constraint: Vec<Term> = bitblast_terms(self.constraint.iter(), &mut map)
             .flatten()
             .collect();
-        let justice: Vec<Term> = bitblast_terms(self.justice.iter(), &mut tm, &mut map)
+        let justice: Vec<Term> = bitblast_terms(self.justice.iter(), &mut map)
             .flatten()
             .collect();
         (
             Self {
-                tm,
                 input,
                 latch,
                 init,
