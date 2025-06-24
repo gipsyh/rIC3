@@ -9,7 +9,7 @@ use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 
 #[derive(Clone)]
 pub struct TransysSolver {
-    dcs: DagCnfSolver,
+    pub dcs: DagCnfSolver,
     ts: Grc<TransysCtx>,
 
     relind: LitVec,
@@ -30,29 +30,6 @@ impl TransysSolver {
             relind: Default::default(),
             rng: StdRng::seed_from_u64(rseed),
         }
-    }
-
-    #[inline]
-    pub fn minimal_pred(
-        &mut self,
-        inputs: &[Lit],
-        latchs: &[Lit],
-        target_constrain: &LitVec,
-    ) -> Option<LitVec> {
-        let assump = LitVec::from_iter(inputs.iter().chain(latchs.iter()).copied());
-        if self
-            .dcs
-            .solve_with_constraint(&assump, vec![target_constrain.clone()])
-        {
-            return None;
-        }
-        Some(
-            latchs
-                .iter()
-                .filter(|l| self.dcs.unsat_has(**l))
-                .copied()
-                .collect(),
-        )
     }
 
     #[inline]
@@ -95,7 +72,7 @@ impl TransysSolver {
             }
             latchs.shuffle(&mut self.rng);
             let olen = latchs.len();
-            if let Some(n) = self.minimal_pred(&inputs, &latchs, &cls) {
+            if let Some(n) = self.dcs.minimal_premise(&inputs, &latchs, &cls) {
                 latchs = n;
             } else {
                 let fail = target

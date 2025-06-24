@@ -133,7 +133,11 @@ impl IC3 {
                 latchs.shuffle(&mut self.rng);
             }
             let olen = latchs.len();
-            latchs = self.lift.minimal_pred(&inputs, &latchs, &cls).unwrap();
+            latchs = self
+                .lift
+                .dcs
+                .minimal_premise(&inputs, &latchs, &cls)
+                .unwrap();
             if latchs.len() == olen || !strengthen {
                 break;
             }

@@ -1,6 +1,7 @@
 mod analyze;
 mod cdb;
 mod domain;
+mod lift;
 mod propagate;
 mod search;
 mod simplify;
