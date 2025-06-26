@@ -2,6 +2,7 @@ use super::DagCnfSolver;
 use bitfield_struct::bitfield;
 use giputils::gvec::Gvec;
 use giputils::hash::GHashMap;
+use log::debug;
 use logicrs::{Lit, LitOrdVec};
 use std::{
     mem::take,
@@ -301,7 +302,7 @@ impl ClauseDB {
 
     #[inline]
     #[allow(unused)]
-    pub fn num_leanrt(&self) -> usize {
+    pub fn num_learnt(&self) -> usize {
         self.learnt.len()
     }
 
@@ -354,10 +355,11 @@ impl DagCnfSolver {
         self.value.v(cls[0]).is_true() && self.reason[cls[0]] == cref
     }
 
-    pub fn clean_leanrt(&mut self, full: bool) {
+    pub fn clean_learnt(&mut self, full: bool) {
         if (full && self.cdb.learnt.len() * 15 >= self.cdb.trans.len())
             || self.cdb.learnt.len() >= self.cdb.trans.len()
         {
+            let onum_learnt = self.cdb.num_learnt();
             self.cdb.learnt.sort_unstable_by(|a, b| {
                 self.cdb
                     .allocator
@@ -376,6 +378,11 @@ impl DagCnfSolver {
                     self.cdb.learnt.push(l);
                 }
             }
+            debug!(
+                "gipsat reduced learnt clauses from {} to {}",
+                onum_learnt,
+                self.cdb.num_learnt()
+            );
             self.garbage_collect();
         }
     }
