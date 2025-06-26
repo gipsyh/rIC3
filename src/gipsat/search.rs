@@ -48,12 +48,6 @@ impl DagCnfSolver {
     ) -> Option<bool> {
         let mut restarts = 0;
         loop {
-            if restarts > 0 && restarts % 10 == 0 {
-                debug!(
-                    "gipsat restarted {restarts} times with {} learnt clauses",
-                    self.cdb.num_leanrt()
-                );
-            }
             if let Some(limit) = limit
                 && restarts > limit as u32
             {
@@ -72,6 +66,12 @@ impl DagCnfSolver {
             match self.search(assumption, Some(rest_base * 100.0)) {
                 None => {
                     restarts += 1;
+                    if restarts % 10 == 0 {
+                        debug!(
+                            "gipsat restarted {restarts} times with {} learnt clauses",
+                            self.cdb.num_learnt()
+                        );
+                    }
                 }
                 Some(r) => return Some(r),
             }
@@ -114,7 +114,7 @@ impl DagCnfSolver {
                     self.backtrack(assumption.len(), true);
                     return None;
                 }
-                self.clean_leanrt(false);
+                self.clean_learnt(false);
                 while self.highest_level() < assumption.len() {
                     let a = assumption[self.highest_level()];
                     match self.value.v(a) {

@@ -247,7 +247,7 @@ impl DagCnfSolver {
             assert!(self.new_round(assump.iter().map(|l| l.var()), vec![], true));
             assump
         };
-        self.clean_leanrt(true);
+        self.clean_learnt(true);
         self.simplify();
         let res = self.search_with_restart(assump, limit);
         self.statistic.avg_solve_time += start.elapsed();
