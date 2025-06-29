@@ -195,7 +195,7 @@ impl ProofObligationQueue {
     }
 
     pub fn clear_to(&mut self, frame: usize) {
-        while let Some(_) = self.pop(frame) {}
+        while self.pop(frame).is_some() {}
     }
 
     #[allow(unused)]
