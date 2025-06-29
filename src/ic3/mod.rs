@@ -152,7 +152,7 @@ impl IC3 {
                     self.obligations.clear_to(bt);
                     restart += 1;
                     if restart % 10 == 0 {
-                        info!("rIC3 restarted {} times", restart);
+                        info!("rIC3 restarted {restart} times");
                     }
                 }
                 r => return r,
