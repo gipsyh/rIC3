@@ -177,6 +177,7 @@ impl TransysSolver {
     }
 
     #[inline]
+    #[allow(unused)]
     pub fn add_domain(&mut self, var: Var, deps: bool) {
         self.dcs.add_domain(var, deps);
     }

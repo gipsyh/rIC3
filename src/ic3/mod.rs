@@ -73,13 +73,7 @@ impl IC3 {
                 self.bad_solver.add_clause(&!lemma.cube());
             }
         }
-        let mut solver = TransysSolver::new(&self.tsctx, true, self.rng.random());
-        for lemma in self.frame.inf.iter() {
-            solver.add_clause(&!lemma.cube());
-        }
-        for v in self.auxiliary_var.iter() {
-            solver.add_domain(*v, true);
-        }
+        let solver = self.inf_solver.clone();
         self.solvers.push(solver);
         self.frame.push(Frame::new());
         if self.level() == 0 {
