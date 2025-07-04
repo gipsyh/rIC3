@@ -12,8 +12,8 @@ license = "GPL-3.0"
 
 [dependencies]
 aig = { path = "./deps/aig-rs", version = "0.4.5" }
-cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.0" }
-kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.0" }
+cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.1" }
+kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.1" }
 logicrs = { path = "./deps/logicrs", version = "0.5.2" }
 giputils = { path = "./deps/giputils", version = "0.3.4" }
 btor = { path = "./deps/btor-rs", version = "0.2.0" }
