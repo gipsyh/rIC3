@@ -11,7 +11,7 @@ impl IC3 {
     pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
         debug!("getting bad state in last frame");
         let start = Instant::now();
-        if !self.cfg.ic3.no_pred_prop {
+        if self.cfg.ic3.pred_prop {
             assert!(!self.cfg.ic3.full_bad);
             let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
             self.statistic.block.get_bad_time += start.elapsed();

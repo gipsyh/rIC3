@@ -21,7 +21,7 @@ impl BMC {
         ts = ts.check_liveness_and_l2s(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        if !cfg.preproc.no_preproc {
+        if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
         let uts = TransysUnroll::new(&ts);

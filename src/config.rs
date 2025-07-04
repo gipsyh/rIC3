@@ -1,4 +1,4 @@
-use clap::{Args, Parser, ValueEnum};
+use clap::{ArgAction, Args, Parser, ValueEnum};
 use std::path::PathBuf;
 
 /// rIC3 model checker
@@ -85,9 +85,9 @@ pub struct IC3Options {
     #[arg(long = "ic3-dynamic", default_value_t = false)]
     pub dynamic: bool,
 
-    /// ic3 counterexample to generalization
-    #[arg(long = "ic3-no-ctg", default_value_t = false)]
-    pub no_ctg: bool,
+    /// ic3 without counterexample to generalization
+    #[arg(long = "no-ic3-ctg", action = ArgAction::SetFalse, default_value_t = true)]
+    pub ctg: bool,
 
     /// max number of ctg
     #[arg(long = "ic3-ctg-max", default_value_t = 3)]
@@ -110,8 +110,8 @@ pub struct IC3Options {
     pub abs_cst: bool,
 
     /// ic3 without predicate property
-    #[arg(long = "ic3-no-pred-prop", default_value_t = false)]
-    pub no_pred_prop: bool,
+    #[arg(long = "no-ic3-pred-prop", action = ArgAction::SetFalse, default_value_t = true)]
+    pub pred_prop: bool,
 
     /// ic3 full assignment of last bad (used in rlive)
     #[arg(long = "ic3-full-bad", default_value_t = false)]
@@ -145,12 +145,8 @@ pub struct KindOptions {
 #[derive(Args, Clone, Debug)]
 pub struct PreprocessOptions {
     /// disable preprocess
-    #[arg(long = "no-preproc", default_value_t = false)]
-    pub no_preproc: bool,
-
-    /// sec preprocess
-    #[arg(long = "sec", default_value_t = false)]
-    pub sec: bool,
+    #[arg(long = "no-preproc", action = ArgAction::SetFalse, default_value_t = true)]
+    pub preproc: bool,
 }
 
 #[derive(Args, Clone, Debug)]
