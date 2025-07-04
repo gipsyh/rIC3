@@ -194,6 +194,10 @@ impl ProofObligationQueue {
         }
     }
 
+    pub fn clear_to(&mut self, frame: usize) {
+        while self.pop(frame).is_some() {}
+    }
+
     #[allow(unused)]
     pub fn iter(&self) -> btree_set::Iter<'_, ProofObligation> {
         self.obligations.iter()

@@ -51,6 +51,13 @@ pub struct IC3 {
     filog: IntervalLogger,
 }
 
+enum BlockResult {
+    Success,
+    Failure,
+    Proved,
+    LimitExceeded,
+}
+
 impl IC3 {
     #[inline]
     pub fn level(&self) -> usize {
@@ -130,10 +137,39 @@ impl IC3 {
         false
     }
 
-    fn block(&mut self) -> Option<bool> {
+    #[allow(unused)]
+    fn block_with_restart(&mut self) -> BlockResult {
+        let mut restart = 0;
+        loop {
+            let rest_base = luby(2.0, restart);
+            match self.block(Some(rest_base * 100.0)) {
+                BlockResult::LimitExceeded => {
+                    let bt = if let Some(a) = self.obligations.peak() {
+                        (a.frame + 2).min(self.level() - 1)
+                    } else {
+                        self.level() - 1
+                    };
+                    self.obligations.clear_to(bt);
+                    restart += 1;
+                    if restart % 10 == 0 {
+                        info!("rIC3 restarted {restart} times");
+                    }
+                }
+                r => return r,
+            }
+        }
+    }
+
+    fn block(&mut self, limit: Option<f64>) -> BlockResult {
+        let mut noc = 0;
         while let Some(mut po) = self.obligations.pop(self.level()) {
             if po.removed {
                 continue;
+            }
+            if let Some(limit) = limit
+                && noc as f64 > limit
+            {
+                return BlockResult::LimitExceeded;
             }
             if self.tsctx.cube_subsume_init(&po.lemma) {
                 if self.cfg.ic3.abs_cst {
@@ -152,13 +188,13 @@ impl IC3 {
                         }
                         continue;
                     } else {
-                        return Some(false);
+                        return BlockResult::Failure;
                     }
                 } else if po.frame > 0 {
                     debug_assert!(!self.solvers[0].solve(&po.lemma));
                 } else {
                     self.add_obligation(po.clone());
-                    return Some(false);
+                    return BlockResult::Failure;
                 }
             }
             if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.lemma) {
@@ -170,10 +206,14 @@ impl IC3 {
             }
             debug!("{}", self.frame.statistic(false));
             po.bump_act();
+            if self.cfg.ic3.drop_po && po.act > 10.0 {
+                continue;
+            }
             let blocked_start = Instant::now();
             let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false, false);
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
+                noc += 1;
                 let mic_type = if self.cfg.ic3.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
                         let mut act = n.act;
@@ -209,7 +249,7 @@ impl IC3 {
                     MicType::from_config(&self.cfg)
                 };
                 if self.generalize(po, mic_type) {
-                    return None;
+                    return BlockResult::Proved;
                 }
             } else {
                 let (model, inputs) = self.get_pred(po.frame, true);
@@ -223,7 +263,7 @@ impl IC3 {
                 self.add_obligation(po);
             }
         }
-        Some(true)
+        BlockResult::Success
     }
 
     #[allow(unused)]
@@ -492,12 +532,12 @@ impl Engine for IC3 {
             let start = Instant::now();
             debug!("blocking phase begin");
             loop {
-                match self.block() {
-                    Some(false) => {
+                match self.block(None) {
+                    BlockResult::Failure => {
                         self.statistic.block.overall_time += start.elapsed();
                         return Some(false);
                     }
-                    None => {
+                    BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.verify();
                         return Some(true);
@@ -520,9 +560,8 @@ impl Engine for IC3 {
                 }
             }
             debug!("blocking phase end");
-            let blocked_time = start.elapsed();
+            self.statistic.block.overall_time += start.elapsed();
             self.filog.log(Level::Info, self.frame.statistic(true));
-            self.statistic.block.overall_time += blocked_time;
             self.extend();
             let start = Instant::now();
             let propagate = self.propagate(None);
@@ -645,4 +684,19 @@ impl Engine for IC3 {
         info!("{statistic:#?}");
         info!("{:#?}", self.statistic);
     }
+}
+
+fn luby(y: f64, mut x: usize) -> f64 {
+    let mut size = 1;
+    let mut seq = 0;
+    while size < x + 1 {
+        seq += 1;
+        size = 2 * size + 1
+    }
+    while size - 1 != x {
+        size = (size - 1) >> 1;
+        seq -= 1;
+        x %= size;
+    }
+    y.powi(seq)
 }

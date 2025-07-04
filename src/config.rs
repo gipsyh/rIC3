@@ -113,6 +113,15 @@ pub struct IC3Options {
     #[arg(long = "no-ic3-pred-prop", action = ArgAction::SetFalse, default_value_t = true)]
     pub pred_prop: bool,
 
+    /// ic3 without dropping proof-obligation
+    #[arg(
+        long = "no-ic3-drop-po",
+        action = ArgAction::SetFalse,
+        default_value_t = true,
+        conflicts_with = "dynamic"
+    )]
+    pub drop_po: bool,
+
     /// ic3 full assignment of last bad (used in rlive)
     #[arg(long = "ic3-full-bad", default_value_t = false)]
     pub full_bad: bool,
