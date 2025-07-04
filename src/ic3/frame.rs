@@ -241,7 +241,7 @@ impl IC3 {
         if frame == 0 {
             assert!(self.frame.len() == 1);
             self.solvers[0].add_clause(&!lemma.cube());
-            if !self.cfg.ic3.no_pred_prop && self.level() == frame {
+            if self.cfg.ic3.pred_prop && self.level() == frame {
                 self.bad_solver.add_clause(&!lemma.cube());
             }
             self.frame[0].push(FrameLemma::new(lemma, po, None));
@@ -263,7 +263,7 @@ impl IC3 {
                         for k in i + 1..=frame {
                             self.solvers[k].add_clause(&clause);
                         }
-                        if !self.cfg.ic3.no_pred_prop && self.level() == frame {
+                        if self.cfg.ic3.pred_prop && self.level() == frame {
                             self.bad_solver.add_clause(&!lemma.cube());
                         }
                         self.frame[frame].push(FrameLemma::new(lemma, po, None));
@@ -290,7 +290,7 @@ impl IC3 {
         for i in begin..=frame {
             self.solvers[i].add_clause(&clause);
         }
-        if !self.cfg.ic3.no_pred_prop && self.level() == frame {
+        if self.cfg.ic3.pred_prop && self.level() == frame {
             self.bad_solver.add_clause(&clause);
         }
         self.frame[frame].push(FrameLemma::new(lemma, po, None));

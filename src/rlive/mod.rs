@@ -118,7 +118,7 @@ impl Rlive {
         }
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts.normalize_justice();
-        if !cfg.preproc.no_preproc {
+        if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
         assert!(ts.justice.len() == 1);
@@ -132,7 +132,7 @@ impl Rlive {
         rts.constraint.push(bvc);
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
         let rcfg =
-            Config::parse_from("-e ic3 --ic3-no-pred-prop --ic3-full-bad --no-preproc".split(' '));
+            Config::parse_from("-e ic3 --no-ic3-pred-prop --ic3-full-bad --no-preproc".split(' '));
         Self {
             cfg,
             ts,

@@ -46,9 +46,6 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     };
     let ts = frontend.ts();
     info!("origin ts has {}", ts.statistic());
-    if cfg.preproc.sec {
-        panic!("Error: sec not support");
-    }
     let mut engine: Box<dyn Engine> = match cfg.engine {
         config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, vec![])),
         config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),

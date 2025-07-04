@@ -59,7 +59,7 @@ impl IC3 {
 
     fn extend(&mut self) {
         debug!("extending IC3 to level {}", self.solvers.len());
-        if !self.cfg.ic3.no_pred_prop {
+        if self.cfg.ic3.pred_prop {
             self.bad_solver = cadical::Solver::new();
             self.bad_ts.load_trans(&mut self.bad_solver, true);
             for lemma in self.frame.inf.iter() {
@@ -382,7 +382,7 @@ impl IC3 {
     fn base(&mut self) -> bool {
         self.extend();
         assert!(self.level() == 0);
-        if !self.cfg.ic3.no_pred_prop {
+        if self.cfg.ic3.pred_prop {
             let bad = self.tsctx.bad;
             if self.solvers[0].solve(&self.tsctx.bad.cube()) {
                 let (input, bad) = self.solvers[0].trivial_pred();
@@ -412,7 +412,7 @@ impl IC3 {
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
         let statistic = Statistic::default();
-        if !cfg.preproc.no_preproc {
+        if cfg.preproc.preproc {
             ts.simplify(&mut rst);
             let frts = FrTs::new(ts, rng.random(), rst, vec![]);
             (ts, rst) = frts.fr();
@@ -421,7 +421,7 @@ impl IC3 {
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
-            cfg.ic3.no_pred_prop = true;
+            cfg.ic3.pred_prop = false;
             ts = uts.interal_signals();
         }
         let mut bad_ts = uts.compile();
