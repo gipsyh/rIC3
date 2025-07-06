@@ -259,20 +259,9 @@ fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
             file.write_all(witness.as_bytes()).unwrap();
         }
     }
-    if !cfg.certify {
-        return;
+    if cfg.certify {
+        certifaiger_check(&cfg.model, engine.certificate.as_ref().unwrap().path());
     }
-    certifaiger_check(
-        &cfg.model,
-        engine
-            .certificate
-            .as_ref()
-            .unwrap()
-            .path()
-            .as_os_str()
-            .to_str()
-            .unwrap(),
-    );
 }
 
 pub fn portfolio_main(cfg: Config) {
