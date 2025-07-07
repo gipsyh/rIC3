@@ -17,7 +17,7 @@ use logicrs::{
     Lit, Var,
     fol::{
         Term,
-        op::{And, Or},
+        op::{Ands, Ors},
     },
 };
 use std::{
@@ -146,13 +146,13 @@ impl Frontend for BtorFrontend {
                     if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(Term::new_op_fold(
-                            And,
+                        r.push(Term::new_op(
+                            Ands,
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = Term::new_op_fold(Or, r);
+                let n = Term::new_op(Ors, r);
                 map.insert(v, n);
             }
         }
