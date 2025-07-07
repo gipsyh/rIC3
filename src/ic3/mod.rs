@@ -452,6 +452,7 @@ impl IC3 {
             (ts, rst) = frts.fr();
         }
         info!("simplified ts has {}", ts.statistic());
+
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {

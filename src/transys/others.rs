@@ -1,6 +1,7 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarVMap, satif::Satif};
+use std::mem::take;
 
 impl Transys {
     pub fn merge(&mut self, other: &Self) {
@@ -81,5 +82,46 @@ impl Transys {
             res.constraint.push(c);
         }
         res
+    }
+
+    pub fn map(&mut self, map: impl Fn(Var) -> Var + Copy, rst: &mut VarVMap) {
+        self.input
+            .iter_mut()
+            .chain(self.latch.iter_mut())
+            .for_each(|v| *v = map(*v));
+        self.rel = self.rel.map(map);
+        for (k, v) in take(&mut self.init) {
+            self.init.insert(map(k), v.map_var(map));
+        }
+        for (k, v) in take(&mut self.next) {
+            self.next.insert(map(k), v.map_var(map));
+        }
+        self.bad = self.bad.map_var(map);
+        self.constraint = self.constraint.map_var(map);
+        self.justice = self.justice.map_var(map);
+        rst.map_key(map);
+    }
+
+    pub fn replace(&mut self, map: &VarLMap, rst: &mut VarVMap) {
+        for &v in self.input.iter().chain(self.latch.iter()) {
+            assert!(!map.contains_key(&v));
+        }
+        self.rel.replace(map);
+        for l in self.next.values_mut().chain(self.init.values_mut()) {
+            if let Some(m) = map.map_lit(*l) {
+                *l = m;
+            }
+        }
+        let map_fn = map.try_map_fn();
+        self.bad = self.bad.map(|l| map_fn(l).unwrap_or(l));
+        self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
+        self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
+        rst.retain(|k, _| !map.contains_key(k));
+    }
+
+    pub fn topsort(&mut self, rst: &mut VarVMap) {
+        let (_, m) = self.rel.topsort();
+        let m = m.inverse();
+        self.map(|v| m[v], rst);
     }
 }

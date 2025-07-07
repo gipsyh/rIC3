@@ -24,7 +24,8 @@ pub struct FrTs {
 }
 
 impl FrTs {
-    pub fn new(ts: Transys, rseed: u64, rst: VarVMap, constraint: Vec<LitVec>) -> Self {
+    pub fn new(mut ts: Transys, rseed: u64, mut rst: VarVMap, constraint: Vec<LitVec>) -> Self {
+        ts.topsort(&mut rst);
         let sim = DagCnfSimulation::new(1000, &ts.rel);
         let mut solver = DagCnfSolver::new(&ts.rel, rseed);
         for cls in constraint.iter() {
