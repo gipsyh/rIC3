@@ -1,4 +1,5 @@
 use super::{Transys, TransysIf};
+use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 impl Transys {
@@ -53,5 +54,32 @@ impl Transys {
             input.push(solver.sat_value_lit(i).unwrap());
         }
         (input, state)
+    }
+
+    pub fn remove_gate_init(&self) -> Self {
+        let mut res = self.clone();
+        let mut init = GHashMap::new();
+        let mut eq = Vec::new();
+        for l in self.input().chain(self.latch()) {
+            if let Some(i) = self.init.get(&l).copied() {
+                if i.try_constant().is_some() {
+                    init.insert(l, i);
+                } else {
+                    eq.push((l, i));
+                }
+            }
+        }
+        if eq.is_empty() {
+            return res;
+        }
+        res.init = init;
+        let iv = res.new_var();
+        res.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        for (v, i) in eq {
+            let e = res.rel.new_xnor(v.lit(), i);
+            let c = res.rel.new_imply(iv.lit(), e);
+            res.constraint.push(c);
+        }
+        res
     }
 }

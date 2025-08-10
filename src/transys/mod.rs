@@ -58,18 +58,26 @@ pub trait TransysIf {
         lits.into_iter().filter_map(|l| self.next(*l)).collect()
     }
 
-    #[inline]
-    fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
-        satif.new_var_to(self.max_var());
+    fn inits(&self) -> LitVvec {
+        let mut cnf = LitVvec::new();
         for l in self.input().chain(self.latch()) {
             if let Some(i) = self.init(l) {
                 if let Some(i) = i.try_constant() {
-                    satif.add_clause(&[l.lit().not_if(!i)]);
+                    cnf.push(LitVec::from([l.lit().not_if(!i)]));
                 } else {
-                    satif.add_clause(&[l.lit(), !i]);
-                    satif.add_clause(&[!l.lit(), i]);
+                    cnf.push(LitVec::from([l.lit(), !i]));
+                    cnf.push(LitVec::from([!l.lit(), i]));
                 }
             }
+        }
+        cnf
+    }
+
+    #[inline]
+    fn load_init<S: Satif + ?Sized>(&self, satif: &mut S) {
+        satif.new_var_to(self.max_var());
+        for cls in self.inits() {
+            satif.add_clause(&cls);
         }
     }
 

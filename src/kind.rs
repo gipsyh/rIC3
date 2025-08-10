@@ -3,7 +3,7 @@ use crate::{
     config::Config,
     transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
 };
-use log::{error, info, warn};
+use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
 
 pub struct Kind {
@@ -18,10 +18,8 @@ pub struct Kind {
 
 impl Kind {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
-        warn!(
-            "Kind does not currently detect counter-example. Please run BMC separately or use the portfolio mode if needed."
-        );
         let ots = ts.clone();
+        ts = ts.remove_gate_init();
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
         let mut ts = ts.remove_dep();
@@ -34,11 +32,7 @@ impl Kind {
         } else {
             TransysUnroll::new(&ts)
         };
-        let solver: Box<dyn Satif> = if cfg.kind.kind_kissat {
-            Box::new(kissat::Solver::new())
-        } else {
-            Box::new(cadical::Solver::new())
-        };
+        let solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         Self {
             uts,
             cfg,
@@ -67,11 +61,7 @@ impl Kind {
     }
 
     pub fn reset_solver(&mut self) {
-        self.solver = if self.cfg.bmc.bmc_kissat {
-            Box::new(kissat::Solver::new())
-        } else {
-            Box::new(cadical::Solver::new())
-        };
+        self.solver = Box::new(cadical::Solver::new());
         for i in 0..self.slv_trans_k {
             self.uts.load_trans(self.solver.as_mut(), i, true);
         }
@@ -85,50 +75,34 @@ impl Kind {
 impl Engine for Kind {
     fn check(&mut self) -> Option<bool> {
         let step = self.cfg.step as usize;
-        for k in (self.cfg.start..=self.cfg.end).step_by(step) {
+        if step != 1 {
+            error!("k-induction step should be 1, got {step}");
+            panic!();
+        }
+        if self.cfg.start != 0 {
+            error!("k-induction start should be 0, got {}", self.cfg.start);
+            panic!();
+        }
+        for k in 0..=self.cfg.end {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
+            info!("kind depth: {k}");
             if k > 0 {
-                info!("kind depth: {k}");
                 self.load_bad_to(k - 1);
-                let res = if self.cfg.kind.kind_kissat {
-                    for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
-                        self.solver.add_clause(&[l]);
-                    }
-                    self.solver.solve(&[])
-                } else {
-                    self.solver
-                        .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k))
-                };
+                let res = self
+                    .solver
+                    .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
                 if !res {
                     info!("k-induction proofed in depth {k}");
                     return Some(true);
                 }
-                if self.cfg.kind.kind_kissat {
-                    self.reset_solver();
-                }
             }
-            // if !self.cfg.kind.no_bmc {
-            // info!("kind bmc depth: {k}");
-            // let res = if self.cfg.kind.kind_kissat {
-            //     self.uts.ts.load_init(self.solver.as_mut());
-            //     for l in self.uts.lits_next(&self.uts.ts.bad.cube(), k) {
-            //         self.solver.add_clause(&[l]);
-            //     }
-            //     self.solver.solve(&[])
-            // } else {
-            //     let mut assump: LitVec = self.uts.ts.init().collect();
-            //     assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
-            //     self.solver.solve(&assump)
-            // };
-            // if res {
-            //     info!("bmc found counter-example in depth {k}");
-            //     return Some(false);
-            // }
-            // if self.cfg.kind.kind_kissat {
-            //     self.reset_solver();
-            // }
-            // }
+            let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
+            assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
+            if self.solver.solve(&assump) {
+                info!("bmc found counter-example in depth {k}");
+                return Some(false);
+            }
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
         None
