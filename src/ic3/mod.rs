@@ -8,7 +8,7 @@ use crate::{
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
-use log::{Level, debug, info, trace};
+use log::{Level, debug, info, trace, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -479,6 +479,10 @@ impl IC3 {
         let lift = TransysSolver::new(&tsctx, false, rng.random());
         let bad_lift = TransysSolver::new(&bad_ts, false, rng.random());
         let abs_cst = if cfg.ic3.abs_cst {
+            if cfg.ic3.pred_prop {
+                warn!("ic3-abs-cst is not compatible with ic3-pred-prop, disabled ic3-pred-prop");
+                cfg.ic3.pred_prop = false;
+            }
             LitVec::new()
         } else {
             ts.constraint.clone()
