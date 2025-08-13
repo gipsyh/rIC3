@@ -76,7 +76,7 @@ impl Rlive {
             assert!(l.var() != self.base_var);
             rts.init.insert(l.var(), Lit::constant(l.polarity()));
         }
-        let mut ic3 = IC3::new(self.rcfg.clone(), rts, vec![]);
+        let mut ic3 = IC3::new(self.rcfg.clone(), rts);
         if ic3.check().unwrap() {
             return Ok(ic3.invariant());
         }
@@ -152,7 +152,7 @@ impl Engine for Rlive {
         loop {
             let mut ts = self.ts.clone();
             ts.bad = take(&mut ts.justice);
-            let mut ic3 = IC3::new(self.rcfg.clone(), ts, vec![]);
+            let mut ic3 = IC3::new(self.rcfg.clone(), ts);
             if ic3.check().unwrap() {
                 return Some(true);
             }

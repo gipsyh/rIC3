@@ -4,9 +4,7 @@ use crate::{
 };
 use giputils::hash::GHashMap;
 use log::info;
-use logicrs::{
-    Lit, LitVec, Var, VarLMap, VarMap, VarVMap, satif::Satif, simulate::DagCnfSimulation,
-};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simulate::DagCnfSimulation};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
@@ -17,20 +15,16 @@ pub struct FrTs {
     map: VarLMap,
     eqc: VarVMap,
     solver: DagCnfSolver,
-    constraint: Vec<LitVec>,
     rseed: u64,
     rng: StdRng,
     rst: VarVMap,
 }
 
 impl FrTs {
-    pub fn new(mut ts: Transys, rseed: u64, mut rst: VarVMap, constraint: Vec<LitVec>) -> Self {
+    pub fn new(mut ts: Transys, rseed: u64, mut rst: VarVMap) -> Self {
         ts.topsort(&mut rst);
         let sim = DagCnfSimulation::new(1000, &ts.rel);
-        let mut solver = DagCnfSolver::new(&ts.rel, rseed);
-        for cls in constraint.iter() {
-            solver.add_clause(cls);
-        }
+        let solver = DagCnfSolver::new(&ts.rel, rseed);
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
@@ -61,7 +55,6 @@ impl FrTs {
             map,
             eqc,
             solver,
-            constraint,
             rseed,
             rst,
             rng,
@@ -123,7 +116,7 @@ impl FrTs {
         self.ts.coi_refine(&mut self.rst);
         self.ts.rearrange(&mut self.rst);
         info!(
-            "frts eliminates {} out of {} vars in {:.2}s.",
+            "frts eliminates {} out of {} vars in {:.2}s",
             *before - *self.ts.max_var(),
             *before,
             start.elapsed().as_secs_f32()

@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let ts = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine: Box<dyn Engine> = match cfg.engine {
-        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, vec![])),
+        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts)),
         config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
         config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
         config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),

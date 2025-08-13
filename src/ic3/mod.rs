@@ -40,7 +40,6 @@ pub struct IC3 {
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
-    pre_lemmas: Vec<LitVec>,
     abs_cst: LitVec,
     bmc_solver: Option<(Box<dyn Satif>, TransysUnroll<Transys>)>,
     ots: Transys,
@@ -92,10 +91,6 @@ impl IC3 {
             for i in init {
                 self.ts.add_init(i.var(), Lit::constant(i.polarity()));
                 self.tsctx.add_init(i.var(), Lit::constant(i.polarity()));
-            }
-        } else if self.level() == 1 {
-            for cls in self.pre_lemmas.clone().iter() {
-                self.add_lemma(1, !cls.clone(), true, None);
             }
         }
     }
@@ -440,7 +435,7 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(mut cfg: Config, mut ts: Transys, pre_lemmas: Vec<LitVec>) -> Self {
+    pub fn new(mut cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let mut rst = VarVMap::new_self_map(ts.max_var());
@@ -448,7 +443,7 @@ impl IC3 {
         let statistic = Statistic::default();
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
-            let frts = FrTs::new(ts, rng.random(), rst, vec![]);
+            let frts = FrTs::new(ts, rng.random(), rst);
             (ts, rst) = frts.fr();
         }
         info!("simplified ts has {}", ts.statistic());
@@ -503,7 +498,6 @@ impl IC3 {
             obligations: ProofObligationQueue::new(),
             frame,
             abs_cst,
-            pre_lemmas,
             auxiliary_var: Vec::new(),
             ots,
             rst,
