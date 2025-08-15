@@ -39,6 +39,7 @@ impl DagCnfSolver {
                 self.cdb.lemmas = self.simplify_subsume(lemmas);
                 self.simplify.last_num_lemma = self.cdb.lemmas.len();
             }
+            self.clean_eq();
             self.garbage_collect();
             self.simplify.last_simplify = self.statistic.num_solve;
         }
@@ -58,7 +59,16 @@ impl DagCnfSolver {
                         continue 'm;
                     }
                     Lbool::FALSE => {
-                        cls.swap_remove(j);
+                        if j <= 1 {
+                            debug_assert!(
+                                cls.slice().iter().any(|&l| self.value.v(l) == Lbool::TRUE)
+                            );
+                            clauses.swap_remove(i);
+                            self.detach_clause(cid);
+                            continue 'm;
+                        } else {
+                            cls.swap_remove(j);
+                        }
                     }
                     _ => {
                         j += 1;
