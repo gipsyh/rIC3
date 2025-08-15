@@ -1,7 +1,7 @@
 use crate::{
     Engine, Proof, Witness,
     config::Config,
-    transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
@@ -22,6 +22,11 @@ impl Kind {
         ts = ts.remove_gate_init();
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
+        if cfg.preproc.preproc {
+            ts.simplify(&mut rst);
+            let frts = FrTs::new(ts, &cfg, rst);
+            (ts, rst) = frts.fr();
+        }
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {

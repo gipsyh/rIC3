@@ -416,7 +416,7 @@ impl IC3 {
         let statistic = Statistic::default();
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
-            let frts = FrTs::new(ts, rng.random(), rst);
+            let frts = FrTs::new(ts, &cfg, rst);
             (ts, rst) = frts.fr();
         }
         info!("simplified ts has {}", ts.statistic());

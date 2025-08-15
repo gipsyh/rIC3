@@ -1,4 +1,5 @@
 use crate::{
+    config::Config,
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf},
 };
@@ -13,21 +14,21 @@ use std::time::Instant;
 
 #[allow(unused)]
 pub struct FrTs {
+    cfg: Config,
     ts: Transys,
     candidate: VarMap<Vec<Lit>>,
     map: VarLMap,
     eqc: VarVMap,
     solver: DagCnfSolver,
-    rseed: u64,
     rng: StdRng,
     rst: VarVMap,
 }
 
 impl FrTs {
-    pub fn new(mut ts: Transys, rseed: u64, mut rst: VarVMap) -> Self {
+    pub fn new(mut ts: Transys, cfg: &Config, mut rst: VarVMap) -> Self {
         ts.topsort(&mut rst);
         let sim = DagCnfSimulation::new(1000, &ts.rel);
-        let solver = DagCnfSolver::new(&ts.rel, rseed);
+        let solver = DagCnfSolver::new(&ts.rel, cfg.rseed);
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
@@ -51,14 +52,14 @@ impl FrTs {
                 candidate[lv.var()].push(lv);
             }
         }
-        let rng = StdRng::seed_from_u64(rseed);
+        let rng = StdRng::seed_from_u64(cfg.rseed);
         Self {
             ts,
+            cfg: cfg.clone(),
             candidate,
             map,
             eqc,
             solver,
-            rseed,
             rst,
             rng,
         }
@@ -74,6 +75,10 @@ impl FrTs {
         let mut replace = VarLMap::new();
         let mut v = Var(1);
         while v <= self.ts.max_var() {
+            if start.elapsed().as_secs() > self.cfg.preproc.frts_tl {
+                info!("frts: timeout");
+                break;
+            }
             if self.ts.rel.is_leaf(v) {
                 v += 1;
                 continue;

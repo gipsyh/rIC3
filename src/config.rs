@@ -149,6 +149,9 @@ pub struct PreprocessOptions {
     /// disable preprocess
     #[arg(long = "no-preproc", action = ArgAction::SetFalse, default_value_t = true)]
     pub preproc: bool,
+    /// frts time limit in seconds
+    #[arg(long = "frts-tl", default_value_t = 1800)]
+    pub frts_tl: u64,
 }
 
 #[derive(Args, Clone, Debug)]
