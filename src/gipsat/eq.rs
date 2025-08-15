@@ -59,7 +59,7 @@ impl DagCnfSolver {
             let cid = clauses[i];
             let cls = self.cdb.get(cid);
             if cls.slice().iter().any(|&l| self.eqc.get_eq(l) != l) {
-                let mut cls = cls.to_litvec();
+                let mut cls = cls.litvec();
                 self.detach_clause(cid);
                 for j in 0..cls.len() {
                     let eq = self.eqc.get_eq(cls[j]);

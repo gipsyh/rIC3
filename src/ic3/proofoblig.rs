@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Default)]
 pub struct ProofObligationInner {
     pub frame: usize,
-    pub input: Vec<LitVec>,
+    pub input: LitVec,
     pub lemma: LitOrdVec,
     pub depth: usize,
     pub next: Option<ProofObligation>,
@@ -72,7 +72,7 @@ impl ProofObligation {
     pub fn new(
         frame: usize,
         lemma: LitOrdVec,
-        input: Vec<LitVec>,
+        input: LitVec,
         depth: usize,
         next: Option<Self>,
     ) -> Self {

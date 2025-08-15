@@ -1,6 +1,5 @@
-use crate::transys::TransysIf;
-
 use super::IC3;
+use crate::transys::TransysIf;
 use giputils::hash::GHashSet;
 use log::debug;
 use logicrs::{LitOrdVec, LitVec, Var, satif::Satif};
@@ -8,43 +7,22 @@ use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 impl IC3 {
-    pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
+    pub(super) fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
         debug!("getting bad state in last frame");
         let start = Instant::now();
-        if self.cfg.ic3.pred_prop {
-            assert!(!self.cfg.ic3.full_bad);
-            let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
-            self.statistic.block.get_bad_time += start.elapsed();
-            res.then(|| {
-                let (s, i) =
-                    self.bad_lift
-                        .get_pred(&self.bad_solver, &self.bad_ts.bad.cube(), true);
-                let mut input = vec![LitVec::default(); 2];
-                for i in i {
-                    if let Some(bi) = self.bad_input.get(&i.var()) {
-                        input[1].push(i.map_var(|_| *bi));
-                    } else {
-                        input[0].push(i);
-                    }
-                }
-                (s, input, 1)
-            })
-        } else {
-            let res = self
-                .solvers
-                .last_mut()
-                .unwrap()
-                .solve(&self.tsctx.bad.cube());
-            self.statistic.block.get_bad_time += start.elapsed();
-            res.then(|| {
-                if self.cfg.ic3.full_bad {
-                    self.get_full_pred(self.solvers.len())
-                } else {
-                    self.get_pred(self.solvers.len(), true)
-                }
-            })
-            .map(|(s, i)| (s, vec![i], 0))
-        }
+        let res = self
+            .solvers
+            .last_mut()
+            .unwrap()
+            .solve(&self.tsctx.bad.cube());
+        self.statistic.block.get_bad_time += start.elapsed();
+        res.then(|| {
+            if self.cfg.ic3.full_bad {
+                self.get_full_pred(self.solvers.len())
+            } else {
+                self.get_pred(self.solvers.len(), true)
+            }
+        })
     }
 }
 

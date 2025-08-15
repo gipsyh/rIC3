@@ -8,7 +8,7 @@ use crate::{
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
-use log::{Level, debug, info, trace, warn};
+use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
@@ -32,10 +32,6 @@ pub struct IC3 {
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
     lift: TransysSolver,
-    bad_ts: Grc<TransysCtx>,
-    bad_solver: cadical::Solver,
-    bad_lift: TransysSolver,
-    bad_input: GHashMap<Var, Var>,
     frame: Frames,
     obligations: ProofObligationQueue,
     activity: Activity,
@@ -65,13 +61,6 @@ impl IC3 {
 
     fn extend(&mut self) {
         debug!("extending IC3 to level {}", self.solvers.len());
-        if self.cfg.ic3.pred_prop {
-            self.bad_solver = cadical::Solver::new();
-            self.bad_ts.load_trans(&mut self.bad_solver, true);
-            for lemma in self.frame.inf.iter() {
-                self.bad_solver.add_clause(&!lemma.cube());
-            }
-        }
         let solver = self.inf_solver.clone();
         self.solvers.push(solver);
         self.frame.push(Frame::new());
@@ -160,6 +149,7 @@ impl IC3 {
             {
                 return BlockResult::LimitExceeded;
             }
+            trace!("blocking {} in {}", po.lemma, po.frame);
             if self.tsctx.cube_subsume_init(&po.lemma) {
                 if self.cfg.ic3.abs_cst {
                     self.add_obligation(po.clone());
@@ -180,7 +170,9 @@ impl IC3 {
                         return BlockResult::Failure;
                     }
                 } else if po.frame > 0 {
-                    debug_assert!(!self.solvers[0].solve(&po.lemma));
+                    let mut assump = po.lemma.cube().clone();
+                    assump.extend(po.input.iter());
+                    debug_assert!(!self.solvers[0].solve(&assump));
                 } else {
                     self.add_obligation(po.clone());
                     return BlockResult::Failure;
@@ -245,7 +237,7 @@ impl IC3 {
                 self.add_obligation(ProofObligation::new(
                     po.frame - 1,
                     LitOrdVec::new(model),
-                    vec![inputs],
+                    inputs,
                     po.depth + 1,
                     Some(po.clone()),
                 ));
@@ -411,31 +403,12 @@ impl IC3 {
     fn base(&mut self) -> bool {
         self.extend();
         assert!(self.level() == 0);
-        if self.cfg.ic3.pred_prop {
-            let bad = self.tsctx.bad;
-            if self.solvers[0].solve(&self.tsctx.bad.cube()) {
-                let (input, bad) = self.solvers[0].trivial_pred();
-                self.add_obligation(ProofObligation::new(
-                    0,
-                    LitOrdVec::new(bad),
-                    vec![input],
-                    0,
-                    None,
-                ));
-                info!("counter-example found in base checking");
-                return false;
-            }
-            self.tsctx.constraint.push(!bad);
-            self.ts.constraint.push(!bad);
-            self.lift = TransysSolver::new(&self.tsctx, false, self.rng.random());
-            self.inf_solver = TransysSolver::new(&self.tsctx, true, self.rng.random());
-        }
         true
     }
 }
 
 impl IC3 {
-    pub fn new(mut cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let mut rst = VarVMap::new_self_map(ts.max_var());
@@ -451,11 +424,8 @@ impl IC3 {
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
-            cfg.ic3.pred_prop = false;
             ts = uts.interal_signals();
         }
-        let mut bad_ts = uts.compile();
-        bad_ts.constraint.extend(ts.bad.iter().map(|&l| !l));
         let mut bad_input = GHashMap::new();
         for &l in ts.input.iter() {
             let n = uts.var_next(l, 1);
@@ -464,20 +434,13 @@ impl IC3 {
         for l in ts.latch_no_next() {
             let n = uts.var_next(l, 1);
             bad_input.insert(n, l);
-            bad_ts.input.push(n);
         }
         let tsctx = Grc::new(ts.ctx());
-        let bad_ts = Grc::new(bad_ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
         let inf_solver = TransysSolver::new(&tsctx, true, rng.random());
         let lift = TransysSolver::new(&tsctx, false, rng.random());
-        let bad_lift = TransysSolver::new(&bad_ts, false, rng.random());
         let abs_cst = if cfg.ic3.abs_cst {
-            if cfg.ic3.pred_prop {
-                warn!("ic3-abs-cst is not compatible with ic3-pred-prop, disabled ic3-pred-prop");
-                cfg.ic3.pred_prop = false;
-            }
             LitVec::new()
         } else {
             ts.constraint.clone()
@@ -489,10 +452,6 @@ impl IC3 {
             activity,
             solvers: Vec::new(),
             inf_solver,
-            bad_ts,
-            bad_solver: cadical::Solver::new(),
-            bad_lift,
-            bad_input,
             lift,
             statistic,
             obligations: ProofObligationQueue::new(),
@@ -537,17 +496,11 @@ impl Engine for IC3 {
                     }
                     _ => (),
                 }
-                if let Some((bad, inputs, depth)) = self.get_bad() {
+                if let Some((bad, inputs)) = self.get_bad() {
                     debug!("bad state found in last frame");
                     trace!("bad = {bad}");
                     let bad = LitOrdVec::new(bad);
-                    self.add_obligation(ProofObligation::new(
-                        self.level(),
-                        bad,
-                        inputs,
-                        depth,
-                        None,
-                    ))
+                    self.add_obligation(ProofObligation::new(self.level(), bad, inputs, 0, None))
                 } else {
                     break;
                 }
@@ -626,7 +579,7 @@ impl Engine for IC3 {
                 let assump: Vec<_> = bad
                     .lemma
                     .iter()
-                    .chain(bad.input[0].iter())
+                    .chain(bad.input.iter())
                     .filter_map(|l| self.rst.lit_map(*l))
                     .collect();
                 let (input, state) = self.ots.exact_init_state(&assump);
@@ -640,26 +593,11 @@ impl Engine for IC3 {
                         .collect(),
                 );
                 res.input.push(
-                    bad.input[0]
+                    bad.input
                         .iter()
                         .filter_map(|l| self.rst.lit_map(*l))
                         .collect(),
                 );
-            }
-            for i in bad.input[1..].iter() {
-                let mut input = LitVec::new();
-                let mut state = LitVec::new();
-                for i in i.iter() {
-                    if self.bad_ts.is_latch(i.var()) {
-                        if let Some(m) = self.rst.lit_map(*i) {
-                            state.push(m);
-                        }
-                    } else if let Some(m) = self.rst.lit_map(*i) {
-                        input.push(m);
-                    }
-                }
-                res.input.push(input);
-                res.state.push(state);
             }
             b = bad.next.clone();
         }

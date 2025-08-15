@@ -104,9 +104,7 @@ impl DagCnfSolver {
         assert!(self.highest_level() == 0);
         let mut clause = logicrs::LitVec::from(clause);
         clause.sort();
-        let Some(clause) = clause.ordered_simp(&self.value) else {
-            return None;
-        };
+        let clause = clause.ordered_simp(&self.value)?;
         if clause.is_empty() {
             self.trivial_unsat = true;
             return None;

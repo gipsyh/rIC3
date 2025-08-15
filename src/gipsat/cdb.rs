@@ -116,7 +116,7 @@ impl Clause {
     }
 
     #[inline]
-    pub fn to_litvec(&self) -> LitVec {
+    pub fn litvec(&self) -> LitVec {
         LitVec::from(self.slice())
     }
 }

@@ -73,7 +73,7 @@ impl Portfolio {
         new_engine("-e ic3 --ic3-ctg-limit 5");
         new_engine("-e ic3 --ic3-ctg-max 5 --ic3-ctg-limit 15");
         new_engine("-e ic3 --ic3-abs-cst --rseed 55");
-        new_engine("-e ic3 --ic3-ctp --ic3-pred-prop");
+        new_engine("-e ic3 --ic3-ctp --rseed 555");
         new_engine("-e ic3 --no-ic3-ctg --ic3-inn");
         new_engine("-e ic3 --ic3-inn");
         new_engine("-e ic3 --ic3-ctg-limit 5 --ic3-inn");

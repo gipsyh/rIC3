@@ -65,7 +65,7 @@ impl Transys {
                 rst.remove(&v);
             }
         }
-        info!("ts coi simplify: removed {} clauses", removed);
+        info!("ts coi simplify: removed {removed} clauses");
     }
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {

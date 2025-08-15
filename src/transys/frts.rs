@@ -83,7 +83,7 @@ impl FrTs {
                 continue;
             };
             let lv = v.lit();
-            debug!("frts: checking var {} with lit {}", m, v);
+            debug!("frts: checking var {m} with lit {v}");
             match self.solver.solve_with_restart_limit(
                 &[],
                 vec![LitVec::from([m, lv]), LitVec::from([!m, !lv])],
@@ -105,7 +105,7 @@ impl FrTs {
                     // }
                 }
                 Some(false) => {
-                    debug!("frts: replace {} with {}", v, m);
+                    debug!("frts: replace {v} with {m}");
                     replace.insert_lit(lv, m);
                     self.solver.add_eq(lv, m);
                     if replace.len() % 5000 == 0 {
@@ -123,7 +123,7 @@ impl FrTs {
                     }
                 }
                 None => {
-                    debug!("frts: checking {} with {} timeout", v, m);
+                    debug!("frts: checking {v} with {m} timeout");
                 }
             }
             v += 1;

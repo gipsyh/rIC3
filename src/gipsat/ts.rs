@@ -91,6 +91,7 @@ impl TransysSolver {
         (latchs, inputs)
     }
 
+    #[allow(unused)]
     pub fn trivial_pred(&mut self) -> (LitVec, LitVec) {
         let mut input = LitVec::new();
         for i in self.ts.input() {
