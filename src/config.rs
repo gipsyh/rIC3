@@ -110,7 +110,7 @@ pub struct IC3Options {
     pub abs_cst: bool,
 
     /// ic3 without predicate property
-    #[arg(long = "no-ic3-pred-prop", action = ArgAction::SetFalse, default_value_t = true)]
+    #[arg(long = "ic3-pred-prop", default_value_t = false)]
     pub pred_prop: bool,
 
     /// ic3 without dropping proof-obligation

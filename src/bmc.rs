@@ -1,10 +1,11 @@
 use crate::{
     Engine, Witness,
     config::Config,
-    transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
 use logicrs::{LitVec, VarVMap, satif::Satif};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub struct BMC {
@@ -17,8 +18,14 @@ pub struct BMC {
 
 impl BMC {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
+        let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
+        if cfg.preproc.preproc {
+            ts.simplify(&mut rst);
+            let frts = FrTs::new(ts, rng.random(), rst);
+            (ts, rst) = frts.fr();
+        }
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
