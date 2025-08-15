@@ -4,6 +4,28 @@ use logicrs::{Lit, LitVec, Var, VarLMap, VarVMap, satif::Satif};
 use std::mem::take;
 
 impl Transys {
+    pub fn frozens(&self) -> Vec<Var> {
+        let mut frozens = vec![Var::CONST];
+        frozens.extend(
+            self.bad
+                .iter()
+                .chain(self.constraint.iter())
+                .chain(self.justice.iter())
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
+        );
+        for l in self.latch.iter() {
+            if let Some(i) = self.init.get(l) {
+                frozens.push(i.var());
+            }
+            if let Some(n) = self.next.get(l) {
+                frozens.push(n.var());
+            }
+        }
+        frozens
+    }
+
     pub fn merge(&mut self, other: &Self) {
         let offset = self.max_var();
         let map = |x: Var| {

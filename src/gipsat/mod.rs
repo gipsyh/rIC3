@@ -1,6 +1,7 @@
 mod analyze;
 mod cdb;
 mod domain;
+mod eq;
 mod lift;
 mod propagate;
 mod search;
@@ -9,6 +10,7 @@ mod statistic;
 mod ts;
 mod vsids;
 
+use crate::gipsat::eq::Eqc;
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
@@ -41,6 +43,7 @@ pub struct DagCnfSolver {
     phase_saving: VarMap<Lbool>,
     analyze: Analyze,
     simplify: Simplify,
+    eqc: Eqc,
     unsat_core: LitSet,
     domain: Domain,
     temporary_domain: bool,
@@ -74,6 +77,7 @@ impl DagCnfSolver {
             phase_saving: Default::default(),
             analyze: Default::default(),
             simplify: Default::default(),
+            eqc: Default::default(),
             unsat_core: Default::default(),
             domain: Domain::new(),
             temporary_domain: Default::default(),
@@ -96,48 +100,47 @@ impl DagCnfSolver {
         solver
     }
 
-    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logicrs::LitVec> {
+    fn simplify_clause(&mut self, clause: &[Lit]) -> Option<LitVec> {
         assert!(self.highest_level() == 0);
-        let mut clause = logicrs::LitVec::new();
-        for l in cls.iter() {
-            assert!(l.var() < self.num_var() + 1);
-            match self.value.v(*l) {
-                Lbool::TRUE => return None,
-                Lbool::FALSE => (),
-                _ => clause.push(*l),
-            }
+        let mut clause = logicrs::LitVec::from(clause);
+        clause.sort();
+        let Some(clause) = clause.ordered_simp(&self.value) else {
+            return None;
+        };
+        if clause.is_empty() {
+            self.trivial_unsat = true;
+            return None;
         }
         Some(clause)
     }
 
     fn add_clause_inner(&mut self, clause: &[Lit], mut kind: ClauseKind) -> CRef {
-        let Some(clause) = self.simplify_clause(clause) else {
-            return CREF_NONE;
-        };
-        if clause.is_empty() {
-            self.trivial_unsat = true;
-            return CREF_NONE;
-        }
-        for l in clause.iter() {
-            if self.constrain_act == l.var() {
+        if let Some(clause) = self.simplify_clause(clause) {
+            if clause.iter().any(|l| l.var() == self.constrain_act) {
                 kind = ClauseKind::Temporary;
             }
-        }
-        if clause.len() == 1 {
-            assert!(!matches!(kind, ClauseKind::Temporary));
-            match self.value.v(clause[0]) {
-                Lbool::TRUE | Lbool::FALSE => todo!(),
-                _ => {
-                    self.assign(clause[0], CREF_NONE);
-                    if self.propagate() != CREF_NONE {
-                        self.trivial_unsat = true;
+            if clause.len() == 1 {
+                assert!(clause[0].var() != self.constrain_act);
+                match self.value.v(clause[0]) {
+                    Lbool::TRUE | Lbool::FALSE => todo!(),
+                    _ => {
+                        self.assign(clause[0], CREF_NONE);
+                        if self.propagate() != CREF_NONE {
+                            self.trivial_unsat = true;
+                        }
+                        CREF_NONE
                     }
-                    CREF_NONE
                 }
+            } else {
+                self.attach_clause(&clause, kind)
             }
         } else {
-            self.attach_clause(&clause, kind)
+            CREF_NONE
         }
+    }
+
+    pub fn add_eq(&mut self, x: Lit, y: Lit) {
+        self.eqc.add_eq(x, y);
     }
 
     // #[allow(unused)]
@@ -325,6 +328,7 @@ impl Satif for DagCnfSolver {
         self.watchers.reserve(var);
         self.vsids.reserve(var);
         self.phase_saving.reserve(var);
+        self.eqc.reserve(var);
         self.analyze.reserve(var);
         self.unsat_core.reserve(var);
         self.domain.reserve(var);

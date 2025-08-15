@@ -1,5 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
+use log::info;
 use logicrs::{Lit, Var, VarVMap};
 
 impl Transys {
@@ -56,12 +57,15 @@ impl Transys {
         }
         self.input.retain(|i| mark.contains(i));
         self.latch.retain(|i| mark.contains(i));
+        let mut removed = 0;
         for v in Var::CONST + 1..=self.max_var() {
             if !mark.contains(&v) {
+                removed += self.rel[v].len();
                 self.rel.del_rel(v);
                 rst.remove(&v);
             }
         }
+        info!("ts coi simplify: removed {} clauses", removed);
     }
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {
@@ -105,24 +109,7 @@ impl Transys {
 
     pub fn simplify(&mut self, rst: &mut VarVMap) {
         self.coi_refine(rst);
-        let mut frozens = vec![Var::CONST];
-        frozens.extend(
-            self.bad
-                .iter()
-                .chain(self.constraint.iter())
-                .chain(self.justice.iter())
-                .map(|l| l.var())
-                .chain(self.input.iter().copied())
-                .chain(self.latch.iter().copied()),
-        );
-        for l in self.latch.iter() {
-            if let Some(i) = self.init.get(l) {
-                frozens.push(i.var());
-            }
-            if let Some(n) = self.next.get(l) {
-                frozens.push(n.var());
-            }
-        }
+        let frozens = self.frozens();
         self.rel = self.rel.simplify(frozens.iter().copied());
         self.rearrange(rst);
     }

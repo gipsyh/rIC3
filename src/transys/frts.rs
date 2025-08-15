@@ -3,8 +3,11 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use giputils::hash::GHashMap;
-use log::info;
-use logicrs::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simulate::DagCnfSimulation};
+use log::{debug, info};
+use logicrs::{
+    Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify,
+    simulate::DagCnfSimulation,
+};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
@@ -68,20 +71,23 @@ impl FrTs {
     pub fn fr(mut self) -> (Transys, VarVMap) {
         let start = Instant::now();
         let before = self.ts.max_var();
-        const NUM_RESTART: usize = 200;
         let mut replace = VarLMap::new();
         let mut v = Var(1);
         while v <= self.ts.max_var() {
+            if self.ts.rel.is_leaf(v) {
+                v += 1;
+                continue;
+            }
             let Some(m) = self.map.map(v) else {
                 v += 1;
                 continue;
             };
             let lv = v.lit();
-            // dbg!(m, v);
+            debug!("frts: checking var {} with lit {}", m, v);
             match self.solver.solve_with_restart_limit(
                 &[],
                 vec![LitVec::from([m, lv]), LitVec::from([!m, !lv])],
-                15,
+                1,
             ) {
                 Some(true) => {
                     // let eqc = self.eqc[v];
@@ -99,15 +105,25 @@ impl FrTs {
                     // }
                 }
                 Some(false) => {
-                    // dbg!("can replace");
+                    debug!("frts: replace {} with {}", v, m);
                     replace.insert_lit(lv, m);
-                    if replace.len() % NUM_RESTART == 0 {
+                    self.solver.add_eq(lv, m);
+                    if replace.len() % 5000 == 0 {
                         self.ts.replace(&replace, &mut self.rst);
+                        self.ts.coi_refine(&mut self.rst);
+                        let mut simp = DagCnfSimplify::new(&self.ts.rel);
+                        for &v in self.ts.frozens().iter() {
+                            simp.froze(v);
+                        }
+                        simp.const_simplify();
+                        simp.bve_simplify();
+                        self.ts.rel = simp.finalize();
                         self.solver = DagCnfSolver::new(&self.ts.rel, 5);
+                        info!("frts ts simplified to: {}", self.ts.statistic());
                     }
                 }
                 None => {
-                    // dbg!("to");
+                    debug!("frts: checking {} with {} timeout", v, m);
                 }
             }
             v += 1;
