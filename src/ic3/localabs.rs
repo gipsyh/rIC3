@@ -132,24 +132,23 @@ impl IC3 {
                 assump.push(v.lit());
             }
         }
-        debug!("checking witness with {} refines", assump.len());
-        if let Some(mut assump) = self.localabs.check(assump) {
-            debug!("checking witness with {} refines", assump.len());
-            let mut i = 0;
-            while i < assump.len() {
-                let ln = self.localabs.opt_rev[&assump[i].var()];
-                if self.localabs.refine.contains(&ln) {
-                    i += 1;
-                    continue;
-                }
-                let mut drop = assump.clone();
-                drop.remove(i);
-                if let Some(drop) = self.localabs.check(drop) {
-                    assump = drop;
-                } else {
-                    i += 1;
-                }
-            }
+        if let Some(assump) = self.localabs.check(assump) {
+            // debug!("checking witness with {} refines", assump.len());
+            // let mut i = 0;
+            // while i < assump.len() {
+            //     let ln = self.localabs.opt_rev[&assump[i].var()];
+            //     if self.localabs.refine.contains(&ln) {
+            //         i += 1;
+            //         continue;
+            //     }
+            //     let mut drop = assump.clone();
+            //     drop.remove(i);
+            //     if let Some(drop) = self.localabs.check(drop) {
+            //         assump = drop;
+            //     } else {
+            //         i += 1;
+            //     }
+            // }
             for l in assump {
                 let ln = self.localabs.opt_rev[&l.var()];
                 assert!(!self.localabs.refine.contains(&ln));
