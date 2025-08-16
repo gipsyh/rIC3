@@ -2,16 +2,12 @@ use crate::{
     Engine, Proof, Witness,
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
-    ic3::frame::FrameLemma,
+    ic3::{frame::FrameLemma, localabs::LocalAbs},
     transys::{Transys, TransysCtx, TransysIf, frts::FrTs, unroll::TransysUnroll},
 };
 use activity::Activity;
 use frame::{Frame, Frames};
-use giputils::{
-    grc::Grc,
-    hash::{GHashMap, GHashSet},
-    logger::IntervalLogger,
-};
+use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
 use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
@@ -23,6 +19,7 @@ use std::time::Instant;
 mod activity;
 mod aux;
 mod frame;
+mod localabs;
 mod mic;
 mod proofoblig;
 mod solver;
@@ -40,8 +37,7 @@ pub struct IC3 {
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
-    local_abs: GHashSet<Var>,
-    bmc_solver: Option<(Box<dyn Satif>, TransysUnroll<Transys>)>,
+    localabs: LocalAbs,
     ots: Transys,
     rst: VarVMap,
     auxiliary_var: Vec<Var>,
@@ -160,9 +156,9 @@ impl IC3 {
             if self.tsctx.cube_subsume_init(&po.lemma) {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
-                    if let Some(refine) = self.check_witness_by_bmc(po.clone()) {
-                        self.local_abs.extend(refine);
-                        info!("local abs refine len: {}", self.local_abs.len(),);
+                    if let Some(refine) = self.check_witness_by_bmc(po.depth) {
+                        self.localabs.refine.extend(refine);
+                        info!("local abs refine len: {}", self.localabs.refine.len());
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
                             for l in f.iter_mut() {
@@ -444,15 +440,7 @@ impl IC3 {
         let frame = Frames::new(&tsctx);
         let inf_solver = TransysSolver::new(&tsctx, true, rng.random());
         let lift = TransysSolver::new(&tsctx, false, rng.random());
-        let mut local_abs = GHashSet::new();
-        local_abs.insert(Var::CONST);
-        local_abs.extend(ts.bad.iter().map(|l| l.var()));
-        if !cfg.ic3.abs_cst {
-            local_abs.extend(ts.constraint.iter().map(|l| l.var()))
-        }
-        if !cfg.ic3.abs_trans {
-            local_abs.extend(ts.next.values().map(|l| l.var()));
-        }
+        let localabs = LocalAbs::new(&ts, &cfg);
         Self {
             cfg,
             ts,
@@ -464,11 +452,10 @@ impl IC3 {
             statistic,
             obligations: ProofObligationQueue::new(),
             frame,
-            local_abs,
+            localabs,
             auxiliary_var: Vec::new(),
             ots,
             rst,
-            bmc_solver: None,
             rng,
             filog: Default::default(),
         }
@@ -551,34 +538,10 @@ impl Engine for IC3 {
     }
 
     fn witness(&mut self) -> Witness {
-        let mut res = Witness::default();
-        if let Some((bmc_solver, uts)) = self.bmc_solver.as_mut() {
-            for k in 0..=uts.num_unroll {
-                let mut w = LitVec::new();
-                for l in uts.ts.input() {
-                    let l = l.lit();
-                    let kl = uts.lit_next(l, k);
-                    if let Some(v) = bmc_solver.sat_value(kl)
-                        && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                    {
-                        w.push(r);
-                    }
-                }
-                res.input.push(w);
-                let mut w = LitVec::new();
-                for l in uts.ts.latch() {
-                    let l = l.lit();
-                    let kl = uts.lit_next(l, k);
-                    if let Some(v) = bmc_solver.sat_value(kl)
-                        && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                    {
-                        w.push(r);
-                    }
-                }
-                res.state.push(w);
-            }
+        if let Some(res) = self.localabs.witness(&self.rst) {
             return res;
         }
+        let mut res = Witness::default();
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         let mut b = Some(b);

@@ -63,7 +63,7 @@ impl IC3 {
         let solver = &mut self.solvers[frame - 1];
         let mut cls: LitVec = solver.get_assump().clone();
         cls.extend_from_slice(&self.ts.constraint);
-        cls.retain(|l| self.local_abs.contains(&l.var()));
+        cls.retain(|l| self.localabs.refine.contains(&l.var()));
         if cls.is_empty() {
             return (LitVec::new(), LitVec::new());
         }

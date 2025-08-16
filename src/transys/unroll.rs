@@ -10,6 +10,7 @@ pub struct TransysUnroll<T: TransysIf> {
     next_map: LitMap<Vec<Lit>>,
     simple_path: Option<Vec<Vec<LitVec>>>,
     pub connect: Option<(GHashMap<Var, Var>, Vec<LitVvec>)>,
+    pub optcst: Option<(GHashMap<Var, Var>, Vec<LitVvec>)>,
 }
 
 impl<T: TransysIf> TransysUnroll<T> {
@@ -31,6 +32,7 @@ impl<T: TransysIf> TransysUnroll<T> {
             next_map,
             simple_path: None,
             connect: None,
+            optcst: None,
         }
     }
 
@@ -58,6 +60,24 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
         }
         self.connect = Some((connect, vec![LitVvec::new()]));
+    }
+
+    pub fn enable_optional_constraint(&mut self)
+    where
+        T: Clone,
+    {
+        assert!(self.num_unroll == 0);
+        let mut opt = GHashMap::new();
+        let mut rel = LitVvec::new();
+        for c in self.ts.constraint() {
+            let cc = opt.get(&c.var()).copied().unwrap_or({
+                self.max_var += 1;
+                opt.insert(c.var(), self.max_var);
+                self.max_var
+            });
+            rel.push(LitVec::from([!cc.lit(), c]));
+        }
+        self.optcst = Some((opt, vec![rel]));
     }
 
     #[inline]
@@ -144,6 +164,15 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
             crel.push(cr);
         }
+        if let Some((opt, crel)) = self.optcst.as_mut() {
+            let mut cr = LitVvec::new();
+            for c in self.ts.constraint() {
+                let cc = opt[&c.var()];
+                let cn = self.next_map[c][self.num_unroll + 1];
+                cr.push(LitVec::from([!cc.lit(), cn]));
+            }
+            crel.push(cr);
+        }
         self.num_unroll += 1;
         if self.simple_path.is_some() {
             self.simple_path();
@@ -176,6 +205,11 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
         }
         if let Some((_, crel)) = self.connect.as_ref() {
+            for cls in crel[u].iter() {
+                satif.add_clause(cls);
+            }
+        }
+        if let Some((_, crel)) = self.optcst.as_ref() {
             for cls in crel[u].iter() {
                 satif.add_clause(cls);
             }

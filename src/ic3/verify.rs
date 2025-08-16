@@ -1,9 +1,10 @@
-use super::{IC3, proofoblig::ProofObligation};
-use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
+use crate::{
+    ic3::IC3,
+    transys::{TransysCtx, TransysIf},
+};
 use cadical::Solver;
-use giputils::hash::GHashMap;
-use log::{debug, error, info};
-use logicrs::{LitVec, Var, satif::Satif};
+use log::{error, info};
+use logicrs::{LitVec, satif::Satif};
 
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
@@ -44,88 +45,5 @@ impl IC3 {
             "inductive invariant verified with {} lemmas!",
             invariants.len()
         );
-    }
-
-    fn check_witness_with_constrain<S: Satif + ?Sized>(
-        &mut self,
-        solver: &mut S,
-        uts: &TransysUnroll<Transys>,
-        mut assumps: LitVec,
-    ) -> Option<LitVec> {
-        let olen = assumps.len();
-        assumps.extend(uts.lits_next(&uts.ts.bad, uts.num_unroll));
-        if solver.solve(&assumps) {
-            None
-        } else {
-            assumps.truncate(olen);
-            assumps.retain(|&l| solver.unsat_has(l));
-            Some(assumps)
-        }
-    }
-
-    pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<Vec<Var>> {
-        debug!("checking witness by bmc with depth {}", b.depth);
-        let mut uts = TransysUnroll::new(&self.ts);
-        if self.cfg.ic3.abs_trans {
-            uts.enable_optional_connect();
-        }
-        uts.unroll_to(b.depth);
-        let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
-        for k in 0..=b.depth {
-            uts.load_trans(solver.as_mut(), k, !self.cfg.ic3.abs_cst);
-        }
-        uts.ts.load_init(solver.as_mut());
-        let mut opt = GHashMap::new();
-        if let Some((connect, _)) = uts.connect.as_ref() {
-            opt = connect.clone();
-        }
-        if self.cfg.ic3.abs_cst {
-            for c in uts.ts.constraint.clone() {
-                if opt.contains_key(&c.var()) {
-                    continue;
-                }
-                let cc = uts.new_var();
-                opt.insert(c.var(), cc);
-                for k in 0..=b.depth {
-                    solver.add_clause(&[!cc.lit(), uts.lit_next(c, k)]);
-                }
-            }
-        }
-        let opt_rev: GHashMap<Var, Var> = opt.iter().map(|(k, v)| (*v, *k)).collect();
-        let assump: LitVec = opt.values().map(|l| l.lit()).collect();
-        debug!("checking witness with {} refines", assump.len());
-        if let Some(mut assump) = self.check_witness_with_constrain(solver.as_mut(), &uts, assump) {
-            debug!("checking witness with {} refines", assump.len());
-            let mut i = 0;
-            while i < assump.len() {
-                let ln = opt_rev[&assump[i].var()];
-                if self.local_abs.contains(&ln) {
-                    i += 1;
-                    continue;
-                }
-                let mut drop = assump.clone();
-                drop.remove(i);
-                if let Some(_) =
-                    self.check_witness_with_constrain(solver.as_mut(), &uts, drop.clone())
-                {
-                    assump = drop;
-                } else {
-                    i += 1;
-                }
-            }
-            let mut res = Vec::new();
-            for l in assump {
-                let ln = opt_rev[&l.var()];
-                if !self.local_abs.contains(&ln) {
-                    res.push(ln);
-                }
-            }
-            assert!(!res.is_empty());
-            Some(res)
-        } else {
-            info!("witness checking passed");
-            self.bmc_solver = Some((solver, uts));
-            None
-        }
     }
 }
