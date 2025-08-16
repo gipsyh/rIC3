@@ -21,8 +21,10 @@ impl BMC {
         ts = ts.check_liveness_and_l2s(&mut rst);
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
-            let frts = FrTs::new(ts, &cfg, rst);
-            (ts, rst) = frts.fr();
+            if cfg.preproc.frts {
+                let frts = FrTs::new(ts, &cfg, rst);
+                (ts, rst) = frts.fr();
+            }
         }
         let mut ts = ts.remove_dep();
         ts.assert_constraint();

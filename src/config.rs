@@ -150,6 +150,9 @@ pub struct PreprocessOptions {
     /// disable preprocess
     #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
+    /// function reduced transys
+    #[arg(long = "frts", action = ArgAction::Set, default_value_t = true)]
+    pub frts: bool,
     /// frts time limit in seconds
     #[arg(long = "frts-tl", default_value_t = 1800)]
     pub frts_tl: u64,
