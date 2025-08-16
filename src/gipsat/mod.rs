@@ -61,7 +61,7 @@ pub struct DagCnfSolver {
 }
 
 impl DagCnfSolver {
-    pub fn new(dc: &DagCnf, rseed: u64) -> Self {
+    pub fn new(dc: &DagCnf) -> Self {
         let constrain_act = Var::CONST;
         let mut solver = Self {
             dc: dc.clone(),
@@ -87,7 +87,7 @@ impl DagCnfSolver {
             constraint: Default::default(),
             statistic: Default::default(),
             trivial_unsat: false,
-            rng: StdRng::seed_from_u64(rseed),
+            rng: StdRng::seed_from_u64(0),
             mark: Default::default(),
         };
         while solver.num_var() < solver.dc.num_var() {
@@ -98,6 +98,12 @@ impl DagCnfSolver {
         }
         assert!(solver.propagate() == CREF_NONE);
         solver
+    }
+
+    #[inline]
+    #[allow(unused)]
+    pub fn set_rseed(&mut self, rseed: u64) {
+        self.rng = StdRng::seed_from_u64(rseed);
     }
 
     fn simplify_clause(&mut self, clause: &[Lit]) -> Option<LitVec> {

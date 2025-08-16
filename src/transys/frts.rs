@@ -9,7 +9,7 @@ use logicrs::{
     Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify,
     simulate::DagCnfSimulation,
 };
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
 #[allow(unused)]
@@ -28,7 +28,7 @@ impl FrTs {
     pub fn new(mut ts: Transys, cfg: &Config, mut rst: VarVMap) -> Self {
         ts.topsort(&mut rst);
         let sim = DagCnfSimulation::new(1000, &ts.rel);
-        let solver = DagCnfSolver::new(&ts.rel, cfg.rseed);
+        let solver = DagCnfSolver::new(&ts.rel);
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
@@ -63,10 +63,6 @@ impl FrTs {
             rst,
             rng,
         }
-    }
-
-    pub fn restart(&mut self) {
-        self.solver = DagCnfSolver::new(&self.ts.rel, self.rng.random());
     }
 
     pub fn fr(mut self) -> (Transys, VarVMap) {
@@ -123,7 +119,7 @@ impl FrTs {
                         simp.const_simplify();
                         simp.bve_simplify();
                         self.ts.rel = simp.finalize();
-                        self.solver = DagCnfSolver::new(&self.ts.rel, 5);
+                        self.solver = DagCnfSolver::new(&self.ts.rel);
                         info!("frts ts simplified to: {}", self.ts.statistic());
                     }
                 }

@@ -12,7 +12,7 @@ use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{Rng, SeedableRng, rngs::StdRng, seq::SliceRandom};
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use statistic::Statistic;
 use std::time::Instant;
 
@@ -408,7 +408,7 @@ impl IC3 {
 impl IC3 {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
-        let mut rng = StdRng::seed_from_u64(cfg.rseed);
+        let rng = StdRng::seed_from_u64(cfg.rseed);
         let mut rst = VarVMap::new_self_map(ts.max_var());
         ts = ts.check_liveness_and_l2s(&mut rst);
         let statistic = Statistic::default();
@@ -438,8 +438,8 @@ impl IC3 {
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
-        let inf_solver = TransysSolver::new(&tsctx, true, rng.random());
-        let lift = TransysSolver::new(&tsctx, false, rng.random());
+        let inf_solver = TransysSolver::new(&tsctx, true);
+        let lift = TransysSolver::new(&tsctx, false);
         let localabs = LocalAbs::new(&ts, &cfg);
         Self {
             cfg,

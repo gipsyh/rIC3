@@ -17,8 +17,8 @@ pub struct TransysSolver {
 }
 
 impl TransysSolver {
-    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool, rseed: u64) -> Self {
-        let mut dcs = DagCnfSolver::new(&ts.rel, rseed);
+    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool) -> Self {
+        let mut dcs = DagCnfSolver::new(&ts.rel);
         if assert_cst {
             for c in ts.constraint.iter() {
                 dcs.add_clause(&[*c]);
@@ -28,7 +28,7 @@ impl TransysSolver {
             dcs,
             ts: ts.clone(),
             relind: Default::default(),
-            rng: StdRng::seed_from_u64(rseed),
+            rng: StdRng::seed_from_u64(0),
         }
     }
 

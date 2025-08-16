@@ -95,7 +95,7 @@ impl LocalAbs {
             }
             res.state.push(w);
         }
-        return Some(res);
+        Some(res)
     }
 
     #[inline]
@@ -118,7 +118,7 @@ impl LocalAbs {
 
 impl IC3 {
     pub(super) fn check_witness_by_bmc(&mut self, depth: usize) -> bool {
-        debug!("localabs: checking witness by bmc with depth {}", depth);
+        debug!("localabs: checking witness by bmc with depth {depth}");
         self.localabs.uts.unroll_to(depth);
         for k in self.localabs.kslv + 1..=depth {
             self.localabs
