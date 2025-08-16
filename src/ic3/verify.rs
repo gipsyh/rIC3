@@ -3,7 +3,7 @@ use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
 use giputils::hash::GHashMap;
 use log::{debug, error, info};
-use logicrs::{Lit, LitVec, Var, satif::Satif};
+use logicrs::{LitVec, Var, satif::Satif};
 
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
@@ -58,7 +58,7 @@ impl IC3 {
             None
         } else {
             assumps.truncate(olen);
-            // assumps.retain(|&l| solver.unsat_has(l));
+            assumps.retain(|&l| solver.unsat_has(l));
             Some(assumps)
         }
     }
@@ -75,38 +75,33 @@ impl IC3 {
             uts.load_trans(solver.as_mut(), k, !self.cfg.ic3.abs_cst);
         }
         uts.ts.load_init(solver.as_mut());
-        let mut opt_cst = GHashMap::new();
+        let mut opt = GHashMap::new();
+        if let Some((connect, _)) = uts.connect.as_ref() {
+            opt = connect.clone();
+        }
         if self.cfg.ic3.abs_cst {
             for c in uts.ts.constraint.clone() {
+                if opt.contains_key(&c.var()) {
+                    continue;
+                }
                 let cc = uts.new_var();
-                opt_cst.insert(c, cc);
+                opt.insert(c.var(), cc);
                 for k in 0..=b.depth {
                     solver.add_clause(&[!cc.lit(), uts.lit_next(c, k)]);
                 }
             }
         }
-        let opt_cst_rev: GHashMap<Var, Lit> = opt_cst.iter().map(|(k, v)| (*v, *k)).collect();
-        let mut assump: LitVec = opt_cst.values().map(|l| l.lit()).collect();
-        let mut opt_latch = GHashMap::new();
-        if let Some((connect, _)) = uts.connect.as_ref() {
-            opt_latch = connect.clone();
-        }
-        let opt_latch_rev: GHashMap<Var, Var> = opt_latch.iter().map(|(k, v)| (*v, *k)).collect();
-        assump.extend(opt_latch.values().map(|l| l.lit()));
+        let opt_rev: GHashMap<Var, Var> = opt.iter().map(|(k, v)| (*v, *k)).collect();
+        let assump: LitVec = opt.values().map(|l| l.lit()).collect();
+        debug!("checking witness with {} refines", assump.len());
         if let Some(mut assump) = self.check_witness_with_constrain(solver.as_mut(), &uts, assump) {
+            debug!("checking witness with {} refines", assump.len());
             let mut i = 0;
             while i < assump.len() {
-                if let Some(ln) = opt_latch_rev.get(&assump[i].var()) {
-                    if self.local_abs.contains(ln) {
-                        i += 1;
-                        continue;
-                    }
-                } else {
-                    let cst = opt_cst_rev.get(&assump[i].var()).unwrap();
-                    if self.local_abs.contains(&cst.var()) {
-                        i += 1;
-                        continue;
-                    }
+                let ln = opt_rev[&assump[i].var()];
+                if self.local_abs.contains(&ln) {
+                    i += 1;
+                    continue;
                 }
                 let mut drop = assump.clone();
                 drop.remove(i);
@@ -120,16 +115,9 @@ impl IC3 {
             }
             let mut res = Vec::new();
             for l in assump {
-                if let Some(ln) = opt_latch_rev.get(&l.var()) {
-                    if !self.local_abs.contains(ln) {
-                        res.push(*ln);
-                    }
-                } else if let Some(c) = opt_cst_rev.get(&l.var()) {
-                    if !self.local_abs.contains(&c.var()) {
-                        res.push(c.var());
-                    }
-                } else {
-                    unreachable!();
+                let ln = opt_rev[&l.var()];
+                if !self.local_abs.contains(&ln) {
+                    res.push(ln);
                 }
             }
             assert!(!res.is_empty());
