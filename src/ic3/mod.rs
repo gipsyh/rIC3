@@ -7,7 +7,11 @@ use crate::{
 };
 use activity::Activity;
 use frame::{Frame, Frames};
-use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
+use giputils::{
+    grc::Grc,
+    hash::{GHashMap, GHashSet},
+    logger::IntervalLogger,
+};
 use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
 use mic::{DropVarParameter, MicType};
@@ -36,7 +40,7 @@ pub struct IC3 {
     obligations: ProofObligationQueue,
     activity: Activity,
     statistic: Statistic,
-    abs_cst: LitVec,
+    local_abs: GHashSet<Var>,
     bmc_solver: Option<(Box<dyn Satif>, TransysUnroll<Transys>)>,
     ots: Transys,
     rst: VarVMap,
@@ -149,16 +153,16 @@ impl IC3 {
             {
                 return BlockResult::LimitExceeded;
             }
-            trace!("blocking {} in {}", po.lemma, po.frame);
+            debug!(
+                "blocking {} in frame {} with depth {}",
+                po.lemma, po.frame, po.depth
+            );
             if self.tsctx.cube_subsume_init(&po.lemma) {
-                if self.cfg.ic3.abs_cst {
+                if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
-                    if let Some(c) = self.check_witness_by_bmc(po.clone()) {
-                        for c in c {
-                            assert!(!self.abs_cst.contains(&c));
-                            self.abs_cst.push(c);
-                        }
-                        info!("abs cst len: {}", self.abs_cst.len(),);
+                    if let Some(refine) = self.check_witness_by_bmc(po.clone()) {
+                        self.local_abs.extend(refine);
+                        info!("local abs refine len: {}", self.local_abs.len(),);
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
                             for l in f.iter_mut() {
@@ -440,11 +444,15 @@ impl IC3 {
         let frame = Frames::new(&tsctx);
         let inf_solver = TransysSolver::new(&tsctx, true, rng.random());
         let lift = TransysSolver::new(&tsctx, false, rng.random());
-        let abs_cst = if cfg.ic3.abs_cst {
-            LitVec::new()
-        } else {
-            ts.constraint.clone()
-        };
+        let mut local_abs = GHashSet::new();
+        local_abs.insert(Var::CONST);
+        local_abs.extend(ts.bad.iter().map(|l| l.var()));
+        if !cfg.ic3.abs_cst {
+            local_abs.extend(ts.constraint.iter().map(|l| l.var()))
+        }
+        if !cfg.ic3.abs_trans {
+            local_abs.extend(ts.next.values().map(|l| l.var()));
+        }
         Self {
             cfg,
             ts,
@@ -456,7 +464,7 @@ impl IC3 {
             statistic,
             obligations: ProofObligationQueue::new(),
             frame,
-            abs_cst,
+            local_abs,
             auxiliary_var: Vec::new(),
             ots,
             rst,

@@ -1,8 +1,9 @@
 use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::{Transys, TransysCtx, TransysIf, unroll::TransysUnroll};
 use cadical::Solver;
-use log::{error, info};
-use logicrs::{LitVec, satif::Satif};
+use giputils::hash::GHashMap;
+use log::{debug, error, info};
+use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
@@ -49,47 +50,94 @@ impl IC3 {
         &mut self,
         solver: &mut S,
         uts: &TransysUnroll<Transys>,
-        constraint: &LitVec,
-    ) -> bool {
-        let mut assumps = LitVec::new();
-        for k in 0..=uts.num_unroll {
-            assumps.extend_from_slice(&uts.lits_next(constraint, k));
-        }
+        mut assumps: LitVec,
+    ) -> Option<LitVec> {
+        let olen = assumps.len();
         assumps.extend(uts.lits_next(&uts.ts.bad, uts.num_unroll));
-        solver.solve(&assumps)
+        if solver.solve(&assumps) {
+            None
+        } else {
+            assumps.truncate(olen);
+            // assumps.retain(|&l| solver.unsat_has(l));
+            Some(assumps)
+        }
     }
 
-    pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<LitVec> {
+    pub(super) fn check_witness_by_bmc(&mut self, b: ProofObligation) -> Option<Vec<Var>> {
+        debug!("checking witness by bmc with depth {}", b.depth);
         let mut uts = TransysUnroll::new(&self.ts);
+        if self.cfg.ic3.abs_trans {
+            uts.enable_optional_connect();
+        }
         uts.unroll_to(b.depth);
         let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         for k in 0..=b.depth {
-            uts.load_trans(solver.as_mut(), k, false);
+            uts.load_trans(solver.as_mut(), k, !self.cfg.ic3.abs_cst);
         }
         uts.ts.load_init(solver.as_mut());
-        let mut cst: LitVec = uts.ts.constraint().collect();
-        if self.check_witness_with_constrain(solver.as_mut(), &uts, &cst) {
+        let mut opt_cst = GHashMap::new();
+        if self.cfg.ic3.abs_cst {
+            for c in uts.ts.constraint.clone() {
+                let cc = uts.new_var();
+                opt_cst.insert(c, cc);
+                for k in 0..=b.depth {
+                    solver.add_clause(&[!cc.lit(), uts.lit_next(c, k)]);
+                }
+            }
+        }
+        let opt_cst_rev: GHashMap<Var, Lit> = opt_cst.iter().map(|(k, v)| (*v, *k)).collect();
+        let mut assump: LitVec = opt_cst.values().map(|l| l.lit()).collect();
+        let mut opt_latch = GHashMap::new();
+        if let Some((connect, _)) = uts.connect.as_ref() {
+            opt_latch = connect.clone();
+        }
+        let opt_latch_rev: GHashMap<Var, Var> = opt_latch.iter().map(|(k, v)| (*v, *k)).collect();
+        assump.extend(opt_latch.values().map(|l| l.lit()));
+        if let Some(mut assump) = self.check_witness_with_constrain(solver.as_mut(), &uts, assump) {
+            let mut i = 0;
+            while i < assump.len() {
+                if let Some(ln) = opt_latch_rev.get(&assump[i].var()) {
+                    if self.local_abs.contains(ln) {
+                        i += 1;
+                        continue;
+                    }
+                } else {
+                    let cst = opt_cst_rev.get(&assump[i].var()).unwrap();
+                    if self.local_abs.contains(&cst.var()) {
+                        i += 1;
+                        continue;
+                    }
+                }
+                let mut drop = assump.clone();
+                drop.remove(i);
+                if let Some(_) =
+                    self.check_witness_with_constrain(solver.as_mut(), &uts, drop.clone())
+                {
+                    assump = drop;
+                } else {
+                    i += 1;
+                }
+            }
+            let mut res = Vec::new();
+            for l in assump {
+                if let Some(ln) = opt_latch_rev.get(&l.var()) {
+                    if !self.local_abs.contains(ln) {
+                        res.push(*ln);
+                    }
+                } else if let Some(c) = opt_cst_rev.get(&l.var()) {
+                    if !self.local_abs.contains(&c.var()) {
+                        res.push(c.var());
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+            assert!(!res.is_empty());
+            Some(res)
+        } else {
             info!("witness checking passed");
             self.bmc_solver = Some((solver, uts));
             None
-        } else {
-            let mut i = 0;
-            while i < cst.len() {
-                if self.abs_cst.contains(&cst[i]) {
-                    i += 1;
-                    continue;
-                }
-                let mut drop = cst.clone();
-                drop.remove(i);
-                if self.check_witness_with_constrain(solver.as_mut(), &uts, &drop) {
-                    i += 1;
-                } else {
-                    cst = drop;
-                }
-            }
-            cst.retain(|l| !self.abs_cst.contains(l));
-            assert!(!cst.is_empty());
-            Some(cst)
         }
     }
 }

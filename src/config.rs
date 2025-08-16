@@ -109,6 +109,10 @@ pub struct IC3Options {
     #[arg(long = "ic3-abs-cst", default_value_t = false)]
     pub abs_cst: bool,
 
+    /// ic3 with abstract trans
+    #[arg(long = "ic3-abs-trans", default_value_t = false)]
+    pub abs_trans: bool,
+
     /// ic3 with dropping proof-obligation
     #[arg(
         long = "ic3-drop-po", action = ArgAction::Set, default_value_t = true,

@@ -32,11 +32,10 @@ impl Kind {
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
-        let uts = if cfg.kind.simple_path {
-            TransysUnroll::new_with_simple_path(&ts)
-        } else {
-            TransysUnroll::new(&ts)
-        };
+        let mut uts = TransysUnroll::new(&ts);
+        if cfg.kind.simple_path {
+            uts.enable_simple_path();
+        }
         let solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         Self {
             uts,
