@@ -9,7 +9,7 @@ use log::{debug, info};
 use logicrs::{LitVec, Var, VarVMap, satif::Satif};
 
 pub struct LocalAbs {
-    pub refine: GHashSet<Var>,
+    refine: GHashSet<Var>,
     uts: TransysUnroll<Transys>,
     solver: Box<dyn Satif>,
     kslv: usize,
@@ -50,6 +50,11 @@ impl LocalAbs {
             }
         }
         let opt_rev: GHashMap<Var, Var> = opt.iter().map(|(k, v)| (*v, *k)).collect();
+        for r in refine.iter() {
+            if let Some(o) = opt.get(r) {
+                solver.add_clause(&[o.lit()]);
+            }
+        }
         Self {
             refine,
             uts,
@@ -92,26 +97,27 @@ impl LocalAbs {
         }
         return Some(res);
     }
-}
 
-impl IC3 {
-    fn check_witness_with_constrain(&mut self, mut assumps: LitVec) -> Option<LitVec> {
+    #[inline]
+    pub fn refine_has(&self, x: Var) -> bool {
+        self.refine.contains(&x)
+    }
+
+    fn check(&mut self, mut assumps: LitVec) -> Option<LitVec> {
         let olen = assumps.len();
-        assumps.extend(
-            self.localabs
-                .uts
-                .lits_next(&self.localabs.uts.ts.bad, self.localabs.uts.num_unroll),
-        );
-        if self.localabs.solver.solve(&assumps) {
+        assumps.extend(self.uts.lits_next(&self.uts.ts.bad, self.uts.num_unroll));
+        if self.solver.solve(&assumps) {
             None
         } else {
             assumps.truncate(olen);
-            assumps.retain(|&l| self.localabs.solver.unsat_has(l));
+            assumps.retain(|&l| self.solver.unsat_has(l));
             Some(assumps)
         }
     }
+}
 
-    pub(super) fn check_witness_by_bmc(&mut self, depth: usize) -> Option<Vec<Var>> {
+impl IC3 {
+    pub(super) fn check_witness_by_bmc(&mut self, depth: usize) -> bool {
         debug!("localabs: checking witness by bmc with depth {}", depth);
         self.localabs.uts.unroll_to(depth);
         for k in self.localabs.kslv + 1..=depth {
@@ -120,9 +126,14 @@ impl IC3 {
                 .load_trans(self.localabs.solver.as_mut(), k, !self.cfg.ic3.abs_cst);
         }
         self.localabs.kslv = depth;
-        let assump: LitVec = self.localabs.opt.values().map(|l| l.lit()).collect();
+        let mut assump = LitVec::new();
+        for (k, v) in self.localabs.opt.iter() {
+            if !self.localabs.refine.contains(k) {
+                assump.push(v.lit());
+            }
+        }
         debug!("checking witness with {} refines", assump.len());
-        if let Some(mut assump) = self.check_witness_with_constrain(assump) {
+        if let Some(mut assump) = self.localabs.check(assump) {
             debug!("checking witness with {} refines", assump.len());
             let mut i = 0;
             while i < assump.len() {
@@ -133,25 +144,24 @@ impl IC3 {
                 }
                 let mut drop = assump.clone();
                 drop.remove(i);
-                if let Some(_) = self.check_witness_with_constrain(drop.clone()) {
+                if let Some(drop) = self.localabs.check(drop) {
                     assump = drop;
                 } else {
                     i += 1;
                 }
             }
-            let mut res = Vec::new();
             for l in assump {
                 let ln = self.localabs.opt_rev[&l.var()];
-                if !self.localabs.refine.contains(&ln) {
-                    res.push(ln);
-                }
+                assert!(!self.localabs.refine.contains(&ln));
+                self.localabs.refine.insert(ln);
+                self.localabs.solver.add_clause(&[l]);
             }
-            assert!(!res.is_empty());
-            Some(res)
+            info!("localabs: refine size: {}", self.localabs.refine.len());
+            false
         } else {
             info!("localabs: witness checking passed");
             self.localabs.foundcex = true;
-            None
+            true
         }
     }
 }

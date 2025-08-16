@@ -156,9 +156,9 @@ impl IC3 {
             if self.tsctx.cube_subsume_init(&po.lemma) {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
-                    if let Some(refine) = self.check_witness_by_bmc(po.depth) {
-                        self.localabs.refine.extend(refine);
-                        info!("local abs refine len: {}", self.localabs.refine.len());
+                    if self.check_witness_by_bmc(po.depth) {
+                        return BlockResult::Failure;
+                    } else {
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
                             for l in f.iter_mut() {
@@ -166,8 +166,6 @@ impl IC3 {
                             }
                         }
                         continue;
-                    } else {
-                        return BlockResult::Failure;
                     }
                 } else if po.frame > 0 {
                     let mut assump = po.lemma.cube().clone();
