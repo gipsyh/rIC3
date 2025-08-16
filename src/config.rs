@@ -85,8 +85,8 @@ pub struct IC3Options {
     #[arg(long = "ic3-dynamic", default_value_t = false)]
     pub dynamic: bool,
 
-    /// ic3 without counterexample to generalization
-    #[arg(long = "no-ic3-ctg", action = ArgAction::SetFalse, default_value_t = true)]
+    /// ic3 with counterexample to generalization
+    #[arg(long = "ic3-ctg", action = ArgAction::Set, default_value_t = true)]
     pub ctg: bool,
 
     /// max number of ctg
@@ -109,12 +109,9 @@ pub struct IC3Options {
     #[arg(long = "ic3-abs-cst", default_value_t = false)]
     pub abs_cst: bool,
 
-    /// ic3 without dropping proof-obligation
+    /// ic3 with dropping proof-obligation
     #[arg(
-        long = "no-ic3-drop-po",
-        action = ArgAction::SetFalse,
-        default_value_t = true,
-        conflicts_with = "dynamic"
+        long = "ic3-drop-po", action = ArgAction::Set, default_value_t = true,
     )]
     pub drop_po: bool,
 
@@ -147,7 +144,7 @@ pub struct KindOptions {
 #[derive(Args, Clone, Debug)]
 pub struct PreprocessOptions {
     /// disable preprocess
-    #[arg(long = "no-preproc", action = ArgAction::SetFalse, default_value_t = true)]
+    #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
     /// frts time limit in seconds
     #[arg(long = "frts-tl", default_value_t = 1800)]
