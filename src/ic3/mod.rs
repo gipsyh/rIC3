@@ -414,13 +414,14 @@ impl IC3 {
         let statistic = Statistic::default();
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
-            if cfg.preproc.frts {
-                let frts = FrTs::new(ts, &cfg, rst);
-                (ts, rst) = frts.fr();
-            }
+            info!("trivial simplified ts: {}", ts.statistic());
             if cfg.preproc.scorr {
                 let scorr = Scorr::new(ts, &cfg, rst);
                 (ts, rst) = scorr.scorr();
+            }
+            if cfg.preproc.frts {
+                let frts = FrTs::new(ts, &cfg, rst);
+                (ts, rst) = frts.fr();
             }
         }
         info!("simplified ts has {}", ts.statistic());

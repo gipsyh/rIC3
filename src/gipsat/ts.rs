@@ -1,6 +1,6 @@
 use crate::{
     gipsat::{DagCnfSolver, SolverStatistic},
-    transys::{Transys, TransysCtx, TransysIf},
+    transys::{TransysCtx, TransysIf},
 };
 use giputils::grc::Grc;
 use log::error;

@@ -1,7 +1,9 @@
 use crate::{
     Engine, Witness,
     config::Config,
-    transys::{Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, unroll::TransysUnroll},
+    transys::{
+        Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, scorr::Scorr, unroll::TransysUnroll,
+    },
 };
 use log::info;
 use logicrs::{LitVec, VarVMap, satif::Satif};
@@ -21,6 +23,11 @@ impl BMC {
         ts = ts.check_liveness_and_l2s(&mut rst);
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
+            info!("trivial simplified ts: {}", ts.statistic());
+            if cfg.preproc.scorr {
+                let scorr = Scorr::new(ts, &cfg, rst);
+                (ts, rst) = scorr.scorr();
+            }
             if cfg.preproc.frts {
                 let frts = FrTs::new(ts, &cfg, rst);
                 (ts, rst) = frts.fr();

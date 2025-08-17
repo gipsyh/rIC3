@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     config::Config,
     gipsat::DagCnfSolver,
@@ -58,8 +60,9 @@ impl Scorr {
     }
 
     pub fn scorr(mut self) -> (Transys, VarVMap) {
+        let start = Instant::now();
         let init = self.ts.init_simulation(1);
-        let mut rt = self.ts.rt_simulation(&init, 100);
+        let mut rt = self.ts.rt_simulation2(&init, 100);
         info!(
             "scorr: init simulation size: {}, rt simulation size: {}",
             init.bv_len(),
@@ -86,11 +89,11 @@ impl Scorr {
             }
         }
         let mut scorr = VarLMap::new();
-        for eqc in cand.values() {
-            if eqc.len() > 1 {
-                dbg!(eqc.len());
-            }
-        }
+        // for eqc in cand.values() {
+        //     if eqc.len() > 1 {
+        //         // dbg!(eqc.len());
+        //     }
+        // }
         for x in latch {
             // println!("scorr: check {x}");
             let (eqc, xl) = if let Some(eqc) = cand.get_mut(&rt[x]) {
@@ -117,11 +120,12 @@ impl Scorr {
                 }
             }
         }
-        dbg!(self.ts.statistic());
+        // dbg!(self.ts.statistic());
         info!(
-            "scorr: simplified {} latchs out of {}",
+            "scorr: eliminates {} latchs out of {} in {:.2}s",
             scorr.len(),
-            self.ts.latch.len()
+            self.ts.latch.len(),
+            start.elapsed().as_secs_f32()
         );
         let replace = scorr.clone();
         // for (x, r) in scorr.iter() {
@@ -144,8 +148,7 @@ impl Scorr {
         self.ts.next.retain(|l, _| !scorr.contains_key(l));
         self.ts.replace(&replace, &mut self.rst);
         self.ts.simplify(&mut self.rst);
-        dbg!(self.ts.statistic());
-        todo!();
+        info!("scorr: simplified ts: {}", self.ts.statistic());
         (self.ts, self.rst)
     }
 }

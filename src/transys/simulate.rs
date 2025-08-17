@@ -6,51 +6,46 @@ use giputils::bitvec::BitVec;
 use logicrs::{LitVec, Var, VarBitVec, satif::Satif};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-impl Transys {
-    // fn random_fill(&self, sim: &mut VarBitVec, num_word: usize) {
-    //     let mut rng = StdRng::seed_from_u64(0);
-    //     while sim.bv_len() < num_word * BitVec::WORD_SIZE {
-    //         let s = rng.random_range(0..sim.bv_len());
-    //         sim[Var::CONST].push(false);
-    //         for &v in self.latch.iter() {
-    //             if !sim[v].is_empty() {
-    //                 let b = sim[v].get(s);
-    //                 sim[v].push(b);
-    //             }
-    //         }
-    //     }
-    //     let mut xstate: GHashSet<u64> = GHashSet::new();
-    //     for &v in self.latch.iter() {
-    //         if sim[v].is_empty() {
-    //             for _ in 0..num_word {
-    //                 let mut r: u64;
-    //                 loop {
-    //                     r = rng.random();
-    //                     if !xstate.contains(&r) {
-    //                         xstate.insert(r);
-    //                         break;
-    //                     }
-    //                 }
-    //                 sim[v].push_word(r);
-    //             }
-    //         }
-    //         assert!(sim[v].len() == num_word * BitVec::WORD_SIZE);
-    //     }
-    // }
+struct Simulate<'t> {
+    ts: &'t Transys,
+    sim: VarBitVec,
+    slv: DagCnfSolver,
+    num_word: usize,
+    domain: Vec<Var>,
+    _rng: StdRng,
+}
 
-    fn state_assign(&self, sim: &VarBitVec, idx: usize) -> LitVec {
-        let mut assump = LitVec::new();
-        for &v in self.latch.iter() {
-            if sim[v].is_empty() {
-                continue;
+impl Simulate<'_> {
+    fn rt_dfs_simulate(&mut self, from: usize) {
+        let assump = self.sim.assign(from, Some(self.ts.latch()));
+        loop {
+            if self.sim.bv_len() >= self.num_word * BitVec::WORD_SIZE {
+                return;
             }
-            let b = sim[v].get(idx);
-            let l = v.lit().not_if(!b);
-            assump.push(l);
+            self.slv.clear_phase();
+            if !self
+                .slv
+                .solve_with_param(&assump, vec![], self.domain.iter().copied(), Some(5))
+                .is_some_and(|r| r)
+            {
+                return;
+            }
+            self.sim[Var::CONST].push(false);
+            let mut block = LitVec::new();
+            for &v in self.ts.latch.iter() {
+                let n = self.ts.next(v.lit()).unwrap();
+                let va = self.slv.sat_value(n).unwrap();
+                let na = self.slv.sat_value_lit(n.var()).unwrap();
+                self.sim[v].push(va);
+                block.push(!na);
+            }
+            self.slv.add_clause(&block);
+            self.rt_dfs_simulate(self.sim.bv_len() - 1);
         }
-        assump
     }
+}
 
+impl Transys {
     pub fn init_simulation(&self, num_word: usize) -> VarBitVec {
         let mut slv = DagCnfSolver::new(&self.rel);
         for cls in self.constraint() {
@@ -89,7 +84,7 @@ impl Transys {
             slv.add_clause(&cls.cube());
         }
         for i in 0..init.bv_len() {
-            let block = !self.state_assign(init, i);
+            let block = !init.assign(i, Some(self.latch().filter(|v| !init[*v].is_empty())));
             let block = self.lits_next(block.iter());
             slv.add_clause(&block);
         }
@@ -98,7 +93,7 @@ impl Transys {
         let mut num_fail = 0;
         while sim.bv_len() < BitVec::WORD_SIZE {
             let from = rng.random_range(0..init.bv_len());
-            let assump = self.state_assign(&init, from);
+            let assump = init.assign(from, Some(self.latch().filter(|v| !init[*v].is_empty())));
             slv.clear_phase();
             if !slv.solve_with_domain(&assump, domain.iter().copied()) {
                 num_fail += 1;
@@ -121,7 +116,7 @@ impl Transys {
         num_fail = 0;
         while sim.bv_len() < num_word * BitVec::WORD_SIZE {
             let from = rng.random_range(0..sim.bv_len());
-            let assump = self.state_assign(&sim, from);
+            let assump = sim.assign(from, Some(self.latch()));
             slv.clear_phase();
             if !slv.solve_with_domain(&assump, domain.iter().copied()) {
                 num_fail += 1;
@@ -142,5 +137,56 @@ impl Transys {
             slv.add_clause(&block);
         }
         sim
+    }
+
+    pub fn rt_simulation2(&self, init: &VarBitVec, num_word: usize) -> VarBitVec {
+        assert!(init.bv_len() > 0);
+        let mut sim = VarBitVec::new();
+        sim.reserve(self.max_var());
+        let mut slv = DagCnfSolver::new(&self.rel);
+        for cls in self.constraint() {
+            slv.add_clause(&cls.cube());
+        }
+        for i in 0..init.bv_len() {
+            let block = !init.assign(i, Some(self.latch().filter(|v| !init[*v].is_empty())));
+            let block = self.lits_next(block.iter());
+            slv.add_clause(&block);
+        }
+        let domain: Vec<_> = self.next.values().map(|l| l.var()).collect();
+        let mut simulate = Simulate {
+            ts: self,
+            sim,
+            slv,
+            num_word,
+            domain,
+            _rng: StdRng::seed_from_u64(0),
+        };
+
+        for from in 0..init.bv_len() {
+            let assump = init.assign(from, Some(self.latch().filter(|v| !init[*v].is_empty())));
+            loop {
+                if simulate.sim.bv_len() >= num_word * BitVec::WORD_SIZE {
+                    return simulate.sim;
+                }
+                if !simulate
+                    .slv
+                    .solve_with_domain(&assump, simulate.domain.iter().copied())
+                {
+                    break;
+                }
+                simulate.sim[Var::CONST].push(false);
+                let mut block = LitVec::new();
+                for &v in simulate.ts.latch.iter() {
+                    let n = simulate.ts.next(v.lit()).unwrap();
+                    let va = simulate.slv.sat_value(n).unwrap();
+                    let na = simulate.slv.sat_value_lit(n.var()).unwrap();
+                    simulate.sim[v].push(va);
+                    block.push(!na);
+                }
+                simulate.slv.add_clause(&block);
+                simulate.rt_dfs_simulate(simulate.sim.bv_len() - 1);
+            }
+        }
+        simulate.sim
     }
 }

@@ -210,7 +210,7 @@ impl DagCnfSolver {
         true
     }
 
-    fn solve_inner(
+    pub fn solve_with_param(
         &mut self,
         assump: &[Lit],
         constraint: Vec<LitVec>,
@@ -269,7 +269,7 @@ impl DagCnfSolver {
         constraint: Vec<LitVec>,
         limit: usize,
     ) -> Option<bool> {
-        self.solve_inner(assumps, constraint, empty::<Var>(), Some(limit))
+        self.solve_with_param(assumps, constraint, empty::<Var>(), Some(limit))
     }
 
     pub fn solve_with_domain(
@@ -277,7 +277,8 @@ impl DagCnfSolver {
         assumps: &[Lit],
         domain: impl Iterator<Item = Var>,
     ) -> bool {
-        self.solve_inner(assumps, vec![], domain, None).unwrap()
+        self.solve_with_param(assumps, vec![], domain, None)
+            .unwrap()
     }
 
     pub fn clear_phase(&mut self) {
@@ -371,12 +372,12 @@ impl Satif for DagCnfSolver {
     }
 
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.solve_inner(assumps, vec![], empty::<Var>(), None)
+        self.solve_with_param(assumps, vec![], empty::<Var>(), None)
             .unwrap()
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assumps, constraint, empty::<Var>(), None)
+        self.solve_with_param(assumps, constraint, empty::<Var>(), None)
             .unwrap()
     }
 

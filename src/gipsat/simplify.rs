@@ -110,10 +110,14 @@ impl DagCnfSolver {
         debug!("simplify subsume");
         let mut clauses: Vec<(CRef, LitOrdVec)> = clauses
             .into_iter()
-            .map(|cref| {
+            .filter_map(|cref| {
                 let cls = self.cdb.get(cref);
-                let lemma = LitOrdVec::new(LitVec::from(cls.slice()));
-                (cref, lemma)
+                if cls.len() > 100 {
+                    None
+                } else {
+                    let lemma = LitOrdVec::new(LitVec::from(cls.slice()));
+                    Some((cref, lemma))
+                }
             })
             .collect();
         clauses.sort_by_key(|(_, l)| l.len());

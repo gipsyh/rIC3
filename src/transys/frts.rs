@@ -130,12 +130,13 @@ impl FrTs {
         self.ts.coi_refine(&mut self.rst);
         self.ts.rearrange(&mut self.rst);
         info!(
-            "frts eliminates {} out of {} vars in {:.2}s",
+            "frts: eliminates {} out of {} vars in {:.2}s",
             *before - *self.ts.max_var(),
             *before,
             start.elapsed().as_secs_f32()
         );
         self.ts.simplify(&mut self.rst);
+        info!("frts: simplified ts: {}", self.ts.statistic());
         (self.ts, self.rst)
     }
 }
