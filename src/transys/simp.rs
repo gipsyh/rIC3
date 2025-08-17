@@ -1,6 +1,6 @@
 use super::{Transys, TransysIf};
 use giputils::hash::GHashSet;
-use log::info;
+use log::debug;
 use logicrs::{Lit, Var, VarVMap};
 
 impl Transys {
@@ -65,7 +65,7 @@ impl Transys {
                 rst.remove(&v);
             }
         }
-        info!("ts coi simplify: removed {removed} clauses");
+        debug!("ts coi simplify: removed {removed} clauses");
     }
 
     pub fn rearrange(&mut self, rst: &mut VarVMap) {

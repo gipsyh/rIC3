@@ -5,10 +5,7 @@ use crate::{
 };
 use giputils::hash::GHashMap;
 use log::{debug, info};
-use logicrs::{
-    Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify,
-    simulate::DagCnfSimulation,
-};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify};
 use rand::{SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
@@ -27,7 +24,7 @@ pub struct FrTs {
 impl FrTs {
     pub fn new(mut ts: Transys, cfg: &Config, mut rst: VarVMap) -> Self {
         ts.topsort(&mut rst);
-        let sim = DagCnfSimulation::new(1000, &ts.rel);
+        let sim = ts.rel.simulation(1000);
         let solver = DagCnfSolver::new(&ts.rel);
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();

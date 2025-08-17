@@ -25,6 +25,7 @@ use rand::Rng;
 use rand::{SeedableRng, rngs::StdRng};
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
+use std::iter::empty;
 use std::time::Instant;
 pub use ts::*;
 use vsids::Vsids;
@@ -213,6 +214,7 @@ impl DagCnfSolver {
         &mut self,
         assump: &[Lit],
         constraint: Vec<LitVec>,
+        domain: impl Iterator<Item = Var>,
         limit: Option<usize>,
     ) -> Option<bool> {
         self.assump = assump.into();
@@ -241,7 +243,7 @@ impl DagCnfSolver {
                 }
             }
             if !self.new_round(
-                assump.iter().chain(cc.iter()).map(|l| l.var()),
+                domain.chain(assump.iter().chain(cc.iter()).map(|l| l.var())),
                 constraint,
                 true,
             ) {
@@ -251,7 +253,7 @@ impl DagCnfSolver {
             };
             &assumption
         } else {
-            assert!(self.new_round(assump.iter().map(|l| l.var()), vec![], true));
+            assert!(self.new_round(domain.chain(assump.iter().map(|l| l.var())), vec![], true));
             assump
         };
         self.clean_learnt(true);
@@ -267,7 +269,21 @@ impl DagCnfSolver {
         constraint: Vec<LitVec>,
         limit: usize,
     ) -> Option<bool> {
-        self.solve_inner(assumps, constraint, Some(limit))
+        self.solve_inner(assumps, constraint, empty::<Var>(), Some(limit))
+    }
+
+    pub fn solve_with_domain(
+        &mut self,
+        assumps: &[Lit],
+        domain: impl Iterator<Item = Var>,
+    ) -> bool {
+        self.solve_inner(assumps, vec![], domain, None).unwrap()
+    }
+
+    pub fn clear_phase(&mut self) {
+        for v in self.phase_saving.iter_mut() {
+            *v = Lbool::NONE;
+        }
     }
 
     #[allow(unused)]
@@ -355,11 +371,13 @@ impl Satif for DagCnfSolver {
     }
 
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.solve_inner(assumps, vec![], None).unwrap()
+        self.solve_inner(assumps, vec![], empty::<Var>(), None)
+            .unwrap()
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assumps, constraint, None).unwrap()
+        self.solve_inner(assumps, constraint, empty::<Var>(), None)
+            .unwrap()
     }
 
     #[inline]

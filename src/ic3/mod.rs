@@ -3,7 +3,7 @@ use crate::{
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{frame::FrameLemma, localabs::LocalAbs},
-    transys::{Transys, TransysCtx, TransysIf, frts::FrTs, unroll::TransysUnroll},
+    transys::{Transys, TransysCtx, TransysIf, frts::FrTs, scorr::Scorr, unroll::TransysUnroll},
 };
 use activity::Activity;
 use frame::{Frame, Frames};
@@ -417,6 +417,10 @@ impl IC3 {
             if cfg.preproc.frts {
                 let frts = FrTs::new(ts, &cfg, rst);
                 (ts, rst) = frts.fr();
+            }
+            if cfg.preproc.scorr {
+                let scorr = Scorr::new(ts, &cfg, rst);
+                (ts, rst) = scorr.scorr();
             }
         }
         info!("simplified ts has {}", ts.statistic());

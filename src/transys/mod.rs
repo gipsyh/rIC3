@@ -5,7 +5,9 @@ mod live;
 pub mod nodep;
 mod others;
 mod refactor;
+pub mod scorr;
 mod simp;
+mod simulate;
 pub mod unroll;
 
 pub use ctx::*;
