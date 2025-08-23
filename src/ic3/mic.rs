@@ -2,6 +2,7 @@ use super::IC3;
 use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
+use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -219,7 +220,11 @@ impl IC3 {
         self.statistic.avg_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         let mut cex = Vec::new();
-        self.activity.sort_by_activity(&mut cube, true);
+        if self.rng.random_bool(0.2) {
+            cube.shuffle(&mut self.rng);
+        } else {
+            self.activity.sort_by_activity(&mut cube, true);
+        }
         let parent = self.frame.parent_lemma(&cube, frame);
         if let Some(parent) = parent {
             let parent = GHashSet::from_iter(parent);
