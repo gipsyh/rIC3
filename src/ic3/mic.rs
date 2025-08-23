@@ -135,7 +135,7 @@ impl IC3 {
                 return None;
             }
             self.statistic.num_down_sat += 1;
-            if self.blocked_with_ordered(frame, &cube, false, true) {
+            if self.blocked_with_ordered(frame, &cube, true) {
                 return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             for lit in cube.iter() {

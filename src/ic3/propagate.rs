@@ -17,7 +17,7 @@ impl IC3 {
                     continue;
                 }
                 for ctp in 0..3 {
-                    if self.blocked_with_ordered(frame_idx + 1, &lemma, false, false) {
+                    if self.blocked_with_ordered(frame_idx + 1, &lemma, false) {
                         let core = self.solvers[frame_idx]
                             .inductive_core()
                             .unwrap_or(lemma.cube().clone());

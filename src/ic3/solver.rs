@@ -37,11 +37,10 @@ impl IC3 {
         &mut self,
         frame: usize,
         cube: &LitVec,
-        ascending: bool,
         strengthen: bool,
     ) -> bool {
         let mut ordered_cube = cube.clone();
-        self.activity.sort_by_activity(&mut ordered_cube, ascending);
+        self.activity.sort_by_activity(&mut ordered_cube, false);
         self.solvers[frame - 1].inductive(&ordered_cube, strengthen)
     }
 
