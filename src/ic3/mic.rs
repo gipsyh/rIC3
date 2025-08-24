@@ -147,11 +147,11 @@ impl IC3 {
             }
             let (model, _) = self.get_pred(frame, false);
             let cex_set: GHashSet<Lit> = GHashSet::from_iter(model.iter().cloned());
-            for lit in cube.iter() {
-                if keep.contains(lit) && !cex_set.contains(lit) {
-                    return None;
-                }
-            }
+            // for lit in cube.iter() {
+            //     if keep.contains(lit) && !cex_set.contains(lit) {
+            //         return None;
+            //     }
+            // }
             if ctg < parameter.max
                 && frame > 1
                 && !self.tsctx.cube_subsume_init(&model)
