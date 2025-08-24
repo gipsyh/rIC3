@@ -62,7 +62,7 @@ impl Scorr {
     pub fn scorr(mut self) -> (Transys, VarVMap) {
         let start = Instant::now();
         let init = self.ts.init_simulation(1);
-        let mut rt = self.ts.rt_simulation2(&init, 100);
+        let mut rt = self.ts.rt_simulation2(&init, 10);
         info!(
             "scorr: init simulation size: {}, rt simulation size: {}",
             init.bv_len(),

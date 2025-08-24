@@ -157,7 +157,7 @@ pub struct PreprocessOptions {
     #[arg(long = "frts-tl", default_value_t = 1800)]
     pub frts_tl: u64,
     /// scorr
-    #[arg(long = "scorr", action = ArgAction::Set, default_value_t = false)]
+    #[arg(long = "scorr", action = ArgAction::Set, default_value_t = true)]
     pub scorr: bool,
 }
 
