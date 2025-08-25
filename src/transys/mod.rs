@@ -1,4 +1,5 @@
 mod aux;
+pub mod certify;
 mod ctx;
 pub mod frts;
 mod live;

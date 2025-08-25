@@ -1,12 +1,10 @@
 use crate::{
     Engine, Witness,
     config::Config,
-    transys::{
-        Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, scorr::Scorr, unroll::TransysUnroll,
-    },
+    transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
-use logicrs::{LitVec, VarVMap, satif::Satif};
+use logicrs::{LitVec, satif::Satif};
 use std::time::Duration;
 
 pub struct BMC {
@@ -14,25 +12,12 @@ pub struct BMC {
     cfg: Config,
     solver: Box<dyn Satif>,
     solver_k: usize,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl BMC {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
-        let mut rst = VarVMap::new_self_map(ts.max_var());
-        ts = ts.check_liveness_and_l2s(&mut rst);
-        if cfg.preproc.preproc {
-            ts.simplify(&mut rst);
-            info!("trivial simplified ts: {}", ts.statistic());
-            if cfg.preproc.scorr {
-                let scorr = Scorr::new(ts, &cfg, rst);
-                (ts, rst) = scorr.scorr();
-            }
-            if cfg.preproc.frts {
-                let frts = FrTs::new(ts, &cfg, rst);
-                (ts, rst) = frts.fr();
-            }
-        }
+    pub fn new(cfg: Config, ts: Transys) -> Self {
+        let (ts, mut rst) = ts.preproc(&cfg.preproc);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
@@ -120,10 +105,8 @@ impl Engine for BMC {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.input.push(w);
@@ -131,10 +114,8 @@ impl Engine for BMC {
             for l in self.uts.ts.latch() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.state.push(w);

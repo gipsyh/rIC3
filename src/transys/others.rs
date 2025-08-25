@@ -1,6 +1,7 @@
 use super::{Transys, TransysIf};
+use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, VarLMap, VarVMap, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarLMap, satif::Satif};
 use std::mem::take;
 
 impl Transys {
@@ -106,7 +107,7 @@ impl Transys {
         res
     }
 
-    pub fn map(&mut self, map: impl Fn(Var) -> Var + Copy, rst: &mut VarVMap) {
+    pub fn map(&mut self, map: impl Fn(Var) -> Var + Copy, rst: &mut Restore) {
         self.input
             .iter_mut()
             .chain(self.latch.iter_mut())
@@ -121,10 +122,10 @@ impl Transys {
         self.bad = self.bad.map_var(map);
         self.constraint = self.constraint.map_var(map);
         self.justice = self.justice.map_var(map);
-        rst.map_key(map);
+        rst.map_var(map);
     }
 
-    pub fn replace(&mut self, map: &VarLMap, rst: &mut VarVMap) {
+    pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {
         for &v in self.input.iter().chain(self.latch.iter()) {
             assert!(!map.contains_key(&v));
         }
@@ -138,10 +139,10 @@ impl Transys {
         self.bad = self.bad.map(|l| map_fn(l).unwrap_or(l));
         self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
         self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
-        rst.retain(|k, _| !map.contains_key(k));
+        rst.retain(|k| !map.contains_key(&k));
     }
 
-    pub fn topsort(&mut self, rst: &mut VarVMap) {
+    pub fn topsort(&mut self, rst: &mut Restore) {
         let (_, m) = self.rel.topsort();
         let m = m.inverse();
         self.map(|v| m[v], rst);

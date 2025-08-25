@@ -30,19 +30,19 @@ pub struct Config {
     pub witness: bool,
 
     #[command(flatten)]
-    pub ic3: IC3Options,
+    pub ic3: IC3Config,
 
     #[command(flatten)]
-    pub bmc: BMCOptions,
+    pub bmc: BMCConfig,
 
     #[command(flatten)]
-    pub kind: KindOptions,
+    pub kind: KindConfig,
 
     #[command(flatten)]
-    pub portfolio: PortfolioOptions,
+    pub portfolio: PortfolioConfig,
 
     #[command(flatten)]
-    pub preproc: PreprocessOptions,
+    pub preproc: PreprocessConfig,
 
     /// start bound
     #[arg(long = "start", default_value_t = 0)]
@@ -80,7 +80,7 @@ pub enum Engine {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct IC3Options {
+pub struct IC3Config {
     /// dynamic generalization
     #[arg(long = "ic3-dynamic", default_value_t = false)]
     pub dynamic: bool,
@@ -129,7 +129,7 @@ pub struct IC3Options {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct BMCOptions {
+pub struct BMCConfig {
     /// bmc single step time limit
     #[arg(long = "bmc-time-limit")]
     pub time_limit: Option<u64>,
@@ -139,14 +139,14 @@ pub struct BMCOptions {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct KindOptions {
+pub struct KindConfig {
     /// simple path constraint
     #[arg(long = "kind-simple-path", default_value_t = false)]
     pub simple_path: bool,
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct PreprocessOptions {
+pub struct PreprocessConfig {
     /// disable preprocess
     #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
@@ -162,7 +162,7 @@ pub struct PreprocessOptions {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct PortfolioOptions {
+pub struct PortfolioConfig {
     /// portfolio woker memory limit in GB
     #[arg(long = "pworker-mem-limit", default_value_t = 16)]
     pub wmem_limit: usize,

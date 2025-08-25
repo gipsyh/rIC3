@@ -2,11 +2,11 @@ use super::IC3;
 use crate::{
     Witness,
     config::Config,
-    transys::{Transys, TransysIf, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
 use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, info};
-use logicrs::{LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{LitVec, Var, satif::Satif};
 
 pub struct LocalAbs {
     refine: GHashSet<Var>,
@@ -66,7 +66,7 @@ impl LocalAbs {
         }
     }
 
-    pub fn witness(&self, rst: &VarVMap) -> Option<Witness> {
+    pub fn witness(&self, rst: &Restore) -> Option<Witness> {
         if !self.foundcex {
             return None;
         }
@@ -76,10 +76,8 @@ impl LocalAbs {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(rst.restore(l.not_if(!v)));
                 }
             }
             res.input.push(w);
@@ -87,10 +85,8 @@ impl LocalAbs {
             for l in self.uts.ts.latch() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(rst.restore(l.not_if(!v)));
                 }
             }
             res.state.push(w);

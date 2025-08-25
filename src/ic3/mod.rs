@@ -3,13 +3,13 @@ use crate::{
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
-    transys::{Transys, TransysCtx, TransysIf, frts::FrTs, scorr::Scorr, unroll::TransysUnroll},
+    transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
 use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
 use log::{Level, debug, info, trace};
-use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitVec, Var, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use statistic::Statistic;
@@ -40,7 +40,7 @@ pub struct IC3 {
     statistic: Statistic,
     localabs: LocalAbs,
     ots: Transys,
-    rst: VarVMap,
+    rst: Restore,
     auxiliary_var: Vec<Var>,
     rng: StdRng,
 
@@ -86,26 +86,11 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: Config, ts: Transys) -> Self {
         let ots = ts.clone();
         let rng = StdRng::seed_from_u64(cfg.rseed);
-        let mut rst = VarVMap::new_self_map(ts.max_var());
-        ts = ts.check_liveness_and_l2s(&mut rst);
         let statistic = Statistic::default();
-        if cfg.preproc.preproc {
-            ts.simplify(&mut rst);
-            info!("trivial simplified ts: {}", ts.statistic());
-            if cfg.preproc.scorr {
-                let scorr = Scorr::new(ts, &cfg, rst);
-                (ts, rst) = scorr.scorr();
-            }
-            if cfg.preproc.frts {
-                let frts = FrTs::new(ts, &cfg, rst);
-                (ts, rst) = frts.fr();
-            }
-        }
-        info!("simplified ts has {}", ts.statistic());
-
+        let (mut ts, rst) = ts.preproc(&cfg.preproc);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
@@ -146,7 +131,7 @@ impl IC3 {
         self.frame
             .invariant()
             .iter()
-            .map(|l| l.map_var(|l| self.rst[l]))
+            .map(|l| l.map_var(|l| self.rst.restore_var(l)))
             .collect()
     }
 }
@@ -200,7 +185,7 @@ impl Engine for IC3 {
         let invariants = self.frame.invariant();
         let invariants = invariants
             .iter()
-            .map(|l| LitVec::from_iter(l.iter().filter_map(|l| self.rst.lit_map(*l))));
+            .map(|l| LitVec::from_iter(l.iter().map(|l| self.rst.restore(*l))));
         let mut proof = self.ots.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {
@@ -232,24 +217,16 @@ impl Engine for IC3 {
                     .lemma
                     .iter()
                     .chain(bad.input.iter())
-                    .filter_map(|l| self.rst.lit_map(*l))
+                    .map(|l| self.rst.restore(*l))
                     .collect();
                 let (input, state) = self.ots.exact_init_state(&assump);
                 res.state.push(state);
                 res.input.push(input);
             } else {
-                res.state.push(
-                    bad.lemma
-                        .iter()
-                        .filter_map(|l| self.rst.lit_map(*l))
-                        .collect(),
-                );
-                res.input.push(
-                    bad.input
-                        .iter()
-                        .filter_map(|l| self.rst.lit_map(*l))
-                        .collect(),
-                );
+                res.state
+                    .push(bad.lemma.iter().map(|l| self.rst.restore(*l)).collect());
+                res.input
+                    .push(bad.input.iter().map(|l| self.rst.restore(*l)).collect());
             }
             b = bad.next.clone();
         }

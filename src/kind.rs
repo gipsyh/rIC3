@@ -1,12 +1,10 @@
 use crate::{
     Engine, Proof, Witness,
     config::Config,
-    transys::{
-        Transys, TransysIf, frts::FrTs, nodep::NoDepTransys, scorr::Scorr, unroll::TransysUnroll,
-    },
+    transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
-use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
@@ -15,27 +13,14 @@ pub struct Kind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     ots: Transys,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl Kind {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts = ts.remove_gate_init();
-        let mut rst = VarVMap::new_self_map(ts.max_var());
-        ts = ts.check_liveness_and_l2s(&mut rst);
-        if cfg.preproc.preproc {
-            ts.simplify(&mut rst);
-            info!("trivial simplified ts: {}", ts.statistic());
-            if cfg.preproc.scorr {
-                let scorr = Scorr::new(ts, &cfg, rst);
-                (ts, rst) = scorr.scorr();
-            }
-            if cfg.preproc.frts {
-                let frts = FrTs::new(ts, &cfg, rst);
-                (ts, rst) = frts.fr();
-            }
-        }
+        let (ts, mut rst) = ts.preproc(&cfg.preproc);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
@@ -240,10 +225,8 @@ impl Engine for Kind {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.input.push(w);
@@ -251,10 +234,8 @@ impl Engine for Kind {
             for l in self.uts.ts.latch() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.state.push(w);

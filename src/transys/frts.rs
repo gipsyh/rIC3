@@ -1,7 +1,7 @@
 use crate::{
-    config::Config,
+    config::PreprocessConfig,
     gipsat::DagCnfSolver,
-    transys::{Transys, TransysIf},
+    transys::{Transys, TransysIf, certify::Restore},
 };
 use giputils::hash::GHashMap;
 use log::{debug, info, trace};
@@ -11,18 +11,18 @@ use std::time::Instant;
 
 #[allow(unused)]
 pub struct FrTs {
-    cfg: Config,
+    cfg: PreprocessConfig,
     ts: Transys,
     candidate: VarMap<Vec<Lit>>,
     map: VarLMap,
     eqc: VarVMap,
     solver: DagCnfSolver,
     rng: StdRng,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl FrTs {
-    pub fn new(mut ts: Transys, cfg: &Config, mut rst: VarVMap) -> Self {
+    pub fn new(mut ts: Transys, cfg: &PreprocessConfig, mut rst: Restore) -> Self {
         ts.topsort(&mut rst);
         let sim = ts.rel.simulation(1000);
         let solver = DagCnfSolver::new(&ts.rel);
@@ -49,7 +49,7 @@ impl FrTs {
                 candidate[lv.var()].push(lv);
             }
         }
-        let rng = StdRng::seed_from_u64(cfg.rseed);
+        let rng = StdRng::seed_from_u64(0);
         Self {
             ts,
             cfg: cfg.clone(),
@@ -62,13 +62,13 @@ impl FrTs {
         }
     }
 
-    pub fn fr(mut self) -> (Transys, VarVMap) {
+    pub fn fr(mut self) -> (Transys, Restore) {
         let start = Instant::now();
         let before = self.ts.max_var();
         let mut replace = VarLMap::new();
         let mut v = Var(1);
         while v <= self.ts.max_var() {
-            if start.elapsed().as_secs() > self.cfg.preproc.frts_tl {
+            if start.elapsed().as_secs() > self.cfg.frts_tl {
                 info!("frts: timeout");
                 break;
             }

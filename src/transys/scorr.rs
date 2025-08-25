@@ -1,22 +1,22 @@
 use crate::{
-    config::Config,
+    config::PreprocessConfig,
     gipsat::DagCnfSolver,
-    transys::{Transys, TransysIf},
+    transys::{Transys, TransysIf, certify::Restore},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
 use log::{info, trace};
-use logicrs::{Lit, LitVec, Var, VarLMap, VarVMap, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarLMap, satif::Satif};
 use std::time::Instant;
 
 pub struct Scorr {
     ts: Transys,
-    rst: VarVMap,
+    rst: Restore,
     init_slv: DagCnfSolver,
     ind_slv: DagCnfSolver,
 }
 
 impl Scorr {
-    pub fn new(ts: Transys, _cfg: &Config, rst: VarVMap) -> Self {
+    pub fn new(ts: Transys, _cfg: &PreprocessConfig, rst: Restore) -> Self {
         let mut ind_slv = DagCnfSolver::new(&ts.rel);
         for c in ts.constraint.iter() {
             ind_slv.add_clause(&[*c]);
@@ -62,7 +62,7 @@ impl Scorr {
             .is_some_and(|r| !r)
     }
 
-    pub fn scorr(mut self) -> (Transys, VarVMap) {
+    pub fn scorr(mut self) -> (Transys, Restore) {
         let start = Instant::now();
         let init = self.ts.init_simulation(1);
         let mut rt = self.ts.rt_simulation2(&init, 10);
@@ -153,7 +153,10 @@ impl Scorr {
         for v in vars {
             let r = scorr[&v];
             if let Some(rr) = scorr.map_lit(r) {
-                scorr.insert_lit(v.lit(), rr);
+                if rr.var() != r.var() {
+                    // dbg!(v, r, rr);
+                    scorr.insert_lit(v.lit(), rr);
+                }
             }
         }
         self.ts.latch.retain(|l| !scorr.contains_key(l));

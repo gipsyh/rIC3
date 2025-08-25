@@ -10,6 +10,7 @@ struct Simulate<'t> {
     ts: &'t Transys,
     sim: VarBitVec,
     slv: DagCnfSolver,
+    consider: Vec<Var>,
     num_word: usize,
     domain: Vec<Var>,
     _rng: StdRng,
@@ -17,7 +18,7 @@ struct Simulate<'t> {
 
 impl Simulate<'_> {
     fn rt_dfs_simulate(&mut self, from: usize) {
-        let assump = self.sim.assign(from, Some(self.ts.latch()));
+        let assump = self.sim.assign(from, Some(self.consider.iter().copied()));
         loop {
             if self.sim.bv_len() >= self.num_word * BitVec::WORD_SIZE {
                 return;
@@ -32,7 +33,7 @@ impl Simulate<'_> {
             }
             self.sim[Var::CONST].push(false);
             let mut block = LitVec::new();
-            for &v in self.ts.latch.iter() {
+            for &v in self.consider.iter() {
                 let n = self.ts.next(v.lit());
                 let va = self.slv.sat_value(n).unwrap();
                 let na = self.slv.sat_value_lit(n.var()).unwrap();
@@ -71,7 +72,6 @@ impl Transys {
             }
             slv.add_clause(&block);
         }
-        assert!(sim.bv_len() > 0);
         sim
     }
 
@@ -142,13 +142,14 @@ impl Transys {
     pub fn rt_simulation2(&self, init: &VarBitVec, num_word: usize) -> VarBitVec {
         assert!(init.bv_len() > 0);
         let mut sim = VarBitVec::new();
+        let consider: Vec<_> = self.latch().filter(|v| !init[*v].is_empty()).collect();
         sim.reserve(self.max_var());
         let mut slv = DagCnfSolver::new(&self.rel);
         for cls in self.constraint() {
             slv.add_clause(&cls.cube());
         }
         for i in 0..init.bv_len() {
-            let block = !init.assign(i, Some(self.latch().filter(|v| !init[*v].is_empty())));
+            let block = !init.assign(i, Some(consider.iter().copied()));
             let block = self.lits_next(block.iter());
             slv.add_clause(&block);
         }
@@ -159,6 +160,7 @@ impl Transys {
             slv,
             num_word,
             domain,
+            consider,
             _rng: StdRng::seed_from_u64(0),
         };
 
@@ -176,7 +178,7 @@ impl Transys {
                 }
                 simulate.sim[Var::CONST].push(false);
                 let mut block = LitVec::new();
-                for &v in simulate.ts.latch.iter() {
+                for &v in simulate.consider.iter() {
                     let n = simulate.ts.next(v.lit());
                     let va = simulate.slv.sat_value(n).unwrap();
                     let na = simulate.slv.sat_value_lit(n.var()).unwrap();
