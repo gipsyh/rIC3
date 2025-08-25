@@ -120,9 +120,8 @@ impl Transys {
 }
 
 impl Transys {
-    pub fn preproc(&self, cfg: &PreprocessConfig) -> (Self, Restore) {
+    pub fn preproc(&self, cfg: &PreprocessConfig, mut rst: Restore) -> (Self, Restore) {
         let mut ts = self.clone();
-        let mut rst = Restore::new(&ts);
         if cfg.preproc {
             ts.simplify(&mut rst);
             info!("trivial simplified ts: {}", ts.statistic());

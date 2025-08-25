@@ -149,4 +149,10 @@ impl Transys {
         let m = m.inverse();
         self.map(|v| m[v], rst);
     }
+
+    pub fn add_init_var(&mut self) -> Var {
+        let iv = self.new_var();
+        self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        iv
+    }
 }

@@ -1,5 +1,6 @@
 use super::IC3;
 use giputils::grc::Grc;
+use log::trace;
 use logicrs::{LitOrdVec, LitVec};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, btree_set};
@@ -163,6 +164,7 @@ impl ProofObligationQueue {
             self.num.resize(po.frame + 1, 0);
         }
         self.num[po.frame] += 1;
+        trace!("add obligation: {}", po.lemma);
         assert!(self.obligations.insert(po));
     }
 

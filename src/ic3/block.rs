@@ -30,10 +30,11 @@ impl IC3 {
 
     fn generalize(&mut self, mut po: ProofObligation, mic_type: MicType) -> bool {
         let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
-            assert!(self.tsctx.cube_subsume_init(&po.lemma));
-            po.frame += 1;
-            self.add_obligation(po.clone());
-            return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
+            unreachable!();
+            // assert!(self.tsctx.cube_subsume_init(&po.lemma));
+            // po.frame += 1;
+            // self.add_obligation(po.clone());
+            // return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
         };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
@@ -99,9 +100,14 @@ impl IC3 {
                         continue;
                     }
                 } else if po.frame > 0 {
-                    let mut assump = po.lemma.cube().clone();
-                    assump.extend(po.input.iter());
-                    debug_assert!(!self.solvers[0].solve(&assump));
+                    let mut lemma = po.lemma.cube().clone();
+                    let llen = lemma.len();
+                    lemma.extend(po.input.iter().copied());
+                    debug_assert!(!self.solvers[0].solve(&lemma));
+                    lemma.truncate(llen);
+                    lemma.push(!self.rst.init_var().lit());
+                    po.lemma = LitOrdVec::new(lemma);
+                    debug_assert!(!self.tsctx.cube_subsume_init(&po.lemma));
                 } else {
                     self.add_obligation(po.clone());
                     return BlockResult::Failure;

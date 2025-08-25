@@ -20,7 +20,8 @@ impl Kind {
     pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts = ts.remove_gate_init();
-        let (ts, mut rst) = ts.preproc(&cfg.preproc);
+        let rst = Restore::new(&ts);
+        let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {

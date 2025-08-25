@@ -50,8 +50,9 @@ pub struct Proof {
 
 #[derive(Debug, Clone)]
 pub struct Restore {
-    pub vmap: VarVMap,
-    pub eqmap: GHashMap<Var, LitVec>,
+    vmap: VarVMap,
+    eqmap: GHashMap<Var, LitVec>,
+    init_var: Option<Var>,
 }
 
 impl Restore {
@@ -59,6 +60,7 @@ impl Restore {
         Self {
             vmap: VarVMap::new_self_map(ts.max_var()),
             eqmap: GHashMap::default(),
+            init_var: None,
         }
     }
 
@@ -74,6 +76,15 @@ impl Restore {
     pub fn remove(&mut self, v: Var) {
         self.vmap.remove(&v);
         self.eqmap.remove(&v);
+        if let Some(iv) = self.init_var {
+            assert!(iv != v);
+        }
+    }
+
+    #[inline]
+    pub fn add_restore(&mut self, v: Var, l: Var) {
+        assert!(!self.vmap.contains_key(&v));
+        self.vmap.insert(v, l);
     }
 
     #[inline]
@@ -81,6 +92,7 @@ impl Restore {
         for (k, v) in take(&mut self.eqmap) {
             self.eqmap.insert(map(k), v);
         }
+        self.init_var = self.init_var.map(|v| map(v));
         self.vmap.map_key(map);
     }
 
@@ -91,6 +103,7 @@ impl Restore {
                 self.eqmap.insert(n, v);
             }
         }
+        self.init_var = self.init_var.map(|l| map(l).unwrap());
         self.vmap.filter_map_key(map);
     }
 
@@ -98,6 +111,9 @@ impl Restore {
     pub fn retain(&mut self, f: impl Fn(Var) -> bool) {
         self.vmap.retain(|&k, _| f(k));
         self.eqmap.retain(|&k, _| f(k));
+        if let Some(iv) = self.init_var {
+            assert!(f(iv));
+        }
     }
 
     #[inline]
@@ -107,6 +123,12 @@ impl Restore {
             self.eqmap.entry(y.var()).or_default().push(xm);
         }
         self.vmap.remove(&x);
+        if let Some(iv) = self.init_var
+            && iv == x
+        {
+            assert!(y.polarity());
+            self.init_var = Some(y.var());
+        }
     }
 
     pub fn eq_invariant(&self) -> LitVvec {
@@ -119,5 +141,14 @@ impl Restore {
             }
         }
         res
+    }
+
+    pub fn init_var(&self) -> Var {
+        self.init_var.unwrap()
+    }
+
+    pub fn set_init_var(&mut self, iv: Var) {
+        assert!(self.init_var.is_none());
+        self.init_var = Some(iv);
     }
 }

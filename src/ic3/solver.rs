@@ -1,14 +1,14 @@
 use super::IC3;
 use crate::transys::TransysIf;
 use giputils::hash::GHashSet;
-use log::debug;
+use log::trace;
 use logicrs::{LitOrdVec, LitVec, Var, satif::Satif};
 use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 impl IC3 {
     pub(super) fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
-        debug!("getting bad state in last frame");
+        trace!("getting bad state in frame {}", self.level());
         let start = Instant::now();
         let res = self
             .solvers

@@ -17,7 +17,8 @@ pub struct BMC {
 
 impl BMC {
     pub fn new(cfg: Config, ts: Transys) -> Self {
-        let (ts, mut rst) = ts.preproc(&cfg.preproc);
+        let rst = Restore::new(&ts);
+        let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
