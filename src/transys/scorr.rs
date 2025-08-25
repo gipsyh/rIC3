@@ -101,7 +101,6 @@ impl Scorr {
         //     }
         // }
         for x in latch {
-            // println!("scorr: check {x}");
             let (eqc, xl) = if let Some(eqc) = cand.get_mut(&rt[x]) {
                 (eqc, x.lit())
             } else if let Some(eqc) = cand.get_mut(&rt.val(!x.lit())) {
@@ -117,7 +116,6 @@ impl Scorr {
                 if y.var() >= x {
                     break;
                 }
-                // println!("check scorr: {x}, {y}");
                 if self.check_scorr(xl, y) {
                     trace!("scorr: {} -> {}", xl, y);
                     scorr.insert_lit(xl, y);
