@@ -132,32 +132,32 @@ impl Scorr {
             self.ts.latch.len(),
             start.elapsed().as_secs_f32()
         );
-        for (x, r) in scorr.clone().iter() {
-            let mut xn = self.ts.next(x.lit());
-            let mut rn = if r.var().is_constant() {
-                *r
-            } else {
-                self.ts.next(*r)
-            };
-            if xn.var() == rn.var() {
-                continue;
-            }
-            if xn.var() < rn.var() {
-                (xn, rn) = (rn, xn);
-            }
-            trace!("scorr: {xn} -> {rn}");
-            scorr.insert_lit(xn, rn);
-        }
-        let mut vars: Vec<Var> = scorr.keys().copied().collect();
-        vars.sort();
-        for v in vars {
-            let r = scorr[&v];
-            if let Some(rr) = scorr.map_lit(r) {
-                if rr.var() != r.var() {
-                    scorr.insert_lit(v.lit(), rr);
-                }
-            }
-        }
+        // for (x, r) in scorr.clone().iter() {
+        //     let mut xn = self.ts.next(x.lit());
+        //     let mut rn = if r.var().is_constant() {
+        //         *r
+        //     } else {
+        //         self.ts.next(*r)
+        //     };
+        //     if xn.var() == rn.var() {
+        //         continue;
+        //     }
+        //     if xn.var() < rn.var() {
+        //         (xn, rn) = (rn, xn);
+        //     }
+        //     trace!("scorr: {xn} -> {rn}");
+        //     scorr.insert_lit(xn, rn);
+        // }
+        // let mut vars: Vec<Var> = scorr.keys().copied().collect();
+        // vars.sort();
+        // for v in vars {
+        //     let r = scorr[&v];
+        //     if let Some(rr) = scorr.map_lit(r) {
+        //         if rr.var() != r.var() {
+        //             scorr.insert_lit(v.lit(), rr);
+        //         }
+        //     }
+        // }
         self.ts.input.retain(|l| !scorr.contains_key(l));
         self.ts.latch.retain(|l| !scorr.contains_key(l));
         self.ts.init.retain(|l, _| !scorr.contains_key(l));
