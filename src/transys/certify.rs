@@ -1,7 +1,6 @@
 use crate::transys::{Transys, TransysIf};
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap};
-use std::mem::take;
 
 #[derive(Clone, Debug, Default)]
 pub struct Witness {
@@ -75,7 +74,6 @@ impl Restore {
     #[inline]
     pub fn remove(&mut self, v: Var) {
         self.vmap.remove(&v);
-        self.eqmap.remove(&v);
         if let Some(iv) = self.init_var {
             assert!(iv != v);
         }
@@ -89,20 +87,12 @@ impl Restore {
 
     #[inline]
     pub fn map_var(&mut self, map: impl Fn(Var) -> Var) {
-        for (k, v) in take(&mut self.eqmap) {
-            self.eqmap.insert(map(k), v);
-        }
         self.init_var = self.init_var.map(|v| map(v));
         self.vmap.map_key(map);
     }
 
     #[inline]
     pub fn filter_map_var(&mut self, map: impl Fn(Var) -> Option<Var>) {
-        for (k, v) in take(&mut self.eqmap) {
-            if let Some(n) = map(k) {
-                self.eqmap.insert(n, v);
-            }
-        }
         self.init_var = self.init_var.map(|l| map(l).unwrap());
         self.vmap.filter_map_key(map);
     }
@@ -110,7 +100,6 @@ impl Restore {
     #[inline]
     pub fn retain(&mut self, f: impl Fn(Var) -> bool) {
         self.vmap.retain(|&k, _| f(k));
-        self.eqmap.retain(|&k, _| f(k));
         if let Some(iv) = self.init_var {
             assert!(f(iv));
         }
@@ -118,11 +107,9 @@ impl Restore {
 
     #[inline]
     pub fn replace(&mut self, x: Var, y: Lit) {
-        if let Some(xm) = self.vmap.get(&x) {
-            let xm = xm.lit().not_if(!y.polarity());
-            self.eqmap.entry(y.var()).or_default().push(xm);
-        }
-        self.vmap.remove(&x);
+        let xm = self.vmap[x].lit().not_if(!y.polarity());
+        let ym = self.vmap[y.var()];
+        self.eqmap.entry(ym).or_default().push(xm);
         if let Some(iv) = self.init_var
             && iv == x
         {
@@ -134,10 +121,9 @@ impl Restore {
     pub fn eq_invariant(&self) -> LitVvec {
         let mut res = LitVvec::new();
         for (v, eq) in self.eqmap.iter() {
-            let v = self.restore(v.lit());
             for &e in eq.iter() {
-                res.push(LitVec::from([v, !e]));
-                res.push(LitVec::from([!v, e]));
+                res.push(LitVec::from([v.lit(), !e]));
+                res.push(LitVec::from([!v.lit(), e]));
             }
         }
         res

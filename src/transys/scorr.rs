@@ -158,10 +158,6 @@ impl Scorr {
         //         }
         //     }
         // }
-        self.ts.input.retain(|l| !scorr.contains_key(l));
-        self.ts.latch.retain(|l| !scorr.contains_key(l));
-        self.ts.init.retain(|l, _| !scorr.contains_key(l));
-        self.ts.next.retain(|l, _| !scorr.contains_key(l));
         self.ts.replace(&scorr, &mut self.rst);
         self.ts.simplify(&mut self.rst);
         info!("scorr: simplified ts: {}", self.ts.statistic());

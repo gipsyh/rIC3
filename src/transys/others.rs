@@ -126,9 +126,17 @@ impl Transys {
     }
 
     pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {
-        for &v in self.input.iter().chain(self.latch.iter()) {
-            assert!(!map.contains_key(&v));
+        for (&x, &y) in map.iter() {
+            if self.is_latch(x) {
+                rst.replace(x, y);
+            } else {
+                rst.remove(x);
+            }
         }
+        self.input.retain(|l| !map.contains_key(l));
+        self.latch.retain(|l| !map.contains_key(l));
+        self.init.retain(|l, _| !map.contains_key(l));
+        self.next.retain(|l, _| !map.contains_key(l));
         self.rel.replace(map);
         for l in self.next.values_mut().chain(self.init.values_mut()) {
             if let Some(m) = map.map_lit(*l) {
@@ -139,13 +147,6 @@ impl Transys {
         self.bad = self.bad.map(|l| map_fn(l).unwrap_or(l));
         self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
         self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
-        for (&x, &y) in map.iter() {
-            if self.is_latch(x) {
-                rst.replace(x, y);
-            } else {
-                rst.remove(x);
-            }
-        }
     }
 
     pub fn topsort(&mut self, rst: &mut Restore) {

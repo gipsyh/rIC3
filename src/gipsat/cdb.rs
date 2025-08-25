@@ -365,8 +365,8 @@ impl DagCnfSolver {
     }
 
     pub fn clean_learnt(&mut self, full: bool) {
-        if (full && self.cdb.learnt.len() * 15 >= self.cdb.trans.len())
-            || self.cdb.learnt.len() >= self.cdb.trans.len()
+        if (full && self.cdb.learnt.len() * 15 > self.cdb.trans.len())
+            || self.cdb.learnt.len() > self.cdb.trans.len()
         {
             let onum_learnt = self.cdb.num_learnt();
             self.cdb.learnt.sort_unstable_by(|a, b| {
