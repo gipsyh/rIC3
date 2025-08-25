@@ -140,7 +140,11 @@ impl Transys {
         self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
         self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
         for (&x, &y) in map.iter() {
-            rst.replace(x, y);
+            if self.is_latch(x) {
+                rst.replace(x, y);
+            } else {
+                rst.remove(x);
+            }
         }
     }
 

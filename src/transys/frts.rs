@@ -103,7 +103,7 @@ impl FrTs {
                     // }
                 }
                 Some(false) => {
-                    debug!("frts: replace {v} with {m}");
+                    debug!("frts: {v} -> {m}");
                     replace.insert_lit(lv, m);
                     self.solver.add_eq(lv, m);
                     if replace.len() % 5000 == 0 {

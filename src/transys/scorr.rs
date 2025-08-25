@@ -145,6 +145,7 @@ impl Scorr {
             if xn.var() < rn.var() {
                 (xn, rn) = (rn, xn);
             }
+            trace!("scorr: {xn} -> {rn}");
             scorr.insert_lit(xn, rn);
         }
         let mut vars: Vec<Var> = scorr.keys().copied().collect();
