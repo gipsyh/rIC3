@@ -65,7 +65,10 @@ impl Scorr {
     pub fn scorr(mut self) -> (Transys, Restore) {
         let start = Instant::now();
         let init = self.ts.init_simulation(1);
-        let mut rt = self.ts.rt_simulation2(&init, 10);
+        if init.bv_len() == 0 {
+            return (self.ts, self.rst);
+        }
+        let mut rt = self.ts.rt_simulation(&init, 10);
         info!(
             "scorr: init simulation size: {}, rt simulation size: {}",
             init.bv_len(),
@@ -142,10 +145,6 @@ impl Scorr {
             if xn.var() < rn.var() {
                 (xn, rn) = (rn, xn);
             }
-            // dbg!(x, r);
-            // dbg!(xn, rn);
-            // dbg!(self.ts.is_latch(xn.var()));
-            // dbg!(self.ts.is_latch(rn.var()));
             scorr.insert_lit(xn, rn);
         }
         let mut vars: Vec<Var> = scorr.keys().copied().collect();
@@ -154,11 +153,11 @@ impl Scorr {
             let r = scorr[&v];
             if let Some(rr) = scorr.map_lit(r) {
                 if rr.var() != r.var() {
-                    // dbg!(v, r, rr);
                     scorr.insert_lit(v.lit(), rr);
                 }
             }
         }
+        self.ts.input.retain(|l| !scorr.contains_key(l));
         self.ts.latch.retain(|l| !scorr.contains_key(l));
         self.ts.init.retain(|l, _| !scorr.contains_key(l));
         self.ts.next.retain(|l, _| !scorr.contains_key(l));

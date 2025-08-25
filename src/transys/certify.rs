@@ -1,6 +1,6 @@
 use crate::transys::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, VarVMap};
+use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap};
 use std::mem::take;
 
 #[derive(Clone, Debug, Default)]
@@ -48,6 +48,7 @@ pub struct Proof {
     pub proof: Transys,
 }
 
+#[derive(Debug, Clone)]
 pub struct Restore {
     pub vmap: VarVMap,
     pub eqmap: GHashMap<Var, LitVec>,
@@ -97,5 +98,26 @@ impl Restore {
     pub fn retain(&mut self, f: impl Fn(Var) -> bool) {
         self.vmap.retain(|&k, _| f(k));
         self.eqmap.retain(|&k, _| f(k));
+    }
+
+    #[inline]
+    pub fn replace(&mut self, x: Var, y: Lit) {
+        if let Some(xm) = self.vmap.get(&x) {
+            let xm = xm.lit().not_if(!y.polarity());
+            self.eqmap.entry(y.var()).or_default().push(xm);
+        }
+        self.vmap.remove(&x);
+    }
+
+    pub fn eq_invariant(&self) -> LitVvec {
+        let mut res = LitVvec::new();
+        for (v, eq) in self.eqmap.iter() {
+            let v = self.restore(v.lit());
+            for &e in eq.iter() {
+                res.push(LitVec::from([v, !e]));
+                res.push(LitVec::from([!v, e]));
+            }
+        }
+        res
     }
 }

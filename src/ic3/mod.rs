@@ -7,9 +7,9 @@ use crate::{
 };
 use activity::Activity;
 use frame::{Frame, Frames};
-use giputils::{grc::Grc, hash::GHashMap, logger::IntervalLogger};
+use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, info, trace};
-use logicrs::{Lit, LitOrdVec, LitVec, Var, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use statistic::Statistic;
@@ -96,11 +96,6 @@ impl IC3 {
         if cfg.ic3.inn {
             ts = uts.interal_signals();
         }
-        let mut bad_input = GHashMap::new();
-        for &l in ts.input.iter() {
-            let n = uts.var_next(l, 1);
-            bad_input.insert(n, l);
-        }
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
@@ -183,9 +178,11 @@ impl Engine for IC3 {
 
     fn proof(&mut self) -> Proof {
         let invariants = self.frame.invariant();
-        let invariants = invariants
+        let mut invariants: LitVvec = invariants
             .iter()
-            .map(|l| LitVec::from_iter(l.iter().map(|l| self.rst.restore(*l))));
+            .map(|l| LitVec::from_iter(l.iter().map(|l| self.rst.restore(*l))))
+            .collect();
+        invariants.extend(self.rst.eq_invariant());
         let mut proof = self.ots.clone();
         let mut certifaiger_dnf = vec![];
         for cube in invariants {

@@ -14,6 +14,7 @@ pub mod unroll;
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
+use std::fmt::{self, Display};
 
 pub trait TransysIf {
     fn max_var(&self) -> Var;
@@ -212,5 +213,22 @@ impl Transys {
             }
             unique.insert(n.var());
         }
+    }
+}
+
+impl Display for Transys {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "input: {:?}", self.input)?;
+        for l in self.latch.iter() {
+            if let Some(i) = self.init.get(l) {
+                writeln!(f, "latch {l}, next {}, init {i}", self.next(l.lit()))?;
+            } else {
+                writeln!(f, "latch {l}, next {}", self.var_next(*l))?;
+            }
+        }
+        writeln!(f, "rel:")?;
+        self.rel.fmt(f)?;
+        writeln!(f, "bad: {:?}", self.bad)?;
+        writeln!(f, "constraint: {:?}", self.constraint)
     }
 }

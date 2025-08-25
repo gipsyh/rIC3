@@ -6,6 +6,7 @@ use cadical::Solver;
 use log::{error, info};
 use logicrs::{LitVec, satif::Satif};
 
+#[allow(unused)]
 pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
@@ -32,6 +33,7 @@ pub fn verify_invariant(ts: &TransysCtx, invariants: &[LitVec]) -> bool {
 }
 
 impl IC3 {
+    #[allow(unused)]
     pub(super) fn verify(&mut self) {
         if !self.cfg.certify {
             return;

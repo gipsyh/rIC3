@@ -139,7 +139,9 @@ impl Transys {
         self.bad = self.bad.map(|l| map_fn(l).unwrap_or(l));
         self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
         self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
-        rst.retain(|k| !map.contains_key(&k));
+        for (&x, &y) in map.iter() {
+            rst.replace(x, y);
+        }
     }
 
     pub fn topsort(&mut self, rst: &mut Restore) {
