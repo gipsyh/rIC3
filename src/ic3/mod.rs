@@ -116,10 +116,6 @@ impl IC3 {
             let n = uts.var_next(l, 1);
             bad_input.insert(n, l);
         }
-        for l in ts.latch_no_next() {
-            let n = uts.var_next(l, 1);
-            bad_input.insert(n, l);
-        }
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);

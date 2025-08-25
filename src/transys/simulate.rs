@@ -33,7 +33,7 @@ impl Simulate<'_> {
             self.sim[Var::CONST].push(false);
             let mut block = LitVec::new();
             for &v in self.ts.latch.iter() {
-                let n = self.ts.next(v.lit()).unwrap();
+                let n = self.ts.next(v.lit());
                 let va = self.slv.sat_value(n).unwrap();
                 let na = self.slv.sat_value_lit(n.var()).unwrap();
                 self.sim[v].push(va);
@@ -105,7 +105,7 @@ impl Transys {
             sim[Var::CONST].push(false);
             let mut block = LitVec::new();
             for &v in self.latch.iter() {
-                let n = self.next(v.lit()).unwrap();
+                let n = self.next(v.lit());
                 let va = slv.sat_value(n).unwrap();
                 let na = slv.sat_value_lit(n.var()).unwrap();
                 sim[v].push(va);
@@ -128,7 +128,7 @@ impl Transys {
             sim[Var::CONST].push(false);
             let mut block = LitVec::new();
             for &v in self.latch.iter() {
-                let n = self.next(v.lit()).unwrap();
+                let n = self.next(v.lit());
                 let va = slv.sat_value(n).unwrap();
                 let na = slv.sat_value_lit(n.var()).unwrap();
                 sim[v].push(va);
@@ -177,7 +177,7 @@ impl Transys {
                 simulate.sim[Var::CONST].push(false);
                 let mut block = LitVec::new();
                 for &v in simulate.ts.latch.iter() {
-                    let n = simulate.ts.next(v.lit()).unwrap();
+                    let n = simulate.ts.next(v.lit());
                     let va = simulate.slv.sat_value(n).unwrap();
                     let na = simulate.slv.sat_value_lit(n.var()).unwrap();
                     simulate.sim[v].push(va);

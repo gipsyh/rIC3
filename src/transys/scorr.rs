@@ -1,13 +1,12 @@
-use std::time::Instant;
-
 use crate::{
     config::Config,
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
-use log::info;
+use log::{info, trace};
 use logicrs::{Lit, LitVec, Var, VarLMap, VarVMap, satif::Satif};
+use std::time::Instant;
 
 pub struct Scorr {
     ts: Transys,
@@ -36,27 +35,31 @@ impl Scorr {
     }
 
     fn check_scorr(&mut self, x: Lit, y: Lit) -> bool {
-        if self
+        if !self
             .init_slv
-            .solve_with_constraint(&[], vec![LitVec::from([x, y]), LitVec::from([!x, !y])])
+            .solve_with_restart_limit(&[], vec![LitVec::from([x, y]), LitVec::from([!x, !y])], 10)
+            .is_some_and(|r| !r)
         {
             return false;
         }
-        let xn = self.ts.next(x).unwrap();
+        let xn = self.ts.next(x);
         let yn = if y.var().is_constant() {
             y
         } else {
-            self.ts.next(y).unwrap()
+            self.ts.next(y)
         };
-        !self.ind_slv.solve_with_constraint(
-            &[],
-            vec![
-                LitVec::from([x, !y]),
-                LitVec::from([!x, y]),
-                LitVec::from([xn, yn]),
-                LitVec::from([!xn, !yn]),
-            ],
-        )
+        self.ind_slv
+            .solve_with_restart_limit(
+                &[],
+                vec![
+                    LitVec::from([x, !y]),
+                    LitVec::from([!x, y]),
+                    LitVec::from([xn, yn]),
+                    LitVec::from([!xn, !yn]),
+                ],
+                10,
+            )
+            .is_some_and(|r| !r)
     }
 
     pub fn scorr(mut self) -> (Transys, VarVMap) {
@@ -90,8 +93,8 @@ impl Scorr {
         }
         let mut scorr = VarLMap::new();
         // for eqc in cand.values() {
-        //     if eqc.len() > 1 {
-        //         // dbg!(eqc.len());
+        //     if eqc.len() > 100 {
+        //         dbg!(eqc.len());
         //     }
         // }
         for x in latch {
@@ -113,40 +116,50 @@ impl Scorr {
                 }
                 // println!("check scorr: {x}, {y}");
                 if self.check_scorr(xl, y) {
-                    // dbg!(xl, y);
+                    trace!("scorr: {} -> {}", xl, y);
                     scorr.insert_lit(xl, y);
                     eqc.retain(|l| l.var() != x);
                     break;
                 }
             }
         }
-        // dbg!(self.ts.statistic());
         info!(
             "scorr: eliminates {} latchs out of {} in {:.2}s",
             scorr.len(),
             self.ts.latch.len(),
             start.elapsed().as_secs_f32()
         );
-        let replace = scorr.clone();
-        // for (x, r) in scorr.iter() {
-        //     let mut xn = self.ts.next(x.lit()).unwrap();
-        //     let mut rn = if r.var().is_constant() {
-        //         *r
-        //     } else {
-        //         self.ts.next(*r).unwrap()
-        //     };
-        //     if xn.var() == rn.var() {
-        //         continue;
-        //     }
-        //     if xn.var() < rn.var() {
-        //         (xn, rn) = (rn, xn);
-        //     }
-        //     replace.insert_lit(xn, rn);
-        // }
+        for (x, r) in scorr.clone().iter() {
+            let mut xn = self.ts.next(x.lit());
+            let mut rn = if r.var().is_constant() {
+                *r
+            } else {
+                self.ts.next(*r)
+            };
+            if xn.var() == rn.var() {
+                continue;
+            }
+            if xn.var() < rn.var() {
+                (xn, rn) = (rn, xn);
+            }
+            // dbg!(x, r);
+            // dbg!(xn, rn);
+            // dbg!(self.ts.is_latch(xn.var()));
+            // dbg!(self.ts.is_latch(rn.var()));
+            scorr.insert_lit(xn, rn);
+        }
+        let mut vars: Vec<Var> = scorr.keys().copied().collect();
+        vars.sort();
+        for v in vars {
+            let r = scorr[&v];
+            if let Some(rr) = scorr.map_lit(r) {
+                scorr.insert_lit(v.lit(), rr);
+            }
+        }
         self.ts.latch.retain(|l| !scorr.contains_key(l));
         self.ts.init.retain(|l, _| !scorr.contains_key(l));
         self.ts.next.retain(|l, _| !scorr.contains_key(l));
-        self.ts.replace(&replace, &mut self.rst);
+        self.ts.replace(&scorr, &mut self.rst);
         self.ts.simplify(&mut self.rst);
         info!("scorr: simplified ts: {}", self.ts.statistic());
         (self.ts, self.rst)

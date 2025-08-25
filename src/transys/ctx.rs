@@ -11,7 +11,7 @@ pub struct TransysCtx {
     pub constraint: LitVec,
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
-    next_map: LitMap<Option<Lit>>,
+    next_map: LitMap<Lit>,
     pub max_latch: Var,
 }
 
@@ -51,7 +51,7 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Option<Lit> {
+    fn next(&self, lit: Lit) -> Lit {
         self.next_map[lit]
     }
 
@@ -110,10 +110,9 @@ impl Transys {
         for &v in latch.iter() {
             let l = v.lit();
             is_latch[v] = true;
-            if let Some(n) = self.next(l) {
-                next_map[l] = Some(n);
-                next_map[!l] = Some(!n);
-            }
+            let n = self.next(l);
+            next_map[l] = n;
+            next_map[!l] = !n;
             if let Some(i) = self.init.get(&v).copied() {
                 init_map[v] = Some(i);
                 if let Some(i) = i.try_constant() {

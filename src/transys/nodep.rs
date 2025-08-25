@@ -33,9 +33,7 @@ impl NoDepTransys {
             if let Some(i) = self.init(l) {
                 frozens.push(i.var());
             }
-            if let Some(n) = self.var_next(l) {
-                frozens.push(n);
-            }
+            frozens.push(self.var_next(l));
         }
         for c in self.constraint.iter() {
             frozens.push(c.var());
@@ -91,8 +89,8 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Option<Lit> {
-        self.next.get(&lit.var()).map(|l| l.not_if(!lit.polarity()))
+    fn next(&self, lit: Lit) -> Lit {
+        self.next.get(&lit.var()).unwrap().not_if(!lit.polarity())
     }
 
     #[inline]

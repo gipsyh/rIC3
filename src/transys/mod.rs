@@ -34,7 +34,7 @@ pub trait TransysIf {
         panic!("Error: is_latch not support");
     }
 
-    fn next(&self, lit: Lit) -> Option<Lit>;
+    fn next(&self, lit: Lit) -> Lit;
 
     fn init(&self, latch: Var) -> Option<Lit>;
 
@@ -42,22 +42,14 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
-    fn latch_had_next(&self) -> impl Iterator<Item = Var> {
-        self.latch().filter(|&v| self.var_next(v).is_some())
-    }
-
-    fn latch_no_next(&self) -> impl Iterator<Item = Var> {
-        self.latch().filter(|&v| self.var_next(v).is_none())
-    }
-
     #[inline]
-    fn var_next(&self, var: Var) -> Option<Var> {
-        self.next(var.lit()).map(|l| l.var())
+    fn var_next(&self, var: Var) -> Var {
+        self.next(var.lit()).var()
     }
 
     #[inline]
     fn lits_next<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
-        lits.into_iter().filter_map(|l| self.next(*l)).collect()
+        lits.into_iter().map(|l| self.next(*l)).collect()
     }
 
     fn inits(&self) -> LitVvec {
@@ -155,8 +147,13 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Option<Lit> {
-        self.next.get(&lit.var()).map(|l| l.not_if(!lit.polarity()))
+    fn is_latch(&self, v: Var) -> bool {
+        self.next.contains_key(&v)
+    }
+
+    #[inline]
+    fn next(&self, lit: Lit) -> Lit {
+        self.next.get(&lit.var()).unwrap().not_if(!lit.polarity())
     }
 
     fn init(&self, latch: Var) -> Option<Lit> {

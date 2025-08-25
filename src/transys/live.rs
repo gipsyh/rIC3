@@ -8,16 +8,16 @@ impl Transys {
     pub fn l2s(&self) -> Self {
         let mut l2s = self.clone();
         let mut nls = Vec::new();
-        for _ in self.latch_had_next() {
+        for _ in self.latch() {
             let nl = l2s.new_var();
             nls.push(nl);
             l2s.add_latch(nl, None, nl.lit());
         }
         let mut eqs = Vec::new();
         let mut eqns = Vec::new();
-        for (l, nl) in self.latch_had_next().zip(nls.iter()) {
+        for (l, nl) in self.latch().zip(nls.iter()) {
             eqs.push(l2s.rel.new_xnor(l.lit(), nl.lit()));
-            eqns.push(l2s.rel.new_xnor(self.next(l.lit()).unwrap(), nl.lit()));
+            eqns.push(l2s.rel.new_xnor(self.next(l.lit()), nl.lit()));
         }
         let eq = l2s.rel.new_and(eqs);
         let eqn = l2s.rel.new_and(eqns);

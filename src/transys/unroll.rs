@@ -51,9 +51,8 @@ impl<T: TransysIf> TransysUnroll<T> {
         assert!(self.num_unroll == 0);
         let mut connect = GHashMap::new();
         for v in self.ts.latch() {
-            if let Some(n) = self.ts.next(v.lit())
-                && !connect.contains_key(&n.var())
-            {
+            let n = self.ts.next(v.lit());
+            if !connect.contains_key(&n.var()) {
                 self.max_var += 1;
                 let c = self.max_var;
                 connect.insert(n.var(), c);
@@ -134,9 +133,9 @@ impl<T: TransysIf> TransysUnroll<T> {
         self.next_map[false_lit].push(false_lit);
         self.next_map[!false_lit].push(!false_lit);
         if self.connect.is_none() {
-            for l in self.ts.latch_had_next() {
+            for l in self.ts.latch() {
                 let l = l.lit();
-                let next = self.lit_next(self.ts.next(l).unwrap(), self.num_unroll);
+                let next = self.lit_next(self.ts.next(l), self.num_unroll);
                 self.next_map[l].push(next);
                 self.next_map[!l].push(!next);
             }
@@ -153,9 +152,9 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
         if let Some((connect, crel)) = self.connect.as_mut() {
             let mut cr = LitVvec::new();
-            for l in self.ts.latch_had_next() {
+            for l in self.ts.latch() {
                 let l = l.lit();
-                let n = self.ts.next(l).unwrap();
+                let n = self.ts.next(l);
                 let c = connect[&n.var()];
                 let n1 = self.next_map[n][self.num_unroll];
                 let n2 = self.next_map[l][self.num_unroll + 1];

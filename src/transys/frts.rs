@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use giputils::hash::GHashMap;
-use log::{debug, info};
+use log::{debug, info, trace};
 use logicrs::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify};
 use rand::{SeedableRng, rngs::StdRng};
 use std::time::Instant;
@@ -81,7 +81,7 @@ impl FrTs {
                 continue;
             };
             let lv = v.lit();
-            debug!("frts: checking var {m} with lit {v}");
+            trace!("frts: checking var {m} with lit {v}");
             match self.solver.solve_with_restart_limit(
                 &[],
                 vec![LitVec::from([m, lv]), LitVec::from([!m, !lv])],
