@@ -33,10 +33,10 @@ impl BMC {
         };
         ts.load_init(solver.as_mut());
         let step = if cfg.bmc.dyn_step {
-            (2000_000 / *ts.max_var()).max(1)
+            (10_000_000 / (*ts.max_var() as u32 as usize + ts.rel.clauses().len())).max(1)
         } else {
-            cfg.step
-        } as usize;
+            cfg.step as usize
+        };
         Self {
             uts,
             step,
