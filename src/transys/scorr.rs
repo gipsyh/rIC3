@@ -98,7 +98,7 @@ impl Scorr {
         }
         let mut scorr = VarLMap::new();
         // for eqc in cand.values() {
-        //     if eqc.len() > 100 {
+        //     if eqc.len() > 200 {
         //         dbg!(eqc.len());
         //     }
         // }
@@ -110,10 +110,10 @@ impl Scorr {
             } else {
                 panic!();
             };
-            if eqc.len() > 100 {
-                continue;
-            }
             for i in 0..eqc.len() {
+                if i > (10000 / eqc.len()).max(1) {
+                    break;
+                }
                 if start.elapsed().as_secs() > self.cfg.scorr_tl {
                     info!("scorr: timeout");
                     break 'm;

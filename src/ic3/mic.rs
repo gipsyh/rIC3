@@ -1,6 +1,7 @@
 use super::IC3;
 use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
+use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
 use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
@@ -223,8 +224,9 @@ impl IC3 {
         } else {
             self.activity.sort_by_activity(&mut cube, true);
         }
-        let parent = self.frame.parent_lemma(&cube, frame);
-        if let Some(parent) = parent {
+        if self.cfg.ic3.parent_lemma
+            && let Some(parent) = self.frame.parent_lemma(&cube, frame)
+        {
             let parent = GHashSet::from_iter(parent);
             cube.sort_by_key(|x| parent.contains(x));
         }
@@ -276,9 +278,12 @@ impl IC3 {
         constraint: &[LitVec],
         mic_type: MicType,
     ) -> LitVec {
-        match mic_type {
+        let mic_olen = cube.len();
+        let r = match mic_type {
             MicType::NoMic => cube,
             MicType::DropVar(parameter) => self.mic_by_drop_var(frame, cube, constraint, parameter),
-        }
+        };
+        trace!("mic from {} to {} len", mic_olen, r.len());
+        r
     }
 }

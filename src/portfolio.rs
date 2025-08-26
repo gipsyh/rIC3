@@ -67,7 +67,7 @@ impl Portfolio {
             engines.push(engine);
         };
         new_engine("-e ic3");
-        new_engine("-e ic3 --ic3-ctg=false");
+        new_engine("-e ic3 --ic3-ctg=false --frts=false --scorr=false");
         new_engine("-e ic3 --ic3-ctp --rseed 5");
         new_engine("-e ic3 --ic3-abs-cst --rseed 55");
         new_engine("-e ic3 --ic3-abs-cst --ic3-abs-trans");
@@ -80,7 +80,7 @@ impl Portfolio {
         new_engine("-e bmc --step 1");
         new_engine("-e bmc --step 10");
         new_engine("-e bmc --bmc-kissat --step 70");
-        new_engine("-e bmc --bmc-kissat --step 135");
+        new_engine("-e bmc --bmc-kissat --bmc-dyn-step");
         new_engine("-e kind --step 1");
         let ps = PortfolioState::new(engines.len());
         Self {

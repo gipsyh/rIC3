@@ -13,6 +13,7 @@ pub struct BMC {
     solver: Box<dyn Satif>,
     solver_k: usize,
     rst: Restore,
+    step: usize,
 }
 
 impl BMC {
@@ -31,8 +32,14 @@ impl BMC {
             Box::new(cadical::Solver::new())
         };
         ts.load_init(solver.as_mut());
+        let step = if cfg.bmc.dyn_step {
+            (2000_000 / *ts.max_var()).max(1)
+        } else {
+            cfg.step
+        } as usize;
         Self {
             uts,
+            step,
             cfg,
             solver,
             solver_k: 0,
@@ -63,8 +70,7 @@ impl BMC {
 
 impl Engine for BMC {
     fn check(&mut self) -> Option<bool> {
-        let step = self.cfg.step as usize;
-        for k in (self.cfg.start..=self.cfg.end).step_by(step) {
+        for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let mut assump = self.uts.lits_next(&self.uts.ts.bad.cube(), k);

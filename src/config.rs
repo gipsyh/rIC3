@@ -126,6 +126,10 @@ pub struct IC3Config {
     /// ic3 with abstract array
     #[arg(long = "ic3-abs-array", default_value_t = false)]
     pub abs_array: bool,
+
+    /// ic3 with finding parent lemma in mic
+    #[arg(long = "ic3-parent-lemma", action = ArgAction::Set, default_value_t = true)]
+    pub parent_lemma: bool,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -133,9 +137,12 @@ pub struct BMCConfig {
     /// bmc single step time limit
     #[arg(long = "bmc-time-limit")]
     pub time_limit: Option<u64>,
-    /// use kissat solver, otherwise cadical
+    /// use kissat solver in bmc, otherwise cadical
     #[arg(long = "bmc-kissat", default_value_t = false)]
     pub bmc_kissat: bool,
+    /// bmc dynamic step
+    #[arg(long = "bmc-dyn-step", default_value_t = false)]
+    pub dyn_step: bool,
 }
 
 #[derive(Args, Clone, Debug)]

@@ -23,7 +23,6 @@ impl Simulate<'_> {
             if self.sim.bv_len() >= self.num_word * BitVec::WORD_SIZE {
                 return;
             }
-            self.slv.clear_phase();
             if !self
                 .slv
                 .solve_with_param(&assump, vec![], self.domain.iter().copied(), Some(5))
@@ -56,7 +55,6 @@ impl Transys {
         let mut sim = VarBitVec::new();
         sim.reserve(self.max_var());
         while sim.bv_len() < num_word * BitVec::WORD_SIZE {
-            slv.clear_phase();
             if !slv.solve(&[]) {
                 break;
             }
@@ -156,6 +154,7 @@ impl Transys {
             let block = self.lits_next(block.iter());
             slv.add_clause(&block);
         }
+        slv.cfg.phase_saving = false;
         let domain: Vec<_> = self.next.values().map(|l| l.var()).collect();
         let mut simulate = Simulate {
             ts: self,
