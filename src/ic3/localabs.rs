@@ -39,16 +39,7 @@ impl LocalAbs {
         let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         uts.load_trans(solver.as_mut(), 0, !cfg.ic3.abs_cst);
         uts.ts.load_init(solver.as_mut());
-
-        let mut opt = GHashMap::new();
-        if let Some((connect, _)) = uts.connect.as_ref() {
-            opt = connect.clone();
-        }
-        if let Some((copt, _)) = uts.optcst.as_ref() {
-            for (k, v) in copt.iter() {
-                opt.insert(*k, *v);
-            }
-        }
+        let opt = uts.opt.clone();
         let opt_rev: GHashMap<Var, Var> = opt.iter().map(|(k, v)| (*v, *k)).collect();
         for r in refine.iter() {
             if let Some(o) = opt.get(r) {
