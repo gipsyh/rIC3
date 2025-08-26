@@ -154,11 +154,14 @@ pub struct PreprocessConfig {
     #[arg(long = "frts", action = ArgAction::Set, default_value_t = true)]
     pub frts: bool,
     /// frts time limit in seconds
-    #[arg(long = "frts-tl", default_value_t = 1800)]
+    #[arg(long = "frts-tl", default_value_t = 1000)]
     pub frts_tl: u64,
     /// scorr
     #[arg(long = "scorr", action = ArgAction::Set, default_value_t = true)]
     pub scorr: bool,
+    /// scorr time limit in seconds
+    #[arg(long = "scorr-tl", default_value_t = 200)]
+    pub scorr_tl: u64,
 }
 
 #[derive(Args, Clone, Debug)]

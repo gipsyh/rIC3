@@ -87,7 +87,7 @@ impl Restore {
 
     #[inline]
     pub fn map_var(&mut self, map: impl Fn(Var) -> Var) {
-        self.init_var = self.init_var.map(|v| map(v));
+        self.init_var = self.init_var.map(&map);
         self.vmap.map_key(map);
     }
 
@@ -129,12 +129,12 @@ impl Restore {
         res
     }
 
-    pub fn init_var(&self) -> Var {
-        self.init_var.unwrap()
-    }
+    // pub fn init_var(&self) -> Var {
+    //     self.init_var.unwrap()
+    // }
 
-    pub fn set_init_var(&mut self, iv: Var) {
-        assert!(self.init_var.is_none());
-        self.init_var = Some(iv);
-    }
+    // pub fn set_init_var(&mut self, iv: Var) {
+    //     assert!(self.init_var.is_none());
+    //     self.init_var = Some(iv);
+    // }
 }

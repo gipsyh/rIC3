@@ -126,11 +126,11 @@ impl Transys {
             ts.simplify(&mut rst);
             info!("trivial simplified ts: {}", ts.statistic());
             if cfg.scorr {
-                let scorr = Scorr::new(ts, &cfg, rst);
+                let scorr = Scorr::new(ts, cfg, rst);
                 (ts, rst) = scorr.scorr();
             }
             if cfg.frts {
-                let frts = FrTs::new(ts, &cfg, rst);
+                let frts = FrTs::new(ts, cfg, rst);
                 (ts, rst) = frts.fr();
             }
         }

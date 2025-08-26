@@ -13,10 +13,11 @@ pub struct Scorr {
     rst: Restore,
     init_slv: DagCnfSolver,
     ind_slv: DagCnfSolver,
+    cfg: PreprocessConfig,
 }
 
 impl Scorr {
-    pub fn new(ts: Transys, _cfg: &PreprocessConfig, rst: Restore) -> Self {
+    pub fn new(ts: Transys, cfg: &PreprocessConfig, rst: Restore) -> Self {
         let mut ind_slv = DagCnfSolver::new(&ts.rel);
         for c in ts.constraint.iter() {
             ind_slv.add_clause(&[*c]);
@@ -31,14 +32,15 @@ impl Scorr {
             rst,
             ind_slv,
             init_slv,
+            cfg: cfg.clone(),
         }
     }
 
     fn check_scorr(&mut self, x: Lit, y: Lit) -> bool {
-        if !self
+        if self
             .init_slv
             .solve_with_restart_limit(&[], vec![LitVec::from([x, y]), LitVec::from([!x, !y])], 10)
-            .is_some_and(|r| !r)
+            .is_none_or(|r| r)
         {
             return false;
         }
@@ -100,7 +102,7 @@ impl Scorr {
         //         dbg!(eqc.len());
         //     }
         // }
-        for x in latch {
+        'm: for x in latch {
             let (eqc, xl) = if let Some(eqc) = cand.get_mut(&rt[x]) {
                 (eqc, x.lit())
             } else if let Some(eqc) = cand.get_mut(&rt.val(!x.lit())) {
@@ -112,12 +114,16 @@ impl Scorr {
                 continue;
             }
             for i in 0..eqc.len() {
+                if start.elapsed().as_secs() > self.cfg.scorr_tl {
+                    info!("scorr: timeout");
+                    break 'm;
+                }
                 let y = eqc[i];
                 if y.var() >= x {
                     break;
                 }
                 if self.check_scorr(xl, y) {
-                    trace!("scorr: {} -> {}", xl, y);
+                    trace!("scorr: {xl} -> {y}");
                     scorr.insert_lit(xl, y);
                     eqc.retain(|l| l.var() != x);
                     break;

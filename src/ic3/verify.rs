@@ -4,10 +4,10 @@ use crate::{
 };
 use cadical::Solver;
 use log::{error, info};
-use logicrs::{LitVec, Var, satif::Satif};
+use logicrs::{LitVec, satif::Satif};
 
 #[allow(unused)]
-pub fn verify_invariant(ts: &TransysCtx, mut invariants: Vec<LitVec>, is_init: Var) -> bool {
+pub fn verify_invariant(ts: &TransysCtx, mut invariants: &[LitVec]) -> bool {
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
     ts.load_init(&mut solver);
@@ -18,7 +18,6 @@ pub fn verify_invariant(ts: &TransysCtx, mut invariants: Vec<LitVec>, is_init: V
     }
     let mut solver = Solver::new();
     ts.load_trans(&mut solver, true);
-    invariants.push(LitVec::from([is_init.lit()]));
     for lemma in invariants.iter() {
         solver.add_clause(&!lemma);
     }
@@ -40,11 +39,13 @@ impl IC3 {
             return;
         }
         let invariants = self.frame.invariant();
-        let num_inv = invariants.len();
-        if !verify_invariant(&self.tsctx, invariants, self.rst.init_var()) {
+        if !verify_invariant(&self.tsctx, &invariants) {
             error!("invariant varify failed");
             panic!();
         }
-        info!("inductive invariant verified with {num_inv} lemmas!");
+        info!(
+            "inductive invariant verified with {} lemmas!",
+            invariants.len()
+        );
     }
 }

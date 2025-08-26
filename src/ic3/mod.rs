@@ -55,7 +55,7 @@ impl IC3 {
 
     fn extend(&mut self) {
         let nl = self.solvers.len();
-        debug!("extending IC3 to level {}", nl);
+        debug!("extending IC3 to level {nl}");
         let solver = self.inf_solver.clone();
         self.solvers.push(solver);
         self.frame.push(Frame::new());
@@ -76,8 +76,6 @@ impl IC3 {
                 self.ts.add_init(i.var(), Lit::constant(i.polarity()));
                 self.tsctx.add_init(i.var(), Lit::constant(i.polarity()));
             }
-        } else {
-            self.solvers[nl].add_clause(&[!self.rst.init_var().lit()]);
         }
     }
 
@@ -90,15 +88,11 @@ impl IC3 {
 
 impl IC3 {
     pub fn new(cfg: Config, ts: Transys) -> Self {
-        let mut ots = ts.clone();
-        let ots_iv = ots.add_init_var();
+        let ots = ts.clone();
         let rst = Restore::new(&ts);
         let rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
-        let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
-        let init_var = ts.add_init_var();
-        rst.add_restore(init_var, ots_iv);
-        rst.set_init_var(init_var);
+        let (mut ts, rst) = ts.preproc(&cfg.preproc, rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
