@@ -7,6 +7,7 @@ use crate::{
 use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, info};
 use logicrs::{LitVec, Var, satif::Satif};
+use rand::seq::SliceRandom;
 
 pub struct LocalAbs {
     refine: GHashSet<Var>,
@@ -119,6 +120,7 @@ impl IC3 {
                 assump.push(v.lit());
             }
         }
+        assump.shuffle(&mut self.rng);
         if let Some(assump) = self.localabs.check(assump) {
             // debug!("checking witness with {} refines", assump.len());
             // let mut i = 0;

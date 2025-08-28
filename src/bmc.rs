@@ -5,6 +5,7 @@ use crate::{
 };
 use log::info;
 use logicrs::{LitVec, satif::Satif};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub struct BMC {
@@ -14,10 +15,12 @@ pub struct BMC {
     solver_k: usize,
     rst: Restore,
     step: usize,
+    rng: StdRng,
 }
 
 impl BMC {
     pub fn new(cfg: Config, ts: Transys) -> Self {
+        let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
@@ -31,6 +34,7 @@ impl BMC {
         } else {
             Box::new(cadical::Solver::new())
         };
+        solver.set_seed(rng.random());
         ts.load_init(solver.as_mut());
         let step = if cfg.bmc.dyn_step {
             (10_000_000 / (*ts.max_var() as u32 as usize + ts.rel.clauses().len())).max(1)
@@ -44,6 +48,7 @@ impl BMC {
             solver,
             solver_k: 0,
             rst,
+            rng,
         }
     }
 
@@ -61,6 +66,7 @@ impl BMC {
         } else {
             Box::new(cadical::Solver::new())
         };
+        self.solver.set_seed(self.rng.random());
         self.uts.ts.load_init(self.solver.as_mut());
         for i in 0..self.solver_k {
             self.uts.load_trans(self.solver.as_mut(), i, true);

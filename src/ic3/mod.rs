@@ -11,7 +11,7 @@ use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use statistic::Statistic;
 use std::time::Instant;
 
@@ -90,7 +90,7 @@ impl IC3 {
     pub fn new(cfg: Config, ts: Transys) -> Self {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
-        let rng = StdRng::seed_from_u64(cfg.rseed);
+        let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
         let (mut ts, rst) = ts.preproc(&cfg.preproc, rst);
         let mut uts = TransysUnroll::new(&ts);
@@ -101,7 +101,8 @@ impl IC3 {
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
-        let inf_solver = TransysSolver::new(&tsctx, true);
+        let mut inf_solver = TransysSolver::new(&tsctx, true);
+        inf_solver.dcs.set_rseed(rng.random());
         let lift = TransysSolver::new(&tsctx, false);
         let localabs = LocalAbs::new(&ts, &cfg);
         Self {
