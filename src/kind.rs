@@ -114,6 +114,14 @@ impl Engine for Kind {
             panic!();
         }
         let mut ts = self.ots.clone();
+        let eqi = self.rst.eq_invariant();
+        let mut certifaiger_dnf = vec![];
+        for cube in eqi {
+            certifaiger_dnf.push(ts.rel.new_and(cube));
+        }
+        certifaiger_dnf.extend(ts.bad);
+        let invariants = ts.rel.new_or(certifaiger_dnf);
+        ts.bad = LitVec::from(invariants);
         if !ts.constraint.is_empty() {
             ts.constraint = LitVec::from([ts.rel.new_and(ts.constraint)]);
         }
