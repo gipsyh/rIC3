@@ -21,7 +21,7 @@ impl Kind {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
-        ts = ts.remove_gate_init();
+        ts = ts.remove_gate_init(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
@@ -241,6 +241,11 @@ impl Engine for Kind {
             wit.input.push(w);
             let mut w = LitVec::new();
             for l in self.uts.ts.latch() {
+                if let Some(iv) = self.rst.init_var()
+                    && iv == l
+                {
+                    continue;
+                }
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
                 if let Some(v) = self.solver.sat_value(kl) {

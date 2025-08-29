@@ -129,12 +129,12 @@ impl Restore {
         res
     }
 
-    // pub fn init_var(&self) -> Var {
-    //     self.init_var.unwrap()
-    // }
+    pub fn init_var(&self) -> Option<Var> {
+        self.init_var
+    }
 
-    // pub fn set_init_var(&mut self, iv: Var) {
-    //     assert!(self.init_var.is_none());
-    //     self.init_var = Some(iv);
-    // }
+    pub fn set_init_var(&mut self, iv: Var) {
+        assert!(self.init_var.is_none());
+        self.init_var = Some(iv);
+    }
 }
