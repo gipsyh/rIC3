@@ -1,4 +1,5 @@
 use clap::{ArgAction, Args, Parser, ValueEnum};
+use log::error;
 use std::path::PathBuf;
 
 /// rIC3 model checker
@@ -63,6 +64,18 @@ pub struct Config {
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,
+}
+
+impl Config {
+    pub fn validate(&self) {
+        match self.engine {
+            Engine::IC3 => self.ic3.validate(),
+            Engine::BMC => {}
+            Engine::Kind => {}
+            Engine::Rlive => {}
+            Engine::Portfolio => {}
+        }
+    }
 }
 
 #[derive(Copy, Clone, ValueEnum, Debug)]
@@ -130,6 +143,15 @@ pub struct IC3Config {
     /// ic3 with finding parent lemma in mic
     #[arg(long = "ic3-parent-lemma", action = ArgAction::Set, default_value_t = true)]
     pub parent_lemma: bool,
+}
+
+impl IC3Config {
+    pub fn validate(&self) {
+        if self.dynamic && self.drop_po {
+            error!("cannot enable both ic3-dynamic and ic3-drop-po");
+            panic!();
+        }
+    }
 }
 
 #[derive(Args, Clone, Debug)]

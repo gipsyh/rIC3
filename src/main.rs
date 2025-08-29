@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .init();
     fs::create_dir_all("/tmp/rIC3")?;
     let mut cfg = Config::parse();
+    cfg.validate();
     cfg.model = cfg.model.canonicalize()?;
     info!("the model to be checked: {}", cfg.model.display());
     if let config::Engine::Portfolio = cfg.engine {
