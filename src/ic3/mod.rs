@@ -230,6 +230,9 @@ impl Engine for IC3 {
             }
             b = bad.next.clone();
         }
+        for s in res.state.iter_mut() {
+            *s = self.rst.restore_eq_state(s);
+        }
         res
     }
 

@@ -137,4 +137,16 @@ impl Restore {
         assert!(self.init_var.is_none());
         self.init_var = Some(iv);
     }
+
+    pub fn restore_eq_state(&self, s: &LitVec) -> LitVec {
+        let mut res = s.clone();
+        for l in s.iter() {
+            if let Some(eq) = self.eqmap.get(&l.var()) {
+                for &el in eq.iter() {
+                    res.push(el.not_if(!l.polarity()));
+                }
+            }
+        }
+        res
+    }
 }

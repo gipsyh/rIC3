@@ -254,6 +254,9 @@ impl Engine for Kind {
             }
             wit.state.push(w);
         }
+        for s in wit.state.iter_mut() {
+            *s = self.rst.restore_eq_state(s);
+        }
         wit
     }
 }
