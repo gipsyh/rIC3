@@ -20,31 +20,22 @@ use logicrs::{
 use std::{
     collections::BTreeMap,
     fmt::Display,
+    mem::take,
     path::Path,
     process::{Command, exit},
 };
 
-impl WlTransys {
-    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, Term>) {
-        let mut rst = GHashMap::new();
-        for i in btor.input.iter() {
-            rst.insert(i.clone(), i.clone());
+impl From<&Btor> for WlTransys {
+    fn from(btor: &Btor) -> Self {
+        Self {
+            input: btor.input.clone(),
+            latch: btor.latch.clone(),
+            init: btor.init.clone(),
+            next: btor.next.clone(),
+            bad: btor.bad.clone(),
+            constraint: btor.constraint.clone(),
+            justice: Default::default(),
         }
-        for l in btor.latch.iter() {
-            rst.insert(l.clone(), l.clone());
-        }
-        (
-            Self {
-                input: btor.input.clone(),
-                latch: btor.latch.clone(),
-                init: btor.init.clone(),
-                next: btor.next.clone(),
-                bad: btor.bad.clone(),
-                constraint: btor.constraint.clone(),
-                justice: Default::default(),
-            },
-            rst,
-        )
     }
 }
 
@@ -71,6 +62,7 @@ pub struct BtorFrontend {
     wb_rst: GHashMap<Term, Term>,
     // bitblast restore
     bb_rst: GHashMap<Var, (Term, usize)>,
+    no_next: GHashSet<Term>,
 }
 
 impl BtorFrontend {
@@ -92,7 +84,15 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let (wts, wb_rst) = WlTransys::from_btor(&btor);
+        let mut wts = WlTransys::from(&btor);
+        let mut wb_rst = GHashMap::new();
+        for i in wts.input.iter() {
+            wb_rst.insert(i.clone(), i.clone());
+        }
+        for l in wts.latch.iter() {
+            wb_rst.insert(l.clone(), l.clone());
+        }
+        let no_next = wts.remove_no_next_latch();
         Self {
             btor,
             owts: wts.clone(),
@@ -100,6 +100,7 @@ impl BtorFrontend {
             _cfg: cfg.clone(),
             wb_rst,
             bb_rst: GHashMap::new(),
+            no_next,
         }
     }
 }
@@ -163,7 +164,7 @@ impl Frontend for BtorFrontend {
         Box::new(btor)
     }
 
-    fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
+    fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), "b0".to_string()];
         let mut idmap = GHashMap::new();
         let mut no_next = GHashSet::new();
@@ -174,6 +175,17 @@ impl Frontend for BtorFrontend {
             idmap.insert(l.clone(), id);
             if !self.btor.next.contains_key(l) {
                 no_next.insert(l.clone());
+            }
+        }
+        for i in 0..witness.len() {
+            let input = take(&mut witness.input[i]);
+            for l in input {
+                let (w, _) = &self.bb_rst[&l.var()];
+                if self.no_next.contains(w) {
+                    witness.state[i].push(l);
+                } else {
+                    witness.input[i].push(l);
+                }
             }
         }
         let mut init = BTreeMap::new();

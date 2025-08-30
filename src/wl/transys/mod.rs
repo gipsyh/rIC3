@@ -2,7 +2,9 @@ mod bitblast;
 mod preproc;
 mod simplify;
 
-use giputils::hash::GHashMap;
+use std::mem::take;
+
+use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::Term;
 
 #[derive(Clone, Debug, Default)]
@@ -26,6 +28,19 @@ impl WlTransys {
     #[inline]
     pub fn next(&self, term: &Term) -> Term {
         self.next.get(term).unwrap().clone()
+    }
+
+    pub fn remove_no_next_latch(&mut self) -> GHashSet<Term> {
+        let mut no_next = GHashSet::new();
+        for l in take(&mut self.latch) {
+            if self.next.contains_key(&l) {
+                self.latch.push(l.clone());
+            } else {
+                no_next.insert(l.clone());
+                self.input.push(l);
+            }
+        }
+        no_next
     }
 }
 
