@@ -84,7 +84,8 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let mut wts = WlTransys::from(&btor);
+        let owts = WlTransys::from(&btor);
+        let mut wts = owts.clone();
         let mut wb_rst = GHashMap::new();
         for i in wts.input.iter() {
             wb_rst.insert(i.clone(), i.clone());
@@ -95,7 +96,7 @@ impl BtorFrontend {
         let no_next = wts.remove_no_next_latch();
         Self {
             btor,
-            owts: wts.clone(),
+            owts,
             wts,
             _cfg: cfg.clone(),
             wb_rst,
@@ -166,6 +167,11 @@ impl Frontend for BtorFrontend {
         }
         for c in ts.constraint() {
             btor.constraint.push(map_lit(c));
+        }
+        for (l, n) in new_latch {
+            let init = ts.init(l).map(|l| map_lit(l));
+            let next = map_lit(ts.next(l.lit()));
+            btor.add_latch(n, init, next);
         }
         Box::new(Btor::from(&btor))
     }
