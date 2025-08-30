@@ -147,6 +147,8 @@ impl Restore {
                 }
             }
         }
+        res.sort();
+        res.dedup();
         res
     }
 }

@@ -103,6 +103,11 @@ impl Scorr {
         //     }
         // }
         'm: for x in latch {
+            if let Some(n) = self.ts.init.get(&x)
+                && !n.var().is_constant()
+            {
+                continue;
+            }
             let (eqc, xl) = if let Some(eqc) = cand.get_mut(&rt[x]) {
                 (eqc, x.lit())
             } else if let Some(eqc) = cand.get_mut(&rt.val(!x.lit())) {
