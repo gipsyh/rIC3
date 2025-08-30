@@ -30,6 +30,15 @@ impl WlTransys {
         self.next.get(term).unwrap().clone()
     }
 
+    pub fn add_latch(&mut self, latch: Term, init: Option<Term>, next: Term) {
+        debug_assert!(!self.next.contains_key(&latch));
+        self.latch.push(latch.clone());
+        if let Some(init) = init {
+            self.init.insert(latch.clone(), init);
+        }
+        self.next.insert(latch, next);
+    }
+
     pub fn remove_no_next_latch(&mut self) -> GHashSet<Term> {
         let mut no_next = GHashSet::new();
         for l in take(&mut self.latch) {

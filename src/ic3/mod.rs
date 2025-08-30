@@ -223,7 +223,7 @@ impl Engine for IC3 {
                     .lemma
                     .iter()
                     .chain(bad.input.iter())
-                    .filter(|l| iv.map_or(true, |v| l.var() != v))
+                    .filter(|l| iv.is_none_or(|v| l.var() != v))
                     .map(|l| self.rst.restore(*l))
                     .collect();
                 let (input, state) = self.ots.exact_init_state(&assump);
@@ -233,14 +233,14 @@ impl Engine for IC3 {
                 res.state.push(
                     bad.lemma
                         .iter()
-                        .filter(|l| iv.map_or(true, |v| l.var() != v))
+                        .filter(|l| iv.is_none_or(|v| l.var() != v))
                         .map(|l| self.rst.restore(*l))
                         .collect(),
                 );
                 res.input.push(
                     bad.input
                         .iter()
-                        .filter(|l| iv.map_or(true, |v| l.var() != v))
+                        .filter(|l| iv.is_none_or(|v| l.var() != v))
                         .map(|l| self.rst.restore(*l))
                         .collect(),
                 );

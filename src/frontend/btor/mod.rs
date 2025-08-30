@@ -15,10 +15,10 @@ use giputils::{
 use log::{debug, error, warn};
 use logicrs::{
     Lit, Var,
-    fol::{Term, op},
+    fol::{Sort, Term, op},
 };
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, hash_map::Entry},
     fmt::Display,
     mem::take,
     path::Path,
@@ -121,7 +121,7 @@ impl Frontend for BtorFrontend {
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
         let ts = proof.proof;
-        let mut btor = self.btor.clone();
+        let mut btor = self.owts.clone();
         btor.bad.clear();
         btor.constraint.clear();
         let mut map: GHashMap<Var, Term> = GHashMap::new();
@@ -130,7 +130,13 @@ impl Frontend for BtorFrontend {
             let (w, b) = &self.bb_rst[&i];
             map.insert(i, w.slice(*b, *b));
         }
+        let mut new_latch = Vec::new();
         for l in ts.latch() {
+            if let Entry::Vacant(e) = self.bb_rst.entry(l) {
+                let nl = Term::new_var(Sort::Bv(1));
+                e.insert((nl.clone(), 0));
+                new_latch.push((l, nl));
+            }
             let (w, b) = &self.bb_rst[&l];
             map.insert(l, w.slice(*b, *b));
         }
@@ -161,7 +167,7 @@ impl Frontend for BtorFrontend {
         for c in ts.constraint() {
             btor.constraint.push(map_lit(c));
         }
-        Box::new(btor)
+        Box::new(Btor::from(&btor))
     }
 
     fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
