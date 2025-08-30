@@ -58,8 +58,8 @@ pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
     _cfg: Config,
-    // wordlevel restore
-    wb_rst: GHashMap<Term, Term>,
+    // // wordlevel restore
+    // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
     bb_rst: GHashMap<Var, (Term, usize)>,
     no_next: GHashSet<Term>,
@@ -86,20 +86,20 @@ impl BtorFrontend {
         }
         let owts = WlTransys::from(&btor);
         let mut wts = owts.clone();
-        let mut wb_rst = GHashMap::new();
-        for i in wts.input.iter() {
-            wb_rst.insert(i.clone(), i.clone());
-        }
-        for l in wts.latch.iter() {
-            wb_rst.insert(l.clone(), l.clone());
-        }
+        // let mut wb_rst = GHashMap::new();
+        // for i in wts.input.iter() {
+        //     wb_rst.insert(i.clone(), i.clone());
+        // }
+        // for l in wts.latch.iter() {
+        //     wb_rst.insert(l.clone(), l.clone());
+        // }
         let no_next = wts.remove_no_next_latch();
         Self {
             btor,
             owts,
             wts,
             _cfg: cfg.clone(),
-            wb_rst,
+            // wb_rst,
             bb_rst: GHashMap::new(),
             no_next,
         }
@@ -109,10 +109,13 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> bl::Transys {
         let mut wts = self.wts.clone();
-        wts.coi_refine(&mut self.wb_rst);
+        wts.coi_refine();
         wts.simplify();
-        wts.coi_refine(&mut self.wb_rst);
-        let (bitblast, bb_rst) = wts.bitblast();
+        wts.coi_refine();
+        let (mut bitblast, bb_rst) = wts.bitblast();
+        bitblast.coi_refine();
+        // bitblast.simplify();
+        // bitblast.coi_refine();
         let (ts, bbl_rst) = bitblast.lower_to_ts();
         for (k, v) in bbl_rst {
             self.bb_rst.insert(k, bb_rst[&v].clone());
