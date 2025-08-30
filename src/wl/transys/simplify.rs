@@ -10,6 +10,7 @@ impl WlTransys {
             .iter()
             .chain(self.bad.iter())
             .chain(self.justice.iter())
+            .chain(self.init.values())
             .cloned()
             .collect();
         let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
@@ -21,11 +22,6 @@ impl WlTransys {
                         && touch.insert(n.clone())
                     {
                         queue.push(n.clone());
-                    }
-                    if let Some(i) = self.init.get(&t)
-                        && touch.insert(i.clone())
-                    {
-                        queue.push(i.clone());
                     }
                 }
                 TermType::Op(op) => {
