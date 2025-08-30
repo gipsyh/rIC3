@@ -115,6 +115,9 @@ impl Transys {
         self.coi_refine(rst);
         let frozens = self.frozens();
         self.rel = self.rel.simplify(frozens.iter().copied());
+        self.constraint.retain(|l| !l.is_constant(true));
+        self.constraint.sort();
+        self.constraint.dedup();
         self.rearrange(rst);
     }
 }
