@@ -21,7 +21,7 @@ impl Kind {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
-        ts = ts.remove_gate_init(&mut rst);
+        ts.remove_gate_init(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {

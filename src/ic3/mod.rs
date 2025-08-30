@@ -92,7 +92,8 @@ impl IC3 {
         let rst = Restore::new(&ts);
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
-        let (mut ts, rst) = ts.preproc(&cfg.preproc, rst);
+        let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
+        ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
@@ -181,6 +182,10 @@ impl Engine for IC3 {
 
     fn proof(&mut self) -> Proof {
         let mut proof = self.ots.clone();
+        if let Some(iv) = self.rst.init_var() {
+            let piv = proof.add_init_var();
+            self.rst.add_restore(iv, piv);
+        }
         let invariants = self.frame.invariant();
         let mut invariants: LitVvec = invariants
             .iter()

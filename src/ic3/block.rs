@@ -98,9 +98,8 @@ impl IC3 {
                         continue;
                     }
                 } else if po.frame > 0 {
-                    let mut lemma = po.lemma.cube().clone();
-                    lemma.extend(po.input.iter().copied());
-                    debug_assert!(!self.solvers[0].solve(&lemma));
+                    let lemma = po.lemma.cube();
+                    debug_assert!(!self.solvers[0].solve(lemma));
                 } else {
                     self.add_obligation(po.clone());
                     return BlockResult::Failure;

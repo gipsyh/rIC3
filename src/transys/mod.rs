@@ -214,6 +214,12 @@ impl Transys {
             unique.insert(n.var());
         }
     }
+
+    pub fn add_init_var(&mut self) -> Var {
+        let iv = self.new_var();
+        self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        iv
+    }
 }
 
 impl Display for Transys {

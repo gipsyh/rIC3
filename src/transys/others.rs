@@ -80,8 +80,7 @@ impl Transys {
         (input, state)
     }
 
-    pub fn remove_gate_init(&self, rst: &mut Restore) -> Self {
-        let mut res = self.clone();
+    pub fn remove_gate_init(&mut self, rst: &mut Restore) {
         let mut init = GHashMap::new();
         let mut eq = Vec::new();
         for l in self.input().chain(self.latch()) {
@@ -94,18 +93,17 @@ impl Transys {
             }
         }
         if eq.is_empty() {
-            return res;
+            return;
         }
-        res.init = init;
-        let iv = res.new_var();
+        self.init = init;
+        let iv = self.add_init_var();
         rst.set_init_var(iv);
-        res.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
         for (v, i) in eq {
-            let e = res.rel.new_xnor(v.lit(), i);
-            let c = res.rel.new_imply(iv.lit(), e);
-            res.constraint.push(c);
+            let e = self.rel.new_xnor(v.lit(), i);
+            let c = self.rel.new_imply(iv.lit(), e);
+            self.constraint.push(c);
+            // rst.add_custom_constraint(c);
         }
-        res
     }
 
     pub fn map(&mut self, map: impl Fn(Var) -> Var + Copy, rst: &mut Restore) {

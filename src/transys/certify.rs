@@ -52,6 +52,7 @@ pub struct Restore {
     vmap: VarVMap,
     eqmap: GHashMap<Var, LitVec>,
     init_var: Option<Var>,
+    custom_cst: LitVec,
 }
 
 impl Restore {
@@ -60,6 +61,7 @@ impl Restore {
             vmap: VarVMap::new_self_map(ts.max_var()),
             eqmap: GHashMap::default(),
             init_var: None,
+            custom_cst: LitVec::new(),
         }
     }
 
@@ -150,5 +152,9 @@ impl Restore {
         res.sort();
         res.dedup();
         res
+    }
+
+    pub fn add_custom_constraint(&mut self, gi: Lit) {
+        self.custom_cst.push(gi);
     }
 }
