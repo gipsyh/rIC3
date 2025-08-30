@@ -216,22 +216,34 @@ impl Engine for IC3 {
         let b = self.obligations.peak().unwrap();
         assert!(b.frame == 0);
         let mut b = Some(b);
+        let iv = self.rst.init_var();
         while let Some(bad) = b {
             if bad.frame == 0 {
                 let assump: Vec<_> = bad
                     .lemma
                     .iter()
                     .chain(bad.input.iter())
+                    .filter(|l| iv.map_or(true, |v| l.var() != v))
                     .map(|l| self.rst.restore(*l))
                     .collect();
                 let (input, state) = self.ots.exact_init_state(&assump);
                 res.state.push(state);
                 res.input.push(input);
             } else {
-                res.state
-                    .push(bad.lemma.iter().map(|l| self.rst.restore(*l)).collect());
-                res.input
-                    .push(bad.input.iter().map(|l| self.rst.restore(*l)).collect());
+                res.state.push(
+                    bad.lemma
+                        .iter()
+                        .filter(|l| iv.map_or(true, |v| l.var() != v))
+                        .map(|l| self.rst.restore(*l))
+                        .collect(),
+                );
+                res.input.push(
+                    bad.input
+                        .iter()
+                        .filter(|l| iv.map_or(true, |v| l.var() != v))
+                        .map(|l| self.rst.restore(*l))
+                        .collect(),
+                );
             }
             b = bad.next.clone();
         }
