@@ -15,10 +15,7 @@ use giputils::{
 use log::{debug, error, warn};
 use logicrs::{
     Lit, Var,
-    fol::{
-        Term,
-        op::{Ands, Ors},
-    },
+    fol::{Term, op},
 };
 use std::{
     collections::BTreeMap,
@@ -146,13 +143,13 @@ impl Frontend for BtorFrontend {
                     if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(Term::new_op(
-                            Ands,
+                        r.push(Term::new_op_fold(
+                            op::And,
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = Term::new_op(Ors, r);
+                let n = Term::new_op_fold(op::Or, r);
                 map.insert(v, n);
             }
         }
