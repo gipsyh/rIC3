@@ -189,7 +189,7 @@ impl Engine for IC3 {
         let mut invariants = self.frame.invariant();
         for c in self.ts.constraint.clone() {
             proof.rel.migrate(&self.ts.rel, c.var(), &mut self.rst.vmap);
-            invariants.push(LitVec::from(c));
+            invariants.push(LitVec::from(!c));
         }
         let mut invariants: LitVvec = invariants
             .iter()
