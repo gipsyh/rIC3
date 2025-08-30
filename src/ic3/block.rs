@@ -138,7 +138,7 @@ impl IC3 {
                         const EXCTG_THRESHOLD: f64 = 40.0;
                         let (limit, max, level) = match act {
                             EXCTG_THRESHOLD.. => {
-                                let limit = ((act - EXCTG_THRESHOLD).powf(0.3) * 2.0 + 5.0).round()
+                                let limit = ((act - EXCTG_THRESHOLD).powf(0.45) * 2.0 + 5.0).round()
                                     as usize;
                                 (limit, 5, 1)
                             }
