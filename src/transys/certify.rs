@@ -49,7 +49,7 @@ pub struct Proof {
 
 #[derive(Debug, Clone)]
 pub struct Restore {
-    vmap: VarVMap,
+    pub(crate) vmap: VarVMap,
     eqmap: GHashMap<Var, LitVec>,
     init_var: Option<Var>,
     custom_cst: LitVec,
@@ -67,6 +67,10 @@ impl Restore {
 
     pub fn restore(&self, l: Lit) -> Lit {
         self.vmap.lit_map(l).unwrap()
+    }
+
+    pub fn try_restore(&self, l: Lit) -> Option<Lit> {
+        self.vmap.lit_map(l)
     }
 
     pub fn restore_var(&self, v: Var) -> Var {

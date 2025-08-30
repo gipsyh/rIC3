@@ -186,7 +186,11 @@ impl Engine for IC3 {
             let piv = proof.add_init_var();
             self.rst.add_restore(iv, piv);
         }
-        let invariants = self.frame.invariant();
+        let mut invariants = self.frame.invariant();
+        for c in self.ts.constraint.clone() {
+            proof.rel.migrate(&self.ts.rel, c.var(), &mut self.rst.vmap);
+            invariants.push(LitVec::from(c));
+        }
         let mut invariants: LitVvec = invariants
             .iter()
             .map(|l| LitVec::from_iter(l.iter().map(|l| self.rst.restore(*l))))
@@ -197,14 +201,8 @@ impl Engine for IC3 {
             certifaiger_dnf.push(proof.rel.new_and(cube));
         }
         let invariants = proof.rel.new_or(certifaiger_dnf);
-        let constrains: Vec<_> = proof
-            .constraint
-            .iter()
-            .map(|e| !*e)
-            .chain(proof.bad.iter().copied())
-            .collect();
-        let constrains = proof.rel.new_or(constrains);
-        proof.bad = LitVec::from(proof.rel.new_or([invariants, constrains]));
+        let bad = proof.rel.new_or(proof.bad);
+        proof.bad = LitVec::from(proof.rel.new_or([invariants, bad]));
         Proof { proof }
     }
 

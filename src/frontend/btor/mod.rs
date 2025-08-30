@@ -169,7 +169,7 @@ impl Frontend for BtorFrontend {
             btor.constraint.push(map_lit(c));
         }
         for (l, n) in new_latch {
-            let init = ts.init(l).map(|l| map_lit(l));
+            let init = ts.init(l).map(map_lit);
             let next = map_lit(ts.next(l.lit()));
             btor.add_latch(n, init, next);
         }
