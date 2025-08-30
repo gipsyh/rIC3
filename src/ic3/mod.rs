@@ -93,12 +93,12 @@ impl IC3 {
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
-        ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.ic3.inn {
             ts = uts.interal_signals();
         }
+        ts.remove_gate_init(&mut rst);
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
