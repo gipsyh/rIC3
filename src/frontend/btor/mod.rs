@@ -191,8 +191,8 @@ impl Frontend for BtorFrontend {
         wts.coi_refine();
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
-        let (mut bitblast, bb_rst) = wts.bitblast();
-        bitblast.coi_refine();
+        let (bitblast, bb_rst) = wts.bitblast();
+        // bitblast.coi_refine();
         // bitblast.simplify();
         // bitblast.coi_refine();
         let (ts, bbl_rst) = bitblast.lower_to_ts();

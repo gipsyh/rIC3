@@ -44,6 +44,7 @@ impl WlTransys {
             if self.next.contains_key(&l) {
                 self.latch.push(l.clone());
             } else {
+                assert!(!self.init.contains_key(&l));
                 no_next.insert(l.clone());
                 self.input.push(l);
             }

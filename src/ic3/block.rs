@@ -114,7 +114,7 @@ impl IC3 {
             }
             debug!("{}", self.frame.statistic(false));
             po.bump_act();
-            if self.cfg.ic3.drop_po && po.act > 10.0 {
+            if self.cfg.ic3.drop_po && po.act > 30.0 {
                 continue;
             }
             let blocked_start = Instant::now();
