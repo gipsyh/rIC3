@@ -53,12 +53,10 @@ impl From<&WlTransys> for Btor {
 }
 
 pub struct BtorFrontend {
-    btor: Btor,
-    #[allow(unused)]
     owts: WlTransys,
     wts: WlTransys,
     _cfg: Config,
-    // // wordlevel restore
+    // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
     bb_rst: GHashMap<Var, (Term, usize)>,
@@ -95,7 +93,6 @@ impl BtorFrontend {
         // }
         let no_next = wts.remove_no_next_latch();
         Self {
-            btor,
             owts,
             wts,
             _cfg: cfg.clone(),
@@ -183,12 +180,12 @@ impl Frontend for BtorFrontend {
         let mut res = vec!["sat".to_string(), "b0".to_string()];
         let mut idmap = GHashMap::new();
         let mut no_next = GHashSet::new();
-        for (id, i) in self.btor.input.iter().enumerate() {
+        for (id, i) in self.owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);
         }
-        for (id, l) in self.btor.latch.iter().enumerate() {
+        for (id, l) in self.owts.latch.iter().enumerate() {
             idmap.insert(l.clone(), id);
-            if !self.btor.next.contains_key(l) {
+            if !self.owts.next.contains_key(l) {
                 no_next.insert(l.clone());
             }
         }
@@ -208,7 +205,7 @@ impl Frontend for BtorFrontend {
             let (w, b) = &self.bb_rst[&i.var()];
             let lid = idmap[w];
             init.entry(lid)
-                .or_insert_with(|| BitVec::new_with(w.sort().bv(), false))
+                .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
                 .set(*b, i.polarity());
         }
         if !init.is_empty() {
@@ -226,7 +223,7 @@ impl Frontend for BtorFrontend {
                         let id = idmap[w];
                         state
                             .entry(id)
-                            .or_insert_with(|| BitVec::new_with(w.sort().bv(), false))
+                            .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
                             .set(*b, i.polarity());
                     }
                 }
@@ -243,7 +240,7 @@ impl Frontend for BtorFrontend {
                 let id = idmap[w];
                 input
                     .entry(id)
-                    .or_insert_with(|| BitVec::new_with(w.sort().bv(), false))
+                    .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
                     .set(*b, i.polarity());
             }
             res.push(format!("@{t}"));
