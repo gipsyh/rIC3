@@ -121,8 +121,15 @@ impl BtorFrontend {
 }
 
 impl BtorFrontend {
-    fn restore_state(&self, state: &[Lit], only_no_next: bool) -> Vec<String> {
+    fn restore_state(&self, state: &[Lit], only_no_next: bool, init: bool) -> Vec<String> {
         let mut map = GHashMap::new();
+        if init {
+            for (l, i) in self.owts.init.iter() {
+                if let Some(c) = i.try_bv_const() {
+                    map.insert(l.clone(), Value::BV(Into::<BitVec>::into(c)));
+                }
+            }
+        }
         for l in state.iter() {
             let (w, b) = &self.bb_rst[&l.var()];
             if only_no_next && !self.no_next.contains(w) {
@@ -184,8 +191,8 @@ impl Frontend for BtorFrontend {
         wts.coi_refine();
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
-        let (bitblast, bb_rst) = wts.bitblast();
-        // bitblast.coi_refine();
+        let (mut bitblast, bb_rst) = wts.bitblast();
+        bitblast.coi_refine();
         // bitblast.simplify();
         // bitblast.coi_refine();
         let (ts, bbl_rst) = bitblast.lower_to_ts();
@@ -258,20 +265,20 @@ impl Frontend for BtorFrontend {
                 }
             }
         }
-        let init = self.restore_state(&witness.state[0], false);
+        let init = self.restore_state(&witness.state[0], false, true);
         if !init.is_empty() {
             res.push("#0".to_string());
             res.extend(init);
         }
         for t in 0..witness.len() {
             if t > 0 {
-                let state = self.restore_state(&witness.state[t], true);
+                let state = self.restore_state(&witness.state[t], true, false);
                 if !state.is_empty() {
                     res.push(format!("#{t}"));
                     res.extend(state);
                 }
             }
-            let input = self.restore_state(&witness.input[t], false);
+            let input = self.restore_state(&witness.input[t], false, false);
             res.push(format!("@{t}"));
             res.extend(input);
         }
