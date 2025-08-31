@@ -210,18 +210,12 @@ impl Frontend for AigFrontend {
     }
 
     fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
-        let wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
+        let mut wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string(), "b".to_string()];
-        let assump: Vec<_> = wit.state[0]
-            .iter()
-            .chain(wit.input[0].iter())
-            .copied()
-            .collect();
-        let (input, state) = self.ots.exact_init_state(&assump);
-
+        wit.exact_init_state(&self.ots);
         let mut line = String::new();
         let mut lbstate = Vec::new();
-        for l in state.iter() {
+        for l in wit.state[0].iter() {
             lbstate.push(Lbool::from(l.polarity()));
             line.push(if l.polarity() { '1' } else { '0' })
         }
@@ -230,7 +224,7 @@ impl Frontend for AigFrontend {
         let mut simulate = TernarySimulate::new(&self.oaig, lbstate);
         let mut lbinput = Vec::new();
         let mut line = String::new();
-        for i in input.iter() {
+        for i in wit.input[0].iter() {
             lbinput.push(Lbool::from(i.polarity()));
             line.push(if i.polarity() { '1' } else { '0' })
         }

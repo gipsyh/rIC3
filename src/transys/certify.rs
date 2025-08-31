@@ -1,6 +1,6 @@
 use crate::transys::{Transys, TransysIf};
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap};
+use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 
 #[derive(Clone, Debug, Default)]
 pub struct Witness {
@@ -39,6 +39,27 @@ impl Witness {
             res.state.extend(witness.state);
         }
         res
+    }
+
+    pub fn exact_init_state(&mut self, ts: &impl TransysIf) {
+        let assump: Vec<_> = self.state[0]
+            .iter()
+            .chain(self.input[0].iter())
+            .copied()
+            .collect();
+        let mut solver = cadical::Solver::new();
+        ts.load_init(&mut solver);
+        ts.load_trans(&mut solver, true);
+        assert!(solver.solve(&assump));
+        let mut state = LitVec::new();
+        for l in ts.latch() {
+            state.push(solver.sat_value_lit(l).unwrap());
+        }
+        let mut input = LitVec::new();
+        for i in ts.input() {
+            input.push(solver.sat_value_lit(i).unwrap());
+        }
+        (self.input[0], self.state[0]) = (input, state);
     }
 }
 

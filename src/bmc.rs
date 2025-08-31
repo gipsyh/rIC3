@@ -9,6 +9,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub struct BMC {
+    ots: Transys,
     uts: TransysUnroll<NoDepTransys>,
     cfg: Config,
     solver: Box<dyn Satif>,
@@ -20,6 +21,7 @@ pub struct BMC {
 
 impl BMC {
     pub fn new(cfg: Config, ts: Transys) -> Self {
+        let ots = ts.clone();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
@@ -42,6 +44,7 @@ impl BMC {
             cfg.step as usize
         };
         Self {
+            ots,
             uts,
             step,
             cfg,
@@ -136,6 +139,7 @@ impl Engine for BMC {
         for s in wit.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
+        wit.exact_init_state(&self.ots);
         wit
     }
 }

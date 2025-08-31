@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, VarLMap, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarLMap};
 use std::mem::take;
 
 impl Transys {
@@ -62,22 +62,6 @@ impl Transys {
         for &l in other.justice.iter() {
             self.justice.push(lmap(l));
         }
-    }
-
-    pub fn exact_init_state(&self, assump: &[Lit]) -> (LitVec, LitVec) {
-        let mut solver = cadical::Solver::new();
-        self.load_init(&mut solver);
-        self.load_trans(&mut solver, true);
-        assert!(solver.solve(assump));
-        let mut state = LitVec::new();
-        for l in self.latch() {
-            state.push(solver.sat_value_lit(l).unwrap());
-        }
-        let mut input = LitVec::new();
-        for i in self.input() {
-            input.push(solver.sat_value_lit(i).unwrap());
-        }
-        (input, state)
     }
 
     pub fn remove_gate_init(&mut self, rst: &mut Restore) {
