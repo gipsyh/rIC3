@@ -4,7 +4,7 @@ use logicrs::fol::{Term, TermType};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
-    pub fn coi_refine(&mut self) {
+    pub fn coi_refine(&mut self, const_init: bool) {
         let mut queue: Vec<_> = self
             .constraint
             .iter()
@@ -14,7 +14,7 @@ impl WlTransys {
             .collect();
         for l in self.latch.iter() {
             if let Some(init) = self.init.get(l)
-                && !init.is_const()
+                && (!init.is_const() || const_init)
             {
                 queue.push(init.clone());
                 queue.push(l.clone());

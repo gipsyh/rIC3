@@ -179,15 +179,15 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> bl::Transys {
         let mut wts = self.wts.clone();
-        wts.coi_refine();
+        wts.coi_refine(false);
         wts.simplify();
-        wts.coi_refine();
+        wts.coi_refine(false);
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
-        let (bitblast, bb_rst) = wts.bitblast();
-        // bitblast.coi_refine();
+        let (mut bitblast, bb_rst) = wts.bitblast();
+        bitblast.coi_refine(true);
         // bitblast.simplify();
-        // bitblast.coi_refine();
+        // bitblast.coi_refine(true);
         let (ts, bbl_rst) = bitblast.lower_to_ts();
         for (k, v) in bbl_rst {
             self.rst.bb_rst.insert(k, bb_rst[&v].clone());
