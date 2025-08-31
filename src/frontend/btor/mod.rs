@@ -182,8 +182,8 @@ impl Frontend for BtorFrontend {
         wts.coi_refine();
         wts.simplify();
         wts.coi_refine();
-        // let btor = Btor::from(&wts);
-        // btor.to_file("simp.btor");
+        let btor = Btor::from(&wts);
+        btor.to_file("simp.btor");
         let (bitblast, bb_rst) = wts.bitblast();
         // bitblast.coi_refine();
         // bitblast.simplify();
@@ -199,7 +199,6 @@ impl Frontend for BtorFrontend {
         let ts = proof.proof;
         let mut btor = self.owts.clone();
         btor.bad.clear();
-        btor.constraint.clear();
         let mut map: GHashMap<Var, Term> = GHashMap::new();
         map.insert(Var::CONST, Term::bool_const(false));
         for i in ts.input() {
@@ -237,9 +236,6 @@ impl Frontend for BtorFrontend {
         let map_lit = |l: Lit| map[&l.var()].not_if(!l.polarity());
         for &b in ts.bad.iter() {
             btor.bad.push(map_lit(b));
-        }
-        for c in ts.constraint() {
-            btor.constraint.push(map_lit(c));
         }
         for (l, n) in new_latch {
             let init = ts.init(l).map(map_lit);
