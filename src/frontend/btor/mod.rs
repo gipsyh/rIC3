@@ -15,7 +15,10 @@ use giputils::{
 use log::{debug, error, warn};
 use logicrs::{
     Lit, Var,
-    fol::{Sort, Term, Value, op},
+    fol::{
+        Sort, Term, Value,
+        op::{self, Read},
+    },
 };
 use std::{
     collections::hash_map::Entry,
@@ -152,6 +155,20 @@ impl BtorFrontend {
         res.sort();
         res.into_iter().map(|(_, v)| v).collect()
     }
+
+    fn bb_get_term(&self, i: Var) -> Term {
+        let (w, b) = &self.bb_rst[&i];
+        match w.sort() {
+            Sort::Bv(_) => w.slice(*b, *b),
+            Sort::Array(idxw, elew) => {
+                let idx = b / elew;
+                let eidx = b % elew;
+                let read_idx = Term::bv_const_from_usize(idx, idxw);
+                let read = Term::new_op(Read, [w.clone(), read_idx]);
+                read.slice(eidx, eidx)
+            }
+        }
+    }
 }
 
 impl Frontend for BtorFrontend {
@@ -181,8 +198,7 @@ impl Frontend for BtorFrontend {
         let mut map: GHashMap<Var, Term> = GHashMap::new();
         map.insert(Var::CONST, Term::bool_const(false));
         for i in ts.input() {
-            let (w, b) = &self.bb_rst[&i];
-            map.insert(i, w.slice(*b, *b));
+            map.insert(i, self.bb_get_term(i));
         }
         let mut new_latch = Vec::new();
         for l in ts.latch() {
@@ -191,8 +207,7 @@ impl Frontend for BtorFrontend {
                 e.insert((nl.clone(), 0));
                 new_latch.push((l, nl));
             }
-            let (w, b) = &self.bb_rst[&l];
-            map.insert(l, w.slice(*b, *b));
+            map.insert(l, self.bb_get_term(l));
         }
         for (v, rel) in ts.rel.iter() {
             if ts.rel.has_rel(v) && !v.is_constant() {
