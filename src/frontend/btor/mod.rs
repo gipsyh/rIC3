@@ -5,7 +5,7 @@ use crate::{
     Proof, Witness,
     config::Config,
     transys::{self as bl, TransysIf},
-    wl::transys::WlTransys,
+    wl::transys::{WlTransys, certify::Restore},
 };
 use btor::Btor;
 use giputils::{
@@ -67,9 +67,9 @@ pub struct BtorFrontend {
     // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
-    bb_rst: GHashMap<Var, (Term, usize)>,
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
+    rst: Restore,
 }
 
 impl BtorFrontend {
@@ -100,22 +100,15 @@ impl BtorFrontend {
             idmap.insert(l.clone(), id);
         }
         let mut wts = owts.clone();
-        // let mut wb_rst = GHashMap::new();
-        // for i in wts.input.iter() {
-        //     wb_rst.insert(i.clone(), i.clone());
-        // }
-        // for l in wts.latch.iter() {
-        //     wb_rst.insert(l.clone(), l.clone());
-        // }
-        let no_next = wts.remove_no_next_latch();
+        let mut rst = Restore::new();
+        let no_next = wts.remove_no_next_latch(&mut rst);
         Self {
             owts,
             wts,
             _cfg: cfg.clone(),
-            // wb_rst,
-            bb_rst: GHashMap::new(),
             idmap,
             no_next,
+            rst,
         }
     }
 }
@@ -131,7 +124,7 @@ impl BtorFrontend {
             }
         }
         for l in state.iter() {
-            let (w, b) = &self.bb_rst[&l.var()];
+            let (w, b) = &self.rst.bb_rst[&l.var()];
             if only_no_next && !self.no_next.contains(w) {
                 continue;
             }
@@ -169,7 +162,7 @@ impl BtorFrontend {
     }
 
     fn bb_get_term(&self, i: Var) -> Term {
-        let (w, b) = &self.bb_rst[&i];
+        let (w, b) = &self.rst.bb_rst[&i];
         match w.sort() {
             Sort::Bv(_) => w.slice(*b, *b),
             Sort::Array(idxw, elew) => {
@@ -197,7 +190,7 @@ impl Frontend for BtorFrontend {
         // bitblast.coi_refine();
         let (ts, bbl_rst) = bitblast.lower_to_ts();
         for (k, v) in bbl_rst {
-            self.bb_rst.insert(k, bb_rst[&v].clone());
+            self.rst.bb_rst.insert(k, bb_rst[&v].clone());
         }
         ts
     }
@@ -213,7 +206,7 @@ impl Frontend for BtorFrontend {
         }
         let mut new_latch = Vec::new();
         for l in ts.latch() {
-            if let Entry::Vacant(e) = self.bb_rst.entry(l) {
+            if let Entry::Vacant(e) = self.rst.bb_rst.entry(l) {
                 let nl = Term::new_var(Sort::Bv(1));
                 e.insert((nl.clone(), 0));
                 new_latch.push((l, nl));
@@ -255,9 +248,12 @@ impl Frontend for BtorFrontend {
     fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), "b0".to_string()];
         for i in 0..witness.len() {
+            if let Some(iv) = self.rst.init_var() {
+                witness.state[i].retain(|l| self.rst.bb_rst[&l.var()].0 != iv);
+            }
             let input = take(&mut witness.input[i]);
             for l in input {
-                let (w, _) = &self.bb_rst[&l.var()];
+                let (w, _) = &self.rst.bb_rst[&l.var()];
                 if self.no_next.contains(w) {
                     witness.state[i].push(l);
                 } else {
