@@ -10,9 +10,16 @@ impl WlTransys {
             .iter()
             .chain(self.bad.iter())
             .chain(self.justice.iter())
-            .chain(self.init.values())
             .cloned()
             .collect();
+        for l in self.latch.iter() {
+            if let Some(init) = self.init.get(l)
+                && !init.is_const()
+            {
+                queue.push(init.clone());
+                queue.push(l.clone());
+            }
+        }
         let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
         while let Some(t) = queue.pop() {
             match &t.deref() {

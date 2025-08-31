@@ -2,10 +2,9 @@ mod bitblast;
 mod preproc;
 mod simplify;
 
-use std::mem::take;
-
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::Term;
+use std::mem::take;
 
 #[derive(Clone, Debug, Default)]
 pub struct WlTransys {
