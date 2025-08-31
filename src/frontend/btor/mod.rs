@@ -15,10 +15,10 @@ use giputils::{
 use log::{debug, error, warn};
 use logicrs::{
     Lit, Var,
-    fol::{Sort, Term, op},
+    fol::{Sort, Term, Value, op},
 };
 use std::{
-    collections::{BTreeMap, hash_map::Entry},
+    collections::hash_map::Entry,
     fmt::Display,
     mem::take,
     path::Path,
@@ -60,6 +60,7 @@ pub struct BtorFrontend {
     // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
     bb_rst: GHashMap<Var, (Term, usize)>,
+    idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
 }
 
@@ -83,6 +84,13 @@ impl BtorFrontend {
             todo!()
         }
         let owts = WlTransys::from(&btor);
+        let mut idmap = GHashMap::new();
+        for (id, i) in owts.input.iter().enumerate() {
+            idmap.insert(i.clone(), id);
+        }
+        for (id, l) in owts.latch.iter().enumerate() {
+            idmap.insert(l.clone(), id);
+        }
         let mut wts = owts.clone();
         // let mut wb_rst = GHashMap::new();
         // for i in wts.input.iter() {
@@ -98,8 +106,51 @@ impl BtorFrontend {
             _cfg: cfg.clone(),
             // wb_rst,
             bb_rst: GHashMap::new(),
+            idmap,
             no_next,
         }
+    }
+}
+
+impl BtorFrontend {
+    fn restore_state(&self, state: &[Lit], only_no_next: bool) -> Vec<String> {
+        let mut map = GHashMap::new();
+        for l in state.iter() {
+            let (w, b) = &self.bb_rst[&l.var()];
+            if only_no_next && !self.no_next.contains(w) {
+                continue;
+            }
+            let sort = w.sort();
+            let entry = map
+                .entry(w.clone())
+                .or_insert_with(|| Value::default_from(&w.sort()));
+            match entry {
+                Value::BV(bv) => bv.set(*b, l.polarity()),
+                Value::Array(array) => {
+                    let (_, e_len) = sort.array();
+                    let idx = *b / e_len;
+                    array
+                        .entry(idx)
+                        .or_insert_with(|| BitVec::new_with(e_len, false))
+                        .set(*b % e_len, l.polarity());
+                }
+            }
+        }
+        let mut res = Vec::new();
+        for (t, v) in map {
+            let id = self.idmap[&t];
+            match &v {
+                Value::BV(bv) => res.push((self.idmap[&t], format!("{id} {bv:b}"))),
+                Value::Array(array) => {
+                    let (i_len, _) = t.sort().array();
+                    for (i, bv) in array.iter() {
+                        res.push((self.idmap[&t], format!("{id} [{:0i_len$b}] {bv:b}", *i)));
+                    }
+                }
+            };
+        }
+        res.sort();
+        res.into_iter().map(|(_, v)| v).collect()
     }
 }
 
@@ -178,17 +229,6 @@ impl Frontend for BtorFrontend {
 
     fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), "b0".to_string()];
-        let mut idmap = GHashMap::new();
-        let mut no_next = GHashSet::new();
-        for (id, i) in self.owts.input.iter().enumerate() {
-            idmap.insert(i.clone(), id);
-        }
-        for (id, l) in self.owts.latch.iter().enumerate() {
-            idmap.insert(l.clone(), id);
-            if !self.owts.next.contains_key(l) {
-                no_next.insert(l.clone());
-            }
-        }
         for i in 0..witness.len() {
             let input = take(&mut witness.input[i]);
             for l in input {
@@ -200,53 +240,22 @@ impl Frontend for BtorFrontend {
                 }
             }
         }
-        let mut init = BTreeMap::new();
-        for i in witness.state[0].iter() {
-            let (w, b) = &self.bb_rst[&i.var()];
-            let lid = idmap[w];
-            init.entry(lid)
-                .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
-                .set(*b, i.polarity());
-        }
+        let init = self.restore_state(&witness.state[0], false);
         if !init.is_empty() {
             res.push("#0".to_string());
-            for (i, v) in init {
-                res.push(format!("{i} {v:b}"));
-            }
+            res.extend(init);
         }
         for t in 0..witness.len() {
             if t > 0 {
-                let mut state = BTreeMap::new();
-                for i in witness.state[t].iter() {
-                    let (w, b) = &self.bb_rst[&i.var()];
-                    if no_next.contains(w) {
-                        let id = idmap[w];
-                        state
-                            .entry(id)
-                            .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
-                            .set(*b, i.polarity());
-                    }
-                }
+                let state = self.restore_state(&witness.state[t], true);
                 if !state.is_empty() {
                     res.push(format!("#{t}"));
-                    for (i, v) in state {
-                        res.push(format!("{i} {v:b}"));
-                    }
+                    res.extend(state);
                 }
             }
-            let mut input = BTreeMap::new();
-            for i in witness.input[t].iter() {
-                let (w, b) = &self.bb_rst[&i.var()];
-                let id = idmap[w];
-                input
-                    .entry(id)
-                    .or_insert_with(|| BitVec::new_with(w.sort().size(), false))
-                    .set(*b, i.polarity());
-            }
+            let input = self.restore_state(&witness.input[t], false);
             res.push(format!("@{t}"));
-            for (i, v) in input {
-                res.push(format!("{i} {v:b}"));
-            }
+            res.extend(input);
         }
         res.push(".\n".to_string());
         Box::new(res.join("\n"))
