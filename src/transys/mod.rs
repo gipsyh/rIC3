@@ -56,7 +56,7 @@ pub trait TransysIf {
 
     fn inits(&self) -> LitVvec {
         let mut cnf = LitVvec::new();
-        for l in self.input().chain(self.latch()) {
+        for l in self.latch() {
             if let Some(i) = self.init(l) {
                 if let Some(i) = i.try_constant() {
                     cnf.push(LitVec::from([l.lit().not_if(!i)]));

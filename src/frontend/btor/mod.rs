@@ -30,6 +30,11 @@ use std::{
 
 impl From<&Btor> for WlTransys {
     fn from(btor: &Btor) -> Self {
+        assert!(
+            btor.input
+                .iter()
+                .all(|i| !btor.init.contains_key(&i) && !btor.next.contains_key(&i))
+        );
         Self {
             input: btor.input.clone(),
             latch: btor.latch.clone(),
