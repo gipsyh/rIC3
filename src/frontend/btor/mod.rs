@@ -198,6 +198,13 @@ impl Frontend for BtorFrontend {
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
         let ts = proof.proof;
         let mut btor = self.owts.clone();
+        if let Some(iv) = self.rst.init_var() {
+            btor.add_latch(
+                iv.clone(),
+                Some(Term::bool_const(true)),
+                Term::bool_const(false),
+            );
+        }
         btor.bad.clear();
         let mut map: GHashMap<Var, Term> = GHashMap::new();
         map.insert(Var::CONST, Term::bool_const(false));
