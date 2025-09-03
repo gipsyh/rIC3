@@ -1,6 +1,7 @@
 mod analyze;
 mod cdb;
 mod domain;
+mod eq;
 mod lift;
 mod propagate;
 mod search;
@@ -9,6 +10,7 @@ mod statistic;
 mod ts;
 mod vsids;
 
+use crate::gipsat::eq::Eqc;
 use analyze::Analyze;
 pub use cdb::ClauseKind;
 use cdb::{CREF_NONE, CRef, ClauseDB};
@@ -23,6 +25,7 @@ use rand::Rng;
 use rand::{SeedableRng, rngs::StdRng};
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
+use std::iter::empty;
 use std::time::Instant;
 pub use ts::*;
 use vsids::Vsids;
@@ -41,6 +44,7 @@ pub struct DagCnfSolver {
     phase_saving: VarMap<Lbool>,
     analyze: Analyze,
     simplify: Simplify,
+    eqc: Eqc,
     unsat_core: LitSet,
     domain: Domain,
     temporary_domain: bool,
@@ -50,6 +54,7 @@ pub struct DagCnfSolver {
     trivial_unsat: bool,
     mark: LitSet,
     rng: StdRng,
+    pub cfg: Config,
 
     assump: LitVec,
     constraint: Vec<LitVec>,
@@ -57,8 +62,19 @@ pub struct DagCnfSolver {
     statistic: SolverStatistic,
 }
 
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub phase_saving: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { phase_saving: true }
+    }
+}
+
 impl DagCnfSolver {
-    pub fn new(dc: &DagCnf, rseed: u64) -> Self {
+    pub fn new(dc: &DagCnf) -> Self {
         let constrain_act = Var::CONST;
         let mut solver = Self {
             dc: dc.clone(),
@@ -74,6 +90,7 @@ impl DagCnfSolver {
             phase_saving: Default::default(),
             analyze: Default::default(),
             simplify: Default::default(),
+            eqc: Default::default(),
             unsat_core: Default::default(),
             domain: Domain::new(),
             temporary_domain: Default::default(),
@@ -83,7 +100,8 @@ impl DagCnfSolver {
             constraint: Default::default(),
             statistic: Default::default(),
             trivial_unsat: false,
-            rng: StdRng::seed_from_u64(rseed),
+            rng: StdRng::seed_from_u64(0),
+            cfg: Default::default(),
             mark: Default::default(),
         };
         while solver.num_var() < solver.dc.num_var() {
@@ -96,48 +114,51 @@ impl DagCnfSolver {
         solver
     }
 
-    fn simplify_clause(&mut self, cls: &[Lit]) -> Option<logicrs::LitVec> {
+    #[inline]
+    #[allow(unused)]
+    pub fn set_rseed(&mut self, rseed: u64) {
+        self.rng = StdRng::seed_from_u64(rseed);
+    }
+
+    fn simplify_clause(&mut self, clause: &[Lit]) -> Option<LitVec> {
         assert!(self.highest_level() == 0);
-        let mut clause = logicrs::LitVec::new();
-        for l in cls.iter() {
-            assert!(l.var() < self.num_var() + 1);
-            match self.value.v(*l) {
-                Lbool::TRUE => return None,
-                Lbool::FALSE => (),
-                _ => clause.push(*l),
-            }
+        let mut clause = logicrs::LitVec::from(clause);
+        clause.sort();
+        let clause = clause.ordered_simp(&self.value)?;
+        if clause.is_empty() {
+            self.trivial_unsat = true;
+            return None;
         }
         Some(clause)
     }
 
     fn add_clause_inner(&mut self, clause: &[Lit], mut kind: ClauseKind) -> CRef {
-        let Some(clause) = self.simplify_clause(clause) else {
-            return CREF_NONE;
-        };
-        if clause.is_empty() {
-            self.trivial_unsat = true;
-            return CREF_NONE;
-        }
-        for l in clause.iter() {
-            if self.constrain_act == l.var() {
+        if let Some(clause) = self.simplify_clause(clause) {
+            if clause.iter().any(|l| l.var() == self.constrain_act) {
                 kind = ClauseKind::Temporary;
             }
-        }
-        if clause.len() == 1 {
-            assert!(!matches!(kind, ClauseKind::Temporary));
-            match self.value.v(clause[0]) {
-                Lbool::TRUE | Lbool::FALSE => todo!(),
-                _ => {
-                    self.assign(clause[0], CREF_NONE);
-                    if self.propagate() != CREF_NONE {
-                        self.trivial_unsat = true;
+            if clause.len() == 1 {
+                assert!(clause[0].var() != self.constrain_act);
+                match self.value.v(clause[0]) {
+                    Lbool::TRUE | Lbool::FALSE => todo!(),
+                    _ => {
+                        self.assign(clause[0], CREF_NONE);
+                        if self.propagate() != CREF_NONE {
+                            self.trivial_unsat = true;
+                        }
+                        CREF_NONE
                     }
-                    CREF_NONE
                 }
+            } else {
+                self.attach_clause(&clause, kind)
             }
         } else {
-            self.attach_clause(&clause, kind)
+            CREF_NONE
         }
+    }
+
+    pub fn add_eq(&mut self, x: Lit, y: Lit) {
+        self.eqc.add_eq(x, y);
     }
 
     // #[allow(unused)]
@@ -202,10 +223,11 @@ impl DagCnfSolver {
         true
     }
 
-    fn solve_inner(
+    pub fn solve_with_param(
         &mut self,
         assump: &[Lit],
         constraint: Vec<LitVec>,
+        domain: impl Iterator<Item = Var>,
         limit: Option<usize>,
     ) -> Option<bool> {
         self.assump = assump.into();
@@ -234,7 +256,7 @@ impl DagCnfSolver {
                 }
             }
             if !self.new_round(
-                assump.iter().chain(cc.iter()).map(|l| l.var()),
+                domain.chain(assump.iter().chain(cc.iter()).map(|l| l.var())),
                 constraint,
                 true,
             ) {
@@ -244,7 +266,7 @@ impl DagCnfSolver {
             };
             &assumption
         } else {
-            assert!(self.new_round(assump.iter().map(|l| l.var()), vec![], true));
+            assert!(self.new_round(domain.chain(assump.iter().map(|l| l.var())), vec![], true));
             assump
         };
         self.clean_learnt(true);
@@ -260,7 +282,16 @@ impl DagCnfSolver {
         constraint: Vec<LitVec>,
         limit: usize,
     ) -> Option<bool> {
-        self.solve_inner(assumps, constraint, Some(limit))
+        self.solve_with_param(assumps, constraint, empty::<Var>(), Some(limit))
+    }
+
+    pub fn solve_with_domain(
+        &mut self,
+        assumps: &[Lit],
+        domain: impl Iterator<Item = Var>,
+    ) -> bool {
+        self.solve_with_param(assumps, vec![], domain, None)
+            .unwrap()
     }
 
     #[allow(unused)]
@@ -325,6 +356,7 @@ impl Satif for DagCnfSolver {
         self.watchers.reserve(var);
         self.vsids.reserve(var);
         self.phase_saving.reserve(var);
+        self.eqc.reserve(var);
         self.analyze.reserve(var);
         self.unsat_core.reserve(var);
         self.domain.reserve(var);
@@ -347,11 +379,13 @@ impl Satif for DagCnfSolver {
     }
 
     fn solve(&mut self, assumps: &[Lit]) -> bool {
-        self.solve_inner(assumps, vec![], None).unwrap()
+        self.solve_with_param(assumps, vec![], empty::<Var>(), None)
+            .unwrap()
     }
 
     fn solve_with_constraint(&mut self, assumps: &[Lit], constraint: Vec<LitVec>) -> bool {
-        self.solve_inner(assumps, constraint, None).unwrap()
+        self.solve_with_param(assumps, constraint, empty::<Var>(), None)
+            .unwrap()
     }
 
     #[inline]

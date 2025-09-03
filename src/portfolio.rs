@@ -66,22 +66,26 @@ impl Portfolio {
             }
             engines.push(engine);
         };
-        new_engine("-e ic3 --no-ic3-ctg");
-        new_engine("-e ic3 --no-ic3-ctg --ic3-ctp --rseed 5555");
-        new_engine("-e ic3 --ic3-dynamic --rseed 55");
-        new_engine("-e ic3");
-        new_engine("-e ic3 --ic3-ctg-limit 5");
-        new_engine("-e ic3 --ic3-ctg-max 5 --ic3-ctg-limit 15");
-        new_engine("-e ic3 --ic3-abs-cst --rseed 55");
-        new_engine("-e ic3 --ic3-ctp");
-        new_engine("-e ic3 --no-ic3-ctg --ic3-inn");
-        new_engine("-e ic3 --ic3-inn");
-        new_engine("-e ic3 --ic3-ctg-limit 5 --ic3-inn");
-        new_engine("-e bmc --step 1");
-        new_engine("-e bmc --step 10");
-        new_engine("-e bmc --bmc-kissat --step 70");
-        new_engine("-e bmc --bmc-kissat --step 135");
-        new_engine("-e kind --step 1 --kind-simple-path");
+        new_engine("-e ic3 --rseed 1");
+        new_engine(
+            "-e ic3 --ic3-ctg=false --frts=false --scorr=false --ic3-drop-po=false --rseed 2",
+        );
+        new_engine("-e ic3 --ic3-drop-po=false --ic3-parent-lemma=false --rseed 3");
+        new_engine("-e ic3 --ic3-abs-cst --rseed 4");
+        new_engine("-e ic3 --ic3-abs-cst --ic3-abs-trans --rseed 5");
+        new_engine(
+            "-e ic3 --ic3-abs-cst --ic3-abs-trans --ic3-dynamic --ic3-drop-po=false --rseed 6",
+        );
+        new_engine("-e ic3 --ic3-ctg-max 5 --ic3-ctg-limit 15 --ic3-drop-po=false --rseed 7");
+        new_engine("-e ic3 --ic3-inn --rseed 8");
+        new_engine("-e ic3 --ic3-inn --ic3-ctp --rseed 9");
+        new_engine("-e ic3 --ic3-inn --ic3-ctg=false --rseed 10");
+        new_engine("-e ic3 --ic3-inn --ic3-dynamic --ic3-drop-po=false --rseed 11");
+        new_engine("-e bmc --step 1 --rseed 12");
+        new_engine("-e bmc --bmc-kissat --step 10 --rseed 13");
+        new_engine("-e bmc --bmc-kissat --step 65 --rseed 14");
+        new_engine("-e bmc --bmc-kissat --bmc-dyn-step --rseed 15");
+        new_engine("-e kind --step 1 --rseed 16");
         let ps = PortfolioState::new(engines.len());
         Self {
             cfg,
@@ -259,20 +263,9 @@ fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
             file.write_all(witness.as_bytes()).unwrap();
         }
     }
-    if !cfg.certify {
-        return;
+    if cfg.certify {
+        certifaiger_check(&cfg.model, engine.certificate.as_ref().unwrap().path());
     }
-    certifaiger_check(
-        &cfg.model,
-        engine
-            .certificate
-            .as_ref()
-            .unwrap()
-            .path()
-            .as_os_str()
-            .to_str()
-            .unwrap(),
-    );
 }
 
 pub fn portfolio_main(cfg: Config) {

@@ -1,8 +1,32 @@
 use super::{Transys, TransysIf};
+use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarLMap};
+use std::mem::take;
 
 impl Transys {
+    pub fn frozens(&self) -> Vec<Var> {
+        let mut frozens = vec![Var::CONST];
+        frozens.extend(
+            self.bad
+                .iter()
+                .chain(self.constraint.iter())
+                .chain(self.justice.iter())
+                .map(|l| l.var())
+                .chain(self.input.iter().copied())
+                .chain(self.latch.iter().copied()),
+        );
+        for l in self.latch.iter() {
+            if let Some(i) = self.init.get(l) {
+                frozens.push(i.var());
+            }
+            if let Some(n) = self.next.get(l) {
+                frozens.push(n.var());
+            }
+        }
+        frozens
+    }
+
     pub fn merge(&mut self, other: &Self) {
         let offset = self.max_var();
         let map = |x: Var| {
@@ -40,24 +64,7 @@ impl Transys {
         }
     }
 
-    pub fn exact_init_state(&self, assump: &[Lit]) -> (LitVec, LitVec) {
-        let mut solver = cadical::Solver::new();
-        self.load_init(&mut solver);
-        self.load_trans(&mut solver, true);
-        assert!(solver.solve(assump));
-        let mut state = LitVec::new();
-        for l in self.latch() {
-            state.push(solver.sat_value_lit(l).unwrap());
-        }
-        let mut input = LitVec::new();
-        for i in self.input() {
-            input.push(solver.sat_value_lit(i).unwrap());
-        }
-        (input, state)
-    }
-
-    pub fn remove_gate_init(&self) -> Self {
-        let mut res = self.clone();
+    pub fn remove_gate_init(&mut self, rst: &mut Restore) {
         let mut init = GHashMap::new();
         let mut eq = Vec::new();
         for l in self.input().chain(self.latch()) {
@@ -70,16 +77,70 @@ impl Transys {
             }
         }
         if eq.is_empty() {
-            return res;
+            return;
         }
-        res.init = init;
-        let iv = res.new_var();
-        res.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        self.init = init;
+        let iv = self.add_init_var();
+        rst.set_init_var(iv);
         for (v, i) in eq {
-            let e = res.rel.new_xnor(v.lit(), i);
-            let c = res.rel.new_imply(iv.lit(), e);
-            res.constraint.push(c);
+            let e = self.rel.new_xnor(v.lit(), i);
+            let c = self.rel.new_imply(iv.lit(), e);
+            self.constraint.push(c);
+            // rst.add_custom_constraint(c);
         }
-        res
     }
+
+    pub fn map(&mut self, map: impl Fn(Var) -> Var + Copy, rst: &mut Restore) {
+        self.input
+            .iter_mut()
+            .chain(self.latch.iter_mut())
+            .for_each(|v| *v = map(*v));
+        self.rel = self.rel.map(map);
+        for (k, v) in take(&mut self.init) {
+            self.init.insert(map(k), v.map_var(map));
+        }
+        for (k, v) in take(&mut self.next) {
+            self.next.insert(map(k), v.map_var(map));
+        }
+        self.bad = self.bad.map_var(map);
+        self.constraint = self.constraint.map_var(map);
+        self.justice = self.justice.map_var(map);
+        rst.map_var(map);
+    }
+
+    pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {
+        for (&x, &y) in map.iter() {
+            if self.is_latch(x) {
+                rst.replace(x, y);
+            } else {
+                rst.remove(x);
+            }
+        }
+        self.input.retain(|l| !map.contains_key(l));
+        self.latch.retain(|l| !map.contains_key(l));
+        self.init.retain(|l, _| !map.contains_key(l));
+        self.next.retain(|l, _| !map.contains_key(l));
+        self.rel.replace(map);
+        for l in self.next.values_mut().chain(self.init.values_mut()) {
+            if let Some(m) = map.map_lit(*l) {
+                *l = m;
+            }
+        }
+        let map_fn = map.try_map_fn();
+        self.bad = self.bad.map(|l| map_fn(l).unwrap_or(l));
+        self.constraint = self.constraint.map(|l| map_fn(l).unwrap_or(l));
+        self.justice = self.justice.map(|l| map_fn(l).unwrap_or(l));
+    }
+
+    pub fn topsort(&mut self, rst: &mut Restore) {
+        let (_, m) = self.rel.topsort();
+        let m = m.inverse();
+        self.map(|v| m[v], rst);
+    }
+
+    // pub fn add_init_var(&mut self) -> Var {
+    //     let iv = self.new_var();
+    //     self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+    //     iv
+    // }
 }

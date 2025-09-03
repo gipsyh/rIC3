@@ -1,4 +1,5 @@
 use clap::{ArgAction, Args, Parser, ValueEnum};
+use log::error;
 use std::path::PathBuf;
 
 /// rIC3 model checker
@@ -30,19 +31,19 @@ pub struct Config {
     pub witness: bool,
 
     #[command(flatten)]
-    pub ic3: IC3Options,
+    pub ic3: IC3Config,
 
     #[command(flatten)]
-    pub bmc: BMCOptions,
+    pub bmc: BMCConfig,
 
     #[command(flatten)]
-    pub kind: KindOptions,
+    pub kind: KindConfig,
 
     #[command(flatten)]
-    pub portfolio: PortfolioOptions,
+    pub portfolio: PortfolioConfig,
 
     #[command(flatten)]
-    pub preproc: PreprocessOptions,
+    pub preproc: PreprocessConfig,
 
     /// start bound
     #[arg(long = "start", default_value_t = 0)]
@@ -65,6 +66,18 @@ pub struct Config {
     pub interrupt_statistic: bool,
 }
 
+impl Config {
+    pub fn validate(&self) {
+        match self.engine {
+            Engine::IC3 => self.ic3.validate(),
+            Engine::BMC => {}
+            Engine::Kind => {}
+            Engine::Rlive => {}
+            Engine::Portfolio => {}
+        }
+    }
+}
+
 #[derive(Copy, Clone, ValueEnum, Debug)]
 pub enum Engine {
     /// ic3
@@ -80,13 +93,13 @@ pub enum Engine {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct IC3Options {
+pub struct IC3Config {
     /// dynamic generalization
     #[arg(long = "ic3-dynamic", default_value_t = false)]
     pub dynamic: bool,
 
-    /// ic3 without counterexample to generalization
-    #[arg(long = "no-ic3-ctg", action = ArgAction::SetFalse, default_value_t = true)]
+    /// ic3 with counterexample to generalization
+    #[arg(long = "ic3-ctg", action = ArgAction::Set, default_value_t = true)]
     pub ctg: bool,
 
     /// max number of ctg
@@ -109,16 +122,13 @@ pub struct IC3Options {
     #[arg(long = "ic3-abs-cst", default_value_t = false)]
     pub abs_cst: bool,
 
-    /// ic3 without predicate property
-    #[arg(long = "no-ic3-pred-prop", action = ArgAction::SetFalse, default_value_t = true)]
-    pub pred_prop: bool,
+    /// ic3 with abstract trans
+    #[arg(long = "ic3-abs-trans", default_value_t = false)]
+    pub abs_trans: bool,
 
-    /// ic3 without dropping proof-obligation
+    /// ic3 with dropping proof-obligation
     #[arg(
-        long = "no-ic3-drop-po",
-        action = ArgAction::SetFalse,
-        default_value_t = true,
-        conflicts_with = "dynamic"
+        long = "ic3-drop-po", action = ArgAction::Set, default_value_t = true,
     )]
     pub drop_po: bool,
 
@@ -129,34 +139,62 @@ pub struct IC3Options {
     /// ic3 with abstract array
     #[arg(long = "ic3-abs-array", default_value_t = false)]
     pub abs_array: bool,
+
+    /// ic3 with finding parent lemma in mic
+    #[arg(long = "ic3-parent-lemma", action = ArgAction::Set, default_value_t = true)]
+    pub parent_lemma: bool,
+}
+
+impl IC3Config {
+    pub fn validate(&self) {
+        if self.dynamic && self.drop_po {
+            error!("cannot enable both ic3-dynamic and ic3-drop-po");
+            panic!();
+        }
+    }
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct BMCOptions {
+pub struct BMCConfig {
     /// bmc single step time limit
     #[arg(long = "bmc-time-limit")]
     pub time_limit: Option<u64>,
-    /// use kissat solver, otherwise cadical
+    /// use kissat solver in bmc, otherwise cadical
     #[arg(long = "bmc-kissat", default_value_t = false)]
     pub bmc_kissat: bool,
+    /// bmc dynamic step
+    #[arg(long = "bmc-dyn-step", default_value_t = false)]
+    pub dyn_step: bool,
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct KindOptions {
+pub struct KindConfig {
     /// simple path constraint
     #[arg(long = "kind-simple-path", default_value_t = false)]
     pub simple_path: bool,
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct PreprocessOptions {
+pub struct PreprocessConfig {
     /// disable preprocess
-    #[arg(long = "no-preproc", action = ArgAction::SetFalse, default_value_t = true)]
+    #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
+    /// function reduced transys
+    #[arg(long = "frts", action = ArgAction::Set, default_value_t = true)]
+    pub frts: bool,
+    /// frts time limit in seconds
+    #[arg(long = "frts-tl", default_value_t = 1000)]
+    pub frts_tl: u64,
+    /// scorr
+    #[arg(long = "scorr", action = ArgAction::Set, default_value_t = true)]
+    pub scorr: bool,
+    /// scorr time limit in seconds
+    #[arg(long = "scorr-tl", default_value_t = 200)]
+    pub scorr_tl: u64,
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct PortfolioOptions {
+pub struct PortfolioConfig {
     /// portfolio woker memory limit in GB
     #[arg(long = "pworker-mem-limit", default_value_t = 16)]
     pub wmem_limit: usize,

@@ -1,10 +1,10 @@
 use crate::{
     Engine, Proof, Witness,
     config::Config,
-    transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
-use logicrs::{Lit, LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
@@ -13,25 +13,24 @@ pub struct Kind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     ots: Transys,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl Kind {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: Config, ts: Transys) -> Self {
         let ots = ts.clone();
-        ts = ts.remove_gate_init();
-        let mut rst = VarVMap::new_self_map(ts.max_var());
-        ts = ts.check_liveness_and_l2s(&mut rst);
+        let rst = Restore::new(&ts);
+        let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
+        ts.remove_gate_init(&mut rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
-        let uts = if cfg.kind.simple_path {
-            TransysUnroll::new_with_simple_path(&ts)
-        } else {
-            TransysUnroll::new(&ts)
-        };
+        let mut uts = TransysUnroll::new(&ts);
+        if cfg.kind.simple_path {
+            uts.enable_simple_path();
+        }
         let solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
         Self {
             uts,
@@ -115,6 +114,14 @@ impl Engine for Kind {
             panic!();
         }
         let mut ts = self.ots.clone();
+        let eqi = self.rst.eq_invariant();
+        let mut certifaiger_dnf = vec![];
+        for cube in eqi {
+            certifaiger_dnf.push(ts.rel.new_and(cube));
+        }
+        certifaiger_dnf.extend(ts.bad);
+        let invariants = ts.rel.new_or(certifaiger_dnf);
+        ts.bad = LitVec::from(invariants);
         if !ts.constraint.is_empty() {
             ts.constraint = LitVec::from([ts.rel.new_and(ts.constraint)]);
         }
@@ -227,24 +234,29 @@ impl Engine for Kind {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.input.push(w);
             let mut w = LitVec::new();
             for l in self.uts.ts.latch() {
+                if let Some(iv) = self.rst.init_var()
+                    && iv == l
+                {
+                    continue;
+                }
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.state.push(w);
+        }
+        wit.exact_init_state(&self.ots);
+        for s in wit.state.iter_mut() {
+            *s = self.rst.restore_eq_state(s);
         }
         wit
     }

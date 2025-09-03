@@ -1,50 +1,28 @@
-use crate::transys::TransysIf;
-
 use super::IC3;
+use crate::transys::TransysIf;
 use giputils::hash::GHashSet;
-use log::debug;
+use log::trace;
 use logicrs::{LitOrdVec, LitVec, Var, satif::Satif};
 use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 impl IC3 {
-    pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>, usize)> {
-        debug!("getting bad state in last frame");
+    pub(super) fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
+        trace!("getting bad state in frame {}", self.level());
         let start = Instant::now();
-        if self.cfg.ic3.pred_prop {
-            assert!(!self.cfg.ic3.full_bad);
-            let res = self.bad_solver.solve(&self.bad_ts.bad.cube());
-            self.statistic.block.get_bad_time += start.elapsed();
-            res.then(|| {
-                let (s, i) =
-                    self.bad_lift
-                        .get_pred(&self.bad_solver, &self.bad_ts.bad.cube(), true);
-                let mut input = vec![LitVec::default(); 2];
-                for i in i {
-                    if let Some(bi) = self.bad_input.get(&i.var()) {
-                        input[1].push(i.map_var(|_| *bi));
-                    } else {
-                        input[0].push(i);
-                    }
-                }
-                (s, input, 1)
-            })
-        } else {
-            let res = self
-                .solvers
-                .last_mut()
-                .unwrap()
-                .solve(&self.tsctx.bad.cube());
-            self.statistic.block.get_bad_time += start.elapsed();
-            res.then(|| {
-                if self.cfg.ic3.full_bad {
-                    self.get_full_pred(self.solvers.len())
-                } else {
-                    self.get_pred(self.solvers.len(), true)
-                }
-            })
-            .map(|(s, i)| (s, vec![i], 0))
-        }
+        let res = self
+            .solvers
+            .last_mut()
+            .unwrap()
+            .solve(&self.tsctx.bad.cube());
+        self.statistic.block.get_bad_time += start.elapsed();
+        res.then(|| {
+            if self.cfg.ic3.full_bad {
+                self.get_full_pred(self.solvers.len())
+            } else {
+                self.get_pred(self.solvers.len(), true)
+            }
+        })
     }
 }
 
@@ -59,11 +37,10 @@ impl IC3 {
         &mut self,
         frame: usize,
         cube: &LitVec,
-        ascending: bool,
         strengthen: bool,
     ) -> bool {
         let mut ordered_cube = cube.clone();
-        self.activity.sort_by_activity(&mut ordered_cube, ascending);
+        self.activity.sort_by_activity(&mut ordered_cube, false);
         self.solvers[frame - 1].inductive(&ordered_cube, strengthen)
     }
 
@@ -84,7 +61,8 @@ impl IC3 {
         let start = Instant::now();
         let solver = &mut self.solvers[frame - 1];
         let mut cls: LitVec = solver.get_assump().clone();
-        cls.extend_from_slice(&self.abs_cst);
+        cls.extend_from_slice(&self.ts.constraint);
+        cls.retain(|l| self.localabs.refine_has(l.var()));
         if cls.is_empty() {
             return (LitVec::new(), LitVec::new());
         }

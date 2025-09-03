@@ -1,35 +1,31 @@
 use crate::{
+    config::PreprocessConfig,
     gipsat::DagCnfSolver,
-    transys::{Transys, TransysIf},
+    transys::{Transys, TransysIf, certify::Restore},
 };
 use giputils::hash::GHashMap;
-use log::info;
-use logicrs::{
-    Lit, LitVec, Var, VarLMap, VarMap, VarVMap, satif::Satif, simulate::DagCnfSimulation,
-};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use log::{debug, info, trace};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarMap, VarVMap, simplify::DagCnfSimplify};
+use rand::{SeedableRng, rngs::StdRng};
 use std::time::Instant;
 
 #[allow(unused)]
 pub struct FrTs {
+    cfg: PreprocessConfig,
     ts: Transys,
     candidate: VarMap<Vec<Lit>>,
     map: VarLMap,
     eqc: VarVMap,
     solver: DagCnfSolver,
-    constraint: Vec<LitVec>,
-    rseed: u64,
     rng: StdRng,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl FrTs {
-    pub fn new(ts: Transys, rseed: u64, rst: VarVMap, constraint: Vec<LitVec>) -> Self {
-        let sim = DagCnfSimulation::new(1000, &ts.rel);
-        let mut solver = DagCnfSolver::new(&ts.rel, rseed);
-        for cls in constraint.iter() {
-            solver.add_clause(cls);
-        }
+    pub fn new(mut ts: Transys, cfg: &PreprocessConfig, mut rst: Restore) -> Self {
+        ts.topsort(&mut rst);
+        let sim = ts.rel.simulation(1000);
+        let solver = DagCnfSolver::new(&ts.rel);
         let mut map = VarLMap::new();
         let mut eqc = VarVMap::new();
         let mut simval: GHashMap<_, Vec<_>> = GHashMap::new();
@@ -53,41 +49,43 @@ impl FrTs {
                 candidate[lv.var()].push(lv);
             }
         }
-        let rng = StdRng::seed_from_u64(rseed);
+        let rng = StdRng::seed_from_u64(0);
         Self {
             ts,
+            cfg: cfg.clone(),
             candidate,
             map,
             eqc,
             solver,
-            constraint,
-            rseed,
             rst,
             rng,
         }
     }
 
-    pub fn restart(&mut self) {
-        self.solver = DagCnfSolver::new(&self.ts.rel, self.rng.random());
-    }
-
-    pub fn fr(mut self) -> (Transys, VarVMap) {
+    pub fn fr(mut self) -> (Transys, Restore) {
         let start = Instant::now();
         let before = self.ts.max_var();
-        const NUM_RESTART: usize = 200;
         let mut replace = VarLMap::new();
         let mut v = Var(1);
         while v <= self.ts.max_var() {
+            if start.elapsed().as_secs() > self.cfg.frts_tl {
+                info!("frts: timeout");
+                break;
+            }
+            if self.ts.rel.is_leaf(v) {
+                v += 1;
+                continue;
+            }
             let Some(m) = self.map.map(v) else {
                 v += 1;
                 continue;
             };
             let lv = v.lit();
-            // dbg!(m, v);
+            trace!("frts: checking var {m} with lit {v}");
             match self.solver.solve_with_restart_limit(
                 &[],
                 vec![LitVec::from([m, lv]), LitVec::from([!m, !lv])],
-                15,
+                1,
             ) {
                 Some(true) => {
                     // let eqc = self.eqc[v];
@@ -105,15 +103,25 @@ impl FrTs {
                     // }
                 }
                 Some(false) => {
-                    // dbg!("can replace");
+                    debug!("frts: {v} -> {m}");
                     replace.insert_lit(lv, m);
-                    if replace.len() % NUM_RESTART == 0 {
+                    self.solver.add_eq(lv, m);
+                    if replace.len() % 5000 == 0 {
                         self.ts.replace(&replace, &mut self.rst);
-                        self.solver = DagCnfSolver::new(&self.ts.rel, 5);
+                        self.ts.coi_refine(&mut self.rst);
+                        let mut simp = DagCnfSimplify::new(&self.ts.rel);
+                        for &v in self.ts.frozens().iter() {
+                            simp.froze(v);
+                        }
+                        simp.const_simplify();
+                        simp.bve_simplify();
+                        self.ts.rel = simp.finalize();
+                        self.solver = DagCnfSolver::new(&self.ts.rel);
+                        info!("frts ts simplified to: {}", self.ts.statistic());
                     }
                 }
                 None => {
-                    // dbg!("to");
+                    debug!("frts: checking {v} with {m} timeout");
                 }
             }
             v += 1;
@@ -122,12 +130,13 @@ impl FrTs {
         self.ts.coi_refine(&mut self.rst);
         self.ts.rearrange(&mut self.rst);
         info!(
-            "frts eliminates {} out of {} vars in {:.2}s.",
+            "frts: eliminates {} out of {} vars in {:.2}s",
             *before - *self.ts.max_var(),
             *before,
             start.elapsed().as_secs_f32()
         );
         self.ts.simplify(&mut self.rst);
+        info!("frts: simplified ts: {}", self.ts.statistic());
         (self.ts, self.rst)
     }
 }

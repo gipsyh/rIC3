@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .init();
     fs::create_dir_all("/tmp/rIC3")?;
     let mut cfg = Config::parse();
+    cfg.validate();
     cfg.model = cfg.model.canonicalize()?;
     info!("the model to be checked: {}", cfg.model.display());
     if let config::Engine::Portfolio = cfg.engine {
@@ -47,7 +48,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let ts = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine: Box<dyn Engine> = match cfg.engine {
-        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, vec![])),
+        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts)),
         config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
         config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
         config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),
@@ -110,7 +111,7 @@ pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engien: &mut dyn E
     } else {
         let witness = engien.witness();
         debug_assert!(witness.state.len() == witness.input.len());
-        frontend.unsafe_certificate(engien.witness())
+        frontend.unsafe_certificate(witness)
     };
     if cfg.witness && !res {
         println!("{certificate}");

@@ -1,6 +1,7 @@
 use super::{Transys, TransysIf};
+use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Cnf, Lit, LitVec, Var, VarVMap, satif::Satif};
+use logicrs::{Cnf, Lit, LitVec, Var, satif::Satif};
 use std::mem::take;
 
 #[derive(Default, Debug, Clone)]
@@ -21,7 +22,7 @@ impl NoDepTransys {
         }
     }
 
-    pub fn simplify(&mut self, rst: &mut VarVMap) {
+    pub fn simplify(&mut self, rst: &mut Restore) {
         let mut simp_solver = cadical::Solver::new();
         simp_solver.new_var_to(self.max_var());
         for c in self.trans() {
@@ -33,9 +34,7 @@ impl NoDepTransys {
             if let Some(i) = self.init(l) {
                 frozens.push(i.var());
             }
-            if let Some(n) = self.var_next(l) {
-                frozens.push(n);
-            }
+            frozens.push(self.var_next(l));
         }
         for c in self.constraint.iter() {
             frozens.push(c.var());
@@ -65,7 +64,7 @@ impl NoDepTransys {
             .collect();
         self.bad = map_lit(&self.bad);
         self.constraint = self.constraint.iter().map(map_lit).collect();
-        *rst = domain_map.inverse().product(rst);
+        rst.filter_map_var(|v| domain_map.get(&v).copied());
     }
 }
 
@@ -91,8 +90,8 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Option<Lit> {
-        self.next.get(&lit.var()).map(|l| l.not_if(!lit.polarity()))
+    fn next(&self, lit: Lit) -> Lit {
+        self.next.get(&lit.var()).unwrap().not_if(!lit.polarity())
     }
 
     #[inline]

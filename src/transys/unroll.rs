@@ -9,6 +9,9 @@ pub struct TransysUnroll<T: TransysIf> {
     pub max_var: Var,
     next_map: LitMap<Vec<Lit>>,
     simple_path: Option<Vec<Vec<LitVec>>>,
+    pub opt: GHashMap<Var, Var>,
+    pub connect: Option<Vec<LitVvec>>,
+    pub optcst: Option<Vec<LitVvec>>,
 }
 
 impl<T: TransysIf> TransysUnroll<T> {
@@ -18,22 +21,10 @@ impl<T: TransysIf> TransysUnroll<T> {
     {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
         next_map.reserve(ts.max_var());
-        let false_lit = Lit::constant(false);
-        next_map[false_lit].push(false_lit);
-        next_map[!false_lit].push(!false_lit);
-        for v in Var::new(0)..=ts.max_var() {
+        for v in Var::CONST..=ts.max_var() {
             let l = v.lit();
-            if next_map[l].is_empty() {
-                next_map[l].push(l);
-                next_map[!l].push(!l);
-            }
-        }
-        for l in ts.latch() {
-            let l = l.lit();
-            if let Some(next) = ts.next(l) {
-                next_map[l].push(next);
-                next_map[!l].push(!next);
-            }
+            next_map[l].push(l);
+            next_map[!l].push(!l);
         }
         Self {
             ts: ts.clone(),
@@ -41,16 +32,51 @@ impl<T: TransysIf> TransysUnroll<T> {
             max_var: ts.max_var(),
             next_map,
             simple_path: None,
+            opt: GHashMap::new(),
+            connect: None,
+            optcst: None,
         }
     }
 
-    pub fn new_with_simple_path(ts: &T) -> Self
+    pub fn enable_simple_path(&mut self)
     where
         T: Clone,
     {
-        let mut res = Self::new(ts);
-        res.simple_path = Some(Vec::new());
-        res
+        assert!(self.num_unroll == 0);
+        self.simple_path = Some(Vec::new());
+    }
+
+    pub fn enable_optional_connect(&mut self)
+    where
+        T: Clone,
+    {
+        assert!(self.num_unroll == 0);
+        for v in self.ts.latch() {
+            let n = self.ts.next(v.lit());
+            if !self.opt.contains_key(&n.var()) {
+                self.max_var += 1;
+                let c = self.max_var;
+                self.opt.insert(n.var(), c);
+            }
+        }
+        self.connect = Some(vec![LitVvec::new()]);
+    }
+
+    pub fn enable_optional_constraint(&mut self)
+    where
+        T: Clone,
+    {
+        assert!(self.num_unroll == 0);
+        let mut rel = LitVvec::new();
+        for c in self.ts.constraint() {
+            let cc = self.opt.get(&c.var()).copied().unwrap_or({
+                self.max_var += 1;
+                self.opt.insert(c.var(), self.max_var);
+                self.max_var
+            });
+            rel.push(LitVec::from([!cc.lit(), c]));
+        }
+        self.optcst = Some(vec![rel]);
     }
 
     #[inline]
@@ -106,6 +132,14 @@ impl<T: TransysIf> TransysUnroll<T> {
         let false_lit = Lit::constant(false);
         self.next_map[false_lit].push(false_lit);
         self.next_map[!false_lit].push(!false_lit);
+        if self.connect.is_none() {
+            for l in self.ts.latch() {
+                let l = l.lit();
+                let next = self.lit_next(self.ts.next(l), self.num_unroll);
+                self.next_map[l].push(next);
+                self.next_map[!l].push(!next);
+            }
+        }
         for v in Var::CONST..=self.ts.max_var() {
             let l = v.lit();
             if self.next_map[l].len() == self.num_unroll + 1 {
@@ -116,11 +150,27 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
             assert!(self.next_map[l].len() == self.num_unroll + 2);
         }
-        for l in self.ts.latch_had_next() {
-            let l = l.lit();
-            let next = self.lit_next(self.lit_next(l, 1), self.num_unroll + 1);
-            self.next_map[l].push(next);
-            self.next_map[!l].push(!next);
+        if let Some(crel) = self.connect.as_mut() {
+            let mut cr = LitVvec::new();
+            for l in self.ts.latch() {
+                let l = l.lit();
+                let n = self.ts.next(l);
+                let c = self.opt[&n.var()];
+                let n1 = self.next_map[n][self.num_unroll];
+                let n2 = self.next_map[l][self.num_unroll + 1];
+                cr.push(LitVec::from([!c.lit(), n1, !n2]));
+                cr.push(LitVec::from([!c.lit(), !n1, n2]));
+            }
+            crel.push(cr);
+        }
+        if let Some(crel) = self.optcst.as_mut() {
+            let mut cr = LitVvec::new();
+            for c in self.ts.constraint() {
+                let cc = self.opt[&c.var()];
+                let cn = self.next_map[c][self.num_unroll + 1];
+                cr.push(LitVec::from([!cc.lit(), cn]));
+            }
+            crel.push(cr);
         }
         self.num_unroll += 1;
         if self.simple_path.is_some() {
@@ -151,6 +201,16 @@ impl<T: TransysIf> TransysUnroll<T> {
         {
             for c in simple_path[u - 1].iter() {
                 satif.add_clause(c);
+            }
+        }
+        if let Some(crel) = self.connect.as_ref() {
+            for cls in crel[u].iter() {
+                satif.add_clause(cls);
+            }
+        }
+        if let Some(crel) = self.optcst.as_ref() {
+            for cls in crel[u].iter() {
+                satif.add_clause(cls);
             }
         }
     }

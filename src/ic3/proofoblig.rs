@@ -1,5 +1,6 @@
 use super::IC3;
 use giputils::grc::Grc;
+use log::trace;
 use logicrs::{LitOrdVec, LitVec};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, btree_set};
@@ -9,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Default)]
 pub struct ProofObligationInner {
     pub frame: usize,
-    pub input: Vec<LitVec>,
+    pub input: LitVec,
     pub lemma: LitOrdVec,
     pub depth: usize,
     pub next: Option<ProofObligation>,
@@ -72,7 +73,7 @@ impl ProofObligation {
     pub fn new(
         frame: usize,
         lemma: LitOrdVec,
-        input: Vec<LitVec>,
+        input: LitVec,
         depth: usize,
         next: Option<Self>,
     ) -> Self {
@@ -163,6 +164,7 @@ impl ProofObligationQueue {
             self.num.resize(po.frame + 1, 0);
         }
         self.num[po.frame] += 1;
+        trace!("add obligation: {}", po.lemma);
         assert!(self.obligations.insert(po));
     }
 

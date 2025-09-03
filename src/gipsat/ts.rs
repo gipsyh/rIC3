@@ -17,8 +17,8 @@ pub struct TransysSolver {
 }
 
 impl TransysSolver {
-    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool, rseed: u64) -> Self {
-        let mut dcs = DagCnfSolver::new(&ts.rel, rseed);
+    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool) -> Self {
+        let mut dcs = DagCnfSolver::new(&ts.rel);
         if assert_cst {
             for c in ts.constraint.iter() {
                 dcs.add_clause(&[*c]);
@@ -28,7 +28,7 @@ impl TransysSolver {
             dcs,
             ts: ts.clone(),
             relind: Default::default(),
-            rng: StdRng::seed_from_u64(rseed),
+            rng: StdRng::seed_from_u64(0),
         }
     }
 
@@ -91,6 +91,7 @@ impl TransysSolver {
         (latchs, inputs)
     }
 
+    #[allow(unused)]
     pub fn trivial_pred(&mut self) -> (LitVec, LitVec) {
         let mut input = LitVec::new();
         for i in self.ts.input() {
@@ -128,9 +129,8 @@ impl TransysSolver {
     pub fn inductive_core(&mut self) -> Option<LitVec> {
         let mut ans = LitVec::new();
         for &l in self.relind.iter() {
-            if let Some(nl) = self.ts.next(l)
-                && self.dcs.unsat_has(nl)
-            {
+            let nl = self.ts.next(l);
+            if self.dcs.unsat_has(nl) {
                 ans.push(l);
             }
         }
@@ -142,9 +142,8 @@ impl TransysSolver {
                     .is_some_and(|i| i != l.polarity())
             })?;
             for &l in self.relind.iter() {
-                if let Some(nl) = self.ts.next(l)
-                    && (self.dcs.unsat_has(nl))
-                {
+                let nl = self.ts.next(l);
+                if self.dcs.unsat_has(nl) {
                     ans.push(l);
                 }
                 if l.eq(new) {
@@ -177,6 +176,7 @@ impl TransysSolver {
     }
 
     #[inline]
+    #[allow(unused)]
     pub fn add_domain(&mut self, var: Var, deps: bool) {
         self.dcs.add_domain(var, deps);
     }

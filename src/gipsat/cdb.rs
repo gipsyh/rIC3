@@ -3,7 +3,7 @@ use bitfield_struct::bitfield;
 use giputils::gvec::Gvec;
 use giputils::hash::GHashMap;
 use log::debug;
-use logicrs::{Lit, LitOrdVec};
+use logicrs::{Lit, LitOrdVec, LitVec};
 use std::{
     mem::take,
     ops::{AddAssign, Index, MulAssign},
@@ -99,16 +99,25 @@ impl Clause {
 
     #[inline]
     pub fn swap_remove(&mut self, index: usize) {
+        debug_assert!(self.len() > 2);
         let len = self.len();
         unsafe {
             *self.data.add(1 + index) = *self.data.add(len);
+            if self.is_learnt() {
+                *self.data.add(len) = *self.data.add(len + 1);
+            };
             (*self.data).header.set_len(len - 1);
-        };
+        }
     }
 
     #[inline]
     pub fn slice(&self) -> &[Lit] {
         unsafe { from_raw_parts(self.data.add(1) as *const Lit, self.len()) }
+    }
+
+    #[inline]
+    pub fn litvec(&self) -> LitVec {
+        LitVec::from(self.slice())
     }
 }
 
@@ -356,8 +365,8 @@ impl DagCnfSolver {
     }
 
     pub fn clean_learnt(&mut self, full: bool) {
-        if (full && self.cdb.learnt.len() * 15 >= self.cdb.trans.len())
-            || self.cdb.learnt.len() >= self.cdb.trans.len()
+        if (full && self.cdb.learnt.len() * 15 > self.cdb.trans.len())
+            || self.cdb.learnt.len() > self.cdb.trans.len()
         {
             let onum_learnt = self.cdb.num_learnt();
             self.cdb.learnt.sort_unstable_by(|a, b| {

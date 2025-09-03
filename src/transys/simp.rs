@@ -1,9 +1,14 @@
 use super::{Transys, TransysIf};
+use crate::{
+    config::PreprocessConfig,
+    transys::{certify::Restore, frts::FrTs, scorr::Scorr},
+};
 use giputils::hash::GHashSet;
-use logicrs::{Lit, Var, VarVMap};
+use log::{debug, info};
+use logicrs::{Lit, Var};
 
 impl Transys {
-    pub fn coi_refine(&mut self, rst: &mut VarVMap) {
+    pub fn coi_refine(&mut self, rst: &mut Restore) {
         let mut mark = GHashSet::new();
         let mut queue = Vec::new();
         for v in self
@@ -56,15 +61,18 @@ impl Transys {
         }
         self.input.retain(|i| mark.contains(i));
         self.latch.retain(|i| mark.contains(i));
+        let mut removed = 0;
         for v in Var::CONST + 1..=self.max_var() {
             if !mark.contains(&v) {
+                removed += self.rel[v].len();
                 self.rel.del_rel(v);
-                rst.remove(&v);
+                rst.remove(v);
             }
         }
+        debug!("ts coi simplify: removed {removed} clauses");
     }
 
-    pub fn rearrange(&mut self, rst: &mut VarVMap) {
+    pub fn rearrange(&mut self, rst: &mut Restore) {
         let mut additional = vec![Var::CONST];
         additional.extend(
             self.constraint
@@ -100,30 +108,37 @@ impl Transys {
         self.bad = self.bad.map(map_lit);
         self.constraint = self.constraint.map(map_lit);
         self.justice = self.justice.map(map_lit);
-        *rst = domain_map.inverse().product(rst);
+        rst.filter_map_var(|v| domain_map.get(&v).copied());
     }
 
-    pub fn simplify(&mut self, rst: &mut VarVMap) {
+    pub fn simplify(&mut self, rst: &mut Restore) {
         self.coi_refine(rst);
-        let mut frozens = vec![Var::CONST];
-        frozens.extend(
-            self.bad
-                .iter()
-                .chain(self.constraint.iter())
-                .chain(self.justice.iter())
-                .map(|l| l.var())
-                .chain(self.input.iter().copied())
-                .chain(self.latch.iter().copied()),
-        );
-        for l in self.latch.iter() {
-            if let Some(i) = self.init.get(l) {
-                frozens.push(i.var());
+        let frozens = self.frozens();
+        self.rel = self.rel.simplify(frozens.iter().copied());
+        self.coi_refine(rst);
+        self.constraint.retain(|l| !l.is_constant(true));
+        self.constraint.sort();
+        self.constraint.dedup();
+        self.rearrange(rst);
+    }
+}
+
+impl Transys {
+    pub fn preproc(&self, cfg: &PreprocessConfig, mut rst: Restore) -> (Self, Restore) {
+        let mut ts = self.clone();
+        if cfg.preproc {
+            ts.simplify(&mut rst);
+            info!("trivial simplified ts: {}", ts.statistic());
+            if cfg.scorr {
+                let scorr = Scorr::new(ts, cfg, rst);
+                (ts, rst) = scorr.scorr();
             }
-            if let Some(n) = self.next.get(l) {
-                frozens.push(n.var());
+            if cfg.frts {
+                let frts = FrTs::new(ts, cfg, rst);
+                (ts, rst) = frts.fr();
             }
         }
-        self.rel = self.rel.simplify(frozens.iter().copied());
-        self.rearrange(rst);
+        info!("preprocessed ts has {}", ts.statistic());
+        (ts, rst)
     }
 }

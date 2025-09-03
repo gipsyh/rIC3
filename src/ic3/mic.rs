@@ -1,7 +1,9 @@
 use super::IC3;
 use crate::{config::Config, transys::TransysIf};
 use giputils::hash::GHashSet;
+use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
+use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -106,9 +108,7 @@ impl IC3 {
                 {
                     s.push(l.not_if(!v));
                 }
-                if let Some(lt) = self.tsctx.next(*l)
-                    && let Some(v) = self.solvers[frame - 1].sat_value(lt)
-                {
+                if let Some(v) = self.solvers[frame - 1].sat_value(self.tsctx.next(*l)) {
                     t.push(l.not_if(!v));
                 }
             }
@@ -135,7 +135,7 @@ impl IC3 {
                 return None;
             }
             self.statistic.num_down_sat += 1;
-            if self.blocked_with_ordered(frame, &cube, false, true) {
+            if self.blocked_with_ordered(frame, &cube, true) {
                 return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             for lit in cube.iter() {
@@ -146,11 +146,11 @@ impl IC3 {
             }
             let (model, _) = self.get_pred(frame, false);
             let cex_set: GHashSet<Lit> = GHashSet::from_iter(model.iter().cloned());
-            for lit in cube.iter() {
-                if keep.contains(lit) && !cex_set.contains(lit) {
-                    return None;
-                }
-            }
+            // for lit in cube.iter() {
+            //     if keep.contains(lit) && !cex_set.contains(lit) {
+            //         return None;
+            //     }
+            // }
             if ctg < parameter.max
                 && frame > 1
                 && !self.tsctx.cube_subsume_init(&model)
@@ -219,9 +219,14 @@ impl IC3 {
         self.statistic.avg_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         let mut cex = Vec::new();
-        self.activity.sort_by_activity(&mut cube, true);
-        let parent = self.frame.parent_lemma(&cube, frame);
-        if let Some(parent) = parent {
+        if self.rng.random_bool(0.2) {
+            cube.shuffle(&mut self.rng);
+        } else {
+            self.activity.sort_by_activity(&mut cube, true);
+        }
+        if self.cfg.ic3.parent_lemma
+            && let Some(parent) = self.frame.parent_lemma(&cube, frame)
+        {
             let parent = GHashSet::from_iter(parent);
             cube.sort_by_key(|x| parent.contains(x));
         }
@@ -273,9 +278,12 @@ impl IC3 {
         constraint: &[LitVec],
         mic_type: MicType,
     ) -> LitVec {
-        match mic_type {
+        let mic_olen = cube.len();
+        let r = match mic_type {
             MicType::NoMic => cube,
             MicType::DropVar(parameter) => self.mic_by_drop_var(frame, cube, constraint, parameter),
-        }
+        };
+        trace!("mic from {} to {} len", mic_olen, r.len());
+        r
     }
 }

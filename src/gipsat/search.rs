@@ -49,7 +49,7 @@ impl DagCnfSolver {
         let mut restarts = 0;
         loop {
             if let Some(limit) = limit
-                && restarts > limit as u32
+                && restarts >= limit as u32
             {
                 return None;
             }

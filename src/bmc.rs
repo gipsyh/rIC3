@@ -1,24 +1,30 @@
 use crate::{
     Engine, Witness,
     config::Config,
-    transys::{Transys, TransysIf, nodep::NoDepTransys, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
-use logicrs::{LitVec, VarVMap, satif::Satif};
+use logicrs::{LitVec, satif::Satif};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub struct BMC {
+    ots: Transys,
     uts: TransysUnroll<NoDepTransys>,
     cfg: Config,
     solver: Box<dyn Satif>,
     solver_k: usize,
-    rst: VarVMap,
+    rst: Restore,
+    step: usize,
+    rng: StdRng,
 }
 
 impl BMC {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
-        let mut rst = VarVMap::new_self_map(ts.max_var());
-        ts = ts.check_liveness_and_l2s(&mut rst);
+    pub fn new(cfg: Config, ts: Transys) -> Self {
+        let ots = ts.clone();
+        let mut rng = StdRng::seed_from_u64(cfg.rseed);
+        let rst = Restore::new(&ts);
+        let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         if cfg.preproc.preproc {
@@ -30,13 +36,22 @@ impl BMC {
         } else {
             Box::new(cadical::Solver::new())
         };
+        solver.set_seed(rng.random());
         ts.load_init(solver.as_mut());
+        let step = if cfg.bmc.dyn_step {
+            (10_000_000 / (*ts.max_var() as usize + ts.rel.clauses().len())).max(1)
+        } else {
+            cfg.step as usize
+        };
         Self {
+            ots,
             uts,
+            step,
             cfg,
             solver,
             solver_k: 0,
             rst,
+            rng,
         }
     }
 
@@ -54,6 +69,7 @@ impl BMC {
         } else {
             Box::new(cadical::Solver::new())
         };
+        self.solver.set_seed(self.rng.random());
         self.uts.ts.load_init(self.solver.as_mut());
         for i in 0..self.solver_k {
             self.uts.load_trans(self.solver.as_mut(), i, true);
@@ -63,8 +79,7 @@ impl BMC {
 
 impl Engine for BMC {
     fn check(&mut self) -> Option<bool> {
-        let step = self.cfg.step as usize;
-        for k in (self.cfg.start..=self.cfg.end).step_by(step) {
+        for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let mut assump = self.uts.lits_next(&self.uts.ts.bad.cube(), k);
@@ -106,10 +121,8 @@ impl Engine for BMC {
             for l in self.uts.ts.input() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.input.push(w);
@@ -117,14 +130,16 @@ impl Engine for BMC {
             for l in self.uts.ts.latch() {
                 let l = l.lit();
                 let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl)
-                    && let Some(r) = self.rst.lit_map(l.not_if(!v))
-                {
-                    w.push(r);
+                if let Some(v) = self.solver.sat_value(kl) {
+                    w.push(self.rst.restore(l.not_if(!v)));
                 }
             }
             wit.state.push(w);
         }
+        for s in wit.state.iter_mut() {
+            *s = self.rst.restore_eq_state(s);
+        }
+        wit.exact_init_state(&self.ots);
         wit
     }
 }

@@ -1,16 +1,20 @@
 mod aux;
+pub mod certify;
 mod ctx;
 pub mod frts;
 mod live;
 pub mod nodep;
 mod others;
-mod replace;
+mod refactor;
+pub mod scorr;
 mod simp;
+mod simulate;
 pub mod unroll;
 
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
+use std::fmt::{self, Display};
 
 pub trait TransysIf {
     fn max_var(&self) -> Var;
@@ -32,7 +36,7 @@ pub trait TransysIf {
         panic!("Error: is_latch not support");
     }
 
-    fn next(&self, lit: Lit) -> Option<Lit>;
+    fn next(&self, lit: Lit) -> Lit;
 
     fn init(&self, latch: Var) -> Option<Lit>;
 
@@ -40,27 +44,19 @@ pub trait TransysIf {
 
     fn trans(&self) -> impl Iterator<Item = &LitVec>;
 
-    fn latch_had_next(&self) -> impl Iterator<Item = Var> {
-        self.latch().filter(|&v| self.var_next(v).is_some())
-    }
-
-    fn latch_no_next(&self) -> impl Iterator<Item = Var> {
-        self.latch().filter(|&v| self.var_next(v).is_none())
-    }
-
     #[inline]
-    fn var_next(&self, var: Var) -> Option<Var> {
-        self.next(var.lit()).map(|l| l.var())
+    fn var_next(&self, var: Var) -> Var {
+        self.next(var.lit()).var()
     }
 
     #[inline]
     fn lits_next<'a>(&self, lits: impl IntoIterator<Item = &'a Lit>) -> LitVec {
-        lits.into_iter().filter_map(|l| self.next(*l)).collect()
+        lits.into_iter().map(|l| self.next(*l)).collect()
     }
 
     fn inits(&self) -> LitVvec {
         let mut cnf = LitVvec::new();
-        for l in self.input().chain(self.latch()) {
+        for l in self.latch() {
             if let Some(i) = self.init(l) {
                 if let Some(i) = i.try_constant() {
                     cnf.push(LitVec::from([l.lit().not_if(!i)]));
@@ -153,8 +149,13 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn next(&self, lit: Lit) -> Option<Lit> {
-        self.next.get(&lit.var()).map(|l| l.not_if(!lit.polarity()))
+    fn is_latch(&self, v: Var) -> bool {
+        self.next.contains_key(&v)
+    }
+
+    #[inline]
+    fn next(&self, lit: Lit) -> Lit {
+        self.next.get(&lit.var()).unwrap().not_if(!lit.polarity())
     }
 
     fn init(&self, latch: Var) -> Option<Lit> {
@@ -212,5 +213,28 @@ impl Transys {
             }
             unique.insert(n.var());
         }
+    }
+
+    pub fn add_init_var(&mut self) -> Var {
+        let iv = self.new_var();
+        self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        iv
+    }
+}
+
+impl Display for Transys {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "input: {:?}", self.input)?;
+        for l in self.latch.iter() {
+            if let Some(i) = self.init.get(l) {
+                writeln!(f, "latch {l}, next {}, init {i}", self.next(l.lit()))?;
+            } else {
+                writeln!(f, "latch {l}, next {}", self.var_next(*l))?;
+            }
+        }
+        writeln!(f, "rel:")?;
+        self.rel.fmt(f)?;
+        writeln!(f, "bad: {:?}", self.bad)?;
+        writeln!(f, "constraint: {:?}", self.constraint)
     }
 }

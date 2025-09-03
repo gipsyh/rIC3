@@ -2,11 +2,11 @@ use crate::{
     Engine, Witness,
     config::Config,
     ic3::IC3,
-    transys::{Transys, TransysIf},
+    transys::{Transys, TransysIf, certify::Restore},
 };
 use clap::Parser;
 use log::{debug, error, warn};
-use logicrs::{Lit, LitOrdVec, LitVec, Var, VarVMap};
+use logicrs::{Lit, LitOrdVec, LitVec, Var};
 use std::mem::take;
 
 pub struct Rlive {
@@ -19,7 +19,7 @@ pub struct Rlive {
     trace: Vec<LitOrdVec>,
     witness: Vec<Witness>,
     shoals: Vec<LitVec>,
-    rst: VarVMap,
+    rst: Restore,
 }
 
 impl Rlive {
@@ -76,7 +76,7 @@ impl Rlive {
             assert!(l.var() != self.base_var);
             rts.init.insert(l.var(), Lit::constant(l.polarity()));
         }
-        let mut ic3 = IC3::new(self.rcfg.clone(), rts, vec![]);
+        let mut ic3 = IC3::new(self.rcfg.clone(), rts);
         if ic3.check().unwrap() {
             return Ok(ic3.invariant());
         }
@@ -116,7 +116,7 @@ impl Rlive {
             error!("rlive requires justice property");
             panic!();
         }
-        let mut rst = VarVMap::new_self_map(ts.max_var());
+        let mut rst = Restore::new(&ts);
         ts.normalize_justice();
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
@@ -152,7 +152,7 @@ impl Engine for Rlive {
         loop {
             let mut ts = self.ts.clone();
             ts.bad = take(&mut ts.justice);
-            let mut ic3 = IC3::new(self.rcfg.clone(), ts, vec![]);
+            let mut ic3 = IC3::new(self.rcfg.clone(), ts);
             if ic3.check().unwrap() {
                 return Some(true);
             }
@@ -167,6 +167,6 @@ impl Engine for Rlive {
 
     fn witness(&mut self) -> Witness {
         let witness = Witness::concat(self.witness.clone());
-        witness.filter_map_var(|v| self.rst.get(&v).copied())
+        witness.map_var(|v| self.rst.restore_var(v))
     }
 }

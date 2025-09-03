@@ -1,9 +1,12 @@
 mod bitblast;
+pub mod certify;
 mod preproc;
 mod simplify;
 
-use giputils::hash::GHashMap;
-use logicrs::fol::Term;
+use crate::wl::transys::certify::Restore;
+use giputils::hash::{GHashMap, GHashSet};
+use logicrs::fol::{Sort, Term, op};
+use std::mem::take;
 
 #[derive(Clone, Debug, Default)]
 pub struct WlTransys {
@@ -26,6 +29,48 @@ impl WlTransys {
     #[inline]
     pub fn next(&self, term: &Term) -> Term {
         self.next.get(term).unwrap().clone()
+    }
+
+    pub fn add_latch(&mut self, latch: Term, init: Option<Term>, next: Term) {
+        debug_assert!(!self.next.contains_key(&latch));
+        self.latch.push(latch.clone());
+        if let Some(init) = init {
+            self.init.insert(latch.clone(), init);
+        }
+        self.next.insert(latch, next);
+    }
+
+    pub fn remove_no_next_latch(&mut self, rst: &mut Restore) -> GHashSet<Term> {
+        let mut no_next = GHashSet::new();
+        for l in take(&mut self.latch) {
+            if self.next.contains_key(&l) {
+                self.latch.push(l.clone());
+            } else {
+                if let Some(init) = self.init.get(&l).cloned() {
+                    if rst.init_var().is_none() {
+                        let iv = self.add_init_var();
+                        rst.set_init_var(iv);
+                    }
+                    let iv = rst.init_var().unwrap();
+                    self.constraint
+                        .push(iv.op1(op::Implies, &l.op1(op::Eq, &init)));
+                }
+                self.init.remove(&l);
+                no_next.insert(l.clone());
+                self.input.push(l);
+            }
+        }
+        no_next
+    }
+
+    pub fn add_init_var(&mut self) -> Term {
+        let iv = Term::new_var(Sort::bool());
+        self.add_latch(
+            iv.clone(),
+            Some(Term::bool_const(true)),
+            Term::bool_const(false),
+        );
+        iv
     }
 }
 
