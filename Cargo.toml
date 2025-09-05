@@ -1,6 +1,6 @@
 [package]
 name = "rIC3"
-version = "1.4.1"
+version = "1.5.0"
 edition = "2024"
 authors = ["Yuheng Su <gipsyh.icu@gmail.com>"]
 repository = "https://github.com/gipsyh/rIC3"
@@ -11,12 +11,12 @@ license = "GPL-3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aig = { path = "./deps/aig-rs", version = "0.4.5" }
-cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.1" }
-kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.1" }
-logicrs = { path = "./deps/logicrs", version = "0.5.2" }
-giputils = { path = "./deps/giputils", version = "0.3.4" }
-btor = { path = "./deps/btor-rs", version = "0.2.0" }
+aig = { path = "./deps/aig-rs", version = "0.4.6" }
+cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.2" }
+kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.2" }
+logicrs = { path = "./deps/logicrs", version = "0.6.0" }
+giputils = { path = "./deps/giputils", version = "0.3.5" }
+btor = { path = "./deps/btor-rs", version = "0.2.1" }
 clap = { version = "4.5.16", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
