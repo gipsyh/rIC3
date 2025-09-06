@@ -128,16 +128,23 @@ impl Portfolio {
         let wmem = self.cfg.portfolio.wmem_limit * 1024 * 1024 * 1024;
         let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
-            let certificate =
-                if self.cfg.certificate.is_some() || self.cfg.certify || self.cfg.witness {
-                    let certificate =
-                        tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
-                    let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                    engine.arg(certify_path);
-                    Some(certificate)
-                } else {
-                    None
-                };
+            let (sat_certificate, unsat_certificate) = if self.cfg.sat_certificate.is_some()
+                || self.cfg.unsat_certificate.is_some()
+                || self.cfg.certify
+                || self.cfg.witness
+            {
+                let sat_certificate =
+                    tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
+                let sat_certify_path = sat_certificate.path().as_os_str().to_str().unwrap();
+                engine.arg(sat_certify_path);
+                let unsat_certificate =
+                    tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
+                let unsat_certify_path = unsat_certificate.path().as_os_str().to_str().unwrap();
+                engine.arg(unsat_certify_path);
+                (Some(sat_certificate), Some(unsat_certificate))
+            } else {
+                (None, None)
+            };
             let mut child = engine.stderr(Stdio::piped()).spawn().unwrap();
             self.engine_pids.push(child.id() as i32);
             let state = self.state.clone();
@@ -178,7 +185,15 @@ impl Portfolio {
                 };
                 let mut lock = state.0.lock().unwrap();
                 if lock.is_checking() {
-                    *lock = PortfolioState::Finished(res, config, certificate);
+                    *lock = PortfolioState::Finished(
+                        res,
+                        config,
+                        if res {
+                            unsat_certificate
+                        } else {
+                            sat_certificate
+                        },
+                    );
                     state.1.notify_one();
                 }
             });
@@ -231,14 +246,14 @@ impl Drop for Portfolio {
 
 fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
     if res {
-        if cfg.certificate.is_none() && !cfg.certify {
+        if cfg.unsat_certificate.is_none() && !cfg.certify {
             return;
         }
-        if let Some(certificate_path) = &cfg.certificate {
+        if let Some(certificate_path) = &cfg.unsat_certificate {
             std::fs::copy(engine.certificate.as_ref().unwrap(), certificate_path).unwrap();
         }
     } else {
-        if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
+        if cfg.sat_certificate.is_none() && !cfg.certify && !cfg.witness {
             return;
         }
         let mut witness = String::new();
@@ -258,7 +273,7 @@ fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
         if cfg.witness {
             println!("{witness}");
         }
-        if let Some(certificate_path) = &cfg.certificate {
+        if let Some(certificate_path) = &cfg.sat_certificate {
             let mut file: File = File::create(certificate_path).unwrap();
             file.write_all(witness.as_bytes()).unwrap();
         }
@@ -273,18 +288,18 @@ pub fn portfolio_main(cfg: Config) {
     let res = engine.check();
     match res {
         Some(true) => {
-            println!("RESULT: UNSAT");
+            println!("unsat");
             if cfg.witness {
                 println!("0");
             }
             certificate(&mut engine, &cfg, true)
         }
         Some(false) => {
-            println!("RESULT: SAT");
+            println!("sat");
             certificate(&mut engine, &cfg, false)
         }
         _ => {
-            println!("RESULT: UNKNOWN");
+            println!("unknown");
             if cfg.witness {
                 println!("2");
             }
