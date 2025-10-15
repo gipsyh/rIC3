@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/docker/v/gipsyh/ric3?label=Docker&logo=docker)](https://hub.docker.com/r/gipsyh/ric3)
 
 ### HWMCC
-rIC3 achieved first place in both the bit-level track and the word-level bit-vector track at the 2024 Hardware Model Checking Competition ([HWMCC'24](https://hwmcc.github.io/2024/)).
+rIC3 achieved first place in both the bit-level track and the word-level bit-vector track at the 2024 and 2025 Hardware Model Checking Competition ([HWMCC](https://hwmcc.github.io)).
 
 <p align="center">
 	<img width="250" height="auto" src="./images/hwmcc24_aiger.png" style="display:inline-block;">

@@ -14,15 +14,15 @@ pub struct Config {
     #[arg(short, long, value_enum, default_value_t = Engine::IC3)]
     pub engine: Engine,
 
-    /// model file in aiger format or in btor2 format
-    /// for aiger model, the file name should be suffixed with .aig or .aag
-    /// for btor model, the file name should be suffixed with .btor or .btor2
+    /// model file in aiger format or in btor2 format,
+    /// for aiger model, the file name should be suffixed with .aig or .aag,
+    /// for btor model, the file name should be suffixed with .btor or .btor2.
     pub model: PathBuf,
 
     /// certificate path
     pub certificate: Option<PathBuf>,
 
-    /// certify with certifaiger
+    /// certify with certifaiger or cerbotor
     #[arg(long, default_value_t = false)]
     pub certify: bool,
 
