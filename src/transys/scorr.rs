@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, certify::Restore},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
-use log::{info, trace};
+use log::{debug, info, trace};
 use logicrs::{Lit, LitVec, Var, VarLMap, satif::Satif};
 use std::time::Instant;
 
@@ -71,7 +71,7 @@ impl Scorr {
             return (self.ts, self.rst);
         }
         let mut rt = self.ts.rt_simulation(&init, 10);
-        info!(
+        debug!(
             "scorr: init simulation size: {}, rt simulation size: {}",
             init.bv_len(),
             rt.bv_len()

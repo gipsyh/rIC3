@@ -32,11 +32,11 @@ impl IC3 {
         let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
             po.frame += 1;
             self.add_obligation(po.clone());
-            return self.add_lemma(po.frame - 1, po.lemma.cube().clone(), false, Some(po));
+            return self.add_lemma(po.frame - 1, po.state.cube().clone(), false, Some(po));
         };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
-        self.statistic.avg_po_cube_len += po.lemma.len();
+        self.statistic.avg_po_cube_len += po.state.len();
         po.push_to(frame);
         self.add_obligation(po.clone());
         if self.add_lemma(frame - 1, mic.clone(), false, Some(po)) {
@@ -81,9 +81,9 @@ impl IC3 {
             }
             trace!(
                 "blocking {} in frame {} with depth {}",
-                po.lemma, po.frame, po.depth
+                po.state, po.frame, po.depth
             );
-            if self.tsctx.cube_subsume_init(&po.lemma) {
+            if self.tsctx.cube_subsume_init(&po.state) {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
                     if self.check_witness_by_bmc(po.depth) {
@@ -98,14 +98,14 @@ impl IC3 {
                         continue;
                     }
                 } else if po.frame > 0 {
-                    let lemma = po.lemma.cube();
+                    let lemma = po.state.cube();
                     debug_assert!(!self.solvers[0].solve(lemma));
                 } else {
                     self.add_obligation(po.clone());
                     return BlockResult::Failure;
                 }
             }
-            if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.lemma) {
+            if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.state) {
                 if let Some(bf) = bf {
                     po.push_to(bf + 1);
                     self.add_obligation(po);
@@ -118,7 +118,7 @@ impl IC3 {
                 continue;
             }
             let blocked_start = Instant::now();
-            let blocked = self.blocked_with_ordered(po.frame, &po.lemma, false);
+            let blocked = self.blocked_with_ordered(po.frame, &po.state, false);
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
                 noc += 1;

@@ -11,7 +11,7 @@ use std::ops::{Deref, DerefMut};
 pub struct ProofObligationInner {
     pub frame: usize,
     pub input: LitVec,
-    pub lemma: LitOrdVec,
+    pub state: LitOrdVec,
     pub depth: usize,
     pub next: Option<ProofObligation>,
     pub removed: bool,
@@ -21,7 +21,7 @@ pub struct ProofObligationInner {
 impl PartialEq for ProofObligationInner {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.lemma == other.lemma && self.removed == other.removed
+        self.state == other.state && self.removed == other.removed
     }
 }
 
@@ -39,8 +39,8 @@ impl Ord for ProofObligationInner {
     fn cmp(&self, other: &Self) -> Ordering {
         match other.frame.cmp(&self.frame) {
             Ordering::Equal => match self.depth.cmp(&other.depth) {
-                Ordering::Equal => match other.lemma.len().cmp(&self.lemma.len()) {
-                    Ordering::Equal => match other.lemma.cmp(&self.lemma) {
+                Ordering::Equal => match other.state.len().cmp(&self.state.len()) {
+                    Ordering::Equal => match other.state.cmp(&self.state) {
                         Ordering::Equal => self.removed.cmp(&other.removed),
                         ord => ord,
                     },
@@ -58,7 +58,7 @@ impl Debug for ProofObligationInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ProofObligation")
             .field("frame", &self.frame)
-            .field("lemma", &self.lemma)
+            .field("lemma", &self.state)
             .field("depth", &self.depth)
             .finish()
     }
@@ -81,7 +81,7 @@ impl ProofObligation {
             inner: Grc::new(ProofObligationInner {
                 frame,
                 input,
-                lemma,
+                state: lemma,
                 depth,
                 next,
                 removed: false,
@@ -164,7 +164,7 @@ impl ProofObligationQueue {
             self.num.resize(po.frame + 1, 0);
         }
         self.num[po.frame] += 1;
-        trace!("add obligation: {}", po.lemma);
+        trace!("add obligation: {}", po.state);
         assert!(self.obligations.insert(po));
     }
 
@@ -212,7 +212,7 @@ impl ProofObligationQueue {
 
 impl IC3 {
     pub(super) fn add_obligation(&mut self, po: ProofObligation) {
-        self.statistic.avg_po_cube_len += po.lemma.len();
+        self.statistic.avg_po_cube_len += po.state.len();
         self.obligations.add(po)
     }
 }

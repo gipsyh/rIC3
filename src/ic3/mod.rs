@@ -217,7 +217,7 @@ impl Engine for IC3 {
         let iv = self.rst.init_var();
         while let Some(bad) = b {
             res.state.push(
-                bad.lemma
+                bad.state
                     .iter()
                     .filter(|l| iv.is_none_or(|v| l.var() != v))
                     .map(|l| self.rst.restore(*l))
