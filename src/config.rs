@@ -11,7 +11,7 @@ use std::path::PathBuf;
 )]
 pub struct Config {
     /// model checking engine
-    #[arg(short, long, value_enum, default_value_t = Engine::IC3)]
+    #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
     pub engine: Engine,
 
     /// model file in aiger format or in btor2 format,

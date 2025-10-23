@@ -33,7 +33,7 @@ impl From<&Btor> for WlTransys {
         assert!(
             btor.input
                 .iter()
-                .all(|i| !btor.init.contains_key(&i) && !btor.next.contains_key(&i))
+                .all(|i| !btor.init.contains_key(i) && !btor.next.contains_key(i))
         );
         Self {
             input: btor.input.clone(),
