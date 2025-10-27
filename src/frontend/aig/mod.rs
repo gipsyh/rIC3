@@ -155,12 +155,6 @@ impl AigFrontend {
                 println!("RESULT: UNSAT");
                 exit(20);
             } else if aig.bads.len() > 1 {
-                if cfg.certify || cfg.certificate.is_some() {
-                    error!(
-                        "multiple properties detected. cannot compress properties when certification is enabled"
-                    );
-                    panic!();
-                }
                 warn!(
                     "multiple properties detected. rIC3 has compressed them into a single property"
                 );
