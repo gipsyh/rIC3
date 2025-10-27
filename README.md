@@ -8,11 +8,6 @@
 ### HWMCC
 rIC3 achieved first place in both the bit-level track and the word-level bit-vector track at the 2024 and 2025 Hardware Model Checking Competition ([HWMCC](https://hwmcc.github.io)).
 
-<p align="center">
-	<img width="250" height="auto" src="./images/hwmcc24_aiger.png" style="display:inline-block;">
-	<img width="250" height="auto" src="./images/hwmcc24_btor2_bv.png" style="display:inline-block;">
-</p>
-
 To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or download the binary release at https://github.com/gipsyh/rIC3-HWMCC24.
 
 ### Publications
