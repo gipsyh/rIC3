@@ -11,8 +11,8 @@ rIC3 achieved first place in both the bit-level track and the word-level bit-vec
 To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or download the binary release at https://github.com/gipsyh/rIC3-HWMCC24.
 
 ### Publications
-- [CAV2025] [The rIC3 Hardware Model Checker](https://arxiv.org/abs/2502.13605)
-- [CAV2025] [Deeply Optimizing the SAT Solver for the IC3 Algorithm](https://arxiv.org/abs/2501.18612)
+- [CAV2025] [The rIC3 Hardware Model Checker](https://doi.org/10.1007/978-3-031-98668-0_9)
+- [CAV2025] [Deeply Optimizing the SAT Solver for the IC3 Algorithm](https://doi.org/10.1007/978-3-031-98668-0_12)
 - [DAC2024] [Predicting Lemmas in Generalization of IC3](http://doi.org/10.1145/3649329.3655970)
 - [arXiv] [Extended CTG Generalization and Dynamic Adjustment of Generalization Strategies in IC3](https://arxiv.org/abs/2501.02480)
 
@@ -39,5 +39,31 @@ To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or dow
 ### Docker
 - build image: ```docker build -t ric3 .```
 - run: ```docker run -v <AIGER FILE>:/model.aig ric3 model.aig```
+
+### Citation
+```
+@inproceedings{rIC3,
+  author       = {Yuheng Su and
+                  Qiusong Yang and
+                  Yiwei Ci and
+                  Tianjun Bu and
+                  Ziyu Huang},
+  editor       = {Ruzica Piskac and
+                  Zvonimir Rakamaric},
+  title        = {The rIC3 Hardware Model Checker},
+  booktitle    = {Computer Aided Verification - 37th International Conference, {CAV}
+                  2025, Zagreb, Croatia, July 23-25, 2025, Proceedings, Part {I}},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {15931},
+  pages        = {185--199},
+  publisher    = {Springer},
+  year         = {2025},
+  url          = {https://doi.org/10.1007/978-3-031-98668-0\_9},
+  doi          = {10.1007/978-3-031-98668-0\_9},
+  timestamp    = {Sun, 02 Nov 2025 12:33:32 +0100},
+  biburl       = {https://dblp.org/rec/conf/cav/SuYCBH25.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+```
 
 Copyright (C) 2023 - Present, Yuheng Su (gipsyh.icu@gmail.com). All rights reserved.
