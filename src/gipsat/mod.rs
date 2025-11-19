@@ -39,7 +39,7 @@ pub struct DagCnfSolver {
     pos_in_trail: Vec<u32>,
     level: VarMap<u32>,
     reason: VarMap<CRef>,
-    propagated: u32,
+    propagated: usize,
     vsids: Vsids,
     phase_saving: VarMap<Lbool>,
     analyze: Analyze,

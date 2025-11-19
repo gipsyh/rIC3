@@ -37,7 +37,7 @@ impl DagCnfSolver {
             }
             self.phase_saving[bt] = Lbool::from(bt.polarity());
         }
-        self.propagated = self.pos_in_trail[level];
+        self.propagated = self.pos_in_trail[level] as usize;
         self.pos_in_trail.truncate(level);
     }
 
