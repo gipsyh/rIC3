@@ -56,40 +56,55 @@ impl DagCnfSolver {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
-            'next_cls: while w < self.watchers.wtrs[p].len() {
-                let watchers = &mut self.watchers.wtrs[p];
-                let blocker = watchers[w].blocker;
+            let wtrs_p_vec = &mut self.watchers.wtrs[p] as *mut Gvec<Watcher>;
+            let wtrs_p_dat = unsafe { (*wtrs_p_vec).as_mut_ptr() };
+            let mut wtrs_p_len = unsafe { (*wtrs_p_vec).len() };
+            'next_cls: while w < wtrs_p_len {
+                let blocker = unsafe { (*wtrs_p_dat.add(w)).blocker };
                 if self.value.v(blocker) == Lbool::TRUE {
                     w += 1;
                     continue;
                 }
-                let cid = watchers[w].clause;
+                let cid = unsafe { (*wtrs_p_dat.add(w)).clause };
                 let mut cref = self.cdb.get(cid);
                 if cref[0] == !p {
                     cref.swap(0, 1);
                 }
-                debug_assert!(cref[1] == !p);
-                if cref[0] != blocker && self.value.v(cref[0]) == Lbool::TRUE {
-                    watchers[w].blocker = cref[0];
+                let cref0 = cref[0];
+                if cref0 != blocker && self.value.v(cref[0]) == Lbool::TRUE {
+                    unsafe {
+                        (*wtrs_p_dat.add(w)).blocker = cref0;
+                    }
                     w += 1;
                     continue;
                 }
-                for i in 2..cref.len() {
+                let cref_len = cref.len();
+                for i in 2..cref_len {
                     let lit = cref[i];
                     if !self.value.v(lit).is_false() {
                         cref.swap(1, i);
-                        watchers.swap_remove(w);
-                        self.watchers.wtrs[!cref[1]].push(Watcher::new(cid, cref[0]));
+                        wtrs_p_len -= 1;
+                        unsafe {
+                            *wtrs_p_dat.add(w) = *wtrs_p_dat.add(wtrs_p_len);
+                        }
+                        self.watchers.wtrs[!cref[1]].push(Watcher::new(cid, cref0));
                         continue 'next_cls;
                     }
                 }
-                watchers[w].blocker = cref[0];
-                if self.value.v(cref[0]).is_false() {
+                unsafe {
+                    (*wtrs_p_dat.add(w)).blocker = cref0;
+                }
+                if self.value.v(cref0).is_false() {
+                    unsafe {
+                        (*wtrs_p_vec).set_len(wtrs_p_len);
+                    }
                     return cid;
                 }
-                let assign = cref[0];
-                self.assign(assign, cid);
+                self.assign(cref0, cid);
                 w += 1;
+            }
+            unsafe {
+                (*wtrs_p_vec).set_len(wtrs_p_len);
             }
         }
         CREF_NONE
@@ -136,7 +151,6 @@ impl DagCnfSolver {
                         unsafe {
                             *wtrs_p_dat.add(w) = *wtrs_p_dat.add(wtrs_p_len);
                         }
-                        // watchers.swap_remove(w);
                         self.watchers.wtrs[!cref[1]].push(Watcher::new(cid, cref0));
                         continue 'next_cls;
                     }
