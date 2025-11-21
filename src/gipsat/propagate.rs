@@ -52,7 +52,7 @@ impl Watchers {
 impl DagCnfSolver {
     #[inline]
     fn propagate_full(&mut self) -> CRef {
-        while self.propagated < self.trail.len() {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
@@ -97,16 +97,14 @@ impl DagCnfSolver {
 
     #[inline]
     fn propagate_domain(&mut self) -> CRef {
-        let mut propagated = self.propagated;
-        let mut trail_len = self.trail.len();
-        while propagated < trail_len {
-            let p = self.trail[propagated];
-            propagated += 1;
+        let mut trail_len = self.trail.len() as u32;
+        while self.propagated < trail_len {
+            let p = self.trail[self.propagated];
+            self.propagated += 1;
             let mut w = 0;
             let wtrs_p_vec = &mut self.watchers.wtrs[p] as *mut Gvec<Watcher>;
             let wtrs_p_dat = unsafe { (*wtrs_p_vec).as_mut_ptr() };
             let mut wtrs_p_len = unsafe { (*wtrs_p_vec).len() };
-
             'next_cls: while w < wtrs_p_len {
                 let blocker = unsafe { (*wtrs_p_dat.add(w)).blocker };
                 let v = self.value.v(blocker);
@@ -119,8 +117,6 @@ impl DagCnfSolver {
                 if cref[0] == !p {
                     cref.swap(0, 1);
                 }
-                debug_assert!(cref[1] == !p);
-
                 let cref0 = cref[0];
                 if cref0 != blocker {
                     let v = self.value.v(cref0);
@@ -132,7 +128,6 @@ impl DagCnfSolver {
                         continue;
                     }
                 }
-
                 let cref_len = cref.len();
                 for i in 2..cref_len {
                     let lit = cref[i];
@@ -154,7 +149,6 @@ impl DagCnfSolver {
                     unsafe {
                         (*wtrs_p_vec).set_len(wtrs_p_len);
                     }
-                    self.propagated = propagated;
                     return cid;
                 }
                 self.assign(cref0, cid);
@@ -165,7 +159,6 @@ impl DagCnfSolver {
                 (*wtrs_p_vec).set_len(wtrs_p_len);
             }
         }
-        self.propagated = propagated;
         CREF_NONE
     }
 
