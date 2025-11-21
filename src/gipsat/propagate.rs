@@ -97,8 +97,7 @@ impl DagCnfSolver {
 
     #[inline]
     fn propagate_domain(&mut self) -> CRef {
-        let mut trail_len = self.trail.len() as u32;
-        while self.propagated < trail_len {
+        while self.propagated < self.trail.len() as u32 {
             let p = self.trail[self.propagated];
             self.propagated += 1;
             let mut w = 0;
@@ -152,7 +151,6 @@ impl DagCnfSolver {
                     return cid;
                 }
                 self.assign(cref0, cid);
-                trail_len += 1;
                 w += 1;
             }
             unsafe {
