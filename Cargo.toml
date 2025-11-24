@@ -17,7 +17,7 @@ kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.2
 logicrs = { path = "./deps/logicrs", version = "0.6.0" }
 giputils = { path = "./deps/giputils", version = "0.3.5" }
 btor = { path = "./deps/btor-rs", version = "0.2.1" }
-clap = { version = "4.5.52", features = ["derive"] }
+clap = { version = "4.5.53", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
 bitfield-struct = "0.12.1"
