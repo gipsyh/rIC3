@@ -16,3 +16,6 @@
 [submodule "deps/btor-rs"]
 	path = deps/btor-rs
 	url = https://github.com/gipsyh/btor-rs.git
+[submodule "deps/bitwuzla-rs"]
+	path = deps/bitwuzla-rs
+	url = https://github.com/gipsyh/bitwuzla-rs
