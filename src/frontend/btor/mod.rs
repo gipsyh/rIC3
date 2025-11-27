@@ -16,7 +16,7 @@ use log::{debug, error, warn};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
-        Sort, Term, Value,
+        BvConst, Sort, Term, Value,
         op::{self, Read},
     },
 };
@@ -168,7 +168,7 @@ impl BtorFrontend {
             Sort::Array(idxw, elew) => {
                 let idx = b / elew;
                 let eidx = b % elew;
-                let read_idx = Term::bv_const_from_usize(idx, idxw);
+                let read_idx = Term::bv_const(BvConst::from_usize(idx, idxw));
                 let read = Term::new_op(Read, [w.clone(), read_idx]);
                 read.slice(eidx, eidx)
             }

@@ -114,11 +114,11 @@ fn aig_symbols(aig: &Aig) -> VarSymbols {
             for s in s.split(' ') {
                 let mut rs = s;
                 let mut idx = 0;
-                if s.ends_with(']') {
-                    if let Some(start) = s.rfind('[') {
-                        idx = s[start + 1..s.len() - 1].parse::<usize>().unwrap();
-                        rs = &s[..start];
-                    }
+                if s.ends_with(']')
+                    && let Some(start) = s.rfind('[')
+                {
+                    idx = s[start + 1..s.len() - 1].parse::<usize>().unwrap();
+                    rs = &s[..start];
                 }
                 symbol.insert(Var::from(x), rs.to_string(), idx);
             }
