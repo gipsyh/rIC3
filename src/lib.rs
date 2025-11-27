@@ -10,7 +10,7 @@ pub mod kind;
 pub mod portfolio;
 pub mod rlive;
 pub mod transys;
-pub mod wl;
+pub mod wltransys;
 
 use crate::transys::certify::{Proof, Witness};
 use config::Config;

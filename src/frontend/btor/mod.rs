@@ -5,7 +5,7 @@ use crate::{
     Proof, Witness,
     config::Config,
     transys::{self as bl, TransysIf},
-    wl::transys::{WlTransys, certify::Restore},
+    wltransys::{WlTransys, certify::Restore},
 };
 use btor::Btor;
 use giputils::{
