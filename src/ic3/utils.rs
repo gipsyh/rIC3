@@ -1,4 +1,6 @@
+use crate::ic3::IC3;
 use giputils::statistic::{Average, CountedDuration, RunningTime, SuccessRate};
+use logicrs::{Lit, LitVec, SymbolAssign};
 use std::{fmt::Debug, time::Duration};
 
 #[derive(Debug, Clone, Default)]
@@ -33,4 +35,14 @@ pub struct Statistic {
     pub num_auxiliary_var: usize,
 
     pub test: SuccessRate,
+}
+
+impl IC3 {
+    pub(crate) fn lits_symbols(&self, lits: impl IntoIterator<Item = Lit>) -> Vec<SymbolAssign> {
+        let lits: LitVec = lits.into_iter().map(|l| self.rst.restore(l)).collect();
+        let lits = self.rst.restore_eq_state(&lits);
+        let mut symbols = self.symbols.lits_symbols(lits);
+        symbols.sort_by(|s1, s2| s1.symbol.cmp(&s2.symbol));
+        symbols
+    }
 }

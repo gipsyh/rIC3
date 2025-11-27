@@ -45,10 +45,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             exit(1);
         }
     };
-    let ts = frontend.ts();
+    let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine: Box<dyn Engine> = match cfg.engine {
-        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts)),
+        config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, symbols)),
         config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
         config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
         config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),

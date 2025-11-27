@@ -3,7 +3,7 @@ use crate::ic3::{
     mic::{DropVarParameter, MicType},
     proofoblig::ProofObligation,
 };
-use log::{debug, info, trace};
+use log::{debug, info};
 use logicrs::{LitOrdVec, LitVec, satif::Satif};
 use std::time::Instant;
 
@@ -39,6 +39,11 @@ impl IC3 {
         self.statistic.avg_po_cube_len += po.state.len();
         po.push_to(frame);
         self.add_obligation(po.clone());
+        debug!(
+            "generalized lemma {:?} in F{}",
+            self.lits_symbols(mic.clone()),
+            frame - 1
+        );
         if self.add_lemma(frame - 1, mic.clone(), false, Some(po)) {
             return true;
         }
@@ -79,10 +84,6 @@ impl IC3 {
             {
                 return BlockResult::LimitExceeded;
             }
-            trace!(
-                "blocking {} in frame {} with depth {}",
-                po.state, po.frame, po.depth
-            );
             if self.tsctx.cube_subsume_init(&po.state) {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
@@ -112,7 +113,6 @@ impl IC3 {
                 }
                 continue;
             }
-            debug!("{}", self.frame.statistic(false));
             po.bump_act();
             if self.cfg.ic3.drop_po && po.act > 20.0 {
                 continue;
@@ -121,6 +121,12 @@ impl IC3 {
             let blocked = self.blocked_with_ordered(po.frame, &po.state, false);
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
+                debug!(
+                    "blocked {:?} in F{} with depth {}",
+                    self.lits_symbols(po.state.clone()),
+                    po.frame,
+                    po.depth
+                );
                 noc += 1;
                 let mic_type = if self.cfg.ic3.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
@@ -159,6 +165,7 @@ impl IC3 {
                 if self.generalize(po, mic_type) {
                     return BlockResult::Proved;
                 }
+                debug!("{}", self.frame.statistic(false));
             } else {
                 let (model, inputs) = self.get_pred(po.frame, true);
                 self.add_obligation(ProofObligation::new(

@@ -9,11 +9,11 @@ use activity::Activity;
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, info, trace};
-use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use statistic::Statistic;
 use std::time::Instant;
+use utils::Statistic;
 
 mod activity;
 mod aux;
@@ -24,12 +24,13 @@ mod mic;
 mod proofoblig;
 mod propagate;
 mod solver;
-mod statistic;
+mod utils;
 mod verify;
 
 pub struct IC3 {
     cfg: Config,
     ts: Transys,
+    symbols: VarSymbols,
     tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
@@ -87,7 +88,7 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(cfg: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, ts: Transys, symbols: VarSymbols) -> Self {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
@@ -109,6 +110,7 @@ impl IC3 {
         Self {
             cfg,
             ts,
+            symbols,
             tsctx,
             activity,
             solvers: Vec::new(),

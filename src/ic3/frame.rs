@@ -237,7 +237,7 @@ impl IC3 {
         po: Option<ProofObligation>,
     ) -> bool {
         let lemma = LitOrdVec::new(lemma);
-        trace!("add lemma: frame:{frame}, {lemma}");
+        trace!("add F{frame} lemma {:?}", self.lits_symbols(lemma.clone()));
         if frame == 0 {
             assert!(self.frame.len() == 1);
             self.solvers[0].add_clause(&!lemma.cube());

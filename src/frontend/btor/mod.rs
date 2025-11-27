@@ -14,7 +14,7 @@ use giputils::{
 };
 use log::{debug, error, warn};
 use logicrs::{
-    Lit, Var,
+    Lit, Var, VarSymbols,
     fol::{
         Sort, Term, Value,
         op::{self, Read},
@@ -177,7 +177,7 @@ impl BtorFrontend {
 }
 
 impl Frontend for BtorFrontend {
-    fn ts(&mut self) -> bl::Transys {
+    fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
         wts.coi_refine(false);
         wts.simplify();
@@ -192,7 +192,7 @@ impl Frontend for BtorFrontend {
         for (k, v) in bbl_rst {
             self.rst.bb_rst.insert(k, bb_rst[&v].clone());
         }
-        ts
+        (ts, VarSymbols::new())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {

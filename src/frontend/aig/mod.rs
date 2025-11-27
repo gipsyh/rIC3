@@ -7,7 +7,7 @@ use crate::{
 use aig::{Aig, AigEdge, TernarySimulate};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
-use logicrs::{Lbool, Lit, LitVec, Var, VarVMap};
+use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols, VarVMap};
 use std::{
     fmt::Display,
     path::Path,
@@ -101,16 +101,37 @@ impl Transys {
     }
 }
 
-pub fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
+fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
     let (mut aig, restore) = aig.coi_refine();
     aig.constraints.retain(|e| !e.is_constant(true));
     (aig, restore)
+}
+
+fn aig_symbols(aig: &Aig) -> VarSymbols {
+    let mut symbol = VarSymbols::new();
+    for &x in aig.inputs.iter().chain(aig.latchs.iter().map(|l| &l.input)) {
+        if let Some(s) = aig.symbols.get(&x) {
+            for s in s.split(' ') {
+                let mut rs = s;
+                let mut idx = 0;
+                if s.ends_with(']') {
+                    if let Some(start) = s.rfind('[') {
+                        idx = s[start + 1..s.len() - 1].parse::<usize>().unwrap();
+                        rs = &s[..start];
+                    }
+                }
+                symbol.insert(Var::from(x), rs.to_string(), idx);
+            }
+        }
+    }
+    symbol
 }
 
 pub struct AigFrontend {
     oaig: Aig,
     ots: Transys,
     ts: Transys,
+    ts_symbols: VarSymbols,
     rst: VarVMap,
 }
 
@@ -162,9 +183,18 @@ impl AigFrontend {
             }
         }
         let ots = Transys::from_aig(&aig, true);
+        let osymbols = aig_symbols(&aig);
         let (aig, rst) = aig_preprocess(&aig);
+        let inv_rst = rst.inverse();
+        let ts_symbols = osymbols.map_var(inv_rst.try_map_fn());
         let ts = Transys::from_aig(&aig, true);
-        Self { oaig, ots, ts, rst }
+        Self {
+            oaig,
+            ots,
+            ts,
+            ts_symbols,
+            rst,
+        }
     }
 
     pub fn is_safety(&self) -> bool {
@@ -178,8 +208,8 @@ impl AigFrontend {
 }
 
 impl Frontend for AigFrontend {
-    fn ts(&mut self) -> Transys {
-        self.ts.clone()
+    fn ts(&mut self) -> (Transys, VarSymbols) {
+        (self.ts.clone(), self.ts_symbols.clone())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
