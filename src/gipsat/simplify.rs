@@ -3,7 +3,7 @@ use super::{
     cdb::{CREF_NONE, CRef},
 };
 use giputils::gvec::Gvec;
-use log::debug;
+use log::{debug, trace};
 use logicrs::{Lbool, LitOrdVec, LitVec, VarMap};
 use std::{mem::take, time::Instant};
 
@@ -100,7 +100,7 @@ impl DagCnfSolver {
         self.cdb.trans = self.simplify_satisfied_clauses(trans);
         simplified -= self.cdb.trans.len();
         self.simplify.last_num_assign = self.trail.len();
-        debug!(
+        trace!(
             "gipsat simplifies {simplified} statisfied clauses in {:?}",
             start.elapsed()
         );

@@ -2,8 +2,9 @@ mod bitblast;
 pub mod certify;
 mod preproc;
 mod simplify;
+pub mod unroll;
 
-use crate::wl::transys::certify::Restore;
+use crate::wltransys::certify::Restore;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Sort, Term, op};
 use std::mem::take;

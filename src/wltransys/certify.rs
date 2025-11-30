@@ -1,5 +1,27 @@
+use crate::wltransys::WlTransys;
 use giputils::hash::GHashMap;
-use logicrs::{Var, fol::Term};
+use logicrs::{
+    Var,
+    fol::{Term, Value},
+};
+
+#[derive(Clone, Debug, Default)]
+pub struct WlWitness {
+    pub input: GHashMap<Term, Value>,
+    pub state: GHashMap<Term, Value>,
+}
+
+impl WlWitness {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct WlProof {
+    pub proof: WlTransys,
+}
 
 #[derive(Clone, Default)]
 pub struct Restore {

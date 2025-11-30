@@ -106,7 +106,7 @@ impl FrTs {
                     debug!("frts: {v} -> {m}");
                     replace.insert_lit(lv, m);
                     self.solver.add_eq(lv, m);
-                    if replace.len() % 5000 == 0 {
+                    if replace.len().is_multiple_of(5000) {
                         self.ts.replace(&replace, &mut self.rst);
                         self.ts.coi_refine(&mut self.rst);
                         let mut simp = DagCnfSimplify::new(&self.ts.rel);

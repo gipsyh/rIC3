@@ -5,7 +5,7 @@ use crate::{
     Proof, Witness,
     config::Config,
     transys::{self as bl, TransysIf},
-    wl::transys::{WlTransys, certify::Restore},
+    wltransys::{WlTransys, certify::Restore},
 };
 use btor::Btor;
 use giputils::{
@@ -14,9 +14,9 @@ use giputils::{
 };
 use log::{debug, error, warn};
 use logicrs::{
-    Lit, Var,
+    Lit, Var, VarSymbols,
     fol::{
-        Sort, Term, Value,
+        BvConst, Sort, Term, Value,
         op::{self, Read},
     },
 };
@@ -28,22 +28,25 @@ use std::{
     process::{Command, exit},
 };
 
-impl From<&Btor> for WlTransys {
-    fn from(btor: &Btor) -> Self {
+impl WlTransys {
+    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, String>) {
         assert!(
             btor.input
                 .iter()
                 .all(|i| !btor.init.contains_key(i) && !btor.next.contains_key(i))
         );
-        Self {
-            input: btor.input.clone(),
-            latch: btor.latch.clone(),
-            init: btor.init.clone(),
-            next: btor.next.clone(),
-            bad: btor.bad.clone(),
-            constraint: btor.constraint.clone(),
-            justice: Default::default(),
-        }
+        (
+            Self {
+                input: btor.input.clone(),
+                latch: btor.latch.clone(),
+                init: btor.init.clone(),
+                next: btor.next.clone(),
+                bad: btor.bad.clone(),
+                constraint: btor.constraint.clone(),
+                justice: Default::default(),
+            },
+            btor.symbols.clone(),
+        )
     }
 }
 
@@ -56,13 +59,16 @@ impl From<&WlTransys> for Btor {
             next: wl.next.clone(),
             bad: wl.bad.clone(),
             constraint: wl.constraint.clone(),
+            symbols: Default::default(),
         }
     }
 }
 
+#[allow(unused)]
 pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
+    symbols: GHashMap<Term, String>,
     _cfg: Config,
     // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
@@ -91,7 +97,7 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let owts = WlTransys::from(&btor);
+        let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);
@@ -105,6 +111,7 @@ impl BtorFrontend {
         Self {
             owts,
             wts,
+            symbols,
             _cfg: cfg.clone(),
             idmap,
             no_next,
@@ -168,7 +175,7 @@ impl BtorFrontend {
             Sort::Array(idxw, elew) => {
                 let idx = b / elew;
                 let eidx = b % elew;
-                let read_idx = Term::bv_const_from_usize(idx, idxw);
+                let read_idx = Term::bv_const(BvConst::from_usize(idx, idxw));
                 let read = Term::new_op(Read, [w.clone(), read_idx]);
                 read.slice(eidx, eidx)
             }
@@ -177,7 +184,7 @@ impl BtorFrontend {
 }
 
 impl Frontend for BtorFrontend {
-    fn ts(&mut self) -> bl::Transys {
+    fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
         wts.coi_refine(false);
         wts.simplify();
@@ -192,7 +199,11 @@ impl Frontend for BtorFrontend {
         for (k, v) in bbl_rst {
             self.rst.bb_rst.insert(k, bb_rst[&v].clone());
         }
-        ts
+        (ts, VarSymbols::new())
+    }
+
+    fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
+        (self.wts.clone(), self.symbols.clone())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {

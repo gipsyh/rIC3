@@ -1,4 +1,4 @@
-use crate::wl::transys::WlTransys;
+use crate::wltransys::WlTransys;
 use giputils::hash::GHashMap;
 use logicrs::fol::{Sort, Term, TermType, op};
 use std::ops::Deref;

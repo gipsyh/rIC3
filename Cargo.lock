@@ -533,6 +533,7 @@ dependencies = [
  "rand",
  "satif-cadical",
  "satif-kissat",
+ "smtif-bitwuzla",
  "tempfile",
 ]
 
@@ -683,6 +684,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2a4719bff48cee6b39d12c020eeb490953ad2443b7055bd0b21fca26bd8c28b"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "smtif-bitwuzla"
+version = "0.1.0"
+dependencies = [
+ "giputils",
+ "lazy_static",
+ "logicrs",
 ]
 
 [[package]]
