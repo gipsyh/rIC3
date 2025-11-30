@@ -17,11 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jwlawson/actions-setup-cmake@v2.0.2
+      - name: Install system dependencies
+        run: sudo apt update && sudo apt install -y libmpfr-dev
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
           components: rustfmt, clippy
+      - name: Install meson and ninja
+        run: pip install meson ninja
       - name: Pull submodules
         run: git submodule update --init --recursive
       - name: Format check
