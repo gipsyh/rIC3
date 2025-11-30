@@ -10,13 +10,23 @@ pub mod kind;
 pub mod portfolio;
 pub mod rlive;
 pub mod transys;
+pub mod wlbmc;
 pub mod wltransys;
 
-use crate::transys::certify::{Proof, Witness};
+use crate::{
+    transys::certify::{Proof, Witness},
+    wltransys::certify::{WlProof, WlWitness},
+};
 use config::Config;
 
 pub trait Engine {
     fn check(&mut self) -> Option<bool>;
+
+    fn statistic(&mut self) {}
+
+    fn is_wl(&self) -> bool {
+        false
+    }
 
     fn proof(&mut self) -> Proof {
         panic!("unsupport proof");
@@ -26,5 +36,13 @@ pub trait Engine {
         panic!("unsupport witness");
     }
 
-    fn statistic(&mut self) {}
+    fn wl_proof(&mut self) -> WlProof {
+        assert!(self.is_wl());
+        panic!("unsupport proof");
+    }
+
+    fn wl_witness(&mut self) -> WlWitness {
+        assert!(self.is_wl());
+        panic!("unsupport witness");
+    }
 }

@@ -2,6 +2,7 @@ mod bitblast;
 pub mod certify;
 mod preproc;
 mod simplify;
+pub mod unroll;
 
 use crate::wltransys::certify::Restore;
 use giputils::hash::{GHashMap, GHashSet};

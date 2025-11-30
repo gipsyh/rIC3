@@ -71,6 +71,7 @@ impl Config {
         match self.engine {
             Engine::IC3 => self.ic3.validate(),
             Engine::BMC => {}
+            Engine::WlBMC => {}
             Engine::Kind => {}
             Engine::Rlive => {}
             Engine::Portfolio => {}
@@ -86,10 +87,18 @@ pub enum Engine {
     Kind,
     /// bmc
     BMC,
+    /// word level bmc
+    WlBMC,
     /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive,
     /// portfolio
     Portfolio,
+}
+
+impl Engine {
+    pub fn is_wl(&self) -> bool {
+        matches!(self, Engine::WlBMC)
+    }
 }
 
 #[derive(Args, Clone, Debug)]

@@ -28,22 +28,25 @@ use std::{
     process::{Command, exit},
 };
 
-impl From<&Btor> for WlTransys {
-    fn from(btor: &Btor) -> Self {
+impl WlTransys {
+    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, String>) {
         assert!(
             btor.input
                 .iter()
                 .all(|i| !btor.init.contains_key(i) && !btor.next.contains_key(i))
         );
-        Self {
-            input: btor.input.clone(),
-            latch: btor.latch.clone(),
-            init: btor.init.clone(),
-            next: btor.next.clone(),
-            bad: btor.bad.clone(),
-            constraint: btor.constraint.clone(),
-            justice: Default::default(),
-        }
+        (
+            Self {
+                input: btor.input.clone(),
+                latch: btor.latch.clone(),
+                init: btor.init.clone(),
+                next: btor.next.clone(),
+                bad: btor.bad.clone(),
+                constraint: btor.constraint.clone(),
+                justice: Default::default(),
+            },
+            btor.symbols.clone(),
+        )
     }
 }
 
@@ -56,13 +59,16 @@ impl From<&WlTransys> for Btor {
             next: wl.next.clone(),
             bad: wl.bad.clone(),
             constraint: wl.constraint.clone(),
+            symbols: Default::default(),
         }
     }
 }
 
+#[allow(unused)]
 pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
+    symbols: GHashMap<Term, String>,
     _cfg: Config,
     // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
@@ -91,7 +97,7 @@ impl BtorFrontend {
             warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
             todo!()
         }
-        let owts = WlTransys::from(&btor);
+        let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);
@@ -105,6 +111,7 @@ impl BtorFrontend {
         Self {
             owts,
             wts,
+            symbols,
             _cfg: cfg.clone(),
             idmap,
             no_next,
@@ -193,6 +200,10 @@ impl Frontend for BtorFrontend {
             self.rst.bb_rst.insert(k, bb_rst[&v].clone());
         }
         (ts, VarSymbols::new())
+    }
+
+    fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
+        (self.wts.clone(), self.symbols.clone())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
