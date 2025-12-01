@@ -1,19 +1,12 @@
-[tasks]
-s0
-l0
-l1
-
 [options]
-s0: mode prove
-l0: mode live
-l1: mode live
+mode prove
 
 [engines]
-aiger suprove
+btor rIC3
 
 [script]
-read -formal -D L1 counter.sv
-prep -top main
+read -formal -sv counter.sv
+prep -top counter
 
 [files]
 counter.sv

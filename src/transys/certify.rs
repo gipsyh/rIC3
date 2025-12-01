@@ -1,4 +1,4 @@
-use crate::transys::{Transys, TransysIf};
+use crate::transys::{Transys, TransysIf, unroll::TransysUnroll};
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 
@@ -6,6 +6,7 @@ use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 pub struct Witness {
     pub input: Vec<LitVec>,
     pub state: Vec<LitVec>,
+    pub bad_id: usize,
 }
 
 impl Witness {
@@ -23,13 +24,41 @@ impl Witness {
     pub fn map_var(&self, f: impl Fn(Var) -> Var) -> Self {
         let input = self.input.iter().map(|w| w.map_var(&f)).collect();
         let state = self.state.iter().map(|w| w.map_var(&f)).collect();
-        Self { input, state }
+        Self {
+            input,
+            state,
+            bad_id: self.bad_id,
+        }
     }
 
     pub fn filter_map_var(&self, f: impl Fn(Var) -> Option<Var>) -> Self {
         let input = self.input.iter().map(|w| w.filter_map_var(&f)).collect();
         let state = self.state.iter().map(|w| w.filter_map_var(&f)).collect();
-        Self { input, state }
+        Self {
+            input,
+            state,
+            bad_id: self.bad_id,
+        }
+    }
+
+    pub fn map(&self, f: impl Fn(Lit) -> Lit) -> Self {
+        let input = self.input.iter().map(|w| w.map(&f)).collect();
+        let state = self.state.iter().map(|w| w.map(&f)).collect();
+        Self {
+            input,
+            state,
+            bad_id: self.bad_id,
+        }
+    }
+
+    pub fn filter_map(&self, f: impl Fn(Lit) -> Option<Lit>) -> Self {
+        let input = self.input.iter().map(|w| w.filter_map(&f)).collect();
+        let state = self.state.iter().map(|w| w.filter_map(&f)).collect();
+        Self {
+            input,
+            state,
+            bad_id: self.bad_id,
+        }
     }
 
     pub fn concat(iter: impl IntoIterator<Item = Witness>) -> Self {
@@ -60,6 +89,34 @@ impl Witness {
             input.push(solver.sat_value_lit(i).unwrap());
         }
         (self.input[0], self.state[0]) = (input, state);
+    }
+
+    pub fn exact_state(&mut self, ts: &Transys) {
+        let mut uts = TransysUnroll::new(ts);
+        uts.unroll_to(self.len() - 1);
+        let mut solver = cadical::Solver::new();
+        ts.load_init(&mut solver);
+        for k in 0..=uts.num_unroll {
+            uts.load_trans(&mut solver, k, true);
+            for l in self.state[k]
+                .iter()
+                .chain(self.input[k].iter())
+                .map(|x| uts.lit_next(*x, k))
+            {
+                solver.add_clause(&[l]);
+            }
+        }
+        assert!(solver.solve(&[]));
+        *self = uts.witness(&solver);
+        self.bad_id = ts
+            .bad
+            .iter()
+            .position(|&b| {
+                solver
+                    .sat_value(uts.lit_next(b, uts.num_unroll))
+                    .is_some_and(|v| v)
+            })
+            .unwrap();
     }
 }
 
@@ -137,6 +194,7 @@ impl Restore {
         let xm = self.vmap[x].lit().not_if(!y.polarity());
         let ym = self.vmap[y.var()];
         self.eqmap.entry(ym).or_default().push(xm);
+        self.vmap.remove(&x);
         if let Some(iv) = self.init_var
             && iv == x
         {

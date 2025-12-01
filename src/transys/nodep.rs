@@ -112,6 +112,7 @@ impl TransysIf for NoDepTransys {
 
 impl Transys {
     pub fn remove_dep(self) -> NoDepTransys {
+        assert!(self.bad.len() == 1);
         NoDepTransys {
             input: self.input,
             latch: self.latch,

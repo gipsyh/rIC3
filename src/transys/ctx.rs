@@ -123,6 +123,7 @@ impl Transys {
                 }
             }
         }
+        assert!(self.bad.len() == 1);
         TransysCtx {
             input,
             latch,

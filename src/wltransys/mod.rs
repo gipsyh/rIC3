@@ -73,6 +73,14 @@ impl WlTransys {
         );
         iv
     }
+
+    pub fn compress_bads(&mut self) {
+        if self.bad.len() <= 1 {
+            return;
+        }
+        let bad = take(&mut self.bad);
+        self.bad = vec![Term::new_op_fold(op::Or, bad)];
+    }
 }
 
 //     pub fn term_next(&self, term: &Term) -> Term {
