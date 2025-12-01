@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
-use logicrs::{LitVec, satif::Satif};
+use logicrs::satif::Satif;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
@@ -20,8 +20,9 @@ pub struct BMC {
 }
 
 impl BMC {
-    pub fn new(cfg: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
+        ts.compress_bads();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
@@ -115,31 +116,12 @@ impl Engine for BMC {
     }
 
     fn witness(&mut self) -> Witness {
-        let mut wit = Witness::default();
-        for k in 0..=self.uts.num_unroll {
-            let mut w = LitVec::new();
-            for l in self.uts.ts.input() {
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(self.rst.restore(l.not_if(!v)));
-                }
-            }
-            wit.input.push(w);
-            let mut w = LitVec::new();
-            for l in self.uts.ts.latch() {
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(self.rst.restore(l.not_if(!v)));
-                }
-            }
-            wit.state.push(w);
-        }
+        let mut wit = self.uts.witness(self.solver.as_ref());
+        wit.map(|l| self.rst.restore(l));
         for s in wit.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
-        wit.exact_init_state(&self.ots);
+        wit.exact_state(&self.ots);
         wit
     }
 }

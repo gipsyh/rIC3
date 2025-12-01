@@ -17,8 +17,9 @@ pub struct Kind {
 }
 
 impl Kind {
-    pub fn new(cfg: Config, ts: Transys) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys) -> Self {
         let ots = ts.clone();
+        ts.compress_bads();
         let rst = Restore::new(&ts);
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
@@ -228,36 +229,13 @@ impl Engine for Kind {
     }
 
     fn witness(&mut self) -> Witness {
-        let mut wit = Witness::default();
-        for k in 0..=self.uts.num_unroll {
-            let mut w = LitVec::new();
-            for l in self.uts.ts.input() {
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(self.rst.restore(l.not_if(!v)));
-                }
-            }
-            wit.input.push(w);
-            let mut w = LitVec::new();
-            for l in self.uts.ts.latch() {
-                if let Some(iv) = self.rst.init_var()
-                    && iv == l
-                {
-                    continue;
-                }
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(self.rst.restore(l.not_if(!v)));
-                }
-            }
-            wit.state.push(w);
-        }
-        wit.exact_init_state(&self.ots);
+        let mut wit = self.uts.witness(self.solver.as_ref());
+        let iv = self.rst.init_var();
+        wit.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
         for s in wit.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
+        wit.exact_state(&self.ots);
         wit
     }
 }

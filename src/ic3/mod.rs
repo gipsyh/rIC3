@@ -88,8 +88,9 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(cfg: Config, ts: Transys, symbols: VarSymbols) -> Self {
+    pub fn new(cfg: Config, mut ts: Transys, symbols: VarSymbols) -> Self {
         let ots = ts.clone();
+        ts.compress_bads();
         let rst = Restore::new(&ts);
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
@@ -209,35 +210,26 @@ impl Engine for IC3 {
     }
 
     fn witness(&mut self) -> Witness {
-        if let Some(res) = self.localabs.witness(&self.rst) {
-            return res;
-        }
-        let mut res = Witness::default();
-        let b = self.obligations.peak().unwrap();
-        assert!(b.frame == 0);
-        let mut b = Some(b);
+        let mut res = if let Some(res) = self.localabs.witness() {
+            res
+        } else {
+            let mut res = Witness::default();
+            let b = self.obligations.peak().unwrap();
+            assert!(b.frame == 0);
+            let mut b = Some(b);
+            while let Some(bad) = b {
+                res.state.push(bad.state.iter().cloned().collect());
+                res.input.push(bad.input.iter().cloned().collect());
+                b = bad.next.clone();
+            }
+            res
+        };
         let iv = self.rst.init_var();
-        while let Some(bad) = b {
-            res.state.push(
-                bad.state
-                    .iter()
-                    .filter(|l| iv.is_none_or(|v| l.var() != v))
-                    .map(|l| self.rst.restore(*l))
-                    .collect(),
-            );
-            res.input.push(
-                bad.input
-                    .iter()
-                    .filter(|l| iv.is_none_or(|v| l.var() != v))
-                    .map(|l| self.rst.restore(*l))
-                    .collect(),
-            );
-            b = bad.next.clone();
-        }
-        res.exact_init_state(&self.ots);
+        res.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
         for s in res.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
+        res.exact_state(&self.ots);
         res
     }
 

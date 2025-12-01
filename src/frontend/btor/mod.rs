@@ -87,15 +87,6 @@ impl BtorFrontend {
                 btor.to_file(certificate);
             }
             exit(20);
-        } else if btor.bad.len() > 1 {
-            if cfg.certify {
-                error!(
-                    "Multiple properties detected. Cannot compress properties when certification is enabled."
-                );
-                panic!();
-            }
-            warn!("Multiple properties detected. rIC3 has compressed them into a single property.");
-            todo!()
         }
         let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
@@ -264,7 +255,7 @@ impl Frontend for BtorFrontend {
     }
 
     fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
-        let mut res = vec!["sat".to_string(), "b0".to_string()];
+        let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
         for i in 0..witness.len() {
             if let Some(iv) = self.rst.init_var() {
                 witness.state[i].retain(|l| self.rst.bb_rst[&l.var()].0 != iv);

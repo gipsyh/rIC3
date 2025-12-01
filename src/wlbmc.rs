@@ -1,10 +1,9 @@
-use log::info;
-
 use crate::{
     Engine,
     config::Config,
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
+use log::info;
 
 pub struct WlBMC {
     cfg: Config,
@@ -14,7 +13,8 @@ pub struct WlBMC {
 }
 
 impl WlBMC {
-    pub fn new(cfg: Config, wts: WlTransys) -> Self {
+    pub fn new(cfg: Config, mut wts: WlTransys) -> Self {
+        wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);
         let mut solver = bitwuzla::Bitwuzla::new();
         for (l, i) in uts.ts.init.iter() {

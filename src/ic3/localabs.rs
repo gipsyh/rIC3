@@ -2,7 +2,7 @@ use super::IC3;
 use crate::{
     Witness,
     config::Config,
-    transys::{Transys, TransysIf, certify::Restore, unroll::TransysUnroll},
+    transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
 use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, info};
@@ -58,32 +58,11 @@ impl LocalAbs {
         }
     }
 
-    pub fn witness(&self, rst: &Restore) -> Option<Witness> {
+    pub fn witness(&self) -> Option<Witness> {
         if !self.foundcex {
             return None;
         }
-        let mut res = Witness::default();
-        for k in 0..=self.uts.num_unroll {
-            let mut w = LitVec::new();
-            for l in self.uts.ts.input() {
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(rst.restore(l.not_if(!v)));
-                }
-            }
-            res.input.push(w);
-            let mut w = LitVec::new();
-            for l in self.uts.ts.latch() {
-                let l = l.lit();
-                let kl = self.uts.lit_next(l, k);
-                if let Some(v) = self.solver.sat_value(kl) {
-                    w.push(rst.restore(l.not_if(!v)));
-                }
-            }
-            res.state.push(w);
-        }
-        Some(res)
+        Some(self.uts.witness(self.solver.as_ref()))
     }
 
     #[inline]

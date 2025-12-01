@@ -4,7 +4,7 @@ use crate::{
     config::Config,
     transys::{Transys, TransysIf},
 };
-use aig::{Aig, AigEdge, TernarySimulate};
+use aig::{Aig, AigEdge};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
 use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols, VarVMap};
@@ -175,11 +175,6 @@ impl AigFrontend {
                 }
                 println!("RESULT: UNSAT");
                 exit(20);
-            } else if aig.bads.len() > 1 {
-                warn!(
-                    "multiple properties detected. rIC3 has compressed them into a single property"
-                );
-                aig.compress_property();
             }
         }
         let ots = Transys::from_aig(&aig, true);
@@ -235,7 +230,12 @@ impl Frontend for AigFrontend {
 
     fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
         let mut wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
-        let mut res = vec!["1".to_string(), "b".to_string()];
+        let mut res = vec!["1".to_string()];
+        if self.is_safety() {
+            res.push(format!("b{}", witness.bad_id));
+        } else {
+            res.push("j0".to_string());
+        }
         wit.exact_init_state(&self.ots);
         let mut line = String::new();
         let mut lbstate = Vec::new();
@@ -244,17 +244,11 @@ impl Frontend for AigFrontend {
             line.push(if l.polarity() { '1' } else { '0' })
         }
         res.push(line);
-
-        let mut simulate = TernarySimulate::new(&self.oaig, lbstate);
-        let mut lbinput = Vec::new();
         let mut line = String::new();
         for i in wit.input[0].iter() {
-            lbinput.push(Lbool::from(i.polarity()));
             line.push(if i.polarity() { '1' } else { '0' })
         }
         res.push(line);
-        simulate.simulate(lbinput);
-
         for c in wit.input[1..].iter() {
             let map: GHashMap<Var, bool> =
                 GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
@@ -270,18 +264,6 @@ impl Frontend for AigFrontend {
                 input.push(Lbool::from(r));
             }
             res.push(line);
-            simulate.simulate(input);
-        }
-        if self.is_safety() {
-            let p = self
-                .oaig
-                .bads
-                .iter()
-                .position(|b| simulate.value(*b).is_true())
-                .unwrap();
-            res[1] = format!("b{p}");
-        } else {
-            res[1] = "j0".to_string();
         }
         res.push(".\n".to_string());
         Box::new(res.join("\n"))

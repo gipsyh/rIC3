@@ -14,7 +14,10 @@ pub mod unroll;
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    mem::take,
+};
 
 pub trait TransysIf {
     fn max_var(&self) -> Var;
@@ -121,6 +124,7 @@ pub struct Transys {
     pub latch: Vec<Var>,
     pub next: GHashMap<Var, Lit>,
     pub init: GHashMap<Var, Lit>,
+    /// multiple bads, not single cube
     pub bad: LitVec,
     pub constraint: LitVec,
     pub justice: LitVec,
@@ -219,6 +223,14 @@ impl Transys {
         let iv = self.new_var();
         self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
         iv
+    }
+
+    pub fn compress_bads(&mut self) {
+        if self.bad.len() <= 1 {
+            return;
+        }
+        let bad = take(&mut self.bad);
+        self.bad = LitVec::from(self.rel.new_or(bad));
     }
 }
 

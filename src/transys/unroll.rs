@@ -1,4 +1,5 @@
 use super::{Transys, TransysIf};
+use crate::transys::certify::Witness;
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
 
@@ -213,6 +214,31 @@ impl<T: TransysIf> TransysUnroll<T> {
                 satif.add_clause(cls);
             }
         }
+    }
+
+    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> Witness {
+        let mut wit = Witness::default();
+        for k in 0..=self.num_unroll {
+            let mut w = LitVec::new();
+            for l in self.ts.input() {
+                let l = l.lit();
+                let kl = self.lit_next(l, k);
+                if let Some(v) = satif.sat_value(kl) {
+                    w.push(l.not_if(!v));
+                }
+            }
+            wit.input.push(w);
+            let mut w = LitVec::new();
+            for l in self.ts.latch() {
+                let l = l.lit();
+                let kl = self.lit_next(l, k);
+                if let Some(v) = satif.sat_value(kl) {
+                    w.push(l.not_if(!v));
+                }
+            }
+            wit.state.push(w);
+        }
+        wit
     }
 }
 impl TransysUnroll<Transys> {
