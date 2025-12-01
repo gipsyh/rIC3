@@ -231,7 +231,7 @@ impl Engine for Kind {
     fn witness(&mut self) -> Witness {
         let mut wit = self.uts.witness(self.solver.as_ref());
         let iv = self.rst.init_var();
-        wit.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
+        wit = wit.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
         for s in wit.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }

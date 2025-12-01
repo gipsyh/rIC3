@@ -194,6 +194,7 @@ impl Restore {
         let xm = self.vmap[x].lit().not_if(!y.polarity());
         let ym = self.vmap[y.var()];
         self.eqmap.entry(ym).or_default().push(xm);
+        self.vmap.remove(&x);
         if let Some(iv) = self.init_var
             && iv == x
         {

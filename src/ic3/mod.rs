@@ -225,7 +225,7 @@ impl Engine for IC3 {
             res
         };
         let iv = self.rst.init_var();
-        res.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
+        res = res.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
         for s in res.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
