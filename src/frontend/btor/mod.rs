@@ -16,7 +16,7 @@ use log::{debug, error, warn};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
-        BvConst, Sort, Term, Value,
+        Sort, Term, Value,
         op::{self, Read},
     },
 };
@@ -117,7 +117,7 @@ impl BtorFrontend {
         if init {
             for (l, i) in self.owts.init.iter() {
                 if let Some(c) = i.try_bv_const() {
-                    map.insert(l.clone(), Value::BV(Into::<BitVec>::into(c)));
+                    map.insert(l.clone(), Value::BV(c.clone()));
                 }
             }
         }
@@ -137,7 +137,7 @@ impl BtorFrontend {
                     let idx = *b / e_len;
                     array
                         .entry(idx)
-                        .or_insert_with(|| BitVec::new_with(e_len, false))
+                        .or_insert_with(|| BitVec::from_elem(e_len, false))
                         .set(*b % e_len, l.polarity());
                 }
             }
@@ -166,7 +166,7 @@ impl BtorFrontend {
             Sort::Array(idxw, elew) => {
                 let idx = b / elew;
                 let eidx = b % elew;
-                let read_idx = Term::bv_const(BvConst::from_usize(idx, idxw));
+                let read_idx = Term::bv_const(BitVec::from_usize(idxw, idx));
                 let read = Term::new_op(Read, [w.clone(), read_idx]);
                 read.slice(eidx, eidx)
             }
