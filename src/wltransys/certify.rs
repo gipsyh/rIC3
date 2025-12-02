@@ -2,19 +2,26 @@ use crate::wltransys::WlTransys;
 use giputils::hash::GHashMap;
 use logicrs::{
     Var,
-    fol::{Term, Value},
+    fol::{BvTermValue, Term, TermValue},
 };
 
 #[derive(Clone, Debug, Default)]
 pub struct WlWitness {
-    pub input: GHashMap<Term, Value>,
-    pub state: GHashMap<Term, Value>,
+    pub input: Vec<Vec<BvTermValue>>,
+    pub state: Vec<Vec<TermValue>>,
+    pub bad_id: usize,
 }
 
 impl WlWitness {
     #[inline]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[inline]
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.state.len()
     }
 }
 

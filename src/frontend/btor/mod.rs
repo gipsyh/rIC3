@@ -5,7 +5,10 @@ use crate::{
     Proof, Witness,
     config::Config,
     transys::{self as bl, TransysIf},
-    wltransys::{WlTransys, certify::Restore},
+    wltransys::{
+        WlTransys,
+        certify::{Restore, WlWitness},
+    },
 };
 use btor::Btor;
 use giputils::{
@@ -16,7 +19,7 @@ use log::{debug, error, warn};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
-        Sort, Term, Value,
+        Sort, Term, TermValue, Value,
         op::{self, Read},
     },
 };
@@ -117,7 +120,7 @@ impl BtorFrontend {
         if init {
             for (l, i) in self.owts.init.iter() {
                 if let Some(c) = i.try_bv_const() {
-                    map.insert(l.clone(), Value::BV(c.clone()));
+                    map.insert(l.clone(), Value::Bv(c.clone()));
                 }
             }
         }
@@ -131,7 +134,7 @@ impl BtorFrontend {
                 .entry(w.clone())
                 .or_insert_with(|| Value::default_from(&w.sort()));
             match entry {
-                Value::BV(bv) => bv.set(*b, l.polarity()),
+                Value::Bv(bv) => bv.set(*b, l.polarity()),
                 Value::Array(array) => {
                     let (_, e_len) = sort.array();
                     let idx = *b / e_len;
@@ -146,7 +149,7 @@ impl BtorFrontend {
         for (t, v) in map {
             let id = self.idmap[&t];
             match &v {
-                Value::BV(bv) => res.push((self.idmap[&t], format!("{id} {bv:b}"))),
+                Value::Bv(bv) => res.push((self.idmap[&t], format!("{id} {bv:b}"))),
                 Value::Array(array) => {
                     let (i_len, _) = t.sort().array();
                     for (i, bv) in array.iter() {
@@ -286,6 +289,48 @@ impl Frontend for BtorFrontend {
             let input = self.restore_state(&witness.input[t], false, false);
             res.push(format!("@{t}"));
             res.extend(input);
+        }
+        res.push(".\n".to_string());
+        Box::new(res.join("\n"))
+    }
+
+    fn wl_unsafe_certificate(&mut self, mut witness: WlWitness) -> Box<dyn Display> {
+        let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
+        for i in 0..witness.len() {
+            if let Some(iv) = self.rst.init_var() {
+                witness.state[i].retain(|tv| tv.t() != iv);
+            }
+            let input = take(&mut witness.input[i]);
+            for lv in input {
+                if self.no_next.contains(lv.t()) {
+                    witness.state[i].push(TermValue::Bv(lv));
+                } else {
+                    witness.input[i].push(lv);
+                }
+            }
+        }
+        for (k, (input, state)) in witness.input.iter().zip(witness.state.iter()).enumerate() {
+            res.push(format!("#{k}"));
+            let mut idw = Vec::new();
+            for tv in state {
+                let id = self.idmap[tv.t()];
+                match tv {
+                    TermValue::Bv(bv) => idw.push((id, format!("{id} {:b}", bv.v()))),
+                    TermValue::Array(_) => {
+                        todo!()
+                    }
+                }
+            }
+            idw.sort();
+            res.extend(idw.into_iter().map(|(_, v)| v));
+            res.push(format!("@{k}"));
+            let mut idw = Vec::new();
+            for tv in input {
+                let id = self.idmap[tv.t()];
+                idw.push((id, format!("{id} {:b}", tv.v())));
+            }
+            idw.sort();
+            res.extend(idw.into_iter().map(|(_, v)| v));
         }
         res.push(".\n".to_string());
         Box::new(res.join("\n"))
