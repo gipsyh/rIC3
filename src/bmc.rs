@@ -91,7 +91,7 @@ impl Engine for BMC {
                 assump.clear();
             }
             info!("bmc depth: {k}");
-            let r = if let Some(limit) = self.cfg.bmc.time_limit {
+            let r = if let Some(limit) = self.cfg.bmc.step_time_limit {
                 let Some(r) =
                     self.solver
                         .solve_with_limit(&assump, vec![], Duration::from_secs(limit))

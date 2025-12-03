@@ -64,6 +64,10 @@ pub struct Config {
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,
+
+    /// time limit in second
+    #[arg(long)]
+    pub time_limit: Option<u64>,
 }
 
 impl Config {
@@ -167,7 +171,7 @@ impl IC3Config {
 pub struct BMCConfig {
     /// bmc single step time limit
     #[arg(long = "bmc-time-limit")]
-    pub time_limit: Option<u64>,
+    pub step_time_limit: Option<u64>,
     /// use kissat solver in bmc, otherwise cadical
     #[arg(long = "bmc-kissat", default_value_t = false)]
     pub bmc_kissat: bool,
