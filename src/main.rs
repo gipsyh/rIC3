@@ -88,19 +88,19 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         Some(res) => {
             if res {
                 if env::var("RIC3_WORKER").is_err() {
-                    println!("RESULT: UNSAT");
+                    println!("UNSAT");
                 }
                 if cfg.witness {
                     println!("0");
                 }
             } else if env::var("RIC3_WORKER").is_err() {
-                println!("RESULT: SAT");
+                println!("SAT");
             }
             certificate(&cfg, frontend.as_mut(), engine.as_mut(), res);
         }
         _ => {
             if env::var("RIC3_WORKER").is_err() {
-                println!("RESULT: UNKNOWN");
+                println!("UNKNOWN");
             }
             if cfg.witness {
                 println!("2");
