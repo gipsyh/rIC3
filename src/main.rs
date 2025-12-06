@@ -6,6 +6,7 @@ use rIC3::{
     Engine,
     bmc::BMC,
     config::{self, Config},
+    ctilg::Ctilg,
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend},
     ic3::IC3,
     kind::Kind,
@@ -64,10 +65,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     };
     let mut engine: Box<dyn Engine> = if cfg.engine.is_wl() {
-        let (wts, _symbols) = frontend.wts();
+        let (wts, symbols) = frontend.wts();
         // info!("origin ts has {}", ts.statistic());
         match cfg.engine {
             config::Engine::WlBMC => Box::new(WlBMC::new(cfg.clone(), wts)),
+            config::Engine::Ctilg => Box::new(Ctilg::new(cfg.clone(), wts, symbols)),
             _ => unreachable!(),
         }
     } else {

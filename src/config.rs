@@ -78,6 +78,7 @@ impl Config {
             Engine::WlBMC => {}
             Engine::Kind => {}
             Engine::Rlive => {}
+            Engine::Ctilg => {}
             Engine::Portfolio => {}
         }
     }
@@ -95,13 +96,15 @@ pub enum Engine {
     WlBMC,
     /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive,
+    /// Ctilg
+    Ctilg,
     /// portfolio
     Portfolio,
 }
 
 impl Engine {
     pub fn is_wl(&self) -> bool {
-        matches!(self, Engine::WlBMC)
+        matches!(self, Engine::WlBMC | Engine::Ctilg)
     }
 }
 

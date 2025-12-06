@@ -3,6 +3,7 @@
 
 pub mod bmc;
 pub mod config;
+pub mod ctilg;
 pub mod frontend;
 mod gipsat;
 pub mod ic3;
