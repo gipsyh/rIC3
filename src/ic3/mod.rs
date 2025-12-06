@@ -157,6 +157,10 @@ impl Engine for IC3 {
                         self.verify();
                         return Some(true);
                     }
+                    BlockResult::OverallTimeLimitExceeded => {
+                        self.statistic.block.overall_time += start.elapsed();
+                        return None;
+                    }
                     _ => (),
                 }
                 if let Some((bad, inputs)) = self.get_bad() {

@@ -89,6 +89,7 @@ impl BtorFrontend {
             if let Some(certificate) = &cfg.certificate {
                 btor.to_file(certificate);
             }
+            println!("UNSAT");
             exit(20);
         }
         let (owts, symbols) = WlTransys::from_btor(&btor);

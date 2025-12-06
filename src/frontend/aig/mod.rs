@@ -173,7 +173,7 @@ impl AigFrontend {
                     }
                     aig.to_file(certificate, true);
                 }
-                println!("RESULT: UNSAT");
+                println!("UNSAT");
                 exit(20);
             }
         }

@@ -11,7 +11,8 @@ pub enum BlockResult {
     Success,
     Failure,
     Proved,
-    LimitExceeded,
+    BlockLimitExceeded,
+    OverallTimeLimitExceeded,
 }
 
 impl IC3 {
@@ -56,7 +57,7 @@ impl IC3 {
         loop {
             let rest_base = luby(2.0, restart);
             match self.block(Some(rest_base * 100.0)) {
-                BlockResult::LimitExceeded => {
+                BlockResult::BlockLimitExceeded => {
                     let bt = if let Some(a) = self.obligations.peak() {
                         (a.frame + 2).min(self.level() - 1)
                     } else {
@@ -82,7 +83,12 @@ impl IC3 {
             if let Some(limit) = limit
                 && noc as f64 > limit
             {
-                return BlockResult::LimitExceeded;
+                return BlockResult::BlockLimitExceeded;
+            }
+            if let Some(limit) = self.cfg.time_limit
+                && self.statistic.time.time().as_secs() > limit
+            {
+                return BlockResult::OverallTimeLimitExceeded;
             }
             if self.tsctx.cube_subsume_init(&po.state) {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {

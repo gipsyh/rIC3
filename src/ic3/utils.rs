@@ -16,7 +16,7 @@ pub struct Block {
 #[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Statistic {
-    time: RunningTime,
+    pub time: RunningTime,
 
     pub num_mic: usize,
     pub avg_mic_cube_len: Average,
