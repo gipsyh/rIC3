@@ -22,7 +22,7 @@ pub struct Config {
     /// certificate path
     pub certificate: Option<PathBuf>,
 
-    /// certify with certifaiger or cerbotor
+    /// certify with certifaiger or cerbtora
     #[arg(long, default_value_t = false)]
     pub certify: bool,
 

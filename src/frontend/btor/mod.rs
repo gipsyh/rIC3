@@ -338,11 +338,11 @@ impl Frontend for BtorFrontend {
     }
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool {
-        cerbotor_check(model, cert)
+        cerbtora_check(model, cert)
     }
 }
 
-pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
+pub fn cerbtora_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
     let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([
@@ -353,7 +353,7 @@ pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) 
             &format!("{}:{}", model.as_ref().display(), model.as_ref().display()),
             "-v",
             &format!("{}:{}", certificate.display(), certificate.display()),
-            "ghcr.io/gipsyh/cerbotor:latest",
+            "ghcr.io/gipsyh/cerbtora:latest",
         ])
         .arg(model.as_ref())
         .arg(certificate)
@@ -367,7 +367,7 @@ pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) 
         match output.status.code() {
             Some(1) => (),
             _ => error!(
-                "cerbotor maybe not avaliable, please `docker pull ghcr.io/gipsyh/cerbotor:latest`"
+                "cerbtora maybe not avaliable, please `docker pull ghcr.io/gipsyh/cerbtora:latest`"
             ),
         }
         false

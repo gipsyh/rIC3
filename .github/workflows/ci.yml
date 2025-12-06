@@ -35,7 +35,7 @@ jobs:
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
-          docker pull ghcr.io/gipsyh/cerbotor:latest
+          docker pull ghcr.io/gipsyh/cerbtora:latest
       - name: Test examples
         run: |
           cargo r -- ./examples/counter/counter.aig --certify || [ $? -eq 10 ]
