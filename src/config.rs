@@ -169,7 +169,8 @@ impl IC3Config {
 
 #[derive(Args, Clone, Debug)]
 pub struct BMCConfig {
-    /// bmc single step time limit
+    /// Per-step time limit for BMC (applies to each BMC step, not the overall solver run).
+    /// The overall `time_limit` option sets the total time limit for the entire solver run.
     #[arg(long = "bmc-time-limit")]
     pub step_time_limit: Option<u64>,
     /// use kissat solver in bmc, otherwise cadical
