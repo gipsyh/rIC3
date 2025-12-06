@@ -1,10 +1,15 @@
 use crate::{
     Engine,
     config::Config,
-    wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
+    wltransys::{
+        WlTransys,
+        certify::{WlProof, WlWitness},
+        unroll::WlTransysUnroll,
+    },
 };
 use giputils::hash::GHashMap;
 use log::{error, info};
+use logicrs::fol::{Sort, Term, op};
 
 pub struct WlKind {
     uts: WlTransysUnroll,
@@ -113,5 +118,72 @@ impl Engine for WlKind {
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
         witness
+    }
+
+    fn wl_proof(&mut self) -> WlProof {
+        if self.cfg.kind.simple_path {
+            error!("k-induction with simple path constraint not support certifaiger");
+            panic!();
+        }
+        let mut proof = self.uts.ts.clone();
+        let mut up = WlTransysUnroll::new(proof.clone());
+        up.enable_new_next_latch();
+        up.unroll_to(self.uts.num_unroll);
+        let bad = proof.bad[0].clone();
+        let mut bads = Vec::new();
+        for k in 0..up.num_unroll {
+            let mut ors = vec![up.next(&bad, k)];
+            for c in proof.constraint.iter() {
+                ors.push(!up.next(c, k));
+            }
+            bads.push(Term::new_op_fold(op::Or, ors));
+        }
+        let mut aux_vars = Vec::with_capacity(up.num_unroll);
+        for k in 0..up.num_unroll {
+            let aux = Term::new_var(Sort::bool());
+            aux_vars.push(aux.clone());
+            let (init, next) = if k == 0 {
+                (Some(Term::bool_const(true)), aux.clone())
+            } else {
+                (Some(Term::bool_const(false)), aux_vars[k - 1].clone())
+            };
+            proof.add_latch(aux, init, next);
+        }
+
+        for k in 1..up.num_unroll {
+            for v in up.ts.input.iter().chain(up.ts.latch.iter()) {
+                let current = up.next(v, k);
+                let prev = up.next(v, k - 1);
+                proof.add_latch(current.clone(), None, prev.clone());
+            }
+        }
+        for i in 0..bads.len() {
+            bads[i] = !aux_vars[i].imply(&!(&bads[i]));
+        }
+        for k in 1..up.num_unroll {
+            let al = aux_vars[k].clone();
+            let al_next = aux_vars[k - 1].clone();
+            let p = al.imply(&al_next);
+            bads.push(!p);
+            let mut eqs = Vec::new();
+            for l in up.ts.latch.iter() {
+                let l_next = up.ts.next(l);
+                let l_next_k = up.next(&l_next, k);
+                let l_ks1 = up.next(l, k - 1);
+                eqs.push(l_next_k.teq(&l_ks1));
+            }
+            let p = al.imply(&Term::new_op_fold(op::And, eqs));
+            bads.push(!p);
+            let mut init = Vec::new();
+            for (l, init_val) in up.ts.init.iter() {
+                let l_ks1 = up.next(l, k - 1);
+                init.push(l_ks1.teq(init_val));
+            }
+            let init = Term::new_op_fold(op::And, init);
+            bads.push(!((!al & al_next).imply(&init)))
+        }
+        bads.push(!&aux_vars[0]);
+        proof.bad = vec![Term::new_op_fold(op::Or, bads)];
+        WlProof { proof }
     }
 }

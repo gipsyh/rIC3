@@ -101,6 +101,20 @@ impl WlTransys {
         let constraint = take(&mut self.constraint);
         self.constraint = vec![Term::new_op_fold(op::Or, constraint)];
     }
+
+    pub fn eliminate_constraint(&mut self) {
+        let c = take(&mut self.constraint);
+        if c.is_empty() {
+            return;
+        }
+        let c = Term::new_op_fold(op::And, c);
+        let v = Term::new_var(Sort::bool());
+        let c = v.clone() & c;
+        self.add_latch(v.clone(), Some(Term::bool_const(true)), c.clone());
+        for i in 0..self.bad.len() {
+            self.bad[i] = &self.bad[i] & &c;
+        }
+    }
 }
 
 //     pub fn term_next(&self, term: &Term) -> Term {
