@@ -65,7 +65,7 @@ pub struct Config {
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,
 
-    /// time limit in second
+    /// time limit in seconds
     #[arg(long)]
     pub time_limit: Option<u64>,
 }
