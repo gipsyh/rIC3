@@ -28,12 +28,24 @@ impl WlTransys {
     }
 
     #[inline]
+    pub fn init(&self, term: &Term) -> Option<Term> {
+        self.init.get(term).cloned()
+    }
+
+    #[inline]
     pub fn next(&self, term: &Term) -> Term {
         self.next.get(term).unwrap().clone()
     }
 
+    #[inline]
+    pub fn add_input(&mut self, input: &Term) {
+        debug_assert!(input.is_var());
+        self.input.push(input.clone());
+    }
+
     pub fn add_latch(&mut self, latch: Term, init: Option<Term>, next: Term) {
         debug_assert!(!self.next.contains_key(&latch));
+        debug_assert!(latch.is_var());
         self.latch.push(latch.clone());
         if let Some(init) = init {
             self.init.insert(latch.clone(), init);
@@ -80,6 +92,14 @@ impl WlTransys {
         }
         let bad = take(&mut self.bad);
         self.bad = vec![Term::new_op_fold(op::Or, bad)];
+    }
+
+    pub fn compress_constraints(&mut self) {
+        if self.bad.len() <= 1 {
+            return;
+        }
+        let constraint = take(&mut self.constraint);
+        self.constraint = vec![Term::new_op_fold(op::Or, constraint)];
     }
 }
 

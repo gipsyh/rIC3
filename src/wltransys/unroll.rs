@@ -62,8 +62,13 @@ impl WlTransysUnroll {
         }
     }
 
+    #[inline]
     pub fn next(&self, t: &Term, k: usize) -> Term {
         self.next_map.get(t).unwrap()[k].clone()
+    }
+
+    pub fn apply_next(&self, t: &Term, k: usize) -> Term {
+        t.apply(|t| self.next_map.get(t).map(|n| n[k].clone()))
     }
 
     pub fn witness(&self, slv: &mut Bitwuzla) -> WlWitness {

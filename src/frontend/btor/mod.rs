@@ -7,7 +7,7 @@ use crate::{
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
-        certify::{Restore, WlWitness},
+        certify::{Restore, WlProof, WlWitness},
     },
 };
 use btor::Btor;
@@ -146,7 +146,7 @@ impl BtorFrontend {
                 }
             }
         }
-        let mut res = Vec::new();
+        let mut res: Vec<(usize, String)> = Vec::new();
         for (t, v) in map {
             let id = self.idmap[&t];
             match &v {
@@ -198,6 +198,10 @@ impl Frontend for BtorFrontend {
     }
 
     fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
+        let mut wts = self.wts.clone();
+        wts.coi_refine(false);
+        wts.simplify();
+        wts.coi_refine(false);
         (self.wts.clone(), self.symbols.clone())
     }
 
@@ -293,6 +297,22 @@ impl Frontend for BtorFrontend {
         }
         res.push(".\n".to_string());
         Box::new(res.join("\n"))
+    }
+
+    fn wl_safe_certificate(&mut self, proof: WlProof) -> Box<dyn Display> {
+        let mut btor = self.owts.clone();
+        for l in proof.input.iter() {
+            if !self.idmap.contains_key(l) {
+                btor.input.push(l.clone());
+            }
+        }
+        for l in proof.latch.iter() {
+            if !self.idmap.contains_key(l) {
+                btor.add_latch(l.clone(), proof.proof.init(l), proof.next(l));
+            }
+        }
+        btor.bad = proof.bad.clone();
+        Box::new(Btor::from(&btor))
     }
 
     fn wl_unsafe_certificate(&mut self, mut witness: WlWitness) -> Box<dyn Display> {
