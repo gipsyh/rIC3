@@ -25,9 +25,12 @@ To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or dow
 ```cargo install rIC3```
 
 ### Install From Source
+rIC3 can be compiled on both Linux and macOS.
+
 - Install the Rust compiler https://www.rust-lang.org/
 - Switch to nightly ```rustup default nightly```
 - ```git clone --recurse-submodules https://github.com/gipsyh/rIC3```
+- Install `gmp` and `mpfr` required by Bitwuzla ```install libgmp-dev libmpfr-dev``` or ```brew install gmp mpfr```
 - Build ```cd rIC3 && cargo b --release```
 - Run ```cargo r --release -- <AIGER/BTOR>```
 - Install ```cargo install --path .```
