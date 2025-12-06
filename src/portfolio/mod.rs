@@ -1,7 +1,9 @@
 use crate::{Config, frontend::aig::certifaiger_check};
 use log::{error, info};
 use process_control::{ChildExt, Control};
+use serde::Deserialize;
 use std::{
+    collections::HashMap,
     env::current_exe,
     fs::File,
     io::{Read, Write},
@@ -40,11 +42,21 @@ impl PortfolioState {
 
 pub struct Portfolio {
     cfg: Config,
-    engines: Vec<Command>,
+    engines: Vec<Engine>,
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
     certificate: Option<NamedTempFile>,
     state: Arc<(Mutex<PortfolioState>, Condvar)>,
+}
+
+struct Engine {
+    name: String,
+    cmd: Command,
+}
+
+#[derive(Deserialize)]
+struct PortfolioConfig {
+    engine: HashMap<String, String>,
 }
 
 impl Portfolio {
@@ -53,39 +65,24 @@ impl Portfolio {
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
         let mut id = 0;
-        let mut new_engine = |args: &str| {
-            let args = args.split(" ");
-            let mut engine = Command::new(current_exe().unwrap());
-            engine.env("RIC3_TMP_DIR", temp_dir_path);
-            engine.env("RUST_LOG", "warn");
-            engine.env("RIC3_WORKER", format!("worker{id}"));
+        let mut new_engine = |name, args: &str| {
+            let args_split = args.split(" ");
+            let mut cmd = Command::new(current_exe().unwrap());
+            cmd.env("RIC3_TMP_DIR", temp_dir_path);
+            cmd.env("RUST_LOG", "warn");
+            cmd.env("RIC3_WORKER", format!("worker{id}"));
             id += 1;
-            engine.arg(&cfg.model);
-            for a in args {
-                engine.arg(a);
+            cmd.arg(&cfg.model);
+            for a in args_split {
+                cmd.arg(a);
             }
-            engines.push(engine);
+            engines.push(Engine { name, cmd });
         };
-        new_engine("-e ic3 --rseed 1");
-        new_engine(
-            "-e ic3 --ic3-ctg=false --frts=false --scorr=false --ic3-drop-po=false --rseed 2",
-        );
-        new_engine("-e ic3 --ic3-drop-po=false --ic3-parent-lemma=false --rseed 3");
-        new_engine("-e ic3 --ic3-abs-cst --rseed 4");
-        new_engine("-e ic3 --ic3-abs-cst --ic3-abs-trans --rseed 5");
-        new_engine(
-            "-e ic3 --ic3-abs-cst --ic3-abs-trans --ic3-dynamic --ic3-drop-po=false --rseed 6",
-        );
-        new_engine("-e ic3 --ic3-ctg-max 5 --ic3-ctg-limit 15 --ic3-drop-po=false --rseed 7");
-        new_engine("-e ic3 --ic3-inn --rseed 8");
-        new_engine("-e ic3 --ic3-inn --ic3-ctp --rseed 9");
-        new_engine("-e ic3 --ic3-inn --ic3-ctg=false --rseed 10");
-        new_engine("-e ic3 --ic3-inn --ic3-dynamic --ic3-drop-po=false --rseed 11");
-        new_engine("-e bmc --step 1 --rseed 12");
-        new_engine("-e bmc --bmc-kissat --step 10 --rseed 13");
-        new_engine("-e bmc --bmc-kissat --step 65 --rseed 14");
-        new_engine("-e bmc --bmc-kissat --bmc-dyn-step --rseed 15");
-        new_engine("-e kind --step 1 --rseed 16");
+        let portfolio_toml = include_str!("portfolio.toml");
+        let portfolio_config: PortfolioConfig = toml::from_str(portfolio_toml).unwrap();
+        for (name, args) in portfolio_config.engine {
+            new_engine(name, &args);
+        }
         let ps = PortfolioState::new(engines.len());
         Self {
             cfg,
@@ -133,22 +130,23 @@ impl Portfolio {
                     let certificate =
                         tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
                     let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                    engine.arg(certify_path);
+                    engine.cmd.arg(certify_path);
                     Some(certificate)
                 } else {
                     None
                 };
-            let mut child = engine.stderr(Stdio::piped()).spawn().unwrap();
+            let mut child = engine.cmd.stderr(Stdio::piped()).spawn().unwrap();
             self.engine_pids.push(child.id() as i32);
             let state = self.state.clone();
             spawn(move || {
                 let config = engine
+                    .cmd
                     .get_args()
                     .skip(1)
                     .map(|cstr| cstr.to_str().unwrap())
                     .collect::<Vec<&str>>();
                 let config = config.join(" ");
-                info!("start engine: {config}");
+                info!("start engine {}: {config}", engine.name);
                 #[cfg(target_os = "linux")]
                 let status = child
                     .controlled()
