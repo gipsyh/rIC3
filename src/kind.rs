@@ -59,17 +59,6 @@ impl Kind {
             self.slv_bad_k += 1;
         }
     }
-
-    pub fn reset_solver(&mut self) {
-        self.solver = Box::new(cadical::Solver::new());
-        for i in 0..self.slv_trans_k {
-            self.uts.load_trans(self.solver.as_mut(), i, true);
-        }
-        for i in 0..self.slv_bad_k {
-            self.solver
-                .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), i));
-        }
-    }
 }
 
 impl Engine for Kind {
