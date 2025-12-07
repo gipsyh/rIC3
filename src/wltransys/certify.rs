@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use crate::wltransys::WlTransys;
 use giputils::hash::GHashMap;
 use logicrs::{
@@ -28,6 +30,22 @@ impl WlWitness {
 #[derive(Clone, Debug, Default)]
 pub struct WlProof {
     pub proof: WlTransys,
+}
+
+impl Deref for WlProof {
+    type Target = WlTransys;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.proof
+    }
+}
+
+impl DerefMut for WlProof {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.proof
+    }
 }
 
 #[derive(Clone, Default)]

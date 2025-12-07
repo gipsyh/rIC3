@@ -7,7 +7,7 @@ use crate::{
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
-        certify::{Restore, WlWitness},
+        certify::{Restore, WlProof, WlWitness},
     },
 };
 use btor::Btor;
@@ -146,7 +146,7 @@ impl BtorFrontend {
                 }
             }
         }
-        let mut res = Vec::new();
+        let mut res: Vec<(usize, String)> = Vec::new();
         for (t, v) in map {
             let id = self.idmap[&t];
             match &v {
@@ -198,7 +198,11 @@ impl Frontend for BtorFrontend {
     }
 
     fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
-        (self.wts.clone(), self.symbols.clone())
+        let mut wts = self.wts.clone();
+        wts.coi_refine(false);
+        wts.simplify();
+        wts.coi_refine(false);
+        (wts, self.symbols.clone())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
@@ -295,6 +299,22 @@ impl Frontend for BtorFrontend {
         Box::new(res.join("\n"))
     }
 
+    fn wl_safe_certificate(&mut self, proof: WlProof) -> Box<dyn Display> {
+        let mut btor = self.owts.clone();
+        for l in proof.input.iter() {
+            if !self.idmap.contains_key(l) {
+                btor.input.push(l.clone());
+            }
+        }
+        for l in proof.latch.iter() {
+            if !self.idmap.contains_key(l) {
+                btor.add_latch(l.clone(), proof.proof.init(l), proof.next(l));
+            }
+        }
+        btor.bad = proof.bad.clone();
+        Box::new(Btor::from(&btor))
+    }
+
     fn wl_unsafe_certificate(&mut self, mut witness: WlWitness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
         for i in 0..witness.len() {
@@ -338,11 +358,11 @@ impl Frontend for BtorFrontend {
     }
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool {
-        cerbotor_check(model, cert)
+        cerbtora_check(model, cert)
     }
 }
 
-pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
+pub fn cerbtora_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
     let certificate = certificate.as_ref();
     let output = Command::new("docker")
         .args([
@@ -353,7 +373,7 @@ pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) 
             &format!("{}:{}", model.as_ref().display(), model.as_ref().display()),
             "-v",
             &format!("{}:{}", certificate.display(), certificate.display()),
-            "ghcr.io/gipsyh/cerbotor:latest",
+            "ghcr.io/gipsyh/cerbtora:latest",
         ])
         .arg(model.as_ref())
         .arg(certificate)
@@ -367,7 +387,7 @@ pub fn cerbotor_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) 
         match output.status.code() {
             Some(1) => (),
             _ => error!(
-                "cerbotor maybe not avaliable, please `docker pull ghcr.io/gipsyh/cerbotor:latest`"
+                "cerbtora maybe not available, please `docker pull ghcr.io/gipsyh/cerbtora:latest`"
             ),
         }
         false

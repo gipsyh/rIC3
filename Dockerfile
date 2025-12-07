@@ -5,7 +5,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /root/rIC3
 COPY . .
 RUN git submodule update --init
-RUN cargo build --release
+RUN cargo clean && cargo build --release
 
 FROM ubuntu:latest
 RUN apt update && apt install -y libmpfr6 libgmp10 && apt clean

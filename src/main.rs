@@ -13,6 +13,7 @@ use rIC3::{
     rlive::Rlive,
     transys::TransysIf,
     wlbmc::WlBMC,
+    wlkind::WlKind,
 };
 use std::{
     env, error, fs,
@@ -68,6 +69,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         // info!("origin ts has {}", ts.statistic());
         match cfg.engine {
             config::Engine::WlBMC => Box::new(WlBMC::new(cfg.clone(), wts)),
+            config::Engine::WlKind => Box::new(WlKind::new(cfg.clone(), wts)),
             _ => unreachable!(),
         }
     } else {

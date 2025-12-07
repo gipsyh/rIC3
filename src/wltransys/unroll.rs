@@ -8,6 +8,8 @@ pub struct WlTransysUnroll {
     pub ts: WlTransys,
     pub num_unroll: usize,
     next_map: GHashMap<Term, Vec<Term>>,
+    /// create new var for next state of latch
+    new_next_latch: Option<Vec<Term>>,
 }
 
 impl WlTransysUnroll {
@@ -29,7 +31,13 @@ impl WlTransysUnroll {
             next_map,
             ts,
             num_unroll: 0,
+            new_next_latch: None,
         }
+    }
+
+    pub fn enable_new_next_latch(&mut self) {
+        assert!(self.num_unroll == 0);
+        self.new_next_latch = Some(Vec::new());
     }
 
     pub fn unroll(&mut self) {
@@ -39,11 +47,20 @@ impl WlTransysUnroll {
             self.next_map.get_mut(i).unwrap().push(ni.clone());
             ilmap.insert(self.next(i, self.num_unroll), ni);
         }
+        let mut connect = Term::bool_const(true);
         for l in self.ts.latch.iter() {
             let nl = self.ts.next(l);
-            let nl = self.next(&nl, self.num_unroll);
+            let mut nl = self.next(&nl, self.num_unroll);
+            if self.new_next_latch.is_some() {
+                let nv = Term::new_var(l.sort());
+                connect = connect & (nv.teq(&nl));
+                nl = nv;
+            }
             self.next_map.get_mut(l).unwrap().push(nl.clone());
             ilmap.insert(self.next(l, self.num_unroll), nl);
+        }
+        if let Some(c) = &mut self.new_next_latch {
+            c.push(connect);
         }
         let mut cache = GHashMap::new();
         for (_, n) in self.next_map.iter_mut() {
@@ -62,8 +79,13 @@ impl WlTransysUnroll {
         }
     }
 
+    #[inline]
     pub fn next(&self, t: &Term, k: usize) -> Term {
         self.next_map.get(t).unwrap()[k].clone()
+    }
+
+    pub fn apply_next(&self, t: &Term, k: usize) -> Term {
+        t.apply(|t| self.next_map.get(t).map(|n| n[k].clone()))
     }
 
     pub fn witness(&self, slv: &mut Bitwuzla) -> WlWitness {

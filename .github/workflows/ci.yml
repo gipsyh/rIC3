@@ -35,7 +35,7 @@ jobs:
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
-          docker pull ghcr.io/gipsyh/cerbotor:latest
+          docker pull ghcr.io/gipsyh/cerbtora:latest
       - name: Test examples
         run: |
           cargo r -- ./examples/counter/counter.aig --certify || [ $? -eq 10 ]
@@ -54,6 +54,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jwlawson/actions-setup-cmake@v2.0.2
+      - name: Install system dependencies
+        run: sudo apt update && sudo apt install -y libmpfr-dev meson
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly

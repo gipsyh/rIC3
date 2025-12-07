@@ -22,7 +22,7 @@ pub struct Config {
     /// certificate path
     pub certificate: Option<PathBuf>,
 
-    /// certify with certifaiger or cerbotor
+    /// certify with certifaiger or cerbtora
     #[arg(long, default_value_t = false)]
     pub certify: bool,
 
@@ -77,6 +77,7 @@ impl Config {
             Engine::BMC => {}
             Engine::WlBMC => {}
             Engine::Kind => {}
+            Engine::WlKind => {}
             Engine::Rlive => {}
             Engine::Portfolio => {}
         }
@@ -93,6 +94,8 @@ pub enum Engine {
     BMC,
     /// word level bmc
     WlBMC,
+    /// word level k-induction
+    WlKind,
     /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive,
     /// portfolio
@@ -101,7 +104,7 @@ pub enum Engine {
 
 impl Engine {
     pub fn is_wl(&self) -> bool {
-        matches!(self, Engine::WlBMC)
+        matches!(self, Engine::WlBMC | Engine::WlKind)
     }
 }
 

@@ -28,12 +28,24 @@ impl WlTransys {
     }
 
     #[inline]
+    pub fn init(&self, term: &Term) -> Option<Term> {
+        self.init.get(term).cloned()
+    }
+
+    #[inline]
     pub fn next(&self, term: &Term) -> Term {
         self.next.get(term).unwrap().clone()
     }
 
+    #[inline]
+    pub fn add_input(&mut self, input: &Term) {
+        debug_assert!(input.is_var());
+        self.input.push(input.clone());
+    }
+
     pub fn add_latch(&mut self, latch: Term, init: Option<Term>, next: Term) {
         debug_assert!(!self.next.contains_key(&latch));
+        debug_assert!(latch.is_var());
         self.latch.push(latch.clone());
         if let Some(init) = init {
             self.init.insert(latch.clone(), init);
@@ -54,7 +66,7 @@ impl WlTransys {
                     }
                     let iv = rst.init_var().unwrap();
                     self.constraint
-                        .push(iv.op1(op::Implies, &l.op1(op::Eq, &init)));
+                        .push(iv.op1(op::Implies, l.op1(op::Eq, &init)));
                 }
                 self.init.remove(&l);
                 no_next.insert(l.clone());
@@ -80,6 +92,28 @@ impl WlTransys {
         }
         let bad = take(&mut self.bad);
         self.bad = vec![Term::new_op_fold(op::Or, bad)];
+    }
+
+    pub fn compress_constraints(&mut self) {
+        if self.bad.len() <= 1 {
+            return;
+        }
+        let constraint = take(&mut self.constraint);
+        self.constraint = vec![Term::new_op_fold(op::And, constraint)];
+    }
+
+    pub fn eliminate_constraint(&mut self) {
+        let c = take(&mut self.constraint);
+        if c.is_empty() {
+            return;
+        }
+        let c = Term::new_op_fold(op::And, c);
+        let v = Term::new_var(Sort::bool());
+        let c = v.clone() & c;
+        self.add_latch(v.clone(), Some(Term::bool_const(true)), c.clone());
+        for i in 0..self.bad.len() {
+            self.bad[i] = &self.bad[i] & &c;
+        }
     }
 }
 

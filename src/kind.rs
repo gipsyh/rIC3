@@ -59,17 +59,6 @@ impl Kind {
             self.slv_bad_k += 1;
         }
     }
-
-    pub fn reset_solver(&mut self) {
-        self.solver = Box::new(cadical::Solver::new());
-        for i in 0..self.slv_trans_k {
-            self.uts.load_trans(self.solver.as_mut(), i, true);
-        }
-        for i in 0..self.slv_bad_k {
-            self.solver
-                .add_clause(&!self.uts.lits_next(&self.uts.ts.bad.cube(), i));
-        }
-    }
 }
 
 impl Engine for Kind {
@@ -156,7 +145,7 @@ impl Engine for Kind {
                 latchs.push(ml);
                 next.insert(ml, lmap(ts.next[&l]));
                 if let Some(i) = ts.init.get(&l) {
-                    inits.insert(ml, *i);
+                    inits.insert(ml, lmap(*i));
                 }
             }
             bads.extend(ts.bad.map(lmap));
@@ -203,9 +192,10 @@ impl Engine for Kind {
             let mut eqs = Vec::new();
             let mut init = Vec::new();
             for j in 0..nl {
-                if let Some(&linit) = inits.get(&latchs[j]) {
-                    init.push(LitVec::from([latchs[(i - 1) * nl + j].lit(), !linit]));
-                    init.push(LitVec::from([!latchs[(i - 1) * nl + j].lit(), linit]));
+                let lis1j = latchs[(i - 1) * nl + j];
+                if let Some(&linit) = inits.get(&lis1j) {
+                    init.push(LitVec::from([lis1j.lit(), !linit]));
+                    init.push(LitVec::from([!lis1j.lit(), linit]));
                 }
                 eqs.push(
                     proof

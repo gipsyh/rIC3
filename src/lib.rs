@@ -11,6 +11,7 @@ pub mod portfolio;
 pub mod rlive;
 pub mod transys;
 pub mod wlbmc;
+pub mod wlkind;
 pub mod wltransys;
 
 use crate::{
