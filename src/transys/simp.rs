@@ -91,7 +91,7 @@ impl Transys {
                 additional.push(n.var());
             }
         }
-        let domain_map = self.rel.rearrange(additional.into_iter());
+        let domain_map = self.rel.rearrange(additional);
         let map_lit = |l: Lit| Lit::new(domain_map[l.var()], l.polarity());
         self.input = self.input.iter().map(|v| domain_map[*v]).collect();
         self.latch = self.latch.iter().map(|v| domain_map[*v]).collect();
