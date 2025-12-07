@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "btor"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "giputils",
  "logicrs",
@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "giputils"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "ahash",
  "log",
@@ -394,7 +394,7 @@ checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "logicrs"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "ahash",
  "giputils",
@@ -539,7 +539,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "rIC3"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "aig",
  "bitfield-struct",
