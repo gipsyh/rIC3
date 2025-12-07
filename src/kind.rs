@@ -145,7 +145,7 @@ impl Engine for Kind {
                 latchs.push(ml);
                 next.insert(ml, lmap(ts.next[&l]));
                 if let Some(i) = ts.init.get(&l) {
-                    inits.insert(ml, *i);
+                    inits.insert(ml, lmap(*i));
                 }
             }
             bads.extend(ts.bad.map(lmap));
@@ -192,9 +192,10 @@ impl Engine for Kind {
             let mut eqs = Vec::new();
             let mut init = Vec::new();
             for j in 0..nl {
-                if let Some(&linit) = inits.get(&latchs[j]) {
-                    init.push(LitVec::from([latchs[(i - 1) * nl + j].lit(), !linit]));
-                    init.push(LitVec::from([!latchs[(i - 1) * nl + j].lit(), linit]));
+                let lis1j = latchs[(i - 1) * nl + j];
+                if let Some(&linit) = inits.get(&lis1j) {
+                    init.push(LitVec::from([lis1j.lit(), !linit]));
+                    init.push(LitVec::from([!lis1j.lit(), linit]));
                 }
                 eqs.push(
                     proof

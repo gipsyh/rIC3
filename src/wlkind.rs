@@ -138,7 +138,7 @@ impl Engine for WlKind {
             }
             bads.push(Term::new_op_fold(op::Or, ors));
         }
-        let mut aux_vars = Vec::with_capacity(up.num_unroll);
+        let mut aux_vars = Vec::new();
         for k in 0..up.num_unroll {
             let aux = Term::new_var(Sort::bool());
             aux_vars.push(aux.clone());
@@ -158,7 +158,7 @@ impl Engine for WlKind {
             }
         }
         for i in 0..bads.len() {
-            bads[i] = !aux_vars[i].imply(&!(&bads[i]));
+            bads[i] = !(aux_vars[i].imply(!&bads[i]));
         }
         for k in 1..up.num_unroll {
             let al = aux_vars[k].clone();
@@ -172,11 +172,12 @@ impl Engine for WlKind {
                 let l_ks1 = up.next(l, k - 1);
                 eqs.push(l_next_k.teq(&l_ks1));
             }
-            let p = al.imply(&Term::new_op_fold(op::And, eqs));
+            let p = al.imply(Term::new_op_fold(op::And, eqs));
             bads.push(!p);
             let mut init = Vec::new();
             for (l, init_val) in up.ts.init.iter() {
                 let l_ks1 = up.next(l, k - 1);
+                let init_val = up.apply_next(init_val, k - 1);
                 init.push(l_ks1.teq(init_val));
             }
             let init = Term::new_op_fold(op::And, init);

@@ -66,7 +66,7 @@ impl WlTransys {
                     }
                     let iv = rst.init_var().unwrap();
                     self.constraint
-                        .push(iv.op1(op::Implies, &l.op1(op::Eq, &init)));
+                        .push(iv.op1(op::Implies, l.op1(op::Eq, &init)));
                 }
                 self.init.remove(&l);
                 no_next.insert(l.clone());
