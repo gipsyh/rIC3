@@ -122,7 +122,7 @@ impl Engine for WlKind {
 
     fn wl_proof(&mut self) -> WlProof {
         if self.cfg.kind.simple_path {
-            error!("k-induction with simple path constraint not support certifaiger");
+            error!("k-induction with simple path constraint does not support certificate");
             panic!();
         }
         let mut proof = self.uts.ts.clone();
