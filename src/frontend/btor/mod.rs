@@ -202,7 +202,7 @@ impl Frontend for BtorFrontend {
         wts.coi_refine(false);
         wts.simplify();
         wts.coi_refine(false);
-        (self.wts.clone(), self.symbols.clone())
+        (wts, self.symbols.clone())
     }
 
     fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
