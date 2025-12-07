@@ -99,7 +99,7 @@ impl WlTransys {
             return;
         }
         let constraint = take(&mut self.constraint);
-        self.constraint = vec![Term::new_op_fold(op::Or, constraint)];
+        self.constraint = vec![Term::new_op_fold(op::And, constraint)];
     }
 
     pub fn eliminate_constraint(&mut self) {
