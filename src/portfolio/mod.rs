@@ -1,7 +1,6 @@
 use crate::{Config, frontend::aig::certifaiger_check};
 use log::{error, info};
 use process_control::{ChildExt, Control};
-use serde::Deserialize;
 use std::{
     collections::HashMap,
     env::current_exe,
@@ -54,11 +53,6 @@ struct Engine {
     cmd: Command,
 }
 
-#[derive(Deserialize)]
-struct PortfolioConfig {
-    engine: HashMap<String, String>,
-}
-
 impl Portfolio {
     pub fn new(cfg: Config) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
@@ -79,8 +73,19 @@ impl Portfolio {
             engines.push(Engine { name, cmd });
         };
         let portfolio_toml = include_str!("portfolio.toml");
-        let portfolio_config: PortfolioConfig = toml::from_str(portfolio_toml).unwrap();
-        for (name, args) in portfolio_config.engine {
+        let portfolio_config: HashMap<String, HashMap<String, String>> =
+            toml::from_str(portfolio_toml).unwrap();
+        let portfolio_config = match cfg.model.extension() {
+            Some(ext) if (ext == "aig") | (ext == "aag") => portfolio_config["bl_default"].clone(),
+            Some(ext) if (ext == "btor") | (ext == "btor2") => {
+                portfolio_config["wl_default"].clone()
+            }
+            _ => {
+                error!("Error: unsupported file format");
+                exit(1);
+            }
+        };
+        for (name, args) in portfolio_config {
             new_engine(name, &args);
         }
         let ps = PortfolioState::new(engines.len());
