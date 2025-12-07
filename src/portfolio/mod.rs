@@ -1,7 +1,6 @@
-use crate::{Config, frontend::aig::certifaiger_check};
+use crate::{Config, frontend::certificate_check};
 use log::{error, info};
 use process_control::{ChildExt, Control};
-use serde::Deserialize;
 use std::{
     collections::HashMap,
     env::current_exe,
@@ -54,11 +53,6 @@ struct Engine {
     cmd: Command,
 }
 
-#[derive(Deserialize)]
-struct PortfolioConfig {
-    engine: HashMap<String, String>,
-}
-
 impl Portfolio {
     pub fn new(cfg: Config) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
@@ -79,8 +73,19 @@ impl Portfolio {
             engines.push(Engine { name, cmd });
         };
         let portfolio_toml = include_str!("portfolio.toml");
-        let portfolio_config: PortfolioConfig = toml::from_str(portfolio_toml).unwrap();
-        for (name, args) in portfolio_config.engine {
+        let portfolio_config: HashMap<String, HashMap<String, String>> =
+            toml::from_str(portfolio_toml).unwrap();
+        let portfolio_config = match cfg.model.extension() {
+            Some(ext) if (ext == "aig") | (ext == "aag") => portfolio_config["bl_default"].clone(),
+            Some(ext) if (ext == "btor") | (ext == "btor2") => {
+                portfolio_config["wl_default"].clone()
+            }
+            _ => {
+                error!("Error: unsupported file format");
+                exit(1);
+            }
+        };
+        for (name, args) in portfolio_config {
             new_engine(name, &args);
         }
         let ps = PortfolioState::new(engines.len());
@@ -216,6 +221,42 @@ impl Portfolio {
         .unwrap();
         self.check_inner()
     }
+
+    fn certificate(&mut self, cfg: &Config, res: bool) {
+        if res {
+            if cfg.certificate.is_none() && !cfg.certify {
+                return;
+            }
+            if let Some(certificate_path) = &cfg.certificate {
+                std::fs::copy(self.certificate.as_ref().unwrap(), certificate_path).unwrap();
+            }
+        } else {
+            if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
+                return;
+            }
+            let mut witness = String::new();
+            File::open(
+                self.certificate
+                    .as_ref()
+                    .unwrap()
+                    .path()
+                    .as_os_str()
+                    .to_str()
+                    .unwrap(),
+            )
+            .unwrap()
+            .read_to_string(&mut witness)
+            .unwrap();
+            if cfg.witness {
+                println!("{witness}");
+            }
+            if let Some(certificate_path) = &cfg.certificate {
+                let mut file: File = File::create(certificate_path).unwrap();
+                file.write_all(witness.as_bytes()).unwrap();
+            }
+        }
+        certificate_check(cfg, self.certificate.as_ref().unwrap().path())
+    }
 }
 
 impl Drop for Portfolio {
@@ -224,45 +265,6 @@ impl Drop for Portfolio {
             .arg("-rf")
             .arg(self.temp_dir.path())
             .output();
-    }
-}
-
-fn certificate(engine: &mut Portfolio, cfg: &Config, res: bool) {
-    if res {
-        if cfg.certificate.is_none() && !cfg.certify {
-            return;
-        }
-        if let Some(certificate_path) = &cfg.certificate {
-            std::fs::copy(engine.certificate.as_ref().unwrap(), certificate_path).unwrap();
-        }
-    } else {
-        if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
-            return;
-        }
-        let mut witness = String::new();
-        File::open(
-            engine
-                .certificate
-                .as_ref()
-                .unwrap()
-                .path()
-                .as_os_str()
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .read_to_string(&mut witness)
-        .unwrap();
-        if cfg.witness {
-            println!("{witness}");
-        }
-        if let Some(certificate_path) = &cfg.certificate {
-            let mut file: File = File::create(certificate_path).unwrap();
-            file.write_all(witness.as_bytes()).unwrap();
-        }
-    }
-    if cfg.certify {
-        certifaiger_check(&cfg.model, engine.certificate.as_ref().unwrap().path());
     }
 }
 
@@ -275,11 +277,11 @@ pub fn portfolio_main(cfg: Config) {
             if cfg.witness {
                 println!("0");
             }
-            certificate(&mut engine, &cfg, true)
+            engine.certificate(&cfg, true)
         }
         Some(false) => {
             println!("SAT");
-            certificate(&mut engine, &cfg, false)
+            engine.certificate(&cfg, false)
         }
         _ => {
             println!("UNKNOWN");

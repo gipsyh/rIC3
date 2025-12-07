@@ -4,7 +4,7 @@ use crate::{
     transys::{Transys, TransysIf, certify::Restore},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
-use log::{debug, info, trace};
+use log::{debug, info};
 use logicrs::{Lit, LitVec, Var, VarLMap, satif::Satif};
 use std::time::Instant;
 
@@ -128,7 +128,7 @@ impl Scorr {
                     break;
                 }
                 if self.check_scorr(xl, y) {
-                    trace!("scorr: {xl} -> {y}");
+                    debug!("scorr: {xl} -> {y}");
                     scorr.insert_lit(xl, y);
                     eqc.retain(|l| l.var() != x);
                     break;

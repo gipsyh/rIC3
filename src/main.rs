@@ -6,7 +6,7 @@ use rIC3::{
     Engine,
     bmc::BMC,
     config::{self, Config},
-    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend},
+    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
     ic3::IC3,
     kind::Kind,
     portfolio::portfolio_main,
@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         Some(ext) if (ext == "aig") | (ext == "aag") => Box::new(AigFrontend::new(&cfg)),
         Some(ext) if (ext == "btor") | (ext == "btor2") => Box::new(BtorFrontend::new(&cfg)),
         _ => {
-            error!("Error: unsupported file format");
+            error!("Unsupported file format. Supported extensions are: .aig, .aag, .btor, .btor2.");
             exit(1);
         }
     };
@@ -146,11 +146,6 @@ pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engine: &mut dyn E
         let certificate_file = tempfile::NamedTempFile::new().unwrap();
         let cert = certificate_file.path();
         fs::write(cert, format!("{certificate}")).unwrap();
-        if frontend.certify(&cfg.model, cert) {
-            info!("certificate verification passed");
-        } else {
-            error!("certificate verification failed");
-            panic!();
-        }
+        certificate_check(cfg, cert);
     }
 }

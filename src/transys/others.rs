@@ -110,6 +110,18 @@ impl Transys {
 
     pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {
         for (&x, &y) in map.iter() {
+            if self.is_latch(x)
+                && let Some(x_init) = self.init(x)
+            {
+                let y_init = x_init.not_if(!y.polarity());
+                if let Some(init) = self.init.get_mut(&y.var()) {
+                    *init = self.rel.new_or([init, &y_init]);
+                } else {
+                    self.init.insert(y.var(), y_init);
+                }
+            }
+        }
+        for (&x, &y) in map.iter() {
             if self.is_latch(x) {
                 rst.replace(x, y);
             } else {
