@@ -387,7 +387,7 @@ pub fn cerbtora_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) 
         match output.status.code() {
             Some(1) => (),
             _ => error!(
-                "cerbtora maybe not avaliable, please `docker pull ghcr.io/gipsyh/cerbtora:latest`"
+                "cerbtora maybe not available, please `docker pull ghcr.io/gipsyh/cerbtora:latest`"
             ),
         }
         false
