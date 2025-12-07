@@ -115,7 +115,7 @@ impl Transys {
             {
                 let y_init = x_init.not_if(!y.polarity());
                 if let Some(init) = self.init.get_mut(&y.var()) {
-                    self.rel.new_or([init, &y_init]);
+                    *init = self.rel.new_or([init, &y_init]);
                 } else {
                     self.init.insert(y.var(), y_init);
                 }
