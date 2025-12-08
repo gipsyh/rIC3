@@ -115,7 +115,10 @@ impl Transys {
             {
                 let y_init = x_init.not_if(!y.polarity());
                 if let Some(init) = self.init.get_mut(&y.var()) {
-                    *init = self.rel.new_or([init, &y_init]);
+                    let c = self.rel.new_xnor(*init, y_init);
+                    if !c.is_constant(true) {
+                        self.constraint.push(c);
+                    }
                 } else {
                     self.init.insert(y.var(), y_init);
                 }
