@@ -46,25 +46,32 @@ impl Engine for Ctilg {
     }
 
     fn check(&mut self) -> Option<bool> {
-        for (i, b) in self.uts.ts.bad.iter().rev().enumerate() {
+        let mut res = true;
+        for (i, b) in self.uts.ts.bad.iter().enumerate() {
             let nb = self.uts.next(b, self.uts.num_unroll);
-            if self.slv.solve(&[nb]) {
-                println!(
-                    "The {}-th property{}is not inductive.",
-                    self.uts.ts.bad.len() - i,
-                    if let Some(s) = self.symbols.get(b) {
-                        format!(" ({s}) ")
-                    } else {
-                        "  ".to_string()
-                    }
-                );
-                return Some(false);
-            }
+            let r = self.slv.solve(&[nb]);
+            res &= !r;
+            println!(
+                "The {}-th property{}is {}inductive.",
+                i + 1,
+                if let Some(s) = self.symbols.get(b) {
+                    format!(" ({s}) ")
+                } else {
+                    " ".to_string()
+                },
+                if r { "NOT " } else { "" }
+            );
         }
-        Some(true)
+        Some(res)
     }
 
     fn wl_witness(&mut self) -> WlWitness {
-        self.uts.witness(&mut self.slv)
+        for b in self.uts.ts.bad.iter().rev() {
+            let nb = self.uts.next(b, self.uts.num_unroll);
+            if self.slv.solve(&[nb]) {
+                return self.uts.witness(&mut self.slv);
+            }
+        }
+        unreachable!()
     }
 }
