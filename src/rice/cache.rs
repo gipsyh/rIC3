@@ -1,4 +1,5 @@
 use bincode::{Decode, Encode};
+use rIC3::McResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -24,20 +25,25 @@ struct SourceCache {
 pub struct RiceProj {
     path: PathBuf,
     dut_path: PathBuf,
+    res_path: PathBuf,
 }
 
 impl RiceProj {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let path = PathBuf::from("riceproj");
-        let mut dut_path = path.clone();
-        dut_path.push("dut");
+        let dut_path = path.join("dut");
+        let res_path = path.join("res");
         if !Path::new(&path).exists() {
             fs::create_dir(&path)?;
         }
         if !Path::new(&dut_path).exists() {
             fs::create_dir(&dut_path)?;
         }
-        Ok(Self { path, dut_path })
+        Ok(Self {
+            path,
+            dut_path,
+            res_path,
+        })
     }
 
     pub fn clear(&self) -> Result<(), Box<dyn Error>> {
@@ -77,7 +83,7 @@ impl RiceProj {
     }
 
     pub fn check_cached_src(&self, sources: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
-        let cache_path = self.dut_path.join("src_cache.bin");
+        let cache_path = self.dut_path.join("src_hash");
         if !cache_path.exists() {
             return Ok(false);
         }
@@ -132,7 +138,22 @@ impl RiceProj {
         }
 
         let content = bincode::encode_to_vec(&cache, bincode::config::standard())?;
-        fs::write(self.dut_path.join("src_cache.bin"), content)?;
+        fs::write(self.dut_path.join("src_hash"), content)?;
         Ok(())
+    }
+
+    pub fn check_cached_res(&self) -> Result<Option<McResult>, Box<dyn Error>> {
+        let res_path = self.res_path.join("res");
+        if !res_path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read(&res_path)?;
+        let cache: SourceCache =
+            bincode::decode_from_slice(&content, bincode::config::standard())?.0;
+        todo!()
+    }
+
+    pub fn cache_res(&self) -> Result<(), Box<dyn Error>> {
+        
     }
 }

@@ -1,10 +1,9 @@
+use serde::Deserialize;
 use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
 };
-
-use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct RiceConfig {

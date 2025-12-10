@@ -1,4 +1,4 @@
-use crate::{RiceConfig, proj::RiceProj};
+use crate::{RiceConfig, cache::RiceProj};
 use std::process::Command;
 
 #[derive(Default)]
