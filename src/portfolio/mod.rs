@@ -66,6 +66,7 @@ impl Portfolio {
             cmd.env("RUST_LOG", "warn");
             cmd.env("RIC3_WORKER", format!("worker{id}"));
             id += 1;
+            cmd.arg("check");
             cmd.arg(&cfg.model);
             for a in args_split {
                 cmd.arg(a);

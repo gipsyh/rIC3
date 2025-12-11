@@ -2,13 +2,7 @@ use clap::{ArgAction, Args, Parser, ValueEnum};
 use log::error;
 use std::path::PathBuf;
 
-/// rIC3 model checker
 #[derive(Parser, Debug, Clone)]
-#[command(
-    version,
-    about,
-    after_help = "Copyright (C) 2023 - Present, Yuheng Su <gipsyh.icu@gmail.com>. All rights reserved."
-)]
 pub struct Config {
     /// model checking engine
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
