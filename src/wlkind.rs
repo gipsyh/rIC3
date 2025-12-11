@@ -1,6 +1,6 @@
 use crate::{
     Engine,
-    config::Config,
+    config::EngineConfig,
     tracer::{Tracer, TracerIf},
     wltransys::{
         WlTransys,
@@ -14,7 +14,7 @@ use logicrs::fol::{Sort, Term, op};
 
 pub struct WlKind {
     uts: WlTransysUnroll,
-    cfg: Config,
+    cfg: EngineConfig,
     solver: bitwuzla::Bitwuzla,
     solver_trans_k: usize,
     solver_bad_k: usize,
@@ -23,7 +23,7 @@ pub struct WlKind {
 }
 
 impl WlKind {
-    pub fn new(cfg: Config, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: EngineConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);

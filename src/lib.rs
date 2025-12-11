@@ -20,7 +20,7 @@ use crate::{
     transys::certify::{Proof, Witness},
     wltransys::certify::{WlProof, WlWitness},
 };
-use config::Config;
+use config::EngineConfig;
 
 #[derive(Clone, Copy, Debug)]
 pub enum McResult {

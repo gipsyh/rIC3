@@ -1,0 +1,13 @@
+[ric3]
+version = "1.6.0"
+
+[dut]
+top = "fifo"
+files = ["fifo.v"]
+
+[prove]
+
+[bughunt]
+depth = 20
+
+[ctilg]

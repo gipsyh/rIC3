@@ -1,6 +1,6 @@
 use crate::{
     Engine, Witness,
-    config::Config,
+    config::EngineConfig,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
@@ -12,7 +12,7 @@ use std::time::Duration;
 pub struct BMC {
     ots: Transys,
     uts: TransysUnroll<NoDepTransys>,
-    cfg: Config,
+    cfg: EngineConfig,
     solver: Box<dyn Satif>,
     solver_k: usize,
     rst: Restore,
@@ -22,7 +22,7 @@ pub struct BMC {
 }
 
 impl BMC {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts.compress_bads();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);

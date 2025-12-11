@@ -1,7 +1,7 @@
 use super::IC3;
 use crate::{
     Witness,
-    config::Config,
+    config::EngineConfig,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
 use giputils::hash::{GHashMap, GHashSet};
@@ -20,7 +20,7 @@ pub struct LocalAbs {
 }
 
 impl LocalAbs {
-    pub fn new(ts: &Transys, cfg: &Config) -> Self {
+    pub fn new(ts: &Transys, cfg: &EngineConfig) -> Self {
         let mut refine = GHashSet::new();
         refine.insert(Var::CONST);
         refine.extend(ts.bad.iter().map(|l| l.var()));

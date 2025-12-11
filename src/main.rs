@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let cli = Cli::parse();
     match cli.command {
-        cli::Commands::Run => todo!(),
+        cli::Commands::Run => cli::run::run(),
         cli::Commands::Check(cfg) => cli::check(cfg),
         cli::Commands::Clean => todo!(),
         cli::Commands::Interact => todo!(),

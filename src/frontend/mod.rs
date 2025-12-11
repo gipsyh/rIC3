@@ -1,6 +1,6 @@
 use crate::{
     Proof, Witness,
-    config::Config,
+    config::EngineConfig,
     frontend::{aig::certifaiger_check, btor::cerbtora_check},
     transys::Transys,
     wltransys::{
@@ -38,7 +38,7 @@ pub trait Frontend {
     fn certify(&mut self, model: &Path, cert: &Path) -> bool;
 }
 
-pub fn certificate_check(cfg: &Config, certificate: impl AsRef<Path>) {
+pub fn certificate_check(cfg: &EngineConfig, certificate: impl AsRef<Path>) {
     if cfg.certify {
         let res = match cfg.model.extension() {
             Some(ext) if (ext == "aig") | (ext == "aag") => {

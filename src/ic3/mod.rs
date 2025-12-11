@@ -1,6 +1,6 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::Config,
+    config::EngineConfig,
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
     tracer::{Tracer, TracerIf},
@@ -29,7 +29,7 @@ mod utils;
 mod verify;
 
 pub struct IC3 {
-    cfg: Config,
+    cfg: EngineConfig,
     ts: Transys,
     symbols: VarSymbols,
     tsctx: Grc<TransysCtx>,
@@ -90,7 +90,7 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(cfg: Config, mut ts: Transys, symbols: VarSymbols) -> Self {
+    pub fn new(cfg: EngineConfig, mut ts: Transys, symbols: VarSymbols) -> Self {
         let ots = ts.clone();
         ts.compress_bads();
         let rst = Restore::new(&ts);

@@ -1,6 +1,6 @@
 use crate::{
     Engine,
-    config::Config,
+    config::EngineConfig,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
@@ -8,7 +8,7 @@ use giputils::hash::GHashMap;
 use log::info;
 
 pub struct WlBMC {
-    cfg: Config,
+    cfg: EngineConfig,
     #[allow(unused)]
     owts: WlTransys,
     uts: WlTransysUnroll,
@@ -18,7 +18,7 @@ pub struct WlBMC {
 }
 
 impl WlBMC {
-    pub fn new(cfg: Config, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: EngineConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);

@@ -1,9 +1,13 @@
+mod cache;
+pub mod run;
+mod yosys;
+
 use clap::{Parser, Subcommand, ValueEnum};
 use log::{error, info};
 use rIC3::{
     Engine,
     bmc::BMC,
-    config::{self, Config},
+    config::{self, EngineConfig},
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
     ic3::IC3,
     kind::Kind,
@@ -31,12 +35,12 @@ pub struct Cli {
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     Run,
-    Check(Config),
+    Check(EngineConfig),
     Clean,
     Interact,
 }
 
-pub fn check(mut cfg: Config) -> Result<(), Box<dyn error::Error>> {
+pub fn check(mut cfg: EngineConfig) -> Result<(), Box<dyn error::Error>> {
     cfg.validate();
     cfg.model = cfg.model.canonicalize()?;
     info!("the model to be checked: {}", cfg.model.display());
@@ -108,7 +112,7 @@ pub fn check(mut cfg: Config) -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn interrupt_statistic(cfg: &Config, engine: &mut dyn Engine) {
+fn interrupt_statistic(cfg: &EngineConfig, engine: &mut dyn Engine) {
     if cfg.interrupt_statistic {
         let e: (usize, usize) = unsafe { transmute((engine as *mut dyn Engine).to_raw_parts()) };
         let _ = ctrlc::set_handler(move || {
@@ -125,7 +129,12 @@ fn interrupt_statistic(cfg: &Config, engine: &mut dyn Engine) {
     }
 }
 
-pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engine: &mut dyn Engine, res: bool) {
+pub fn certificate(
+    cfg: &EngineConfig,
+    frontend: &mut dyn Frontend,
+    engine: &mut dyn Engine,
+    res: bool,
+) {
     if cfg.certificate.is_none() && !cfg.certify && (!cfg.witness || res) {
         return;
     }

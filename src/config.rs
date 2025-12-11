@@ -3,7 +3,7 @@ use log::error;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
-pub struct Config {
+pub struct EngineConfig {
     /// model checking engine
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
     pub engine: Engine,
@@ -64,7 +64,7 @@ pub struct Config {
     pub time_limit: Option<u64>,
 }
 
-impl Config {
+impl EngineConfig {
     pub fn validate(&self) {
         match self.engine {
             Engine::IC3 => self.ic3.validate(),
@@ -211,8 +211,8 @@ pub struct PortfolioConfig {
     pub wmem_limit: usize,
 }
 
-impl Default for Config {
+impl Default for EngineConfig {
     fn default() -> Self {
-        Config::parse_from([""])
+        EngineConfig::parse_from([""])
     }
 }

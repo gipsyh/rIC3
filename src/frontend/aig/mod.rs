@@ -1,7 +1,7 @@
 use super::Frontend;
 use crate::{
     Proof, Witness,
-    config::Config,
+    config::EngineConfig,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
@@ -136,7 +136,7 @@ pub struct AigFrontend {
 }
 
 impl AigFrontend {
-    pub fn new(cfg: &Config) -> Self {
+    pub fn new(cfg: &EngineConfig) -> Self {
         let mut oaig = Aig::from_file(&cfg.model);
         if !oaig.outputs.is_empty() {
             if oaig.bads.is_empty() {

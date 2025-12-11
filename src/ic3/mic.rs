@@ -1,5 +1,5 @@
 use super::IC3;
-use crate::{config::Config, transys::TransysIf};
+use crate::{config::EngineConfig, transys::TransysIf};
 use giputils::hash::GHashSet;
 use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
@@ -36,7 +36,7 @@ pub enum MicType {
 }
 
 impl MicType {
-    pub fn from_config(cfg: &Config) -> Self {
+    pub fn from_config(cfg: &EngineConfig) -> Self {
         let p = if cfg.ic3.ctg {
             DropVarParameter {
                 limit: cfg.ic3.ctg_limit,

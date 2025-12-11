@@ -3,7 +3,7 @@ mod array;
 use super::Frontend;
 use crate::{
     Proof, Witness,
-    config::Config,
+    config::EngineConfig,
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
@@ -72,7 +72,7 @@ pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
     symbols: GHashMap<Term, String>,
-    _cfg: Config,
+    _cfg: EngineConfig,
     // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
@@ -82,7 +82,7 @@ pub struct BtorFrontend {
 }
 
 impl BtorFrontend {
-    pub fn new(cfg: &Config) -> Self {
+    pub fn new(cfg: &EngineConfig) -> Self {
         let btor = Btor::from_file(&cfg.model);
         if btor.bad.is_empty() {
             warn!("no property to be checked");

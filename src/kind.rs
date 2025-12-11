@@ -1,6 +1,6 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::Config,
+    config::EngineConfig,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
@@ -9,7 +9,7 @@ use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
-    cfg: Config,
+    cfg: EngineConfig,
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
@@ -19,7 +19,7 @@ pub struct Kind {
 }
 
 impl Kind {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts.compress_bads();
         let rst = Restore::new(&ts);

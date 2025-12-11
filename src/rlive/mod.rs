@@ -1,6 +1,6 @@
 use crate::{
     Engine, Witness,
-    config::Config,
+    config::EngineConfig,
     ic3::IC3,
     transys::{Transys, TransysIf, certify::Restore},
 };
@@ -11,11 +11,11 @@ use std::mem::take;
 
 pub struct Rlive {
     #[allow(unused)]
-    cfg: Config,
+    cfg: EngineConfig,
     ts: Transys,
-    rcfg: Config,  // reach check config
-    rts: Transys,  // reach check ts
-    base_var: Var, // base var
+    rcfg: EngineConfig, // reach check config
+    rts: Transys,       // reach check ts
+    base_var: Var,      // base var
     trace: Vec<LitOrdVec>,
     witness: Vec<Witness>,
     shoals: Vec<LitVec>,
@@ -110,7 +110,7 @@ impl Rlive {
 }
 
 impl Rlive {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
         warn!("rlive is unstable, use with caution");
         if ts.justice.is_empty() {
             error!("rlive requires justice property");
@@ -131,8 +131,9 @@ impl Rlive {
         let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
-        let rcfg =
-            Config::parse_from("-e ic3 --no-ic3-pred-prop --ic3-full-bad --no-preproc".split(' '));
+        let rcfg = EngineConfig::parse_from(
+            "-e ic3 --no-ic3-pred-prop --ic3-full-bad --no-preproc".split(' '),
+        );
         Self {
             cfg,
             ts,
