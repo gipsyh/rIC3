@@ -1,8 +1,9 @@
 use crate::{
-    Engine, Proof, Witness,
+    Engine, McResult, Proof, Witness,
     config::Config,
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
+    tracer::{Tracer, TracerIf},
     transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
 use activity::Activity;
@@ -46,6 +47,7 @@ pub struct IC3 {
     rng: StdRng,
 
     filog: IntervalLogger,
+    tracer: Tracer,
 }
 
 impl IC3 {
@@ -126,6 +128,7 @@ impl IC3 {
             rst,
             rng,
             filog: Default::default(),
+            tracer: Tracer::new(),
         }
     }
 
@@ -141,6 +144,7 @@ impl IC3 {
 impl Engine for IC3 {
     fn check(&mut self) -> Option<bool> {
         if !self.base() {
+            self.tracer.trace_res(McResult::Unsafe(0));
             return Some(false);
         }
         loop {
@@ -148,13 +152,15 @@ impl Engine for IC3 {
             debug!("blocking phase begin");
             loop {
                 match self.block(None) {
-                    BlockResult::Failure => {
+                    BlockResult::Failure(depth) => {
                         self.statistic.block.overall_time += start.elapsed();
+                        self.tracer.trace_res(McResult::Unsafe(depth));
                         return Some(false);
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.verify();
+                        self.tracer.trace_res(McResult::Safe);
                         return Some(true);
                     }
                     BlockResult::OverallTimeLimitExceeded => {
@@ -175,16 +181,22 @@ impl Engine for IC3 {
             debug!("blocking phase end");
             self.statistic.block.overall_time += start.elapsed();
             self.filog.log(Level::Info, self.frame.statistic(true));
+            self.tracer.trace_res(McResult::Unknown(Some(self.level())));
             self.extend();
             let start = Instant::now();
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
                 self.verify();
+                self.tracer.trace_res(McResult::Safe);
                 return Some(true);
             }
             self.propagete_to_inf();
         }
+    }
+
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
     }
 
     fn proof(&mut self) -> Proof {

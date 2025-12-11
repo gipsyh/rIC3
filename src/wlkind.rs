@@ -1,6 +1,7 @@
 use crate::{
     Engine,
     config::Config,
+    tracer::{Tracer, TracerIf},
     wltransys::{
         WlTransys,
         certify::{WlProof, WlWitness},
@@ -18,6 +19,7 @@ pub struct WlKind {
     solver_trans_k: usize,
     solver_bad_k: usize,
     owts: WlTransys,
+    tracer: Tracer,
 }
 
 impl WlKind {
@@ -33,6 +35,7 @@ impl WlKind {
             solver_trans_k: 0,
             solver_bad_k: 0,
             owts,
+            tracer: Tracer::new(),
         }
     }
 
@@ -74,12 +77,11 @@ impl Engine for WlKind {
         for k in 0..=self.cfg.end {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
-            info!("kind depth: {k}");
             if k > 0 {
                 self.load_bad_to(k - 1);
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
-                    info!("k-induction proofed in depth {k}");
+                    self.tracer.trace_res(crate::McResult::Safe);
                     return Some(true);
                 }
             }
@@ -92,12 +94,17 @@ impl Engine for WlKind {
             assump.push(bad_at_k);
 
             if self.solver.solve(&assump) {
-                info!("bmc found counter-example in depth {k}");
+                self.tracer.trace_res(crate::McResult::Unsafe(k));
                 return Some(false);
             }
+            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
         None
+    }
+
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
     }
 
     fn wl_witness(&mut self) -> WlWitness {

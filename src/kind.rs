@@ -1,6 +1,7 @@
 use crate::{
-    Engine, Proof, Witness,
+    Engine, McResult, Proof, Witness,
     config::Config,
+    tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::{error, info};
@@ -14,6 +15,7 @@ pub struct Kind {
     slv_bad_k: usize,
     ots: Transys,
     rst: Restore,
+    tracer: Tracer,
 }
 
 impl Kind {
@@ -41,6 +43,7 @@ impl Kind {
             slv_bad_k: 0,
             ots,
             rst,
+            tracer: Tracer::new(),
         }
     }
 
@@ -75,26 +78,30 @@ impl Engine for Kind {
         for k in 0..=self.cfg.end {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
-            info!("kind depth: {k}");
             if k > 0 {
                 self.load_bad_to(k - 1);
                 let res = self
                     .solver
                     .solve(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
                 if !res {
-                    info!("k-induction proofed in depth {k}");
+                    self.tracer.trace_res(McResult::Safe);
                     return Some(true);
                 }
             }
             let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
             assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad.cube(), k));
             if self.solver.solve(&assump) {
-                info!("bmc found counter-example in depth {k}");
+                self.tracer.trace_res(McResult::Unsafe(k));
                 return Some(false);
             }
+            self.tracer.trace_res(McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
         None
+    }
+
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
     }
 
     fn proof(&mut self) -> Proof {

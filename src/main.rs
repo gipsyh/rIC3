@@ -1,6 +1,6 @@
 #![feature(ptr_metadata)]
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use log::{error, info};
 use rIC3::{
     Engine,
@@ -11,6 +11,7 @@ use rIC3::{
     kind::Kind,
     portfolio::portfolio_main,
     rlive::Rlive,
+    tracer::LogTracer,
     transys::TransysIf,
     wlbmc::WlBMC,
     wlkind::WlKind,
@@ -83,6 +84,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             _ => unreachable!(),
         }
     };
+    let log_tracer = Box::new(LogTracer::new(
+        cfg.engine.to_possible_value().unwrap().get_name(),
+    ));
+    engine.add_tracer(log_tracer);
     interrupt_statistic(&cfg, engine.as_mut());
     let res = engine.check();
     engine.statistic();

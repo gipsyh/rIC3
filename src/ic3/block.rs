@@ -9,7 +9,7 @@ use std::time::Instant;
 
 pub enum BlockResult {
     Success,
-    Failure,
+    Failure(usize),
     Proved,
     BlockLimitExceeded,
     OverallTimeLimitExceeded,
@@ -94,7 +94,7 @@ impl IC3 {
                 if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
                     self.add_obligation(po.clone());
                     if self.check_witness_by_bmc(po.depth) {
-                        return BlockResult::Failure;
+                        return BlockResult::Failure(po.depth);
                     } else {
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
@@ -109,7 +109,7 @@ impl IC3 {
                     debug_assert!(!self.solvers[0].solve(lemma));
                 } else {
                     self.add_obligation(po.clone());
-                    return BlockResult::Failure;
+                    return BlockResult::Failure(po.depth);
                 }
             }
             if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.state) {

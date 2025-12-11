@@ -1,6 +1,7 @@
 use crate::{
     Engine,
     config::Config,
+    tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
 use giputils::hash::GHashMap;
@@ -13,6 +14,7 @@ pub struct WlBMC {
     uts: WlTransysUnroll,
     solver: bitwuzla::Bitwuzla,
     solver_k: usize,
+    tracer: Tracer,
 }
 
 impl WlBMC {
@@ -30,6 +32,7 @@ impl WlBMC {
             uts,
             solver,
             solver_k: 0,
+            tracer: Tracer::new(),
         }
     }
 
@@ -53,14 +56,18 @@ impl Engine for WlBMC {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
-            info!("bmc depth: {k}");
             if self.solver.solve(&[assump]) {
-                info!("bmc found counter-example in depth {k}");
+                self.tracer.trace_res(crate::McResult::Unsafe(k));
                 return Some(false);
             }
+            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
         None
+    }
+
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
     }
 
     fn wl_witness(&mut self) -> WlWitness {

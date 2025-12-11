@@ -1,6 +1,7 @@
 use crate::{
     Engine, Witness,
     config::Config,
+    tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use log::info;
@@ -17,6 +18,7 @@ pub struct BMC {
     rst: Restore,
     step: usize,
     rng: StdRng,
+    tracer: Tracer,
 }
 
 impl BMC {
@@ -53,6 +55,7 @@ impl BMC {
             solver_k: 0,
             rst,
             rng,
+            tracer: Tracer::new(),
         }
     }
 
@@ -90,7 +93,6 @@ impl Engine for BMC {
                 }
                 assump.clear();
             }
-            info!("bmc depth: {k}");
             let r = if let Some(limit) = self.cfg.bmc.step_time_limit {
                 let Some(r) =
                     self.solver
@@ -104,15 +106,20 @@ impl Engine for BMC {
                 self.solver.solve(&assump)
             };
             if r {
-                info!("bmc found counter-example in depth {k}");
+                self.tracer.trace_res(crate::McResult::Unsafe(k));
                 return Some(false);
             }
+            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
             if self.cfg.bmc.bmc_kissat {
                 self.reset_solver();
             }
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
         None
+    }
+
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
     }
 
     fn witness(&mut self) -> Witness {
