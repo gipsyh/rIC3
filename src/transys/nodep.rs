@@ -23,7 +23,7 @@ impl NoDepTransys {
     }
 
     pub fn simplify(&mut self, rst: &mut Restore) {
-        let mut simp_solver = cadical::Solver::new();
+        let mut simp_solver = cadical::CaDiCaL::new();
         simp_solver.new_var_to(self.max_var());
         for c in self.trans() {
             simp_solver.add_clause(c);

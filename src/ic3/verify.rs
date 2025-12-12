@@ -2,13 +2,12 @@ use crate::{
     ic3::IC3,
     transys::{TransysCtx, TransysIf},
 };
-use cadical::Solver;
 use log::{error, info};
 use logicrs::{LitVec, satif::Satif};
 
 #[allow(unused)]
 pub fn verify_invariant(ts: &TransysCtx, mut invariants: &[LitVec]) -> bool {
-    let mut solver = Solver::new();
+    let mut solver = cadical::CaDiCaL::new();
     ts.load_trans(&mut solver, true);
     ts.load_init(&mut solver);
     for lemma in invariants.iter() {
@@ -16,7 +15,7 @@ pub fn verify_invariant(ts: &TransysCtx, mut invariants: &[LitVec]) -> bool {
             return false;
         }
     }
-    let mut solver = Solver::new();
+    let mut solver = cadical::CaDiCaL::new();
     ts.load_trans(&mut solver, true);
     for lemma in invariants.iter() {
         solver.add_clause(&!lemma);

@@ -76,7 +76,7 @@ impl Witness {
             .chain(self.input[0].iter())
             .copied()
             .collect();
-        let mut solver = cadical::Solver::new();
+        let mut solver = cadical::CaDiCaL::new();
         ts.load_init(&mut solver);
         ts.load_trans(&mut solver, true);
         assert!(solver.solve(&assump));
@@ -94,7 +94,7 @@ impl Witness {
     pub fn exact_state(&mut self, ts: &Transys) {
         let mut uts = TransysUnroll::new(ts);
         uts.unroll_to(self.len() - 1);
-        let mut solver = cadical::Solver::new();
+        let mut solver = cadical::CaDiCaL::new();
         ts.load_init(&mut solver);
         for k in 0..=uts.num_unroll {
             uts.load_trans(&mut solver, k, true);

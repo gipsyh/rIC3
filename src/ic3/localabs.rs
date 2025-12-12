@@ -37,7 +37,7 @@ impl LocalAbs {
         if cfg.ic3.abs_cst {
             uts.enable_optional_constraint();
         }
-        let mut solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
+        let mut solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
         uts.load_trans(solver.as_mut(), 0, !cfg.ic3.abs_cst);
         uts.ts.load_init(solver.as_mut());
         let opt = uts.opt.clone();

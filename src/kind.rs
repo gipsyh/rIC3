@@ -34,7 +34,7 @@ impl Kind {
         if cfg.kind.simple_path {
             uts.enable_simple_path();
         }
-        let solver: Box<dyn Satif> = Box::new(cadical::Solver::new());
+        let solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
         Self {
             uts,
             cfg,
