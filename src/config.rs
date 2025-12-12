@@ -1,28 +1,11 @@
 use clap::{ArgAction, Args, Parser, ValueEnum};
 use log::error;
-use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
 pub struct EngineConfig {
     /// model checking engine
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
     pub engine: Engine,
-
-    /// model file in aiger format or in btor2 format,
-    /// for aiger model, the file name should be suffixed with .aig or .aag,
-    /// for btor model, the file name should be suffixed with .btor or .btor2.
-    pub model: PathBuf,
-
-    /// certificate path
-    pub certificate: Option<PathBuf>,
-
-    /// certify with certifaiger or cerbtora
-    #[arg(long, default_value_t = false)]
-    pub certify: bool,
-
-    /// print witness when model is unsafe
-    #[arg(long, default_value_t = false)]
-    pub witness: bool,
 
     #[command(flatten)]
     pub ic3: IC3Config,
@@ -54,10 +37,6 @@ pub struct EngineConfig {
     /// random seed
     #[arg(long, default_value_t = 0)]
     pub rseed: u64,
-
-    /// interrupt statistic
-    #[arg(long, default_value_t = false)]
-    pub interrupt_statistic: bool,
 
     /// time limit in seconds
     #[arg(long)]

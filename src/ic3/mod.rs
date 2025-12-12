@@ -26,7 +26,6 @@ mod proofoblig;
 mod propagate;
 mod solver;
 mod utils;
-mod verify;
 
 pub struct IC3 {
     cfg: EngineConfig,
@@ -159,7 +158,6 @@ impl Engine for IC3 {
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.verify();
                         self.tracer.trace_res(McResult::Safe);
                         return Some(true);
                     }
@@ -187,7 +185,6 @@ impl Engine for IC3 {
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
-                self.verify();
                 self.tracer.trace_res(McResult::Safe);
                 return Some(true);
             }

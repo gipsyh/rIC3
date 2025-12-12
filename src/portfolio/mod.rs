@@ -1,13 +1,13 @@
-use crate::{EngineConfig, frontend::certificate_check};
+use crate::EngineConfig;
 use log::{error, info};
 use process_control::{ChildExt, Control};
 use std::{
     collections::HashMap,
     env::current_exe,
-    fs::File,
-    io::{Read, Write},
+    io::{BufRead, BufReader, Read},
     mem::take,
     ops::{Deref, DerefMut},
+    path::PathBuf,
     process::{Command, Stdio, exit},
     sync::{Arc, Condvar, Mutex},
     thread::spawn,
@@ -40,11 +40,12 @@ impl PortfolioState {
 }
 
 pub struct Portfolio {
+    cert: Option<PathBuf>,
+    #[allow(unused)]
     cfg: EngineConfig,
     engines: Vec<Engine>,
     temp_dir: TempDir,
     engine_pids: Vec<i32>,
-    certificate: Option<NamedTempFile>,
     state: Arc<(Mutex<PortfolioState>, Condvar)>,
 }
 
@@ -54,7 +55,7 @@ struct Engine {
 }
 
 impl Portfolio {
-    pub fn new(cfg: EngineConfig) -> Self {
+    pub fn new(model: PathBuf, cert: Option<PathBuf>, cfg: EngineConfig) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
@@ -64,10 +65,9 @@ impl Portfolio {
             let mut cmd = Command::new(current_exe().unwrap());
             cmd.env("RIC3_TMP_DIR", temp_dir_path);
             cmd.env("RUST_LOG", "warn");
-            cmd.env("RIC3_WORKER", format!("worker{id}"));
             id += 1;
             cmd.arg("check");
-            cmd.arg(&cfg.model);
+            cmd.arg(&model);
             for a in args_split {
                 cmd.arg(a);
             }
@@ -76,7 +76,7 @@ impl Portfolio {
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
-        let portfolio_config = match cfg.model.extension() {
+        let portfolio_config = match model.extension() {
             Some(ext) if (ext == "aig") | (ext == "aag") => portfolio_config["bl_default"].clone(),
             Some(ext) if (ext == "btor") | (ext == "btor2") => {
                 portfolio_config["wl_default"].clone()
@@ -91,10 +91,10 @@ impl Portfolio {
         }
         let ps = PortfolioState::new(engines.len());
         Self {
+            cert,
             cfg,
             engines,
             temp_dir,
-            certificate: None,
             engine_pids: Default::default(),
             state: Arc::new((Mutex::new(ps), Condvar::new())),
         }
@@ -131,17 +131,20 @@ impl Portfolio {
         let wmem = self.cfg.portfolio.wmem_limit * 1024 * 1024 * 1024;
         let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
-            let certificate =
-                if self.cfg.certificate.is_some() || self.cfg.certify || self.cfg.witness {
-                    let certificate =
-                        tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
-                    let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                    engine.cmd.arg(certify_path);
-                    Some(certificate)
-                } else {
-                    None
-                };
-            let mut child = engine.cmd.stderr(Stdio::piped()).spawn().unwrap();
+            let certificate = if self.cert.is_some() {
+                let certificate = tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
+                let certify_path = certificate.path().as_os_str().to_str().unwrap();
+                engine.cmd.arg(certify_path);
+                Some(certificate)
+            } else {
+                None
+            };
+            let mut child = engine
+                .cmd
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
             self.engine_pids.push(child.id() as i32);
             let state = self.state.clone();
             spawn(move || {
@@ -152,7 +155,8 @@ impl Portfolio {
                     .map(|cstr| cstr.to_str().unwrap())
                     .collect::<Vec<&str>>();
                 let config = config.join(" ");
-                info!("start engine {}: {config}", engine.name);
+                info!("start engine {}", engine.name);
+                let stdout = child.stdout.take().unwrap();
                 #[cfg(target_os = "linux")]
                 let status = child
                     .controlled()
@@ -162,23 +166,43 @@ impl Portfolio {
                     .unwrap();
                 #[cfg(target_os = "macos")]
                 let status = child.controlled().wait().unwrap().unwrap();
-                let res = match status.code() {
-                    Some(10) => false,
-                    Some(20) => true,
-                    e => {
-                        let mut ps = state.0.lock().unwrap();
-                        if let PortfolioState::Checking(np) = ps.deref_mut() {
-                            info!("{config} unexpectedly exited, exit code: {e:?}");
-                            let mut stderr = String::new();
-                            child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
-                            info!("{stderr}");
-                            *np -= 1;
-                            if *np == 0 {
-                                state.1.notify_one();
+                let mut res = None;
+                if let Some(0) = status.code() {
+                    let reader = BufReader::new(stdout);
+                    let mut res_line = String::new();
+                    for line in reader.lines() {
+                        match line {
+                            Ok(l) => {
+                                res_line = l;
                             }
+                            Err(_) => (),
                         }
-                        return;
                     }
+                    match res_line.as_str() {
+                        "SAT" => res = Some(false),
+                        "UNSAT" => res = Some(true),
+                        _ => (),
+                    }
+                }
+                let Some(res) = res else {
+                    let mut ps = state.0.lock().unwrap();
+                    if let PortfolioState::Checking(np) = ps.deref_mut() {
+                        if !matches!(status.code(), Some(0)) {
+                            info!(
+                                "{} unexpectedly exited, exit code: {:?}",
+                                engine.name,
+                                status.code()
+                            );
+                        }
+                        let mut stderr = String::new();
+                        child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
+                        info!("{stderr}");
+                        *np -= 1;
+                        if *np == 0 {
+                            state.1.notify_one();
+                        }
+                    }
+                    return;
                 };
                 let mut lock = state.0.lock().unwrap();
                 if lock.is_checking() {
@@ -195,8 +219,10 @@ impl Portfolio {
         }
         let (res, config, certificate) = result.result();
         drop(result);
-        self.certificate = certificate;
         info!("best configuration: {config}");
+        if let Some(cert) = &self.cert {
+            std::fs::copy(certificate.as_ref().unwrap(), cert).unwrap();
+        }
         let pids: Vec<String> = self.engine_pids.iter().map(|p| format!("{}", *p)).collect();
         let pid = pids.join(",");
         let _ = Command::new("pkill")
@@ -222,42 +248,6 @@ impl Portfolio {
         .unwrap();
         self.check_inner()
     }
-
-    fn certificate(&mut self, cfg: &EngineConfig, res: bool) {
-        if res {
-            if cfg.certificate.is_none() && !cfg.certify {
-                return;
-            }
-            if let Some(certificate_path) = &cfg.certificate {
-                std::fs::copy(self.certificate.as_ref().unwrap(), certificate_path).unwrap();
-            }
-        } else {
-            if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
-                return;
-            }
-            let mut witness = String::new();
-            File::open(
-                self.certificate
-                    .as_ref()
-                    .unwrap()
-                    .path()
-                    .as_os_str()
-                    .to_str()
-                    .unwrap(),
-            )
-            .unwrap()
-            .read_to_string(&mut witness)
-            .unwrap();
-            if cfg.witness {
-                println!("{witness}");
-            }
-            if let Some(certificate_path) = &cfg.certificate {
-                let mut file: File = File::create(certificate_path).unwrap();
-                file.write_all(witness.as_bytes()).unwrap();
-            }
-        }
-        certificate_check(cfg, self.certificate.as_ref().unwrap().path())
-    }
 }
 
 impl Drop for Portfolio {
@@ -266,34 +256,5 @@ impl Drop for Portfolio {
             .arg("-rf")
             .arg(self.temp_dir.path())
             .output();
-    }
-}
-
-pub fn portfolio_main(cfg: EngineConfig) {
-    let mut engine = Portfolio::new(cfg.clone());
-    let res = engine.check();
-    match res {
-        Some(true) => {
-            println!("UNSAT");
-            if cfg.witness {
-                println!("0");
-            }
-            engine.certificate(&cfg, true)
-        }
-        Some(false) => {
-            println!("SAT");
-            engine.certificate(&cfg, false)
-        }
-        _ => {
-            println!("UNKNOWN");
-            if cfg.witness {
-                println!("2");
-            }
-        }
-    }
-    if let Some(res) = res {
-        exit(if res { 20 } else { 10 })
-    } else {
-        exit(30)
     }
 }

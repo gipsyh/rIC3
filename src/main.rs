@@ -2,8 +2,7 @@
 
 mod cli;
 
-use crate::cli::Cli;
-use clap::Parser;
+use crate::cli::cli_main;
 use std::{env, error, fs};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
@@ -15,12 +14,5 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .format_target(false)
         .init();
     fs::create_dir_all("/tmp/rIC3")?;
-
-    let cli = Cli::parse();
-    match cli.command {
-        cli::Commands::Run => cli::run::run(),
-        cli::Commands::Check(cfg) => cli::check(cfg),
-        cli::Commands::Clean => todo!(),
-        cli::Commands::Interact => todo!(),
-    }
+    cli_main()
 }

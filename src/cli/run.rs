@@ -1,4 +1,4 @@
-use crate::cli::{cache::Ric3Proj, check, yosys::Yosys};
+use crate::cli::{cache::Ric3Proj, yosys::Yosys};
 use clap::Parser;
 use serde::Deserialize;
 use std::{
@@ -43,5 +43,6 @@ pub fn run() -> Result<(), Box<dyn error::Error>> {
     let btor = ric3_proj.dut_path().join("dut.btor");
     let ric3_cfg =
         rIC3::config::EngineConfig::parse_from(["", "-e", "ic3", &format!("{}", btor.display())]);
-    check(ric3_cfg)
+    todo!()
+    // check(ric3_cfg)
 }

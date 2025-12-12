@@ -1,0 +1,193 @@
+use aig::Aig;
+use btor::Btor;
+use clap::{Parser, ValueEnum};
+use log::{error, info};
+use rIC3::{
+    Engine,
+    bmc::BMC,
+    config::{self, EngineConfig},
+    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
+    ic3::IC3,
+    kind::Kind,
+    portfolio::Portfolio,
+    rlive::Rlive,
+    tracer::LogTracer,
+    transys::TransysIf,
+    wlbmc::WlBMC,
+    wlkind::WlKind,
+};
+use std::{error, fs, mem::transmute, path::PathBuf, process::exit, ptr};
+
+#[derive(Parser, Debug, Clone)]
+pub struct CheckConfig {
+    /// model file in aiger format or in btor2 format,
+    /// for aiger model, the file name should be suffixed with .aig or .aag,
+    /// for btor model, the file name should be suffixed with .btor or .btor2.
+    pub model: PathBuf,
+
+    /// certificate path
+    pub certificate: Option<PathBuf>,
+
+    /// certify with certifaiger or cerbtora
+    #[arg(long, default_value_t = false)]
+    pub certify: bool,
+
+    /// print witness when model is unsafe
+    #[arg(long, default_value_t = false)]
+    pub witness: bool,
+
+    /// interrupt statistic
+    #[arg(long, default_value_t = false)]
+    pub interrupt_statistic: bool,
+}
+
+fn report_res(chk: &CheckConfig, res: Option<bool>) {
+    match res {
+        Some(res) => {
+            if res {
+                println!("UNSAT");
+                if chk.witness {
+                    println!("0");
+                }
+            } else {
+                println!("SAT");
+                if chk.witness {
+                    let witness = fs::read_to_string(chk.certificate.as_ref().unwrap()).unwrap();
+                    println!("{witness}");
+                }
+            }
+        }
+        _ => {
+            println!("UNKNOWN");
+            if chk.witness {
+                println!("2");
+            }
+        }
+    }
+}
+
+pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> Result<(), Box<dyn error::Error>> {
+    cfg.validate();
+    chk.model = chk.model.canonicalize()?;
+    info!("the model to be checked: {}", chk.model.display());
+    let mut tmp_cert = None;
+    if chk.certificate.is_none() && (chk.certify || chk.witness) {
+        let tmp_cert_file = tempfile::NamedTempFile::new().unwrap();
+        chk.certificate = Some(PathBuf::from(tmp_cert_file.path()));
+        tmp_cert = Some(tmp_cert_file);
+    }
+    if let config::Engine::Portfolio = cfg.engine {
+        let res = portfolio_main(chk, cfg);
+        drop(tmp_cert);
+        return res;
+    }
+    let mut frontend: Box<dyn Frontend> = match chk.model.extension() {
+        Some(ext) if (ext == "aig") | (ext == "aag") => {
+            let aig = Aig::from_file(&chk.model);
+            Box::new(AigFrontend::new(aig))
+        }
+        Some(ext) if (ext == "btor") | (ext == "btor2") => {
+            let btor = Btor::from_file(&chk.model);
+            Box::new(BtorFrontend::new(btor))
+        }
+        _ => {
+            error!("Unsupported file format. Supported extensions are: .aig, .aag, .btor, .btor2.");
+            exit(1);
+        }
+    };
+    let mut engine: Box<dyn Engine> = if cfg.engine.is_wl() {
+        let (wts, _symbols) = frontend.wts();
+        // info!("origin ts has {}", ts.statistic());
+        match cfg.engine {
+            config::Engine::WlBMC => Box::new(WlBMC::new(cfg.clone(), wts)),
+            config::Engine::WlKind => Box::new(WlKind::new(cfg.clone(), wts)),
+            _ => unreachable!(),
+        }
+    } else {
+        let (ts, symbols) = frontend.ts();
+        info!("origin ts has {}", ts.statistic());
+        match cfg.engine {
+            config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, symbols)),
+            config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
+            config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
+            config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),
+            _ => unreachable!(),
+        }
+    };
+    let log_tracer = Box::new(LogTracer::new(
+        cfg.engine.to_possible_value().unwrap().get_name(),
+    ));
+    engine.add_tracer(log_tracer);
+    interrupt_statistic(&chk, engine.as_mut());
+    let res = engine.check();
+    engine.statistic();
+    if let Some(res) = res {
+        certificate(&chk, frontend.as_mut(), engine.as_mut(), res);
+    }
+    report_res(&chk, res);
+    if chk.certify {
+        assert!(certificate_check(
+            &chk.model,
+            chk.certificate.as_ref().unwrap()
+        ));
+    }
+    drop(tmp_cert);
+    Ok(())
+}
+
+fn interrupt_statistic(chk: &CheckConfig, engine: &mut dyn Engine) {
+    if chk.interrupt_statistic {
+        let e: (usize, usize) = unsafe { transmute((engine as *mut dyn Engine).to_raw_parts()) };
+        let _ = ctrlc::set_handler(move || {
+            let e: *mut dyn Engine = unsafe {
+                ptr::from_raw_parts_mut(
+                    e.0 as *mut (),
+                    transmute::<usize, std::ptr::DynMetadata<dyn rIC3::Engine>>(e.1),
+                )
+            };
+            let e = unsafe { &mut *e };
+            e.statistic();
+            exit(124);
+        });
+    }
+}
+
+pub fn certificate(
+    chk: &CheckConfig,
+    frontend: &mut dyn Frontend,
+    engine: &mut dyn Engine,
+    res: bool,
+) {
+    if chk.certificate.is_none() {
+        return;
+    }
+    let certificate = if engine.is_wl() {
+        if res {
+            frontend.wl_safe_certificate(engine.wl_proof())
+        } else {
+            let witness = engine.wl_witness();
+            debug_assert!(witness.state.len() == witness.input.len());
+            frontend.wl_unsafe_certificate(witness)
+        }
+    } else if res {
+        frontend.safe_certificate(engine.proof())
+    } else {
+        let witness = engine.witness();
+        debug_assert!(witness.state.len() == witness.input.len());
+        frontend.unsafe_certificate(witness)
+    };
+    fs::write(chk.certificate.as_ref().unwrap(), format!("{certificate}")).unwrap();
+}
+
+pub fn portfolio_main(chk: CheckConfig, cfg: EngineConfig) -> Result<(), Box<dyn error::Error>> {
+    let mut engine = Portfolio::new(chk.model.clone(), chk.certificate.clone(), cfg.clone());
+    let res = engine.check();
+    report_res(&chk, res);
+    if chk.certify {
+        assert!(certificate_check(
+            &chk.model,
+            chk.certificate.as_ref().unwrap()
+        ));
+    }
+    Ok(())
+}

@@ -3,7 +3,6 @@ mod array;
 use super::Frontend;
 use crate::{
     Proof, Witness,
-    config::EngineConfig,
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
@@ -15,7 +14,7 @@ use giputils::{
     bitvec::BitVec,
     hash::{GHashMap, GHashSet},
 };
-use log::{debug, error, warn};
+use log::{debug, error};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
@@ -23,13 +22,7 @@ use logicrs::{
         op::{self, Read},
     },
 };
-use std::{
-    collections::hash_map::Entry,
-    fmt::Display,
-    mem::take,
-    path::Path,
-    process::{Command, exit},
-};
+use std::{collections::hash_map::Entry, fmt::Display, mem::take, path::Path, process::Command};
 
 impl WlTransys {
     fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, String>) {
@@ -72,7 +65,6 @@ pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
     symbols: GHashMap<Term, String>,
-    _cfg: EngineConfig,
     // wordlevel restore
     // wb_rst: GHashMap<Term, Term>,
     // bitblast restore
@@ -82,16 +74,7 @@ pub struct BtorFrontend {
 }
 
 impl BtorFrontend {
-    pub fn new(cfg: &EngineConfig) -> Self {
-        let btor = Btor::from_file(&cfg.model);
-        if btor.bad.is_empty() {
-            warn!("no property to be checked");
-            if let Some(certificate) = &cfg.certificate {
-                btor.to_file(certificate);
-            }
-            println!("UNSAT");
-            exit(20);
-        }
+    pub fn new(btor: Btor) -> Self {
         let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
@@ -107,7 +90,6 @@ impl BtorFrontend {
             owts,
             wts,
             symbols,
-            _cfg: cfg.clone(),
             idmap,
             no_next,
             rst,

@@ -1,18 +1,13 @@
 use super::Frontend;
 use crate::{
     Proof, Witness,
-    config::EngineConfig,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
 use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols, VarVMap};
-use std::{
-    fmt::Display,
-    path::Path,
-    process::{Command, exit},
-};
+use std::{fmt::Display, path::Path, process::Command};
 
 impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
@@ -136,8 +131,8 @@ pub struct AigFrontend {
 }
 
 impl AigFrontend {
-    pub fn new(cfg: &EngineConfig) -> Self {
-        let mut oaig = Aig::from_file(&cfg.model);
+    pub fn new(aig: Aig) -> Self {
+        let mut oaig = aig;
         if !oaig.outputs.is_empty() {
             if oaig.bads.is_empty() {
                 oaig.bads = std::mem::take(&mut oaig.outputs);
@@ -162,19 +157,6 @@ impl AigFrontend {
             if !aig.fairness.is_empty() {
                 warn!("fairness constraints are ignored when solving the safety property");
                 aig.fairness.clear();
-            }
-            if aig.bads.is_empty() {
-                warn!("no property to be checked");
-                if let Some(certificate) = &cfg.certificate {
-                    let mut map = aig.inputs.clone();
-                    map.extend(aig.latchs.iter().map(|l| l.input));
-                    for x in map {
-                        aig.set_symbol(x, &format!("= {}", x * 2));
-                    }
-                    aig.to_file(certificate, true);
-                }
-                println!("UNSAT");
-                exit(20);
             }
         }
         let ots = Transys::from_aig(&aig, true);
