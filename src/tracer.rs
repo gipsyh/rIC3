@@ -1,7 +1,7 @@
 use crate::McResult;
 use log::info;
 
-pub trait TracerIf {
+pub trait TracerIf: Sync + Send {
     fn trace_res(&mut self, _res: McResult) {}
 }
 
