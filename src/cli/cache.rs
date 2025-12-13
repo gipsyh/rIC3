@@ -22,6 +22,7 @@ pub struct Ric3Proj {
     path: PathBuf,
     dut_path: PathBuf,
     res_path: PathBuf,
+    tmp_path: PathBuf,
 }
 
 impl Ric3Proj {
@@ -29,16 +30,22 @@ impl Ric3Proj {
         let path = PathBuf::from("ric3proj");
         let dut_path = path.join("dut");
         let res_path = path.join("res");
-        if !Path::new(&path).exists() {
-            fs::create_dir(&path)?;
-        }
-        if !Path::new(&dut_path).exists() {
-            fs::create_dir(&dut_path)?;
+        let tmp_path = path.join("tmp");
+        for p in [
+            path.clone(),
+            dut_path.clone(),
+            res_path.clone(),
+            tmp_path.clone(),
+        ] {
+            if !Path::new(&p).exists() {
+                fs::create_dir(&p)?;
+            }
         }
         Ok(Self {
             path,
             dut_path,
             res_path,
+            tmp_path,
         })
     }
 
@@ -57,6 +64,8 @@ impl Ric3Proj {
             }
         }
         fs::create_dir(&self.dut_path)?;
+        fs::create_dir(&self.res_path)?;
+        fs::create_dir(&self.tmp_path)?;
         Ok(())
     }
 
@@ -66,6 +75,10 @@ impl Ric3Proj {
 
     pub fn res_path(&self) -> &PathBuf {
         &self.res_path
+    }
+
+    pub fn tmp_path(&self) -> &PathBuf {
+        &self.tmp_path
     }
 
     fn calculate_hash(path: &Path) -> anyhow::Result<String> {
@@ -83,7 +96,7 @@ impl Ric3Proj {
     }
 
     pub fn check_cached_src(&self, sources: &[PathBuf]) -> anyhow::Result<bool> {
-        let cache_path = self.dut_path.join("hash.toml");
+        let cache_path = self.dut_path.join("hash.ron");
         if !cache_path.exists() {
             return Ok(false);
         }

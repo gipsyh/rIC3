@@ -170,13 +170,8 @@ impl Portfolio {
                 if let Some(0) = status.code() {
                     let reader = BufReader::new(stdout);
                     let mut res_line = String::new();
-                    for line in reader.lines() {
-                        match line {
-                            Ok(l) => {
-                                res_line = l;
-                            }
-                            Err(_) => (),
-                        }
+                    for l in reader.lines().flatten() {
+                        res_line = l;
                     }
                     match res_line.as_str() {
                         "SAT" => res = Some(false),

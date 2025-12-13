@@ -1,4 +1,7 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
+use btor::Btor;
+use clap::Parser;
+use rIC3::{McResult, config::EngineConfig, portfolio::Portfolio};
 use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -8,7 +11,11 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Cell, Row, Table},
 };
-use std::time::{Duration, Instant};
+use std::{
+    mem::take,
+    thread::spawn,
+    time::{Duration, Instant},
+};
 
 impl PropMcState {
     fn color(&self) -> Color {
@@ -77,10 +84,10 @@ impl Run {
     }
 
     pub fn stop_selected(&mut self) {
-        if let Some(i) = self.table.selected() {
-            if self.mc[i].state == McStatus::Solving {
-                self.mc[i].state = McStatus::Pause;
-            }
+        if let Some(i) = self.table.selected()
+            && self.mc[i].state == McStatus::Solving
+        {
+            self.mc[i].state = McStatus::Pause;
         }
     }
 
@@ -97,20 +104,35 @@ impl Run {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
+            if self.solving.as_ref().is_some_and(|s| s.1.is_finished()) {
+                let (id, join) = take(&mut self.solving).unwrap();
+                let res = join.join().unwrap();
+                self.mc[id].prop.res = match res {
+                    Some(true) => McResult::Safe,
+                    Some(false) => McResult::Unsafe(0),
+                    None => McResult::Unknown(None),
+                };
+                self.mc[id].state = McStatus::Pause;
+            }
+
+            if self.solving.is_none() {
+                self.launch_engine();
+            }
+
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
             if ratatui::crossterm::event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Char('q') => self.should_quit = true,
-                            KeyCode::Down => self.next(),
-                            KeyCode::Up => self.previous(),
-                            KeyCode::Char('s') => self.stop_selected(),
-                            _ => {}
-                        }
+                if let Event::Key(key) = event::read()?
+                    && key.kind == KeyEventKind::Press
+                {
+                    match key.code {
+                        KeyCode::Char('q') => self.should_quit = true,
+                        KeyCode::Down => self.next(),
+                        KeyCode::Up => self.previous(),
+                        KeyCode::Char('s') => self.stop_selected(),
+                        _ => {}
                     }
                 }
             }
@@ -128,7 +150,22 @@ impl Run {
         }
     }
 
-    fn launch_engine(&mut self) {}
+    fn launch_engine(&mut self) {
+        let Some(id) = self.queue.pop_front() else {
+            return;
+        };
+        self.mc[id].state = McStatus::Solving;
+        let mut wts = self.wts.clone();
+        wts.bad = vec![wts.bad[id].clone()];
+        let btor_path = self.ric3_proj.tmp_path().join(format!("p{id}.btor"));
+        let btor = Btor::from(&wts);
+        btor.to_file(&btor_path);
+        let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
+        let cert_file = self.ric3_proj.res_path().join(format!("p{id}.cert"));
+        let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg);
+        let join = spawn(move || engine.check());
+        self.solving = Some((id, join));
+    }
 
     fn ui(&mut self, frame: &mut Frame) {
         let rects = Layout::default()
@@ -143,7 +180,7 @@ impl Run {
         let header_style = Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD);
-        let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+        let selected_style = Style::default();
 
         let header = ["ID", "Property", "Status", "Bound", "Engine"]
             .into_iter()

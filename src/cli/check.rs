@@ -16,7 +16,7 @@ use rIC3::{
     wlbmc::WlBMC,
     wlkind::WlKind,
 };
-use std::{fs, mem::transmute, path::PathBuf, process::exit, ptr};
+use std::{env, fs, mem::transmute, path::PathBuf, process::exit, ptr};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -67,6 +67,13 @@ fn report_res(chk: &CheckConfig, res: Option<bool>) {
 }
 
 pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
+    if env::var("RUST_LOG").is_err() {
+        unsafe { env::set_var("RUST_LOG", "info") };
+    }
+    env_logger::Builder::from_default_env()
+        .format_timestamp(None)
+        .format_target(false)
+        .init();
     cfg.validate();
     chk.model = chk.model.canonicalize()?;
     info!("the model to be checked: {}", chk.model.display());

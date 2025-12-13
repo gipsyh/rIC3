@@ -153,11 +153,9 @@ impl AigFrontend {
                 );
                 panic!();
             }
-        } else {
-            if !aig.fairness.is_empty() {
-                warn!("fairness constraints are ignored when solving the safety property");
-                aig.fairness.clear();
-            }
+        } else if !aig.fairness.is_empty() {
+            warn!("fairness constraints are ignored when solving the safety property");
+            aig.fairness.clear();
         }
         let ots = Transys::from_aig(&aig, true);
         let osymbols = aig_symbols(&aig);

@@ -14,8 +14,10 @@ use rIC3::{
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::VecDeque,
     fs,
     path::{Path, PathBuf},
+    thread::JoinHandle,
 };
 use strum::AsRefStr;
 
@@ -57,6 +59,7 @@ pub enum McStatus {
     Wait,
 }
 
+#[derive(Debug)]
 struct PropMcState {
     prop: PropMcInfo,
     state: McStatus,
@@ -82,20 +85,32 @@ impl PropMcState {
 
 struct Run {
     table: TableState,
-    should_quit: bool,
-    mc: Vec<PropMcState>,
+    ric3_proj: Ric3Proj,
     wts: WlTransys,
+    mc: Vec<PropMcState>,
+    queue: VecDeque<usize>,
+    solving: Option<(usize, JoinHandle<Option<bool>>)>,
+    should_quit: bool,
 }
 
 impl Run {
-    fn new(wts: WlTransys, mc: Vec<PropMcState>) -> Self {
+    fn new(wts: WlTransys, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> Self {
         let mut table = TableState::default();
         table.select(Some(0));
+        let mut queue = VecDeque::new();
+        for m in mc.iter() {
+            if let McResult::Unknown(_) = m.prop.res {
+                queue.push_back(m.prop.id);
+            }
+        }
         Self {
             table,
-            should_quit: false,
+            ric3_proj,
+            queue,
             mc,
             wts,
+            solving: None,
+            should_quit: false,
         }
     }
 }
@@ -109,7 +124,6 @@ pub fn run() -> anyhow::Result<()> {
         Yosys::generate_btor(&ric3_cfg, &ric3_proj);
         ric3_proj.cache_src(&ric3_cfg.dut_src())?;
     }
-
     let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
@@ -124,32 +138,9 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::defalut_from_wts(&wts, &symbol));
-
-    // let res = if let Some(r) = res.get(&0) {
-    //     r.clone()
-    // } else {
-    //     let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
-    //     let cert_file = ric3_proj.res_path().join("cert");
-    //     let mut engine = Portfolio::new(btor_file, Some(cert_file), engine_cfg);
-    //     let res = engine.check();
-    //     let mut map = HashMap::new();
-    //     match res {
-    //         Some(res) => {
-    //             let r = if res {
-    //                 McResult::Safe
-    //             } else {
-    //                 McResult::Unsafe(0)
-    //             };
-    //             map.insert(0, r);
-    //             ric3_proj.cache_res(map)?;
-    //             r
-    //         }
-    //         None => todo!(),
-    //     }
-    // };
-    let mut run = Run::new(wts, mc);
+    let mut run = Run::new(wts, mc, ric3_proj);
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
-    ric3_proj.cache_res(res)?;
+    run.ric3_proj.cache_res(res)?;
     Ok(())
 }
