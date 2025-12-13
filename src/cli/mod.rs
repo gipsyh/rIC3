@@ -6,7 +6,6 @@ mod yosys;
 use crate::cli::check::CheckConfig;
 use clap::{Parser, Subcommand};
 use rIC3::config::EngineConfig;
-use std::error;
 
 /// rIC3 Hardware Formal Verification Tool
 #[derive(Parser, Debug, Clone)]
@@ -34,7 +33,7 @@ pub enum Commands {
     Interact,
 }
 
-pub fn cli_main() -> Result<(), Box<dyn error::Error>> {
+pub fn cli_main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Run => run::run(),

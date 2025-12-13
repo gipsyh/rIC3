@@ -3,9 +3,9 @@
 mod cli;
 
 use crate::cli::cli_main;
-use std::{env, error, fs};
+use std::{env, fs};
 
-fn main() -> Result<(), Box<dyn error::Error>> {
+fn main() -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
     }

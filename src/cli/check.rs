@@ -16,7 +16,7 @@ use rIC3::{
     wlbmc::WlBMC,
     wlkind::WlKind,
 };
-use std::{error, fs, mem::transmute, path::PathBuf, process::exit, ptr};
+use std::{fs, mem::transmute, path::PathBuf, process::exit, ptr};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -66,7 +66,7 @@ fn report_res(chk: &CheckConfig, res: Option<bool>) {
     }
 }
 
-pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> Result<(), Box<dyn error::Error>> {
+pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     cfg.validate();
     chk.model = chk.model.canonicalize()?;
     info!("the model to be checked: {}", chk.model.display());
@@ -179,7 +179,7 @@ pub fn certificate(
     fs::write(chk.certificate.as_ref().unwrap(), format!("{certificate}")).unwrap();
 }
 
-pub fn portfolio_main(chk: CheckConfig, cfg: EngineConfig) -> Result<(), Box<dyn error::Error>> {
+pub fn portfolio_main(chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     let mut engine = Portfolio::new(chk.model.clone(), chk.certificate.clone(), cfg.clone());
     let res = engine.check();
     report_res(&chk, res);

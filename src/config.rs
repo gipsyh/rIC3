@@ -1,7 +1,8 @@
 use clap::{ArgAction, Args, Parser, ValueEnum};
 use log::error;
+use serde::{Deserialize, Serialize};
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfig {
     /// model checking engine
     #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
@@ -57,7 +58,7 @@ impl EngineConfig {
     }
 }
 
-#[derive(Copy, Clone, ValueEnum, Debug)]
+#[derive(Copy, Clone, ValueEnum, Debug, Serialize, Deserialize)]
 pub enum Engine {
     /// ic3
     IC3,
@@ -81,7 +82,7 @@ impl Engine {
     }
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct IC3Config {
     /// dynamic generalization
     #[arg(long = "ic3-dynamic", default_value_t = false)]
@@ -143,7 +144,7 @@ impl IC3Config {
     }
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct BMCConfig {
     /// Per-step time limit for BMC (applies to each BMC step, not the overall solver run).
     /// The overall `time_limit` option sets the total time limit for the entire solver run.
@@ -157,14 +158,14 @@ pub struct BMCConfig {
     pub dyn_step: bool,
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct KindConfig {
     /// simple path constraint
     #[arg(long = "kind-simple-path", default_value_t = false)]
     pub simple_path: bool,
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct PreprocessConfig {
     /// disable preprocess
     #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
@@ -183,7 +184,7 @@ pub struct PreprocessConfig {
     pub scorr_tl: u64,
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct PortfolioConfig {
     /// portfolio woker memory limit in GB
     #[arg(long = "pworker-mem-limit", default_value_t = 16)]

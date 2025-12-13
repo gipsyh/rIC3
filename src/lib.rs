@@ -21,8 +21,9 @@ use crate::{
     wltransys::certify::{WlProof, WlWitness},
 };
 use config::EngineConfig;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum McResult {
     /// Safe
     Safe,

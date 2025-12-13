@@ -1,23 +1,19 @@
-use bincode::{Decode, Encode};
-use rIC3::McResult;
+use crate::cli::run::PropMcInfo;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
-    error::Error,
     fs,
     io::Read,
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Encode, Decode)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct FileEntry {
-    modified_nanos: u128,
     hash: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Encode, Decode)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct SourceCache {
     files: HashMap<PathBuf, FileEntry>,
 }
@@ -29,7 +25,7 @@ pub struct Ric3Proj {
 }
 
 impl Ric3Proj {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
+    pub fn new() -> anyhow::Result<Self> {
         let path = PathBuf::from("ric3proj");
         let dut_path = path.join("dut");
         let res_path = path.join("res");
@@ -46,7 +42,7 @@ impl Ric3Proj {
         })
     }
 
-    pub fn clear(&self) -> Result<(), Box<dyn Error>> {
+    pub fn clear(&self) -> anyhow::Result<()> {
         if let Ok(entries) = fs::read_dir(&self.path) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -68,7 +64,11 @@ impl Ric3Proj {
         &self.dut_path
     }
 
-    fn calculate_hash(path: &Path) -> Result<String, Box<dyn Error>> {
+    pub fn res_path(&self) -> &PathBuf {
+        &self.res_path
+    }
+
+    fn calculate_hash(path: &Path) -> anyhow::Result<String> {
         let mut file = fs::File::open(path)?;
         let mut hasher = Sha256::new();
         let mut buffer = [0; 8192];
@@ -82,27 +82,19 @@ impl Ric3Proj {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
-    pub fn check_cached_src(&self, sources: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
+    pub fn check_cached_src(&self, sources: &[PathBuf]) -> anyhow::Result<bool> {
         let cache_path = self.dut_path.join("hash");
         if !cache_path.exists() {
             return Ok(false);
         }
         let content = fs::read(&cache_path)?;
-        let cache: SourceCache =
-            bincode::decode_from_slice(&content, bincode::config::standard())?.0;
+        let cache: SourceCache = toml::from_slice(&content)?;
         if cache.files.len() != sources.len() {
             return Ok(false);
         }
         for src in sources {
             let src = fs::canonicalize(src)?;
             if let Some(entry) = cache.files.get(&src) {
-                let metadata = fs::metadata(&src)?;
-                let modified = metadata
-                    .modified()?
-                    .duration_since(SystemTime::UNIX_EPOCH)?;
-                if entry.modified_nanos != modified.as_nanos() {
-                    return Ok(false);
-                }
                 let current_hash = Self::calculate_hash(&src)?;
                 if entry.hash != current_hash {
                     return Ok(false);
@@ -115,45 +107,41 @@ impl Ric3Proj {
         Ok(true)
     }
 
-    pub fn cache_src(&self, sources: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+    pub fn cache_src(&self, sources: &[PathBuf]) -> anyhow::Result<()> {
         if !self.dut_path.exists() {
             fs::create_dir_all(&self.dut_path)?;
         }
         let mut cache = SourceCache::default();
         for src in sources {
             let abs_src = fs::canonicalize(src)?;
-            let metadata = fs::metadata(&abs_src)?;
-            let modified = metadata
-                .modified()?
-                .duration_since(SystemTime::UNIX_EPOCH)?;
             let hash = Self::calculate_hash(&abs_src)?;
 
-            cache.files.insert(
-                abs_src,
-                FileEntry {
-                    modified_nanos: modified.as_nanos(),
-                    hash,
-                },
-            );
+            cache.files.insert(abs_src, FileEntry { hash });
         }
-
-        let content = bincode::encode_to_vec(&cache, bincode::config::standard())?;
+        let content = toml::to_string(&cache)?;
         fs::write(self.dut_path.join("hash"), content)?;
         Ok(())
     }
 
-    pub fn check_cached_res(&self) -> Result<Option<McResult>, Box<dyn Error>> {
+    pub fn check_cached_res(&self) -> anyhow::Result<Option<Vec<PropMcInfo>>> {
+        if !self.res_path.exists() {
+            fs::create_dir_all(&self.res_path)?;
+        }
         let res_path = self.res_path.join("res");
         if !res_path.exists() {
             return Ok(None);
         }
         let content = fs::read(&res_path)?;
-        let cache: SourceCache =
-            bincode::decode_from_slice(&content, bincode::config::standard())?.0;
-        todo!()
+        let res: Vec<PropMcInfo> = toml::from_slice(&content)?;
+        Ok(Some(res))
     }
 
-    pub fn cache_res(&self) -> Result<(), Box<dyn Error>> {
-        todo!()
+    pub fn cache_res(&self, res: &[PropMcInfo]) -> anyhow::Result<()> {
+        if !self.res_path.exists() {
+            fs::create_dir_all(&self.res_path)?;
+        }
+        let cache = toml::to_string(res)?;
+        fs::write(self.res_path.join("res"), cache)?;
+        Ok(())
     }
 }
