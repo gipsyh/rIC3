@@ -1,0 +1,12 @@
+[ric3]
+version = "1.6.0"
+
+[dut]
+top = "counter"
+files = ["counter.sv"]
+
+[prove]
+
+[bughunt]
+
+[ctilg]

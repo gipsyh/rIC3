@@ -17,6 +17,7 @@ impl PropMcState {
             rIC3::McResult::Unsafe(_) => Color::Red,
             rIC3::McResult::Unknown(_) => match self.state {
                 McStatus::Solving => Color::Yellow,
+                McStatus::Wait => Color::DarkGray,
                 McStatus::Pause => Color::DarkGray,
             },
         }
@@ -26,19 +27,21 @@ impl PropMcState {
         match self.prop.res {
             rIC3::McResult::Safe => "Safe",
             rIC3::McResult::Unsafe(_) => "Unsafe",
-            rIC3::McResult::Unknown(_) => match self.state {
-                McStatus::Solving => "Solving",
-                McStatus::Pause => "Pause",
-            },
+            rIC3::McResult::Unknown(_) => self.state.as_ref(),
         }
     }
 
     fn cells(&'_ self) -> Vec<Cell<'_>> {
+        let bound = match self.prop.res {
+            rIC3::McResult::Unsafe(b) => format!("{b}"),
+            rIC3::McResult::Unknown(Some(b)) => format!("{b}"),
+            _ => "-".to_string(),
+        };
         vec![
             Cell::from(self.prop.id.to_string()),
             Cell::from(self.prop.name.clone()),
             Cell::from(self.as_str()).fg(self.color()),
-            Cell::from("0"),
+            Cell::from(bound),
             Cell::from("IC3"),
         ]
     }
@@ -105,7 +108,7 @@ impl Run {
                             KeyCode::Char('q') => self.should_quit = true,
                             KeyCode::Down => self.next(),
                             KeyCode::Up => self.previous(),
-                            KeyCode::Enter => self.stop_selected(),
+                            KeyCode::Char('s') => self.stop_selected(),
                             _ => {}
                         }
                     }
@@ -124,6 +127,8 @@ impl Run {
             }
         }
     }
+
+    fn launch_engine(&mut self) {}
 
     fn ui(&mut self, frame: &mut Frame) {
         let rects = Layout::default()
@@ -176,7 +181,7 @@ impl Run {
         let text = Line::from(vec![
             Span::styled(" [↑/↓] ", keys_style),
             Span::styled("Select Row ", info_style),
-            Span::styled(" [Enter] ", keys_style),
+            Span::styled(" [s] ", keys_style),
             Span::styled("Stop Solving ", info_style),
             Span::styled(" [q] ", keys_style),
             Span::styled("Quit", info_style),

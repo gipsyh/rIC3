@@ -1,6 +1,7 @@
 mod tui;
 
 use crate::cli::{cache::Ric3Proj, yosys::Yosys};
+use anyhow::Ok;
 use btor::Btor;
 use giputils::hash::GHashMap;
 use logicrs::fol::Term;
@@ -16,6 +17,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use strum::AsRefStr;
 
 #[derive(Deserialize, Debug)]
 pub struct Ric3Config {
@@ -48,10 +50,11 @@ pub struct PropMcInfo {
     config: Option<EngineConfig>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AsRefStr)]
 pub enum McStatus {
     Solving,
     Pause,
+    Wait,
 }
 
 struct PropMcState {
@@ -70,7 +73,7 @@ impl PropMcState {
                     res: McResult::default(),
                     config: Default::default(),
                 },
-                state: McStatus::Pause,
+                state: McStatus::Wait,
             });
         }
         mc
@@ -81,16 +84,18 @@ struct Run {
     table: TableState,
     should_quit: bool,
     mc: Vec<PropMcState>,
+    wts: WlTransys,
 }
 
 impl Run {
-    fn new(mc: Vec<PropMcState>) -> Self {
+    fn new(wts: WlTransys, mc: Vec<PropMcState>) -> Self {
         let mut table = TableState::default();
         table.select(Some(0));
         Self {
             table,
             should_quit: false,
             mc,
+            wts,
         }
     }
 }
@@ -114,7 +119,7 @@ pub fn run() -> anyhow::Result<()> {
             p.into_iter()
                 .map(|p| PropMcState {
                     prop: p,
-                    state: McStatus::Pause,
+                    state: McStatus::Wait,
                 })
                 .collect()
         })
@@ -142,6 +147,9 @@ pub fn run() -> anyhow::Result<()> {
     //         None => todo!(),
     //     }
     // };
-    let mut run = Run::new(mc);
-    run.run()
+    let mut run = Run::new(wts, mc);
+    run.run()?;
+    let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
+    ric3_proj.cache_res(res)?;
+    Ok(())
 }

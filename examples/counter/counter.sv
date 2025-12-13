@@ -17,9 +17,9 @@ module counter #(
     always_comb assume (!rst_n == $initstate);
     always @(posedge clk)
         if (rst_n) begin
-            assert (count != {W{1'b1}});
-            assert (count != {(W - 1) {1'b1}});
-            assert (count != {(W - 3) {1'b1}});
-            assert (count != {(W - 2) {1'b1}});
+            p0: assert (count != {W{1'b1}});
+            p1: assert (count != {(W - 1) {1'b1}});
+            p2: assert (count != {(W - 3) {1'b1}});
+            p3: assert (count != {(W - 2) {1'b1}});
         end
 endmodule

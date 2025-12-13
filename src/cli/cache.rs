@@ -83,12 +83,12 @@ impl Ric3Proj {
     }
 
     pub fn check_cached_src(&self, sources: &[PathBuf]) -> anyhow::Result<bool> {
-        let cache_path = self.dut_path.join("hash");
+        let cache_path = self.dut_path.join("hash.toml");
         if !cache_path.exists() {
             return Ok(false);
         }
-        let content = fs::read(&cache_path)?;
-        let cache: SourceCache = toml::from_slice(&content)?;
+        let content = fs::read_to_string(&cache_path)?;
+        let cache: SourceCache = ron::from_str(&content)?;
         if cache.files.len() != sources.len() {
             return Ok(false);
         }
@@ -118,8 +118,8 @@ impl Ric3Proj {
 
             cache.files.insert(abs_src, FileEntry { hash });
         }
-        let content = toml::to_string(&cache)?;
-        fs::write(self.dut_path.join("hash"), content)?;
+        let content = ron::to_string(&cache)?;
+        fs::write(self.dut_path.join("hash.ron"), content)?;
         Ok(())
     }
 
@@ -127,21 +127,21 @@ impl Ric3Proj {
         if !self.res_path.exists() {
             fs::create_dir_all(&self.res_path)?;
         }
-        let res_path = self.res_path.join("res");
+        let res_path = self.res_path.join("res.ron");
         if !res_path.exists() {
             return Ok(None);
         }
-        let content = fs::read(&res_path)?;
-        let res: Vec<PropMcInfo> = toml::from_slice(&content)?;
+        let content = fs::read_to_string(&res_path)?;
+        let res: Vec<PropMcInfo> = ron::from_str(&content)?;
         Ok(Some(res))
     }
 
-    pub fn cache_res(&self, res: &[PropMcInfo]) -> anyhow::Result<()> {
+    pub fn cache_res(&self, res: Vec<PropMcInfo>) -> anyhow::Result<()> {
         if !self.res_path.exists() {
             fs::create_dir_all(&self.res_path)?;
         }
-        let cache = toml::to_string(res)?;
-        fs::write(self.res_path.join("res"), cache)?;
+        let cache = ron::to_string(&res)?;
+        fs::write(self.res_path.join("res.ron"), cache)?;
         Ok(())
     }
 }
