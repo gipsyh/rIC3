@@ -1,6 +1,6 @@
 mod tui;
 
-use crate::cli::{cache::Ric3Proj, yosys::Yosys};
+use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use btor::Btor;
 use giputils::hash::GHashMap;
@@ -13,36 +13,8 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    fs,
-    path::{Path, PathBuf},
-    thread::JoinHandle,
-};
+use std::{collections::VecDeque, thread::JoinHandle};
 use strum::AsRefStr;
-
-#[derive(Deserialize, Debug)]
-pub struct Ric3Config {
-    pub dut: Dut,
-}
-
-impl Ric3Config {
-    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-        let config_content = fs::read_to_string(p)?;
-        let config: Self = toml::from_str(&config_content)?;
-        Ok(config)
-    }
-
-    pub fn dut_src(&self) -> Vec<PathBuf> {
-        self.dut.files.clone()
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Dut {
-    pub top: String,
-    pub files: Vec<PathBuf>,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PropMcInfo {
@@ -117,12 +89,12 @@ impl Run {
 
 pub fn run() -> anyhow::Result<()> {
     let ric3_cfg = Ric3Config::from_file("ric3.toml")?;
-    let ric3_proj = Ric3Proj::new()?;
-    let same = ric3_proj.check_cached_src(&ric3_cfg.dut_src())?;
-    if !same {
+    let mut ric3_proj = Ric3Proj::new()?;
+    let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut_src())?;
+    if cached.is_none_or(|c| !c) {
         ric3_proj.clear()?;
-        Yosys::generate_btor(&ric3_cfg, &ric3_proj);
-        ric3_proj.cache_src(&ric3_cfg.dut_src())?;
+        Yosys::generate_btor(&ric3_cfg, &ric3_proj.dut_path());
+        ric3_proj.cache_dut(&ric3_cfg.dut_src())?;
     }
     let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);

@@ -1,11 +1,18 @@
 mod cache;
 mod check;
+mod clean;
+mod ctilg;
 mod run;
 mod yosys;
 
-use crate::cli::check::CheckConfig;
+use crate::cli::{check::CheckConfig, clean::clean, ctilg::ctilg};
 use clap::{Parser, Subcommand};
 use rIC3::config::EngineConfig;
+use serde::Deserialize;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// rIC3 Hardware Formal Verification Tool
 #[derive(Parser, Debug, Clone)]
@@ -30,7 +37,7 @@ pub enum Commands {
         cfg: EngineConfig,
     },
     Clean,
-    Interact,
+    Ctilg,
 }
 
 pub fn cli_main() -> anyhow::Result<()> {
@@ -38,7 +45,30 @@ pub fn cli_main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Run => run::run(),
         Commands::Check { chk, cfg } => check::check(chk, cfg),
-        Commands::Clean => todo!(),
-        Commands::Interact => todo!(),
+        Commands::Clean => clean(),
+        Commands::Ctilg => ctilg(),
     }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Ric3Config {
+    pub dut: Dut,
+}
+
+impl Ric3Config {
+    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
+        let config_content = fs::read_to_string(p)?;
+        let config: Self = toml::from_str(&config_content)?;
+        Ok(config)
+    }
+
+    pub fn dut_src(&self) -> Vec<PathBuf> {
+        self.dut.files.clone()
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Dut {
+    pub top: String,
+    pub files: Vec<PathBuf>,
 }

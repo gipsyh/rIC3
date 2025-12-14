@@ -18,8 +18,9 @@ module counter #(
     always @(posedge clk)
         if (rst_n) begin
             p0: assert (count != {W{1'b1}});
-            p1: assert (count != {(W - 1) {1'b1}});
-            p2: assert (count != {(W - 3) {1'b1}});
-            p3: assert (count != {(W - 2) {1'b1}});
+            p1: assert (count <= {(W - 1) {1'b1}});
+            p2: assert (count != {(W - 2) {1'b1}});
+            p3: assert (count != {(W - 3) {1'b1}});
+            p4: assert (count != {(W - 4) {1'b1}});
         end
 endmodule

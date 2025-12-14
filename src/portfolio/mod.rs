@@ -234,13 +234,13 @@ impl Portfolio {
     }
 
     pub fn check(&mut self) -> Option<bool> {
-        let ric3 = self as *mut Self as usize;
-        ctrlc::set_handler(move || {
-            let ric3 = unsafe { &mut *(ric3 as *mut Portfolio) };
-            ric3.terminate();
-            exit(124);
-        })
-        .unwrap();
+        // let ric3 = self as *mut Self as usize;
+        // ctrlc::set_handler(move || {
+        //     let ric3 = unsafe { &mut *(ric3 as *mut Portfolio) };
+        //     ric3.terminate();
+        //     exit(124);
+        // })
+        // .unwrap();
         self.check_inner()
     }
 }

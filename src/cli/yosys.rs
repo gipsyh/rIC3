@@ -1,5 +1,5 @@
-use crate::cli::{cache::Ric3Proj, run::Ric3Config};
-use std::process::Command;
+use super::Ric3Config;
+use std::{path::Path, process::Command};
 
 #[derive(Default)]
 pub struct Yosys {
@@ -27,7 +27,7 @@ impl Yosys {
         }
     }
 
-    pub fn generate_btor(cfg: &Ric3Config, rp: &Ric3Proj) {
+    pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) {
         let mut yosys = Self::new();
         for file in &cfg.dut.files {
             yosys.add_command(&format!("read_verilog -sv {}", file.display()));
@@ -58,7 +58,7 @@ impl Yosys {
         yosys.add_command("opt -fast");
         yosys.add_command("delete -output");
         yosys.add_command("dffunmap");
-        let dp = rp.dut_path();
+        let dp = p.as_ref();
         yosys.add_command(&format!(
             "write_btor -i {} -ywmap {} {}",
             dp.join("dut.info").display(),

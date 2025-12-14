@@ -20,65 +20,84 @@ struct SourceCache {
 
 pub struct Ric3Proj {
     path: PathBuf,
-    dut_path: PathBuf,
-    res_path: PathBuf,
-    tmp_path: PathBuf,
 }
 
 impl Ric3Proj {
     pub fn new() -> anyhow::Result<Self> {
         let path = PathBuf::from("ric3proj");
-        let dut_path = path.join("dut");
-        let res_path = path.join("res");
-        let tmp_path = path.join("tmp");
+        if !Path::new(&path).exists() {
+            fs::create_dir(&path)?;
+        }
+        let mut res = Self { path };
+        res.create_subdir()?;
+        Ok(res)
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn dut_path(&self) -> PathBuf {
+        self.path.join("dut")
+    }
+
+    pub fn res_path(&self) -> PathBuf {
+        self.path.join("res")
+    }
+
+    pub fn ctilg_path(&self) -> PathBuf {
+        self.path.join("ctilg")
+    }
+
+    pub fn tmp_path(&self) -> PathBuf {
+        self.path.join("tmp")
+    }
+
+    pub fn new_dir_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
+        let p_ref = p.as_ref();
+        if p_ref.exists() {
+            if p_ref.is_file() {
+                fs::remove_file(p_ref)?;
+                fs::create_dir(p_ref)?;
+            } else {
+                self.clear_entry(p_ref)?;
+            }
+        } else {
+            fs::create_dir(p_ref)?;
+        }
+        Ok(p.as_ref().into())
+    }
+
+    fn create_subdir(&mut self) -> anyhow::Result<()> {
         for p in [
-            path.clone(),
-            dut_path.clone(),
-            res_path.clone(),
-            tmp_path.clone(),
+            self.dut_path(),
+            self.res_path(),
+            self.ctilg_path(),
+            self.tmp_path(),
         ] {
             if !Path::new(&p).exists() {
                 fs::create_dir(&p)?;
             }
         }
-        Ok(Self {
-            path,
-            dut_path,
-            res_path,
-            tmp_path,
-        })
-    }
-
-    pub fn clear(&self) -> anyhow::Result<()> {
-        if let Ok(entries) = fs::read_dir(&self.path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                match entry.file_type() {
-                    Ok(ft) if ft.is_dir() => {
-                        fs::remove_dir_all(&path)?;
-                    }
-                    _ => {
-                        fs::remove_file(&path)?;
-                    }
-                }
-            }
-        }
-        fs::create_dir(&self.dut_path)?;
-        fs::create_dir(&self.res_path)?;
-        fs::create_dir(&self.tmp_path)?;
         Ok(())
     }
 
-    pub fn dut_path(&self) -> &PathBuf {
-        &self.dut_path
+    pub fn clear_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<()> {
+        for entry in fs::read_dir(p.as_ref())? {
+            let entry = entry?;
+            let path = entry.path();
+            if entry.file_type()?.is_dir() {
+                fs::remove_dir_all(&path)?;
+            } else {
+                fs::remove_file(&path)?;
+            }
+        }
+        Ok(())
     }
 
-    pub fn res_path(&self) -> &PathBuf {
-        &self.res_path
-    }
-
-    pub fn tmp_path(&self) -> &PathBuf {
-        &self.tmp_path
+    pub fn clear(&mut self) -> anyhow::Result<()> {
+        self.clear_entry(self.path.clone())?;
+        self.create_subdir()
     }
 
     fn calculate_hash(path: &Path) -> anyhow::Result<String> {
@@ -95,35 +114,34 @@ impl Ric3Proj {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
-    pub fn check_cached_src(&self, sources: &[PathBuf]) -> anyhow::Result<bool> {
-        let cache_path = self.dut_path.join("hash.ron");
+    /// None: not exists
+    /// Some(bool): consistency
+    pub fn check_cached_dut(&self, sources: &[PathBuf]) -> anyhow::Result<Option<bool>> {
+        let cache_path = self.dut_path().join("hash.ron");
         if !cache_path.exists() {
-            return Ok(false);
+            return Ok(None);
         }
         let content = fs::read_to_string(&cache_path)?;
         let cache: SourceCache = ron::from_str(&content)?;
         if cache.files.len() != sources.len() {
-            return Ok(false);
+            return Ok(Some(false));
         }
         for src in sources {
             let src = fs::canonicalize(src)?;
             if let Some(entry) = cache.files.get(&src) {
                 let current_hash = Self::calculate_hash(&src)?;
                 if entry.hash != current_hash {
-                    return Ok(false);
+                    return Ok(Some(false));
                 }
             } else {
-                return Ok(false);
+                return Ok(Some(false));
             }
         }
 
-        Ok(true)
+        Ok(Some(true))
     }
 
-    pub fn cache_src(&self, sources: &[PathBuf]) -> anyhow::Result<()> {
-        if !self.dut_path.exists() {
-            fs::create_dir_all(&self.dut_path)?;
-        }
+    pub fn cache_dut(&self, sources: &[PathBuf]) -> anyhow::Result<()> {
         let mut cache = SourceCache::default();
         for src in sources {
             let abs_src = fs::canonicalize(src)?;
@@ -132,15 +150,12 @@ impl Ric3Proj {
             cache.files.insert(abs_src, FileEntry { hash });
         }
         let content = ron::to_string(&cache)?;
-        fs::write(self.dut_path.join("hash.ron"), content)?;
+        fs::write(self.dut_path().join("hash.ron"), content)?;
         Ok(())
     }
 
     pub fn check_cached_res(&self) -> anyhow::Result<Option<Vec<PropMcInfo>>> {
-        if !self.res_path.exists() {
-            fs::create_dir_all(&self.res_path)?;
-        }
-        let res_path = self.res_path.join("res.ron");
+        let res_path = self.res_path().join("res.ron");
         if !res_path.exists() {
             return Ok(None);
         }
@@ -150,11 +165,8 @@ impl Ric3Proj {
     }
 
     pub fn cache_res(&self, res: Vec<PropMcInfo>) -> anyhow::Result<()> {
-        if !self.res_path.exists() {
-            fs::create_dir_all(&self.res_path)?;
-        }
         let cache = ron::to_string(&res)?;
-        fs::write(self.res_path.join("res.ron"), cache)?;
+        fs::write(self.res_path().join("res.ron"), cache)?;
         Ok(())
     }
 }
