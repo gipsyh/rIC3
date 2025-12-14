@@ -158,7 +158,7 @@ impl Ctilg {
                 .title(title)
                 .border_style(border_style),
         )
-        .highlight_symbol("> ");
+        .highlight_symbol(">> ");
 
         frame.render_stateful_widget(t, area, state);
     }

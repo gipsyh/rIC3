@@ -30,7 +30,7 @@ impl Yosys {
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) {
         let mut yosys = Self::new();
         for file in &cfg.dut.files {
-            yosys.add_command(&format!("read_verilog -sv {}", file.display()));
+            yosys.add_command(&format!("read_verilog -formal -sv {}", file.display()));
         }
         yosys.add_command(&format!("prep -top {}", cfg.dut.top));
         yosys.add_command("hierarchy -smtcheck");
