@@ -123,17 +123,16 @@ impl Run {
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
-            if ratatui::crossterm::event::poll(timeout)? {
-                if let Event::Key(key) = event::read()?
-                    && key.kind == KeyEventKind::Press
-                {
-                    match key.code {
-                        KeyCode::Char('q') => self.should_quit = true,
-                        KeyCode::Down => self.next(),
-                        KeyCode::Up => self.previous(),
-                        KeyCode::Char('s') => self.stop_selected(),
-                        _ => {}
-                    }
+            if ratatui::crossterm::event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Char('q') => self.should_quit = true,
+                    KeyCode::Down => self.next(),
+                    KeyCode::Up => self.previous(),
+                    KeyCode::Char('s') => self.stop_selected(),
+                    _ => {}
                 }
             }
 

@@ -53,21 +53,6 @@ impl Ric3Proj {
         self.path.join("tmp")
     }
 
-    pub fn new_dir_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
-        let p_ref = p.as_ref();
-        if p_ref.exists() {
-            if p_ref.is_file() {
-                fs::remove_file(p_ref)?;
-                fs::create_dir(p_ref)?;
-            } else {
-                self.clear_entry(p_ref)?;
-            }
-        } else {
-            fs::create_dir(p_ref)?;
-        }
-        Ok(p.as_ref().into())
-    }
-
     fn create_subdir(&mut self) -> anyhow::Result<()> {
         for p in [
             self.dut_path(),

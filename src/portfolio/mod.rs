@@ -170,7 +170,7 @@ impl Portfolio {
                 if let Some(0) = status.code() {
                     let reader = BufReader::new(stdout);
                     let mut res_line = String::new();
-                    for l in reader.lines().flatten() {
+                    for l in reader.lines().map_while(Result::ok) {
                         res_line = l;
                     }
                     match res_line.as_str() {

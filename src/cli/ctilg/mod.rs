@@ -56,7 +56,7 @@ impl Ctilg {
         let b = &self.uts.ts.bad[id];
         let nb = self.uts.next(b, self.uts.num_unroll);
         assert!(self.slv.solve(&[nb]));
-        return self.uts.witness(&mut self.slv);
+        self.uts.witness(&mut self.slv)
     }
 
     fn btorvcd(
@@ -82,7 +82,7 @@ pub fn ctilg() -> anyhow::Result<()> {
     let ric3_proj = Ric3Proj::new()?;
     let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none() {
-        Yosys::generate_btor(&ric3_cfg, &ric3_proj.dut_path())?;
+        Yosys::generate_btor(&ric3_cfg, ric3_proj.dut_path())?;
         ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     } else if let Some(false) = cached {
         // let ctilg_dut = ric3_proj.new_dir_entry(ric3_proj.ctilg_path().join("dut"))?;

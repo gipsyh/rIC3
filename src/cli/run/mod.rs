@@ -93,7 +93,7 @@ pub fn run() -> anyhow::Result<()> {
     let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none_or(|c| !c) {
         ric3_proj.clear()?;
-        Yosys::generate_btor(&ric3_cfg, &ric3_proj.dut_path())?;
+        Yosys::generate_btor(&ric3_cfg, ric3_proj.dut_path())?;
         ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     }
     let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
