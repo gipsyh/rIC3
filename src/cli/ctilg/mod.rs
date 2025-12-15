@@ -5,11 +5,12 @@ use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
 use giputils::hash::GHashMap;
-use logicrs::fol::Term;
+use logicrs::fol::{Term, TermValue};
 use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
+use ratatui::crossterm::style::Stylize;
 use std::{fs, path::Path, process::Command};
 
 pub struct Ctilg {
@@ -52,6 +53,25 @@ impl Ctilg {
         self.res.iter().all(|l| *l)
     }
 
+    fn check_cti(&mut self, cti: &WlWitness) -> bool {
+        assert!(cti.len() == self.uts.num_unroll + 1);
+        let mut assume = Vec::new();
+        for k in 0..self.uts.num_unroll {
+            for input in cti.input[k].iter() {
+                let kt = self.uts.next(input.t(), k);
+                assume.push(kt.teq(Term::bv_const(input.v().clone())));
+            }
+            for state in cti.state[k].iter() {
+                let TermValue::Bv(state) = state else {
+                    todo!();
+                };
+                let kt = self.uts.next(state.t(), k);
+                assume.push(kt.teq(Term::bv_const(state.v().clone())));
+            }
+        }
+        !self.slv.solve(&assume)
+    }
+
     fn witness(&mut self, id: usize) -> WlWitness {
         let b = &self.uts.ts.bad[id];
         let nb = self.uts.next(b, self.uts.num_unroll);
@@ -92,9 +112,29 @@ pub fn ctilg() -> anyhow::Result<()> {
     let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
+
+    let cti_file = ric3_proj.ctilg_path().join("cti");
+    let cti = if cti_file.exists() {
+        let cti = fs::read_to_string(cti_file)?;
+        Some(btorfe.deserialize_wl_unsafe_certificate(cti))
+    } else {
+        None
+    };
+
     let mut ctilg = Ctilg::new(wts, symbol);
+    if let Some(cti_val) = &cti {
+        if ctilg.check_cti(cti_val) {
+            println!("{}", "The CTI has been successfully blocked.".green());
+        } else {
+            println!("{}", "The CTI has NOT been blocked yet.".red());
+            return Ok(());
+        }
+    }
     if ctilg.check_inductive() {
-        println!("All properties are inductive. Proof succeeded.");
+        println!(
+            "{}",
+            "All properties are inductive. Proof succeeded.".green()
+        );
         return Ok(());
     }
     let cti = ctilg.tui_run()?;
@@ -110,5 +150,9 @@ pub fn ctilg() -> anyhow::Result<()> {
         witness_file,
         ric3_proj.ctilg_path().join("cti.vcd"),
     )?;
+    println!(
+        "Witness VCD generated at {}",
+        ric3_proj.ctilg_path().join("cti.vcd").display()
+    );
     Ok(())
 }

@@ -18,7 +18,7 @@ use log::{debug, error};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
-        Sort, Term, TermValue, Value,
+        BvTermValue, Sort, Term, TermValue, Value,
         op::{self, Read},
     },
 };
@@ -157,6 +157,58 @@ impl BtorFrontend {
                 read.slice(eidx, eidx)
             }
         }
+    }
+
+    pub fn deserialize_wl_unsafe_certificate(&self, content: String) -> WlWitness {
+        assert!(self.no_next.is_empty());
+        let mut lines = content.lines();
+        let first = lines.next().unwrap();
+        assert_eq!(first, "sat");
+        let second = lines.next().unwrap();
+        assert!(second.starts_with('b'));
+        let bad_id = second[1..].parse::<usize>().unwrap();
+        let mut witness = WlWitness::new();
+        witness.bad_id = bad_id;
+        let mut current_frame = 0;
+        let mut is_state = false;
+
+        for line in lines {
+            if line == "." {
+                break;
+            }
+            if line.starts_with('#') {
+                let k = line[1..].parse::<usize>().unwrap();
+                if k >= witness.state.len() {
+                    witness.state.resize(k + 1, Vec::new());
+                }
+                current_frame = k;
+                is_state = true;
+                continue;
+            }
+            if line.starts_with('@') {
+                let k = line[1..].parse::<usize>().expect("Invalid frame index");
+                if k >= witness.input.len() {
+                    witness.input.resize(k + 1, Vec::new());
+                }
+                current_frame = k;
+                is_state = false;
+                continue;
+            }
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            assert!(parts.len() == 2);
+            let id = parts[0].parse::<usize>().unwrap();
+            let val = BitVec::from(parts[1]);
+            if is_state {
+                let term = self.owts.latch[id].clone();
+                let tv = TermValue::Bv(BvTermValue::new(term, val));
+                witness.state[current_frame].push(tv);
+            } else {
+                let term = self.owts.input[id].clone();
+                let bv = BvTermValue::new(term, val);
+                witness.input[current_frame].push(bv);
+            }
+        }
+        witness
     }
 }
 
