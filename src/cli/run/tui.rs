@@ -182,6 +182,9 @@ impl Run {
             Some(true) => {
                 for (_, &id) in bad_id_map.iter() {
                     self.mc[id].prop.res = McResult::Safe;
+                    let cert = self.ric3_proj.path("tmp/px.cert");
+                    let new_cert = self.ric3_proj.path(format!("res/p{id}.cert"));
+                    fs::copy(cert, new_cert).unwrap();
                 }
             }
             Some(false) => {
