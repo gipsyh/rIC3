@@ -156,11 +156,11 @@ impl Run {
         self.mc[id].state = McStatus::Solving;
         let mut wts = self.wts.clone();
         wts.bad = vec![wts.bad[id].clone()];
-        let btor_path = self.ric3_proj.tmp_path().join(format!("p{id}.btor"));
+        let btor_path = self.ric3_proj.path(format!("tmp/p{id}.btor"));
         let btor = Btor::from(&wts);
         btor.to_file(&btor_path);
         let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
-        let cert_file = self.ric3_proj.res_path().join(format!("p{id}.cert"));
+        let cert_file = self.ric3_proj.path(format!("res/p{id}.cert"));
         let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg);
         let join = spawn(move || engine.check());
         self.solving = Some((id, join));

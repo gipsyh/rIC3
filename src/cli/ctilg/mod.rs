@@ -102,20 +102,20 @@ pub fn ctilg() -> anyhow::Result<()> {
     let ric3_proj = Ric3Proj::new()?;
     let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none() {
-        Yosys::generate_btor(&ric3_cfg, ric3_proj.dut_path())?;
+        Yosys::generate_btor(&ric3_cfg, ric3_proj.path("dut"))?;
         ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     } else if let Some(false) = cached {
         // let ctilg_dut = ric3_proj.new_dir_entry(ric3_proj.ctilg_path().join("dut"))?;
         // Yosys::generate_btor(&ric3_cfg, &ctilg_dut);
         todo!();
     }
-    let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
+    let btor = Btor::from_file(ric3_proj.path("dut/dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
-
-    let cti_file = ric3_proj.ctilg_path().join("cti");
+    fs::create_dir_all(ric3_proj.path("ctilg"))?;
+    let cti_file = ric3_proj.path("ctilg/cti");
     let cti = if cti_file.exists() {
-        let cti = fs::read_to_string(cti_file)?;
+        let cti = fs::read_to_string(&cti_file)?;
         Some(btorfe.deserialize_wl_unsafe_certificate(cti))
     } else {
         None
@@ -125,6 +125,7 @@ pub fn ctilg() -> anyhow::Result<()> {
     if let Some(cti_val) = &cti {
         if ctilg.check_cti(cti_val) {
             println!("{}", "The CTI has been successfully blocked.".green());
+            fs::remove_file(cti_file)?;
         } else {
             println!("{}", "The CTI has NOT been blocked yet.".red());
             return Ok(());
@@ -142,17 +143,17 @@ pub fn ctilg() -> anyhow::Result<()> {
         return Ok(());
     };
     let witness = ctilg.witness(cti);
-    let witness_file = ric3_proj.ctilg_path().join("cti");
+    let witness_file = ric3_proj.path("ctilg/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
     ctilg.btorvcd(
-        ric3_proj.dut_path(),
+        ric3_proj.path("dut"),
         witness_file,
-        ric3_proj.ctilg_path().join("cti.vcd"),
+        ric3_proj.path("ctilg/cti.vcd"),
     )?;
     println!(
         "Witness VCD generated at {}",
-        ric3_proj.ctilg_path().join("cti.vcd").display()
+        ric3_proj.path("ctilg/cti.vcd").display()
     );
     Ok(())
 }

@@ -28,43 +28,11 @@ impl Ric3Proj {
         if !Path::new(&path).exists() {
             fs::create_dir(&path)?;
         }
-        let mut res = Self { path };
-        res.create_subdir()?;
-        Ok(res)
+        Ok(Self { path })
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn dut_path(&self) -> PathBuf {
-        self.path.join("dut")
-    }
-
-    pub fn res_path(&self) -> PathBuf {
-        self.path.join("res")
-    }
-
-    pub fn ctilg_path(&self) -> PathBuf {
-        self.path.join("ctilg")
-    }
-
-    pub fn tmp_path(&self) -> PathBuf {
-        self.path.join("tmp")
-    }
-
-    fn create_subdir(&mut self) -> anyhow::Result<()> {
-        for p in [
-            self.dut_path(),
-            self.res_path(),
-            self.ctilg_path(),
-            self.tmp_path(),
-        ] {
-            if !Path::new(&p).exists() {
-                fs::create_dir(&p)?;
-            }
-        }
-        Ok(())
+    pub fn path(&self, join: impl AsRef<Path>) -> PathBuf {
+        self.path.join(join.as_ref())
     }
 
     pub fn clear_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -81,8 +49,7 @@ impl Ric3Proj {
     }
 
     pub fn clear(&mut self) -> anyhow::Result<()> {
-        self.clear_entry(self.path.clone())?;
-        self.create_subdir()
+        self.clear_entry(self.path.clone())
     }
 
     fn calculate_hash(path: &Path) -> anyhow::Result<String> {
@@ -102,7 +69,7 @@ impl Ric3Proj {
     /// None: not exists
     /// Some(bool): consistency
     pub fn check_cached_dut(&self, sources: &[PathBuf]) -> anyhow::Result<Option<bool>> {
-        let cache_path = self.dut_path().join("hash.ron");
+        let cache_path = self.path("dut/hash.ron");
         if !cache_path.exists() {
             return Ok(None);
         }
@@ -135,12 +102,12 @@ impl Ric3Proj {
             cache.files.insert(abs_src, FileEntry { hash });
         }
         let content = ron::to_string(&cache)?;
-        fs::write(self.dut_path().join("hash.ron"), content)?;
+        fs::write(self.path("dut/hash.ron"), content)?;
         Ok(())
     }
 
     pub fn check_cached_res(&self) -> anyhow::Result<Option<Vec<PropMcInfo>>> {
-        let res_path = self.res_path().join("res.ron");
+        let res_path = self.path("res/res.ron");
         if !res_path.exists() {
             return Ok(None);
         }
@@ -151,7 +118,7 @@ impl Ric3Proj {
 
     pub fn cache_res(&self, res: Vec<PropMcInfo>) -> anyhow::Result<()> {
         let cache = ron::to_string(&res)?;
-        fs::write(self.res_path().join("res.ron"), cache)?;
+        fs::write(self.path("res/res.ron"), cache)?;
         Ok(())
     }
 }

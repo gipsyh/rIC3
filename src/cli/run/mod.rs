@@ -13,7 +13,7 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, thread::JoinHandle};
+use std::{collections::VecDeque, fs, thread::JoinHandle};
 use strum::AsRefStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -66,7 +66,9 @@ struct Run {
 }
 
 impl Run {
-    fn new(wts: WlTransys, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> Self {
+    fn new(wts: WlTransys, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
+        fs::create_dir_all(ric3_proj.path("tmp"))?;
+        fs::create_dir_all(ric3_proj.path("res"))?;
         let mut table = TableState::default();
         table.select(Some(0));
         let mut queue = VecDeque::new();
@@ -75,7 +77,7 @@ impl Run {
                 queue.push_back(m.prop.id);
             }
         }
-        Self {
+        Ok(Self {
             table,
             ric3_proj,
             queue,
@@ -83,7 +85,7 @@ impl Run {
             wts,
             solving: None,
             should_quit: false,
-        }
+        })
     }
 }
 
@@ -93,10 +95,10 @@ pub fn run() -> anyhow::Result<()> {
     let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none_or(|c| !c) {
         ric3_proj.clear()?;
-        Yosys::generate_btor(&ric3_cfg, ric3_proj.dut_path())?;
+        Yosys::generate_btor(&ric3_cfg, ric3_proj.path("dut"))?;
         ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     }
-    let btor = Btor::from_file(ric3_proj.dut_path().join("dut.btor"));
+    let btor = Btor::from_file(ric3_proj.path("dut/dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
     let mc = ric3_proj
@@ -110,7 +112,7 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::defalut_from_wts(&wts, &symbol));
-    let mut run = Run::new(wts, mc, ric3_proj);
+    let mut run = Run::new(wts, mc, ric3_proj)?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;
