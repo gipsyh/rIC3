@@ -80,10 +80,10 @@ impl Ctilg {
 pub fn ctilg() -> anyhow::Result<()> {
     let ric3_cfg = Ric3Config::from_file("ric3.toml")?;
     let ric3_proj = Ric3Proj::new()?;
-    let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut_src())?;
+    let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none() {
-        Yosys::generate_btor(&ric3_cfg, &ric3_proj.dut_path());
-        ric3_proj.cache_dut(&ric3_cfg.dut_src())?;
+        Yosys::generate_btor(&ric3_cfg, &ric3_proj.dut_path())?;
+        ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     } else if let Some(false) = cached {
         // let ctilg_dut = ric3_proj.new_dir_entry(ric3_proj.ctilg_path().join("dut"))?;
         // Yosys::generate_btor(&ric3_cfg, &ctilg_dut);

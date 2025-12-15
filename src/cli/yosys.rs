@@ -1,5 +1,10 @@
 use super::Ric3Config;
-use std::{path::Path, process::Command};
+use giputils::file::recreate_dir;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 #[derive(Default)]
 pub struct Yosys {
@@ -15,21 +20,35 @@ impl Yosys {
         self.commands.push(cmd.to_string());
     }
 
-    pub fn execute(&mut self) {
+    pub fn execute(&mut self, cwd: Option<impl AsRef<Path>>) -> anyhow::Result<()> {
         let cmds = self.commands.join(" ; ");
-        let status = Command::new("yosys")
-            .arg("-p")
-            .arg(&cmds)
-            .status()
-            .expect("Failed to execute yosys");
-        if !status.success() {
-            panic!("Yosys failed");
+        let mut cmd = Command::new("yosys");
+        if let Some(cwd) = cwd {
+            cmd.current_dir(cwd.as_ref());
         }
+        let status = cmd.arg("-p").arg(&cmds).status()?;
+        if !status.success() {
+            anyhow::bail!("Yosys execution failed")
+        }
+        Ok(())
     }
 
-    pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) {
+    pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
+        let src_dir = p.as_ref().join("src");
+        recreate_dir(&src_dir)?;
+        let mut files = Vec::new();
+        for f in cfg.dut.files.iter() {
+            let file_name = f.file_name().unwrap();
+            let dest = src_dir.join(file_name);
+            fs::copy(f, &dest)?;
+            files.push(file_name);
+        }
+        for f in cfg.dut.include_files.iter().flatten() {
+            let dest = src_dir.join(f.file_name().unwrap());
+            fs::copy(f, &dest)?;
+        }
         let mut yosys = Self::new();
-        for file in &cfg.dut.files {
+        for file in files.iter() {
             yosys.add_command(&format!("read_verilog -formal -sv {}", file.display()));
         }
         yosys.add_command(&format!("prep -top {}", cfg.dut.top));
@@ -58,13 +77,13 @@ impl Yosys {
         yosys.add_command("opt -fast");
         yosys.add_command("delete -output");
         yosys.add_command("dffunmap");
-        let dp = p.as_ref();
+        let dp = PathBuf::from("..");
         yosys.add_command(&format!(
             "write_btor -i {} -ywmap {} {}",
             dp.join("dut.info").display(),
             dp.join("dut.ywb").display(),
             dp.join("dut.btor").display(),
         ));
-        yosys.execute();
+        yosys.execute(Some(src_dir))
     }
 }

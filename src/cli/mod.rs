@@ -7,6 +7,7 @@ mod yosys;
 
 use crate::cli::{check::CheckConfig, clean::clean, ctilg::ctilg};
 use clap::{Parser, Subcommand};
+use giputils::hash::GHashSet;
 use rIC3::config::EngineConfig;
 use serde::Deserialize;
 use std::{
@@ -56,14 +57,11 @@ pub struct Ric3Config {
 }
 
 impl Ric3Config {
-    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
+    fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config_content = fs::read_to_string(p)?;
         let config: Self = toml::from_str(&config_content)?;
+        config.dut.validate()?;
         Ok(config)
-    }
-
-    pub fn dut_src(&self) -> Vec<PathBuf> {
-        self.dut.files.clone()
     }
 }
 
@@ -71,4 +69,36 @@ impl Ric3Config {
 pub struct Dut {
     pub top: String,
     pub files: Vec<PathBuf>,
+    pub include_files: Option<Vec<PathBuf>>,
+}
+
+impl Dut {
+    fn src(&self) -> Vec<PathBuf> {
+        self.files
+            .iter()
+            .chain(self.include_files.iter().flatten())
+            .cloned()
+            .collect()
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if self.files.is_empty() {
+            anyhow::bail!("dut files cannot be empty");
+        }
+        let mut seen_names = GHashSet::new();
+        let files = self.src();
+        for file in files.iter() {
+            if !file.exists() {
+                anyhow::bail!("file not found: {:?}", file);
+            }
+            if let Some(name) = file.file_name() {
+                if !seen_names.insert(name) {
+                    anyhow::bail!("duplicate file name found: {:?}", name);
+                }
+            } else {
+                anyhow::bail!("invalid file path: {:?}", file);
+            }
+        }
+        Ok(())
+    }
 }
