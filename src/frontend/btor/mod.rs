@@ -175,8 +175,8 @@ impl BtorFrontend {
             if line == "." {
                 break;
             }
-            if line.starts_with('#') {
-                let k = line[1..].parse::<usize>().unwrap();
+            if let Some(stripped) = line.strip_prefix('#') {
+                let k = stripped.parse::<usize>().unwrap();
                 if k >= witness.state.len() {
                     witness.state.resize(k + 1, Vec::new());
                 }
@@ -184,8 +184,8 @@ impl BtorFrontend {
                 is_state = true;
                 continue;
             }
-            if line.starts_with('@') {
-                let k = line[1..].parse::<usize>().expect("Invalid frame index");
+            if let Some(stripped) = line.strip_prefix('@') {
+                let k = stripped.parse::<usize>().unwrap();
                 if k >= witness.input.len() {
                     witness.input.resize(k + 1, Vec::new());
                 }
@@ -209,7 +209,7 @@ impl BtorFrontend {
         }
         for k in 0..witness.len() {
             for s in take(&mut witness.state[k]) {
-                if self.no_next.contains(&s.t()) {
+                if self.no_next.contains(s.t()) {
                     witness.input[k].push(s.try_bv().unwrap());
                 } else {
                     witness.state[k].push(s);
