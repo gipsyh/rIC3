@@ -25,6 +25,11 @@ impl WlWitness {
     pub fn len(&self) -> usize {
         self.state.len()
     }
+
+    pub fn resize(&mut self, size: usize) {
+        self.input.resize(size, Vec::new());
+        self.state.resize(size, Vec::new());
+    }
 }
 
 #[derive(Clone, Debug, Default)]

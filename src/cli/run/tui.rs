@@ -1,7 +1,13 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
 use btor::Btor;
 use clap::Parser;
-use rIC3::{McResult, config::EngineConfig, portfolio::Portfolio};
+use giputils::hash::GHashMap;
+use rIC3::{
+    McResult,
+    config::EngineConfig,
+    frontend::{Frontend, btor::BtorFrontend},
+    portfolio::Portfolio,
+};
 use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -12,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Row, Table},
 };
 use std::{
+    fs,
     mem::take,
     thread::spawn,
     time::{Duration, Instant},
@@ -104,15 +111,8 @@ impl Run {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
-            if self.solving.as_ref().is_some_and(|s| s.1.is_finished()) {
-                let (id, join) = take(&mut self.solving).unwrap();
-                let res = join.join().unwrap();
-                self.mc[id].prop.res = match res {
-                    Some(true) => McResult::Safe,
-                    Some(false) => McResult::Unsafe(0),
-                    None => McResult::Unknown(None),
-                };
-                self.mc[id].state = McStatus::Pause;
+            if self.solving.as_ref().is_some_and(|s| s.0.is_finished()) {
+                self.handle_engine();
             }
 
             if self.solving.is_none() {
@@ -150,20 +150,68 @@ impl Run {
     }
 
     fn launch_engine(&mut self) {
-        let Some(id) = self.queue.pop_front() else {
-            return;
-        };
-        self.mc[id].state = McStatus::Solving;
         let mut wts = self.wts.clone();
-        wts.bad = vec![wts.bad[id].clone()];
-        let btor_path = self.ric3_proj.path(format!("tmp/p{id}.btor"));
+        wts.bad.clear();
+        let mut bad_id_map = GHashMap::new();
+        for m in self.mc.iter_mut() {
+            if let McResult::Unknown(_) = m.prop.res
+                && let McStatus::Wait = m.state
+            {
+                bad_id_map.insert(wts.bad.len(), m.prop.id);
+                wts.bad.push(self.wts.bad[m.prop.id].clone());
+                m.state = McStatus::Solving;
+            }
+        }
+        if bad_id_map.is_empty() {
+            return;
+        }
+        let btor_path = self.ric3_proj.path("tmp/px.btor");
         let btor = Btor::from(&wts);
         btor.to_file(&btor_path);
         let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
-        let cert_file = self.ric3_proj.path(format!("res/p{id}.cert"));
+        let cert_file = self.ric3_proj.path("tmp/px.cert");
         let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg);
         let join = spawn(move || engine.check());
-        self.solving = Some((id, join));
+        self.solving = Some((join, bad_id_map));
+    }
+
+    fn handle_engine(&mut self) {
+        let (join, bad_id_map) = take(&mut self.solving).unwrap();
+        let res = join.join().unwrap();
+        match res {
+            Some(true) => {
+                for (_, &id) in bad_id_map.iter() {
+                    self.mc[id].prop.res = McResult::Safe;
+                }
+            }
+            Some(false) => {
+                for (_, &id) in bad_id_map.iter() {
+                    self.mc[id].state = McStatus::Wait;
+                }
+                let btorfe = BtorFrontend::new(Btor::from_file(self.ric3_proj.path("tmp/px.btor")));
+                let cert_file = self.ric3_proj.path("tmp/px.cert");
+                let cert = fs::read_to_string(&cert_file).unwrap();
+                let witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
+                let bad_id = bad_id_map[&witness.bad_id];
+                self.mc[bad_id].prop.res = McResult::Unsafe(witness.len());
+
+                let mut btorfe =
+                    BtorFrontend::new(Btor::from_file(self.ric3_proj.path("dut/dut.btor")));
+                let mut witness = btorfe.deserialize_wl_unsafe_certificate(cert);
+                witness.bad_id = bad_id;
+                let cert_path = self.ric3_proj.path(format!("res/p{bad_id}.cert"));
+                fs::write(
+                    cert_path,
+                    format!("{}", btorfe.wl_unsafe_certificate(witness),),
+                )
+                .unwrap();
+            }
+            None => {
+                for (_, &id) in bad_id_map.iter() {
+                    self.mc[id].state = McStatus::Pause;
+                }
+            }
+        }
     }
 
     fn ui(&mut self, frame: &mut Frame) {

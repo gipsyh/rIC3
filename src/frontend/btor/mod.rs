@@ -177,8 +177,8 @@ impl BtorFrontend {
             }
             if let Some(stripped) = line.strip_prefix('#') {
                 let k = stripped.parse::<usize>().unwrap();
-                if k >= witness.state.len() {
-                    witness.state.resize(k + 1, Vec::new());
+                if k >= witness.len() {
+                    witness.resize(k + 1);
                 }
                 current_frame = k;
                 is_state = true;
@@ -186,8 +186,8 @@ impl BtorFrontend {
             }
             if let Some(stripped) = line.strip_prefix('@') {
                 let k = stripped.parse::<usize>().unwrap();
-                if k >= witness.input.len() {
-                    witness.input.resize(k + 1, Vec::new());
+                if k >= witness.len() {
+                    witness.resize(k + 1);
                 }
                 current_frame = k;
                 is_state = false;

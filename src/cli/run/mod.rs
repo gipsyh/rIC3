@@ -3,7 +3,7 @@ mod tui;
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use btor::Btor;
-use giputils::hash::GHashMap;
+use giputils::{file::recreate_dir, hash::GHashMap};
 use logicrs::fol::Term;
 use rIC3::{
     McResult,
@@ -13,7 +13,7 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fs, thread::JoinHandle};
+use std::{fs, thread::JoinHandle};
 use strum::AsRefStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -60,27 +60,19 @@ struct Run {
     ric3_proj: Ric3Proj,
     wts: WlTransys,
     mc: Vec<PropMcState>,
-    queue: VecDeque<usize>,
-    solving: Option<(usize, JoinHandle<Option<bool>>)>,
+    solving: Option<(JoinHandle<Option<bool>>, GHashMap<usize, usize>)>,
     should_quit: bool,
 }
 
 impl Run {
     fn new(wts: WlTransys, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
-        fs::create_dir_all(ric3_proj.path("tmp"))?;
         fs::create_dir_all(ric3_proj.path("res"))?;
+        recreate_dir(ric3_proj.path("tmp"))?;
         let mut table = TableState::default();
         table.select(Some(0));
-        let mut queue = VecDeque::new();
-        for m in mc.iter() {
-            if let McResult::Unknown(_) = m.prop.res {
-                queue.push_back(m.prop.id);
-            }
-        }
         Ok(Self {
             table,
             ric3_proj,
-            queue,
             mc,
             wts,
             solving: None,
