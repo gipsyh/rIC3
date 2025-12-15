@@ -4,14 +4,18 @@ use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
-use giputils::hash::GHashMap;
+use clap::Parser;
+use giputils::{file::recreate_dir, hash::GHashMap};
+use log::info;
 use logicrs::fol::{Term, TermValue};
 use rIC3::{
+    config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
+    portfolio::Portfolio,
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
-use std::{fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 pub struct Ctilg {
     slv: Bitwuzla,
@@ -78,28 +82,40 @@ impl Ctilg {
         assert!(self.slv.solve(&[nb]));
         self.uts.witness(&mut self.slv)
     }
+}
 
-    fn btorvcd(
-        &mut self,
-        dut: impl AsRef<Path>,
-        witness: impl AsRef<Path>,
-        vcd: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let mut btorvcd = Command::new("btorvcd");
-        btorvcd.args(["-c", "--vcd"]);
-        btorvcd.arg(vcd.as_ref());
-        btorvcd.args(["--hierarchical-symbols", "--info"]);
-        btorvcd.arg(dut.as_ref().join("dut.info"));
-        btorvcd.arg(dut.as_ref().join("dut.btor"));
-        btorvcd.arg(witness.as_ref());
-        btorvcd.output()?;
-        Ok(())
-    }
+fn btorvcd(
+    cex: bool,
+    dut: impl AsRef<Path>,
+    witness: impl AsRef<Path>,
+    vcd: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    let mut btorvcd = if cex {
+        Command::new("btorsim")
+    } else {
+        Command::new("btorvcd")
+    };
+    btorvcd.args(["-c", "--vcd"]);
+    btorvcd.arg(vcd.as_ref());
+    btorvcd.args(["--hierarchical-symbols", "--info"]);
+    btorvcd.arg(dut.as_ref().join("dut.info"));
+    btorvcd.arg(dut.as_ref().join("dut.btor"));
+    btorvcd.arg(witness.as_ref());
+    btorvcd.output()?;
+    Ok(())
 }
 
 pub fn ctilg() -> anyhow::Result<()> {
+    if env::var("RUST_LOG").is_err() {
+        unsafe { env::set_var("RUST_LOG", "info") };
+    }
+    env_logger::Builder::from_default_env()
+        .format_timestamp(None)
+        .format_target(false)
+        .init();
     let ric3_cfg = Ric3Config::from_file("ric3.toml")?;
     let ric3_proj = Ric3Proj::new()?;
+    recreate_dir(ric3_proj.path("tmp"))?;
     let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
     if cached.is_none() {
         Yosys::generate_btor(&ric3_cfg, ric3_proj.path("dut"))?;
@@ -109,6 +125,31 @@ pub fn ctilg() -> anyhow::Result<()> {
         // Yosys::generate_btor(&ric3_cfg, &ctilg_dut);
         todo!();
     }
+    info!("Starting portfolio engine for all properties with a 10s time limit.");
+    let cfg = EngineConfig::parse_from(["", "-e", "portfolio", "--time-limit", "10"]);
+    let cert_file = ric3_proj.path("tmp/dut.cert");
+    let mut engine = Portfolio::new(ric3_proj.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
+    let res = engine.check();
+    match res {
+        Some(true) => {
+            info!("{}", "All properties are SAFE.".green());
+        }
+        Some(false) => {
+            info!(
+                "{}",
+                "A real counterexample was found for property p0.".red()
+            );
+            let vcd = ric3_proj.path("ctilg/cex.vcd");
+            btorvcd(true, ric3_proj.path("dut"), cert_file, &vcd)?;
+            info!("Counter example VCD generated at {}", vcd.display());
+        }
+        None => {
+            info!(
+                "The portfolio engine failed to obtain a result and will continue with the CTILG engine."
+            );
+        }
+    };
+
     let btor = Btor::from_file(ric3_proj.path("dut/dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
@@ -124,15 +165,15 @@ pub fn ctilg() -> anyhow::Result<()> {
     let mut ctilg = Ctilg::new(wts, symbol);
     if let Some(cti_val) = &cti {
         if ctilg.check_cti(cti_val) {
-            println!("{}", "The CTI has been successfully blocked.".green());
+            info!("{}", "The CTI has been successfully blocked.".green());
             fs::remove_file(cti_file)?;
         } else {
-            println!("{}", "The CTI has NOT been blocked yet.".red());
+            info!("{}", "The CTI has NOT been blocked yet.".red());
             return Ok(());
         }
     }
     if ctilg.check_inductive() {
-        println!(
+        info!(
             "{}",
             "All properties are inductive. Proof succeeded.".green()
         );
@@ -146,12 +187,13 @@ pub fn ctilg() -> anyhow::Result<()> {
     let witness_file = ric3_proj.path("ctilg/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
-    ctilg.btorvcd(
+    btorvcd(
+        false,
         ric3_proj.path("dut"),
         witness_file,
         ric3_proj.path("ctilg/cti.vcd"),
     )?;
-    println!(
+    info!(
         "Witness VCD generated at {}",
         ric3_proj.path("ctilg/cti.vcd").display()
     );

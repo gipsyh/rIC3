@@ -5,6 +5,7 @@ use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
+use std::time::Instant;
 use std::{
     collections::HashMap,
     env::current_exe,
@@ -133,9 +134,18 @@ impl Portfolio {
 
         self.monitor = Some(thread::spawn(move || monitor_run(tx)));
 
+        let start = Instant::now();
         loop {
             if self.stop_flag.load(Ordering::Relaxed) {
                 info!("Interrupted by external signal");
+                self.terminate_inner();
+                return None;
+            }
+
+            if let Some(t) = self.cfg.time_limit
+                && start.elapsed().as_secs() >= t
+            {
+                info!("Terminated by timeout.");
                 self.terminate_inner();
                 return None;
             }
@@ -199,9 +209,5 @@ impl Portfolio {
                 }
             }
         }
-    }
-
-    pub fn stop_flag(&self) -> Arc<AtomicBool> {
-        self.stop_flag.clone()
     }
 }
