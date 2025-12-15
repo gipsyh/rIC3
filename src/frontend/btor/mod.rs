@@ -160,7 +160,6 @@ impl BtorFrontend {
     }
 
     pub fn deserialize_wl_unsafe_certificate(&self, content: String) -> WlWitness {
-        assert!(self.no_next.is_empty());
         let mut lines = content.lines();
         let first = lines.next().unwrap();
         assert_eq!(first, "sat");
@@ -206,6 +205,15 @@ impl BtorFrontend {
                 let term = self.owts.input[id].clone();
                 let bv = BvTermValue::new(term, val);
                 witness.input[current_frame].push(bv);
+            }
+        }
+        for k in 0..witness.len() {
+            for s in take(&mut witness.state[k]) {
+                if self.no_next.contains(&s.t()) {
+                    witness.input[k].push(s.try_bv().unwrap());
+                } else {
+                    witness.state[k].push(s);
+                }
             }
         }
         witness
