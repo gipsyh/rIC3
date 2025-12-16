@@ -19,8 +19,11 @@ use ratatui::{
 };
 use std::{
     fs,
-    mem::take,
-    thread::spawn,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread::{JoinHandle, spawn},
     time::{Duration, Instant},
 };
 
@@ -67,6 +70,13 @@ impl PropMcState {
     }
 }
 
+pub(super) struct RunTask {
+    join: JoinHandle<Option<bool>>,
+    bad_id_map: GHashMap<usize, usize>,
+    cfg: EngineConfig,
+    stop: Arc<AtomicBool>,
+}
+
 impl Run {
     fn next(&mut self) {
         let i = match self.table.selected() {
@@ -100,6 +110,9 @@ impl Run {
         if let Some(i) = self.table.selected()
             && self.mc[i].state == McStatus::Solving
         {
+            let task = self.solving.take().unwrap();
+            task.stop.store(true, Ordering::Relaxed);
+            self.handle_task(task);
             self.mc[i].state = McStatus::Pause;
         }
     }
@@ -117,12 +130,13 @@ impl Run {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
-            if self.solving.as_ref().is_some_and(|s| s.0.is_finished()) {
-                self.handle_engine();
+            if self.solving.as_ref().is_some_and(|s| s.join.is_finished()) {
+                let task = self.solving.take().unwrap();
+                self.handle_task(task);
             }
 
             if self.solving.is_none() {
-                self.launch_engine();
+                self.launch_task();
             }
 
             let timeout = tick_rate
@@ -147,6 +161,10 @@ impl Run {
             }
 
             if self.should_quit {
+                if let Some(task) = self.solving.take() {
+                    task.stop.store(true, Ordering::Relaxed);
+                    self.handle_task(task);
+                }
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                 terminal.show_cursor()?;
@@ -155,7 +173,7 @@ impl Run {
         }
     }
 
-    fn launch_engine(&mut self) {
+    fn launch_task(&mut self) {
         let mut wts = self.wts.clone();
         wts.bad.clear();
         let mut bad_id_map = GHashMap::new();
@@ -174,37 +192,42 @@ impl Run {
         let btor_path = self.ric3_proj.path("tmp/px.btor");
         let btor = Btor::from(&wts);
         btor.to_file(&btor_path);
-        let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
+        let cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
         let cert_file = self.ric3_proj.path("tmp/px.cert");
-        let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg.clone());
+        let mut engine = Portfolio::new(btor_path, Some(cert_file), cfg.clone());
+        let stop = engine.get_stop_signal();
         let join = spawn(move || engine.check());
-        self.solving = Some((join, bad_id_map, engine_cfg));
+        self.solving = Some(RunTask {
+            join,
+            bad_id_map,
+            cfg,
+            stop,
+        });
     }
 
-    fn handle_engine(&mut self) {
-        let (join, bad_id_map, config) = take(&mut self.solving).unwrap();
-        let res = join.join().unwrap();
+    fn handle_task(&mut self, task: RunTask) {
+        let res = task.join.join().unwrap();
         match res {
             Some(true) => {
-                for (_, &id) in bad_id_map.iter() {
+                for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].prop.res = McResult::Safe;
-                    self.mc[id].prop.config = Some(config.clone());
+                    self.mc[id].prop.config = Some(task.cfg.clone());
                     let cert = self.ric3_proj.path("tmp/px.cert");
                     let new_cert = self.ric3_proj.path(format!("res/p{id}.cert"));
                     fs::copy(cert, new_cert).unwrap();
                 }
             }
             Some(false) => {
-                for (_, &id) in bad_id_map.iter() {
+                for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].state = McStatus::Wait;
                 }
                 let btorfe = BtorFrontend::new(Btor::from_file(self.ric3_proj.path("tmp/px.btor")));
                 let cert_file = self.ric3_proj.path("tmp/px.cert");
                 let cert = fs::read_to_string(&cert_file).unwrap();
                 let witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
-                let bad_id = bad_id_map[&witness.bad_id];
+                let bad_id = task.bad_id_map[&witness.bad_id];
                 self.mc[bad_id].prop.res = McResult::Unsafe(witness.len());
-                self.mc[bad_id].prop.config = Some(config.clone());
+                self.mc[bad_id].prop.config = Some(task.cfg.clone());
 
                 let mut btorfe =
                     BtorFrontend::new(Btor::from_file(self.ric3_proj.path("dut/dut.btor")));
@@ -218,8 +241,8 @@ impl Run {
                 .unwrap();
             }
             None => {
-                for (_, &id) in bad_id_map.iter() {
-                    self.mc[id].state = McStatus::Pause;
+                for (_, &id) in task.bad_id_map.iter() {
+                    self.mc[id].state = McStatus::Wait;
                 }
             }
         }

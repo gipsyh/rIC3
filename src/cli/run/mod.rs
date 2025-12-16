@@ -1,5 +1,7 @@
 mod tui;
 
+use crate::cli::run::tui::RunTask;
+
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use btor::Btor;
@@ -13,7 +15,7 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{fs, thread::JoinHandle};
+use std::fs;
 use strum::AsRefStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -60,12 +62,7 @@ struct Run {
     ric3_proj: Ric3Proj,
     wts: WlTransys,
     mc: Vec<PropMcState>,
-    #[allow(clippy::type_complexity)]
-    solving: Option<(
-        JoinHandle<Option<bool>>,
-        GHashMap<usize, usize>,
-        EngineConfig,
-    )>,
+    solving: Option<RunTask>,
     should_quit: bool,
 }
 

@@ -210,4 +210,8 @@ impl Portfolio {
             }
         }
     }
+
+    pub fn get_stop_signal(&self) -> Arc<AtomicBool> {
+        self.stop_flag.clone()
+    }
 }
