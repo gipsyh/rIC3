@@ -29,7 +29,10 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
+    /// Run verification using 'ric3.toml' (requires the file in the current directory)
     Run,
+
+    /// Verify properties for AIGER/BTOR files with custom configurations
     Check {
         #[command(flatten)]
         chk: CheckConfig,
@@ -37,7 +40,11 @@ pub enum Commands {
         #[command(flatten)]
         cfg: EngineConfig,
     },
+
+    /// Clean up verification cache and artifacts
     Clean,
+
+    /// CTI Guided Interactive Lemma Generation
     Ctilg,
 }
 
