@@ -8,7 +8,9 @@ description = "hardware model checker"
 keywords = ["formal-method", "model-checking", "IC3"]
 license = "GPL-3.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "ric3"
+path = "src/main.rs"
 
 [dependencies]
 aig = { path = "./deps/aig-rs", version = "0.4.6" }

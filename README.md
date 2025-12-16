@@ -36,8 +36,8 @@ rIC3 can be compiled on both Linux and macOS.
 - Install ```cargo install --path .```
 
 ### Run
-- 16-threads Portfolio ```rIC3 <AIGER/BTOR>```
-- single-thread IC3 ```rIC3 -e ic3 <AIGER/BTOR>```
+- 16-threads Portfolio ```ric3 <AIGER/BTOR>```
+- single-thread IC3 ```ric3 -e ic3 <AIGER/BTOR>```
 
 ### Docker
 - build image: ```docker build -t ric3 .```
