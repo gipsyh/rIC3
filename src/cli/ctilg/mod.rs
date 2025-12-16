@@ -7,7 +7,7 @@ use btor::Btor;
 use clap::Parser;
 use giputils::{file::recreate_dir, hash::GHashMap};
 use log::info;
-use logicrs::fol::{Term, TermValue};
+use logicrs::fol::{BvTermValue, Term, TermValue};
 use rIC3::{
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
@@ -15,7 +15,7 @@ use rIC3::{
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
-use std::{env, fs, path::Path, process::Command};
+use std::{env, fs, mem::take, path::Path, process::Command};
 
 pub struct Ctilg {
     slv: Bitwuzla,
@@ -105,6 +105,44 @@ fn btorvcd(
     Ok(())
 }
 
+fn refresh_cti(cti_file: &Path, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
+    if !cti_file.exists() {
+        return Ok(());
+    }
+    let btor_old = Btor::from_file(dut_old.join("dut.btor"));
+    let btorfe_old = BtorFrontend::new(btor_old.clone());
+    let mut cti = btorfe_old.deserialize_wl_unsafe_certificate(fs::read_to_string(cti_file)?);
+    let ywb_old = btor_old.witness_map(&fs::read_to_string(dut_old.join("dut.ywb"))?);
+    let btor_new = Btor::from_file(dut_new.join("dut.btor"));
+    let mut btorfe_new = BtorFrontend::new(btor_new.clone());
+    let ywb_new = btor_new.witness_map(&fs::read_to_string(dut_new.join("dut.ywb"))?);
+    let ywb_old_inv: GHashMap<_, _> = ywb_old.into_iter().map(|(k, v)| (v, k)).collect();
+    let mut term_map = GHashMap::new();
+    for (n, s) in ywb_new {
+        if let Some(o) = ywb_old_inv.get(&s) {
+            term_map.insert(o, n);
+        }
+    }
+    for k in 0..cti.len() {
+        for x in take(&mut cti.input[k]) {
+            if let Some(n) = term_map.get(x.t()) {
+                cti.input[k].push(BvTermValue::new(n.clone(), x.v().clone()));
+            }
+        }
+        for x in take(&mut cti.state[k]) {
+            if let Some(n) = term_map.get(x.t()) {
+                let x = x.try_bv().unwrap();
+                cti.state[k].push(TermValue::Bv(BvTermValue::new(n.clone(), x.v().clone())));
+            }
+        }
+    }
+    fs::write(
+        cti_file,
+        format!("{}", btorfe_new.wl_unsafe_certificate(cti)),
+    )?;
+    Ok(())
+}
+
 pub fn ctilg() -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
@@ -113,22 +151,23 @@ pub fn ctilg() -> anyhow::Result<()> {
         .format_timestamp(None)
         .format_target(false)
         .init();
-    let ric3_cfg = Ric3Config::from_file("ric3.toml")?;
-    let ric3_proj = Ric3Proj::new()?;
-    recreate_dir(ric3_proj.path("tmp"))?;
-    let cached = ric3_proj.check_cached_dut(&ric3_cfg.dut.src())?;
+    let rcfg = Ric3Config::from_file("ric3.toml")?;
+    let rp = Ric3Proj::new()?;
+    recreate_dir(rp.path("tmp"))?;
+    let cached = rp.check_cached_dut(&rcfg.dut.src())?;
     if cached.is_none() {
-        Yosys::generate_btor(&ric3_cfg, ric3_proj.path("dut"))?;
-        ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
+        Yosys::generate_btor(&rcfg, rp.path("dut"))?;
+        rp.cache_dut(&rcfg.dut.src())?;
     } else if let Some(false) = cached {
-        // let ctilg_dut = ric3_proj.new_dir_entry(ric3_proj.ctilg_path().join("dut"))?;
-        // Yosys::generate_btor(&ric3_cfg, &ctilg_dut);
-        todo!();
+        Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
+        refresh_cti(&rp.path("ctilg/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
+        fs::remove_dir_all(rp.path("dut"))?;
+        fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
     }
     info!("Starting portfolio engine for all properties with a 10s time limit.");
     let cfg = EngineConfig::parse_from(["", "-e", "portfolio", "--time-limit", "10"]);
-    let cert_file = ric3_proj.path("tmp/dut.cert");
-    let mut engine = Portfolio::new(ric3_proj.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
+    let cert_file = rp.path("tmp/dut.cert");
+    let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
     match res {
         Some(true) => {
@@ -139,8 +178,8 @@ pub fn ctilg() -> anyhow::Result<()> {
                 "{}",
                 "A real counterexample was found for property p0.".red()
             );
-            let vcd = ric3_proj.path("ctilg/cex.vcd");
-            btorvcd(true, ric3_proj.path("dut"), cert_file, &vcd)?;
+            let vcd = rp.path("ctilg/cex.vcd");
+            btorvcd(true, rp.path("dut"), cert_file, &vcd)?;
             info!("Counter example VCD generated at {}", vcd.display());
         }
         None => {
@@ -150,11 +189,11 @@ pub fn ctilg() -> anyhow::Result<()> {
         }
     };
 
-    let btor = Btor::from_file(ric3_proj.path("dut/dut.btor"));
+    let btor = Btor::from_file(rp.path("dut/dut.btor"));
     let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
-    fs::create_dir_all(ric3_proj.path("ctilg"))?;
-    let cti_file = ric3_proj.path("ctilg/cti");
+    fs::create_dir_all(rp.path("ctilg"))?;
+    let cti_file = rp.path("ctilg/cti");
     let cti = if cti_file.exists() {
         let cti = fs::read_to_string(&cti_file)?;
         Some(btorfe.deserialize_wl_unsafe_certificate(cti))
@@ -184,18 +223,18 @@ pub fn ctilg() -> anyhow::Result<()> {
         return Ok(());
     };
     let witness = ctilg.witness(cti);
-    let witness_file = ric3_proj.path("ctilg/cti");
+    let witness_file = rp.path("ctilg/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
     btorvcd(
         false,
-        ric3_proj.path("dut"),
+        rp.path("dut"),
         witness_file,
-        ric3_proj.path("ctilg/cti.vcd"),
+        rp.path("ctilg/cti.vcd"),
     )?;
     info!(
         "Witness VCD generated at {}",
-        ric3_proj.path("ctilg/cti.vcd").display()
+        rp.path("ctilg/cti.vcd").display()
     );
     Ok(())
 }

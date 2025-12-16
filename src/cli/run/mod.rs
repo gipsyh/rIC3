@@ -60,6 +60,7 @@ struct Run {
     ric3_proj: Ric3Proj,
     wts: WlTransys,
     mc: Vec<PropMcState>,
+    #[allow(clippy::type_complexity)]
     solving: Option<(
         JoinHandle<Option<bool>>,
         GHashMap<usize, usize>,
