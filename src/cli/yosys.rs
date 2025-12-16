@@ -62,6 +62,7 @@ impl Yosys {
         yosys.add_command("memory_nordff");
         yosys.add_command("chformal -cover -remove");
         yosys.add_command("chformal -early");
+        // yosys.add_command("async2sync");
         yosys.add_command("chformal -lower");
         yosys.add_command("opt_clean");
         yosys.add_command("formalff -clk2ff -hierarchy -assume"); // -ff2anyinit

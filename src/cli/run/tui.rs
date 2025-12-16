@@ -56,7 +56,13 @@ impl PropMcState {
             Cell::from(self.prop.name.clone()),
             Cell::from(self.as_str()).fg(self.color()),
             Cell::from(bound),
-            Cell::from("IC3"),
+            Cell::from(
+                self.prop
+                    .config
+                    .as_ref()
+                    .map(|c| c.engine.as_ref())
+                    .unwrap_or("-"),
+            ),
         ]
     }
 }
@@ -170,18 +176,19 @@ impl Run {
         btor.to_file(&btor_path);
         let engine_cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
         let cert_file = self.ric3_proj.path("tmp/px.cert");
-        let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg);
+        let mut engine = Portfolio::new(btor_path, Some(cert_file), engine_cfg.clone());
         let join = spawn(move || engine.check());
-        self.solving = Some((join, bad_id_map));
+        self.solving = Some((join, bad_id_map, engine_cfg));
     }
 
     fn handle_engine(&mut self) {
-        let (join, bad_id_map) = take(&mut self.solving).unwrap();
+        let (join, bad_id_map, config) = take(&mut self.solving).unwrap();
         let res = join.join().unwrap();
         match res {
             Some(true) => {
                 for (_, &id) in bad_id_map.iter() {
                     self.mc[id].prop.res = McResult::Safe;
+                    self.mc[id].prop.config = Some(config.clone());
                     let cert = self.ric3_proj.path("tmp/px.cert");
                     let new_cert = self.ric3_proj.path(format!("res/p{id}.cert"));
                     fs::copy(cert, new_cert).unwrap();
@@ -197,6 +204,7 @@ impl Run {
                 let witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
                 let bad_id = bad_id_map[&witness.bad_id];
                 self.mc[bad_id].prop.res = McResult::Unsafe(witness.len());
+                self.mc[bad_id].prop.config = Some(config.clone());
 
                 let mut btorfe =
                     BtorFrontend::new(Btor::from_file(self.ric3_proj.path("dut/dut.btor")));

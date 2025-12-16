@@ -5,7 +5,7 @@ module counter #(
     input rst_n
 );
     reg [W-1:0] count;
-    always @(posedge clk or negedge rst_n)
+    always @(posedge clk)
         if (!rst_n) begin
             count <= {W{1'b0}};
         end else if (count == {(W - 1) {1'b1}}) begin

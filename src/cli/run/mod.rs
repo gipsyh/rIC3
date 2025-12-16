@@ -60,7 +60,11 @@ struct Run {
     ric3_proj: Ric3Proj,
     wts: WlTransys,
     mc: Vec<PropMcState>,
-    solving: Option<(JoinHandle<Option<bool>>, GHashMap<usize, usize>)>,
+    solving: Option<(
+        JoinHandle<Option<bool>>,
+        GHashMap<usize, usize>,
+        EngineConfig,
+    )>,
     should_quit: bool,
 }
 

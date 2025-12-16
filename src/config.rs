@@ -1,6 +1,7 @@
 use clap::{ArgAction, Args, Parser, ValueEnum};
 use log::error;
 use serde::{Deserialize, Serialize};
+use strum::AsRefStr;
 
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfig {
@@ -58,7 +59,7 @@ impl EngineConfig {
     }
 }
 
-#[derive(Copy, Clone, ValueEnum, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, ValueEnum, Debug, Serialize, Deserialize, AsRefStr)]
 pub enum Engine {
     /// ic3
     IC3,
