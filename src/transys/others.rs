@@ -117,7 +117,8 @@ impl Transys {
                 if let Some(init) = self.init.get_mut(&y.var()) {
                     let c = self.rel.new_xnor(*init, y_init);
                     if !c.is_constant(true) {
-                        self.constraint.push(c);
+                        // self.constraint.push(c);
+                        todo!();
                     }
                 } else {
                     self.init.insert(y.var(), y_init);
