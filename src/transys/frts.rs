@@ -1,5 +1,5 @@
 use crate::{
-    config::PreprocessConfig,
+    config::PreprocConfig,
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf, certify::Restore},
 };
@@ -11,7 +11,7 @@ use std::time::Instant;
 
 #[allow(unused)]
 pub struct FrTs {
-    cfg: PreprocessConfig,
+    cfg: PreprocConfig,
     ts: Transys,
     candidate: VarMap<Vec<Lit>>,
     map: VarLMap,
@@ -22,7 +22,7 @@ pub struct FrTs {
 }
 
 impl FrTs {
-    pub fn new(mut ts: Transys, cfg: &PreprocessConfig, mut rst: Restore) -> Self {
+    pub fn new(mut ts: Transys, cfg: &PreprocConfig, mut rst: Restore) -> Self {
         ts.topsort(&mut rst);
         let sim = ts.rel.simulation(1000);
         let solver = DagCnfSolver::new(&ts.rel);

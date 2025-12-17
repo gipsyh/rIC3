@@ -91,7 +91,7 @@ impl IC3 {
                 return BlockResult::OverallTimeLimitExceeded;
             }
             if self.tsctx.cube_subsume_init(&po.state) {
-                if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
+                if self.cfg.abs_cst || self.cfg.abs_trans {
                     self.add_obligation(po.clone());
                     if self.check_witness_by_bmc(po.depth) {
                         return BlockResult::Failure(po.depth);
@@ -120,7 +120,7 @@ impl IC3 {
                 continue;
             }
             po.bump_act();
-            if self.cfg.ic3.drop_po && po.act > 20.0 {
+            if self.cfg.drop_po && po.act > 20.0 {
                 continue;
             }
             let blocked_start = Instant::now();
@@ -134,7 +134,7 @@ impl IC3 {
                     po.depth
                 );
                 noc += 1;
-                let mic_type = if self.cfg.ic3.dynamic {
+                let mic_type = if self.cfg.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
                         let mut act = n.act;
                         for _ in 0..2 {

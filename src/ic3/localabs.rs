@@ -1,7 +1,7 @@
 use super::IC3;
 use crate::{
     Witness,
-    config::EngineConfig,
+    ic3::IC3Config,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
 use giputils::hash::{GHashMap, GHashSet};
@@ -20,25 +20,25 @@ pub struct LocalAbs {
 }
 
 impl LocalAbs {
-    pub fn new(ts: &Transys, cfg: &EngineConfig) -> Self {
+    pub fn new(ts: &Transys, cfg: &IC3Config) -> Self {
         let mut refine = GHashSet::new();
         refine.insert(Var::CONST);
         refine.extend(ts.bad.iter().map(|l| l.var()));
-        if !cfg.ic3.abs_cst {
+        if !cfg.abs_cst {
             refine.extend(ts.constraint.iter().map(|l| l.var()))
         }
-        if !cfg.ic3.abs_trans {
+        if !cfg.abs_trans {
             refine.extend(ts.next.values().map(|l| l.var()));
         }
         let mut uts = TransysUnroll::new(ts);
-        if cfg.ic3.abs_trans {
+        if cfg.abs_trans {
             uts.enable_optional_connect();
         }
-        if cfg.ic3.abs_cst {
+        if cfg.abs_cst {
             uts.enable_optional_constraint();
         }
         let mut solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
-        uts.load_trans(solver.as_mut(), 0, !cfg.ic3.abs_cst);
+        uts.load_trans(solver.as_mut(), 0, !cfg.abs_cst);
         uts.ts.load_init(solver.as_mut());
         let opt = uts.opt.clone();
         let opt_rev: GHashMap<Var, Var> = opt.iter().map(|(k, v)| (*v, *k)).collect();
@@ -90,7 +90,7 @@ impl IC3 {
         for k in self.localabs.kslv + 1..=depth {
             self.localabs
                 .uts
-                .load_trans(self.localabs.solver.as_mut(), k, !self.cfg.ic3.abs_cst);
+                .load_trans(self.localabs.solver.as_mut(), k, !self.cfg.abs_cst);
         }
         self.localabs.kslv = depth;
         let mut assump = LitVec::new();

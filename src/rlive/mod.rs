@@ -1,25 +1,43 @@
 use crate::{
     Engine, Witness,
-    config::EngineConfig,
-    ic3::IC3,
+    config::{self, EngineConfig, EngineConfigBase, PreprocConfig},
+    ic3::{IC3, IC3Config},
     transys::{Transys, TransysIf, certify::Restore},
 };
-use clap::Parser;
+use clap::{Args, Parser};
 use log::{debug, error, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
-use std::mem::take;
+use serde::{Deserialize, Serialize};
+use std::{mem::take, ops::Deref};
 
 pub struct Rlive {
     #[allow(unused)]
-    cfg: EngineConfig,
+    cfg: RliveConfig,
     ts: Transys,
-    rcfg: EngineConfig, // reach check config
-    rts: Transys,       // reach check ts
-    base_var: Var,      // base var
+    rcfg: IC3Config, // reach check config
+    rts: Transys,    // reach check ts
+    base_var: Var,   // base var
     trace: Vec<LitOrdVec>,
     witness: Vec<Witness>,
     shoals: Vec<LitVec>,
     rst: Restore,
+}
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct RliveConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+}
+
+impl Deref for RliveConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
 }
 
 impl Rlive {
@@ -110,7 +128,7 @@ impl Rlive {
 }
 
 impl Rlive {
-    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
+    pub fn new(cfg: RliveConfig, mut ts: Transys) -> Self {
         warn!("rlive is unstable, use with caution");
         if ts.justice.is_empty() {
             error!("rlive requires justice property");
@@ -131,13 +149,15 @@ impl Rlive {
         let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
-        let rcfg = EngineConfig::parse_from(
-            "-e ic3 --no-ic3-pred-prop --ic3-full-bad --no-preproc".split(' '),
-        );
+        let rcfg =
+            EngineConfig::parse_from("ic3 --no-pred-prop --full-bad --no-preproc".split(' '));
+        let config::Engine::IC3(rcfg) = rcfg.deref() else {
+            unreachable!()
+        };
         Self {
             cfg,
             ts,
-            rcfg,
+            rcfg: rcfg.clone(),
             rts,
             base_var,
             trace: Vec::new(),

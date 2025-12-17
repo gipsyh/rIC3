@@ -4,7 +4,7 @@ use clap::Parser;
 use giputils::hash::GHashMap;
 use rIC3::{
     McResult,
-    config::EngineConfig,
+    config::{self, EngineConfig},
     frontend::{Frontend, btor::BtorFrontend},
     portfolio::Portfolio,
 };
@@ -59,13 +59,7 @@ impl PropMcState {
             Cell::from(self.prop.name.clone()),
             Cell::from(self.as_str()).fg(self.color()),
             Cell::from(bound),
-            Cell::from(
-                self.prop
-                    .config
-                    .as_ref()
-                    .map(|c| c.engine.as_ref())
-                    .unwrap_or("-"),
-            ),
+            Cell::from(self.prop.config.as_ref().map(|c| c.as_ref()).unwrap_or("-")),
         ]
     }
 }
@@ -192,9 +186,12 @@ impl Run {
         let btor_path = self.ric3_proj.path("tmp/px.btor");
         let btor = Btor::from(&wts);
         btor.to_file(&btor_path);
-        let cfg = EngineConfig::parse_from(["", "-e", "portfolio"]);
+        let cfg = EngineConfig::parse_from(["", "portfolio"]);
+        let config::Engine::Portfolio(pcfg) = &cfg.engine else {
+            panic!()
+        };
         let cert_file = self.ric3_proj.path("tmp/px.cert");
-        let mut engine = Portfolio::new(btor_path, Some(cert_file), cfg.clone());
+        let mut engine = Portfolio::new(btor_path, Some(cert_file), pcfg.clone());
         let stop = engine.get_stop_signal();
         let join = spawn(move || engine.check());
         self.solving = Some(RunTask {

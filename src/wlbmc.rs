@@ -1,14 +1,31 @@
 use crate::{
     Engine,
-    config::EngineConfig,
+    config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
+use clap::Args;
 use giputils::hash::GHashMap;
 use log::info;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct WlBMCConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+}
+
+impl Deref for WlBMCConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
 
 pub struct WlBMC {
-    cfg: EngineConfig,
+    cfg: WlBMCConfig,
     #[allow(unused)]
     owts: WlTransys,
     uts: WlTransysUnroll,
@@ -18,7 +35,7 @@ pub struct WlBMC {
 }
 
 impl WlBMC {
-    pub fn new(cfg: EngineConfig, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: WlBMCConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);

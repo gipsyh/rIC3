@@ -17,7 +17,7 @@ impl IC3 {
             .solve(&self.tsctx.bad.cube());
         self.statistic.block.get_bad_time += start.elapsed();
         res.then(|| {
-            if self.cfg.ic3.full_bad {
+            if self.cfg.full_bad {
                 self.get_full_pred(self.solvers.len())
             } else {
                 self.get_pred(self.solvers.len(), true)
@@ -96,7 +96,7 @@ impl IC3 {
         let rev: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             cube.reverse();
         });
-        let mut order = if self.cfg.ic3.inn || !self.auxiliary_var.is_empty() {
+        let mut order = if self.cfg.inn || !self.auxiliary_var.is_empty() {
             vec![inn, act, rev]
         } else {
             vec![act, rev]

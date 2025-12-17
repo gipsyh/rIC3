@@ -1,15 +1,39 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::EngineConfig,
+    config::{EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
+use clap::Args;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, satif::Satif};
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct KindConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+
+    /// simple path constraint
+    #[arg(long = "simple-path", default_value_t = false)]
+    pub simple_path: bool,
+}
+
+impl Deref for KindConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,
-    cfg: EngineConfig,
+    cfg: KindConfig,
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
@@ -19,7 +43,7 @@ pub struct Kind {
 }
 
 impl Kind {
-    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
+    pub fn new(cfg: KindConfig, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts.compress_bads();
         let rst = Restore::new(&ts);
@@ -31,7 +55,7 @@ impl Kind {
             ts.simplify(&mut rst);
         }
         let mut uts = TransysUnroll::new(&ts);
-        if cfg.kind.simple_path {
+        if cfg.simple_path {
             uts.enable_simple_path();
         }
         let solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
@@ -105,7 +129,7 @@ impl Engine for Kind {
     }
 
     fn proof(&mut self) -> Proof {
-        if self.cfg.kind.simple_path {
+        if self.cfg.simple_path {
             //TODO: support certifaiger with simple path constraint
             error!("k-induction with simple path constraint not support certifaiger");
             panic!();

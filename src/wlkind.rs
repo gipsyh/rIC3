@@ -1,6 +1,6 @@
 use crate::{
     Engine,
-    config::EngineConfig,
+    config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
     wltransys::{
         WlTransys,
@@ -8,13 +8,30 @@ use crate::{
         unroll::WlTransysUnroll,
     },
 };
+use clap::Args;
 use giputils::hash::GHashMap;
 use log::{error, info};
 use logicrs::fol::{Sort, Term, op};
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct WlKindConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+}
+
+impl Deref for WlKindConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
 
 pub struct WlKind {
     uts: WlTransysUnroll,
-    cfg: EngineConfig,
+    cfg: WlKindConfig,
     solver: bitwuzla::Bitwuzla,
     solver_trans_k: usize,
     solver_bad_k: usize,
@@ -23,7 +40,7 @@ pub struct WlKind {
 }
 
 impl WlKind {
-    pub fn new(cfg: EngineConfig, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: WlKindConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);
@@ -128,10 +145,6 @@ impl Engine for WlKind {
     }
 
     fn wl_proof(&mut self) -> WlProof {
-        if self.cfg.kind.simple_path {
-            error!("k-induction with simple path constraint does not support certificate");
-            panic!();
-        }
         let mut proof = self.uts.ts.clone();
         let mut up = WlTransysUnroll::new(proof.clone());
         up.enable_new_next_latch();

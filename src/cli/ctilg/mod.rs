@@ -9,7 +9,7 @@ use giputils::{file::recreate_dir, hash::GHashMap};
 use log::info;
 use logicrs::fol::{BvTermValue, Term, TermValue};
 use rIC3::{
-    config::EngineConfig,
+    config::{self, EngineConfig},
     frontend::{Frontend, btor::BtorFrontend},
     portfolio::Portfolio,
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
@@ -165,7 +165,10 @@ pub fn ctilg() -> anyhow::Result<()> {
         fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
     }
     info!("Starting portfolio engine for all properties with a 10s time limit.");
-    let cfg = EngineConfig::parse_from(["", "-e", "portfolio", "--time-limit", "10"]);
+    let cfg = EngineConfig::parse_from(["", "portfolio", "--time-limit", "10"]);
+    let config::Engine::Portfolio(cfg) = cfg.engine else {
+        panic!()
+    };
     let cert_file = rp.path("tmp/dut.cert");
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();

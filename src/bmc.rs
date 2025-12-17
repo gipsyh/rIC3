@@ -1,18 +1,50 @@
 use crate::{
     Engine, Witness,
-    config::EngineConfig,
+    config::{EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
+use clap::Args;
 use log::info;
 use logicrs::satif::Satif;
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
+use std::{ops::Deref, time::Duration};
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct BMCConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+
+    /// per-step time limit (applies to each BMC step, not the overall solver run).
+    /// The overall `time_limit` option sets the total time limit for the entire solver run.
+    #[arg(long = "step-time-limit")]
+    pub step_time_limit: Option<u64>,
+
+    /// use kissat solver in bmc, otherwise cadical
+    #[arg(long = "kissat", default_value_t = false)]
+    pub kissat: bool,
+
+    /// dynamic step
+    #[arg(long = "dyn-step", default_value_t = false)]
+    pub dyn_step: bool,
+}
+
+impl Deref for BMCConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
 
 pub struct BMC {
     ots: Transys,
     uts: TransysUnroll<NoDepTransys>,
-    cfg: EngineConfig,
+    cfg: BMCConfig,
     solver: Box<dyn Satif>,
     solver_k: usize,
     rst: Restore,
@@ -22,7 +54,7 @@ pub struct BMC {
 }
 
 impl BMC {
-    pub fn new(cfg: EngineConfig, mut ts: Transys) -> Self {
+    pub fn new(cfg: BMCConfig, mut ts: Transys) -> Self {
         let ots = ts.clone();
         ts.compress_bads();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
@@ -34,14 +66,14 @@ impl BMC {
             ts.simplify(&mut rst);
         }
         let uts = TransysUnroll::new(&ts);
-        let mut solver: Box<dyn Satif> = if cfg.bmc.bmc_kissat {
+        let mut solver: Box<dyn Satif> = if cfg.kissat {
             Box::new(kissat::Kissat::new())
         } else {
             Box::new(cadical::CaDiCaL::new())
         };
         solver.set_seed(rng.random());
         ts.load_init(solver.as_mut());
-        let step = if cfg.bmc.dyn_step {
+        let step = if cfg.dyn_step {
             (10_000_000 / (*ts.max_var() as usize + ts.rel.clauses().len())).max(1)
         } else {
             cfg.step as usize
@@ -68,7 +100,7 @@ impl BMC {
     }
 
     pub fn reset_solver(&mut self) {
-        self.solver = if self.cfg.bmc.bmc_kissat {
+        self.solver = if self.cfg.kissat {
             Box::new(kissat::Kissat::new())
         } else {
             Box::new(cadical::CaDiCaL::new())
@@ -87,13 +119,13 @@ impl Engine for BMC {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let mut assump = self.uts.lits_next(&self.uts.ts.bad.cube(), k);
-            if self.cfg.bmc.bmc_kissat {
+            if self.cfg.kissat {
                 for b in assump.iter() {
                     self.solver.add_clause(&[*b]);
                 }
                 assump.clear();
             }
-            let r = if let Some(limit) = self.cfg.bmc.step_time_limit {
+            let r = if let Some(limit) = self.cfg.step_time_limit {
                 let Some(r) =
                     self.solver
                         .solve_with_limit(&assump, vec![], Duration::from_secs(limit))
@@ -110,7 +142,7 @@ impl Engine for BMC {
                 return Some(false);
             }
             self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
-            if self.cfg.bmc.bmc_kissat {
+            if self.cfg.kissat {
                 self.reset_solver();
             }
         }

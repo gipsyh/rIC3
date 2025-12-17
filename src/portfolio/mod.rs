@@ -1,8 +1,11 @@
-use crate::EngineConfig;
+use crate::config::EngineConfigBase;
+use clap::Args;
 use log::{error, info};
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 use std::time::Instant;
@@ -22,20 +25,47 @@ use std::{
 };
 use tempfile::{NamedTempFile, TempDir};
 
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct PortfolioConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+    /// woker memory limit in GB
+    #[arg(long = "worker-mem-limit", default_value_t = 16)]
+    pub wmem_limit: usize,
+}
+
+impl Default for PortfolioConfig {
+    fn default() -> Self {
+        Self {
+            base: Default::default(),
+            wmem_limit: 16,
+        }
+    }
+}
+
+impl Deref for PortfolioConfig {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
 pub struct Portfolio {
     cert: Option<PathBuf>,
-    #[allow(unused)]
-    cfg: EngineConfig,
+    cfg: PortfolioConfig,
     engines: Vec<Engine>,
-    temp_dir: TempDir,
     engine_pids: Vec<Pid>,
     stop_flag: Arc<AtomicBool>,
     monitor: Option<JoinHandle<()>>,
+    #[allow(unused)]
+    temp_dir: TempDir,
 }
 
 struct Engine {
     name: String,
     cmd: Command,
+    cert: Option<NamedTempFile>,
 }
 
 fn monitor_run(tx: Sender<Option<WaitStatus>>) {
@@ -52,23 +82,32 @@ fn monitor_run(tx: Sender<Option<WaitStatus>>) {
 }
 
 impl Portfolio {
-    pub fn new(model: PathBuf, cert: Option<PathBuf>, cfg: EngineConfig) -> Self {
+    pub fn new(model: PathBuf, cert: Option<PathBuf>, cfg: PortfolioConfig) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
         let mut id = 0;
         let mut new_engine = |name, args: &str| {
-            let args_split = args.split(" ");
             let mut cmd = Command::new(current_exe().unwrap());
             cmd.env("RIC3_TMP_DIR", temp_dir_path);
             cmd.env("RUST_LOG", "warn");
             id += 1;
             cmd.arg("check");
             cmd.arg(&model);
+            let cert = if cert.is_some() {
+                let certificate = NamedTempFile::new_in(temp_dir.path()).unwrap();
+                let certify_path = certificate.path().as_os_str().to_str().unwrap();
+                cmd.arg("--cert");
+                cmd.arg(certify_path);
+                Some(certificate)
+            } else {
+                None
+            };
+            let args_split = args.split(" ");
             for a in args_split {
                 cmd.arg(a);
             }
-            engines.push(Engine { name, cmd });
+            engines.push(Engine { name, cmd, cert });
         };
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
@@ -107,27 +146,16 @@ impl Portfolio {
     pub fn check(&mut self) -> Option<bool> {
         let mut running = HashMap::new();
         for mut engine in take(&mut self.engines) {
-            let certificate = if self.cert.is_some() {
-                let certificate = NamedTempFile::new_in(self.temp_dir.path()).unwrap();
-                let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                engine.cmd.arg(certify_path);
-                Some(certificate)
-            } else {
-                None
-            };
-
             let child = engine
                 .cmd
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
                 .unwrap();
-
             info!("start engine {}", engine.name);
-
             let pid = Pid::from_raw(child.id() as i32);
             self.engine_pids.push(pid);
-            running.insert(pid, (child, engine, certificate));
+            running.insert(pid, (child, engine));
         }
 
         let (tx, rx) = mpsc::channel();
@@ -153,7 +181,7 @@ impl Portfolio {
             match rx.recv_timeout(std::time::Duration::from_millis(100)) {
                 Ok(msg) => match msg {
                     Some(WaitStatus::Exited(pid, code)) => {
-                        if let Some((mut child, engine, certificate)) = running.remove(&pid) {
+                        if let Some((mut child, engine)) = running.remove(&pid) {
                             if code == 0 {
                                 let stdout = child.stdout.take().unwrap();
                                 let reader = BufReader::new(stdout);
@@ -176,7 +204,7 @@ impl Portfolio {
                                         .join(" ");
                                     info!("best configuration: {config}");
                                     if let Some(cert) = &self.cert
-                                        && let Some(c) = certificate
+                                        && let Some(c) = engine.cert
                                     {
                                         let _ = std::fs::copy(c.path(), cert);
                                     }

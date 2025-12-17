@@ -1,5 +1,5 @@
 use super::IC3;
-use crate::{config::EngineConfig, transys::TransysIf};
+use crate::{ic3::IC3Config, transys::TransysIf};
 use giputils::hash::GHashSet;
 use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
@@ -36,11 +36,11 @@ pub enum MicType {
 }
 
 impl MicType {
-    pub fn from_config(cfg: &EngineConfig) -> Self {
-        let p = if cfg.ic3.ctg {
+    pub fn from_config(cfg: &IC3Config) -> Self {
+        let p = if cfg.ctg {
             DropVarParameter {
-                limit: cfg.ic3.ctg_limit,
-                max: cfg.ic3.ctg_max,
+                limit: cfg.ctg_limit,
+                max: cfg.ctg_max,
                 level: 1,
             }
         } else {
@@ -224,7 +224,7 @@ impl IC3 {
         } else {
             self.activity.sort_by_activity(&mut cube, true);
         }
-        if self.cfg.ic3.parent_lemma
+        if self.cfg.parent_lemma
             && let Some(parent) = self.frame.parent_lemma(&cube, frame)
         {
             let parent = GHashSet::from_iter(parent);

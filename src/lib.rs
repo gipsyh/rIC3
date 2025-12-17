@@ -20,7 +20,6 @@ use crate::{
     transys::certify::{Proof, Witness},
     wltransys::certify::{WlProof, WlWitness},
 };
-use config::EngineConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]

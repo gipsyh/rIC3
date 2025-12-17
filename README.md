@@ -32,12 +32,12 @@ rIC3 can be compiled on both Linux and macOS.
 - ```git clone --recurse-submodules https://github.com/gipsyh/rIC3```
 - Install `gmp` and `mpfr` required by Bitwuzla ```apt install libgmp-dev libmpfr-dev``` or ```brew install gmp mpfr```
 - Build ```cd rIC3 && cargo b --release```
-- Run ```cargo r --release -- <AIGER/BTOR>```
+- Run ```cargo r --release -- check <AIGER/BTOR> portfolio```
 - Install ```cargo install --path .```
 
 ### Run
-- 16-threads Portfolio ```ric3 <AIGER/BTOR>```
-- single-thread IC3 ```ric3 -e ic3 <AIGER/BTOR>```
+- 16-threads Portfolio ```ric3 check <AIGER/BTOR> portfolio```
+- single-thread IC3 ```ric3 check <AIGER/BTOR> ic3```
 
 ### Docker
 - build image: ```docker build -t ric3 .```

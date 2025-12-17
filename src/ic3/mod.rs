@@ -1,19 +1,21 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::EngineConfig,
+    config::{EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
 use activity::Activity;
+use clap::{ArgAction, Args};
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, logger::IntervalLogger};
-use log::{Level, debug, info, trace};
+use log::{Level, debug, error, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use std::time::Instant;
+use serde::{Deserialize, Serialize};
+use std::{ops::Deref, time::Instant};
 use utils::Statistic;
 
 mod activity;
@@ -27,8 +29,84 @@ mod propagate;
 mod solver;
 mod utils;
 
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct IC3Config {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+
+    /// dynamic generalization
+    #[arg(long = "dynamic", default_value_t = false)]
+    pub dynamic: bool,
+
+    /// counterexample to generalization
+    #[arg(long = "ctg", action = ArgAction::Set, default_value_t = true)]
+    pub ctg: bool,
+
+    /// max number of ctg
+    #[arg(long = "ctg-max", default_value_t = 3)]
+    pub ctg_max: usize,
+
+    /// ctg limit
+    #[arg(long = "ctg-limit", default_value_t = 1)]
+    pub ctg_limit: usize,
+
+    /// counterexample to propagation
+    #[arg(long = "ctp", default_value_t = false)]
+    pub ctp: bool,
+
+    /// internal signals (FMCAD'21)
+    #[arg(long = "inn", default_value_t = false)]
+    pub inn: bool,
+
+    /// abstract constrains
+    #[arg(long = "abs-cst", default_value_t = false)]
+    pub abs_cst: bool,
+
+    /// abstract trans
+    #[arg(long = "abs-trans", default_value_t = false)]
+    pub abs_trans: bool,
+
+    /// dropping proof-obligation
+    #[arg(
+        long = "drop-po", action = ArgAction::Set, default_value_t = true,
+    )]
+    pub drop_po: bool,
+
+    /// full assignment of last bad (used in rlive)
+    #[arg(long = "full-bad", default_value_t = false)]
+    pub full_bad: bool,
+
+    /// abstract array
+    #[arg(long = "abs-array", default_value_t = false)]
+    pub abs_array: bool,
+
+    /// finding parent lemma in mic
+    #[arg(long = "parent-lemma", action = ArgAction::Set, default_value_t = true)]
+    pub parent_lemma: bool,
+}
+
+impl Deref for IC3Config {
+    type Target = EngineConfigBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl IC3Config {
+    fn validate(&self) {
+        if self.dynamic && self.drop_po {
+            error!("cannot enable both ic3-dynamic and ic3-drop-po");
+            panic!();
+        }
+    }
+}
+
 pub struct IC3 {
-    cfg: EngineConfig,
+    cfg: IC3Config,
     ts: Transys,
     symbols: VarSymbols,
     tsctx: Grc<TransysCtx>,
@@ -89,7 +167,8 @@ impl IC3 {
 }
 
 impl IC3 {
-    pub fn new(cfg: EngineConfig, mut ts: Transys, symbols: VarSymbols) -> Self {
+    pub fn new(cfg: IC3Config, mut ts: Transys, symbols: VarSymbols) -> Self {
+        cfg.validate();
         let ots = ts.clone();
         ts.compress_bads();
         let rst = Restore::new(&ts);
@@ -98,7 +177,7 @@ impl IC3 {
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
-        if cfg.ic3.inn {
+        if cfg.inn {
             ts = uts.interal_signals();
         }
         ts.remove_gate_init(&mut rst);

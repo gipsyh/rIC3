@@ -32,7 +32,7 @@ impl IC3 {
                         self.statistic.ctp.statistic(ctp > 0);
                         break;
                     }
-                    if !self.cfg.ic3.ctp {
+                    if !self.cfg.ctp {
                         break;
                     }
                     let (ctp, _) = self.get_pred(frame_idx + 1, false);

@@ -1,6 +1,6 @@
 use aig::Aig;
 use btor::Btor;
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use log::{error, info};
 use rIC3::{
     Engine,
@@ -9,7 +9,7 @@ use rIC3::{
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
     ic3::IC3,
     kind::Kind,
-    portfolio::Portfolio,
+    portfolio::{Portfolio, PortfolioConfig},
     rlive::Rlive,
     tracer::LogTracer,
     transys::TransysIf,
@@ -26,7 +26,8 @@ pub struct CheckConfig {
     pub model: PathBuf,
 
     /// certificate path
-    pub certificate: Option<PathBuf>,
+    #[arg(long)]
+    pub cert: Option<PathBuf>,
 
     /// certify with certifaiger or cerbtora
     #[arg(long, default_value_t = false)]
@@ -52,7 +53,7 @@ fn report_res(chk: &CheckConfig, res: Option<bool>) {
             } else {
                 println!("SAT");
                 if chk.witness {
-                    let witness = fs::read_to_string(chk.certificate.as_ref().unwrap()).unwrap();
+                    let witness = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
                     println!("{witness}");
                 }
             }
@@ -74,16 +75,15 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         .format_timestamp(None)
         .format_target(false)
         .init();
-    cfg.validate();
     chk.model = chk.model.canonicalize()?;
     info!("the model to be checked: {}", chk.model.display());
     let mut tmp_cert = None;
-    if chk.certificate.is_none() && (chk.certify || chk.witness) {
+    if chk.cert.is_none() && (chk.certify || chk.witness) {
         let tmp_cert_file = tempfile::NamedTempFile::new().unwrap();
-        chk.certificate = Some(PathBuf::from(tmp_cert_file.path()));
+        chk.cert = Some(PathBuf::from(tmp_cert_file.path()));
         tmp_cert = Some(tmp_cert_file);
     }
-    if let config::Engine::Portfolio = cfg.engine {
+    if let config::Engine::Portfolio(cfg) = cfg.engine {
         let res = portfolio_main(chk, cfg);
         drop(tmp_cert);
         return res;
@@ -102,28 +102,26 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             exit(1);
         }
     };
-    let mut engine: Box<dyn Engine> = if cfg.engine.is_wl() {
+    let log_tracer = Box::new(LogTracer::new(cfg.as_ref()));
+    let mut engine: Box<dyn Engine> = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
         // info!("origin ts has {}", ts.statistic());
         match cfg.engine {
-            config::Engine::WlBMC => Box::new(WlBMC::new(cfg.clone(), wts)),
-            config::Engine::WlKind => Box::new(WlKind::new(cfg.clone(), wts)),
+            config::Engine::WlBMC(cfg) => Box::new(WlBMC::new(cfg, wts)),
+            config::Engine::WlKind(cfg) => Box::new(WlKind::new(cfg.clone(), wts)),
             _ => unreachable!(),
         }
     } else {
         let (ts, symbols) = frontend.ts();
         info!("origin ts has {}", ts.statistic());
         match cfg.engine {
-            config::Engine::IC3 => Box::new(IC3::new(cfg.clone(), ts, symbols)),
-            config::Engine::Kind => Box::new(Kind::new(cfg.clone(), ts)),
-            config::Engine::BMC => Box::new(BMC::new(cfg.clone(), ts)),
-            config::Engine::Rlive => Box::new(Rlive::new(cfg.clone(), ts)),
+            config::Engine::IC3(cfg) => Box::new(IC3::new(cfg.clone(), ts, symbols)),
+            config::Engine::Kind(cfg) => Box::new(Kind::new(cfg.clone(), ts)),
+            config::Engine::BMC(cfg) => Box::new(BMC::new(cfg.clone(), ts)),
+            config::Engine::Rlive(cfg) => Box::new(Rlive::new(cfg.clone(), ts)),
             _ => unreachable!(),
         }
     };
-    let log_tracer = Box::new(LogTracer::new(
-        cfg.engine.to_possible_value().unwrap().get_name(),
-    ));
     engine.add_tracer(log_tracer);
     interrupt_statistic(&chk, engine.as_mut());
     let res = engine.check();
@@ -133,10 +131,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     }
     report_res(&chk, res);
     if chk.certify {
-        assert!(certificate_check(
-            &chk.model,
-            chk.certificate.as_ref().unwrap()
-        ));
+        assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));
     }
     drop(tmp_cert);
     Ok(())
@@ -165,7 +160,7 @@ pub fn certificate(
     engine: &mut dyn Engine,
     res: bool,
 ) {
-    if chk.certificate.is_none() {
+    if chk.cert.is_none() {
         return;
     }
     let certificate = if engine.is_wl() {
@@ -183,18 +178,15 @@ pub fn certificate(
         debug_assert!(witness.state.len() == witness.input.len());
         frontend.unsafe_certificate(witness)
     };
-    fs::write(chk.certificate.as_ref().unwrap(), format!("{certificate}")).unwrap();
+    fs::write(chk.cert.as_ref().unwrap(), format!("{certificate}")).unwrap();
 }
 
-pub fn portfolio_main(chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
-    let mut engine = Portfolio::new(chk.model.clone(), chk.certificate.clone(), cfg.clone());
+pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {
+    let mut engine = Portfolio::new(chk.model.clone(), chk.cert.clone(), cfg);
     let res = engine.check();
     report_res(&chk, res);
     if chk.certify {
-        assert!(certificate_check(
-            &chk.model,
-            chk.certificate.as_ref().unwrap()
-        ));
+        assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));
     }
     Ok(())
 }
