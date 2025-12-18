@@ -10,7 +10,7 @@ pub struct NoDepTransys {
     pub latch: Vec<Var>,
     pub next: GHashMap<Var, Lit>,
     pub init: GHashMap<Var, Lit>,
-    pub bad: Lit,
+    pub bad: LitVec,
     pub constraint: LitVec,
     pub rel: Cnf,
 }
@@ -28,7 +28,8 @@ impl NoDepTransys {
         for c in self.trans() {
             simp_solver.add_clause(c);
         }
-        let mut frozens = vec![Var::CONST, self.bad.var()];
+        let mut frozens = vec![Var::CONST];
+        frozens.extend(self.bad.iter().map(|l| l.var()));
         frozens.extend(self.input.iter().chain(self.latch.iter()).copied());
         for &l in self.latch.iter() {
             if let Some(i) = self.init(l) {
@@ -62,7 +63,7 @@ impl NoDepTransys {
             .iter()
             .map(|(v, n)| (domain_map[*v], map_lit(n)))
             .collect();
-        self.bad = map_lit(&self.bad);
+        self.bad = self.bad.iter().map(map_lit).collect();
         self.constraint = self.constraint.iter().map(map_lit).collect();
         rst.filter_map_var(|v| domain_map.get(&v).copied());
     }
@@ -112,13 +113,12 @@ impl TransysIf for NoDepTransys {
 
 impl Transys {
     pub fn remove_dep(self) -> NoDepTransys {
-        assert!(self.bad.len() == 1);
         NoDepTransys {
             input: self.input,
             latch: self.latch,
             next: self.next,
             init: self.init,
-            bad: self.bad[0],
+            bad: self.bad,
             constraint: self.constraint,
             rel: self.rel.lower(),
         }
