@@ -3,7 +3,7 @@ use btor::Btor;
 use clap::Parser;
 use log::{error, info};
 use rIC3::{
-    Engine,
+    Engine, McResult,
     bmc::BMC,
     config::{self, EngineConfig},
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
@@ -42,23 +42,22 @@ pub struct CheckConfig {
     pub interrupt_statistic: bool,
 }
 
-fn report_res(chk: &CheckConfig, res: Option<bool>) {
+fn report_res(chk: &CheckConfig, res: McResult) {
     match res {
-        Some(res) => {
-            if res {
-                println!("UNSAT");
-                if chk.witness {
-                    println!("0");
-                }
-            } else {
-                println!("SAT");
-                if chk.witness {
-                    let witness = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
-                    println!("{witness}");
-                }
+        McResult::Safe => {
+            println!("UNSAT");
+            if chk.witness {
+                println!("0");
             }
         }
-        _ => {
+        McResult::Unsafe(_) => {
+            println!("SAT");
+            if chk.witness {
+                let witness = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
+                println!("{witness}");
+            }
+        }
+        McResult::Unknown(_) => {
             println!("UNKNOWN");
             if chk.witness {
                 println!("2");
@@ -126,8 +125,14 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     interrupt_statistic(&chk, engine.as_mut());
     let res = engine.check();
     engine.statistic();
-    if let Some(res) = res {
-        certificate(&chk, frontend.as_mut(), engine.as_mut(), res);
+    match res {
+        McResult::Safe => {
+            certificate(&chk, frontend.as_mut(), engine.as_mut(), true);
+        }
+        McResult::Unsafe(_) => {
+            certificate(&chk, frontend.as_mut(), engine.as_mut(), false);
+        }
+        McResult::Unknown(_) => todo!(),
     }
     report_res(&chk, res);
     if chk.certify {

@@ -65,7 +65,7 @@ impl PropMcState {
 }
 
 pub(super) struct RunTask {
-    join: JoinHandle<Option<bool>>,
+    join: JoinHandle<McResult>,
     bad_id_map: GHashMap<usize, usize>,
     cfg: EngineConfig,
     stop: Arc<AtomicBool>,
@@ -205,7 +205,7 @@ impl Run {
     fn handle_task(&mut self, task: RunTask) {
         let res = task.join.join().unwrap();
         match res {
-            Some(true) => {
+            McResult::Safe => {
                 for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].prop.res = McResult::Safe;
                     self.mc[id].prop.config = Some(task.cfg.clone());
@@ -214,7 +214,7 @@ impl Run {
                     fs::copy(cert, new_cert).unwrap();
                 }
             }
-            Some(false) => {
+            McResult::Unsafe(_) => {
                 for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].state = McStatus::Wait;
                 }
@@ -237,7 +237,7 @@ impl Run {
                 )
                 .unwrap();
             }
-            None => {
+            McResult::Unknown(_) => {
                 for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].state = McStatus::Wait;
                 }

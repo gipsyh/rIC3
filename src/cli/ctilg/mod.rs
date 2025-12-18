@@ -9,6 +9,7 @@ use giputils::{file::recreate_dir, hash::GHashMap};
 use log::info;
 use logicrs::fol::{BvTermValue, Term, TermValue};
 use rIC3::{
+    McResult,
     config::{self, EngineConfig},
     frontend::{Frontend, btor::BtorFrontend},
     portfolio::Portfolio,
@@ -173,10 +174,10 @@ pub fn ctilg() -> anyhow::Result<()> {
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
     match res {
-        Some(true) => {
+        McResult::Safe => {
             info!("{}", "All properties are SAFE.".green());
         }
-        Some(false) => {
+        McResult::Unsafe(_) => {
             info!(
                 "{}",
                 "A real counterexample was found for property p0.".red()
@@ -185,7 +186,7 @@ pub fn ctilg() -> anyhow::Result<()> {
             btorvcd(true, rp.path("dut"), cert_file, &vcd)?;
             info!("Counter example VCD generated at {}", vcd.display());
         }
-        None => {
+        McResult::Unknown(_) => {
             info!(
                 "The portfolio engine failed to obtain a result and will continue with the CTILG engine."
             );

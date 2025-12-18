@@ -1,5 +1,5 @@
 use crate::{
-    Engine,
+    Engine, McResult,
     config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
     wltransys::{
@@ -81,7 +81,7 @@ impl Engine for WlKind {
         true
     }
 
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         let step = self.cfg.step as usize;
         if step != 1 {
             error!("k-induction step should be 1, got {step}");
@@ -99,7 +99,7 @@ impl Engine for WlKind {
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
                     self.tracer.trace_res(crate::McResult::Safe);
-                    return Some(true);
+                    return McResult::Safe;
                 }
             }
 
@@ -112,12 +112,12 @@ impl Engine for WlKind {
 
             if self.solver.solve(&assump) {
                 self.tracer.trace_res(crate::McResult::Unsafe(k));
-                return Some(false);
+                return McResult::Unsafe(k);
             }
             self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

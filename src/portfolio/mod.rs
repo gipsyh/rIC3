@@ -1,3 +1,4 @@
+use crate::McResult;
 use crate::config::EngineConfigBase;
 use clap::Args;
 use log::{error, info};
@@ -143,7 +144,7 @@ impl Portfolio {
         take(&mut self.monitor).unwrap().join().unwrap();
     }
 
-    pub fn check(&mut self) -> Option<bool> {
+    pub fn check(&mut self) -> McResult {
         let mut running = HashMap::new();
         for mut engine in take(&mut self.engines) {
             let child = engine
@@ -167,7 +168,7 @@ impl Portfolio {
             if self.stop_flag.load(Ordering::Relaxed) {
                 info!("Interrupted by external signal");
                 self.terminate_inner();
-                return None;
+                return McResult::Unknown(None);
             }
 
             if let Some(t) = self.cfg.time_limit
@@ -175,7 +176,7 @@ impl Portfolio {
             {
                 info!("Terminated by timeout.");
                 self.terminate_inner();
-                return None;
+                return McResult::Unknown(None);
             }
 
             match rx.recv_timeout(std::time::Duration::from_millis(100)) {
@@ -209,7 +210,11 @@ impl Portfolio {
                                         let _ = std::fs::copy(c.path(), cert);
                                     }
                                     self.terminate_inner();
-                                    return Some(r);
+                                    return if r {
+                                        McResult::Safe
+                                    } else {
+                                        McResult::Unsafe(0)
+                                    };
                                 }
                             } else {
                                 let mut stderr = String::new();
@@ -226,7 +231,7 @@ impl Portfolio {
                     None => {
                         error!("all workers unexpectedly exited :(");
                         self.terminate_inner();
-                        return None;
+                        return McResult::Unknown(None);
                     }
                     _ => unreachable!(),
                 },

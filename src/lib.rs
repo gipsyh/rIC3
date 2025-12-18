@@ -39,7 +39,7 @@ impl Default for McResult {
 }
 
 pub trait Engine {
-    fn check(&mut self) -> Option<bool>;
+    fn check(&mut self) -> McResult;
 
     fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {
         panic!("unsupport adding tracer");

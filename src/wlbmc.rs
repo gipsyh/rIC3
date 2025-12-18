@@ -1,5 +1,5 @@
 use crate::{
-    Engine,
+    Engine, McResult,
     config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
@@ -68,19 +68,19 @@ impl Engine for WlBMC {
         true
     }
 
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.cfg.step as usize) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
             if self.solver.solve(&[assump]) {
                 self.tracer.trace_res(crate::McResult::Unsafe(k));
-                return Some(false);
+                return McResult::Unsafe(k);
             }
             self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

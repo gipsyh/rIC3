@@ -89,7 +89,7 @@ impl Kind {
 }
 
 impl Engine for Kind {
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         let step = self.cfg.step as usize;
         if step != 1 {
             error!("k-induction step should be 1, got {step}");
@@ -107,19 +107,19 @@ impl Engine for Kind {
                 let res = self.solver.solve(&self.uts.lits_next(&self.uts.ts.bad, k));
                 if !res {
                     self.tracer.trace_res(McResult::Safe);
-                    return Some(true);
+                    return McResult::Safe;
                 }
             }
             let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
             assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad, k));
             if self.solver.solve(&assump) {
                 self.tracer.trace_res(McResult::Unsafe(k));
-                return Some(false);
+                return McResult::Unsafe(k);
             }
             self.tracer.trace_res(McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

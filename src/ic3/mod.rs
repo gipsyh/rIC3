@@ -158,12 +158,6 @@ impl IC3 {
             }
         }
     }
-
-    fn base(&mut self) -> bool {
-        self.extend();
-        assert!(self.level() == 0);
-        true
-    }
 }
 
 impl IC3 {
@@ -220,11 +214,8 @@ impl IC3 {
 }
 
 impl Engine for IC3 {
-    fn check(&mut self) -> Option<bool> {
-        if !self.base() {
-            self.tracer.trace_res(McResult::Unsafe(0));
-            return Some(false);
-        }
+    fn check(&mut self) -> McResult {
+        self.extend();
         loop {
             let start = Instant::now();
             debug!("blocking phase begin");
@@ -233,16 +224,16 @@ impl Engine for IC3 {
                     BlockResult::Failure(depth) => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.tracer.trace_res(McResult::Unsafe(depth));
-                        return Some(false);
+                        return McResult::Unsafe(depth);
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.tracer.trace_res(McResult::Safe);
-                        return Some(true);
+                        return McResult::Safe;
                     }
                     BlockResult::OverallTimeLimitExceeded => {
                         self.statistic.block.overall_time += start.elapsed();
-                        return None;
+                        return McResult::Unknown(Some(self.level()));
                     }
                     _ => (),
                 }
@@ -265,7 +256,7 @@ impl Engine for IC3 {
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
                 self.tracer.trace_res(McResult::Safe);
-                return Some(true);
+                return McResult::Safe;
             }
             self.propagete_to_inf();
         }

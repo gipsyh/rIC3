@@ -1,5 +1,5 @@
 use crate::{
-    Engine, Witness,
+    Engine, McResult, Witness,
     config::{EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
@@ -114,7 +114,7 @@ impl BMC {
 }
 
 impl Engine for BMC {
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
@@ -139,7 +139,7 @@ impl Engine for BMC {
             };
             if r {
                 self.tracer.trace_res(crate::McResult::Unsafe(k));
-                return Some(false);
+                return McResult::Unsafe(k);
             }
             self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
             if self.cfg.kissat {
@@ -147,7 +147,7 @@ impl Engine for BMC {
             }
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
