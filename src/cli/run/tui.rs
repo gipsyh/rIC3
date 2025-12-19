@@ -1,4 +1,7 @@
-use crate::cli::run::{McStatus, PropMcState, Run};
+use crate::cli::{
+    run::{McStatus, PropMcState, Run},
+    yosys::Yosys,
+};
 use btor::Btor;
 use clap::Parser;
 use giputils::hash::GHashMap;
@@ -232,8 +235,20 @@ impl Run {
                 witness.bad_id = bad_id;
                 let cert_path = self.ric3_proj.path(format!("res/p{bad_id}.cert"));
                 fs::write(
-                    cert_path,
+                    &cert_path,
                     format!("{}", btorfe.wl_unsafe_certificate(witness),),
+                )
+                .unwrap();
+                Yosys::btor_wit_to_yosys_wit(
+                    cert_path,
+                    self.ric3_proj.path("dut/dut.ywb"),
+                    self.ric3_proj.path(format!("res/p{bad_id}.yw")),
+                )
+                .unwrap();
+                Yosys::yosys_wit_to_vcd(
+                    self.ric3_proj.path("dut/dut.il"),
+                    self.ric3_proj.path(format!("res/p{bad_id}.yw")),
+                    self.ric3_proj.path(format!("res/p{bad_id}.vcd")),
                 )
                 .unwrap();
             }

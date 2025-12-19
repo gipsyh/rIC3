@@ -21,11 +21,11 @@ impl Yosys {
         self.commands.push(cmd.to_string());
     }
 
-    pub fn execute(&mut self, cwd: Option<impl AsRef<Path>>) -> anyhow::Result<()> {
+    pub fn execute(&mut self, cwd: Option<&Path>) -> anyhow::Result<()> {
         let cmds = self.commands.join(" ; ");
         let mut cmd = Command::new("yosys");
         if let Some(cwd) = cwd {
-            cmd.current_dir(cwd.as_ref());
+            cmd.current_dir(cwd);
         }
         let output = cmd.arg("-p").arg(&cmds).output()?;
         if !output.status.success() {
@@ -79,6 +79,41 @@ impl Yosys {
             dp.join("dut.ywb").display(),
             dp.join("dut.btor").display(),
         ));
-        yosys.execute(Some(src_dir))
+        yosys.execute(Some(&src_dir))
+    }
+
+    pub fn btor_wit_to_yosys_wit(
+        btor_wit: impl AsRef<Path>,
+        ywb_file: impl AsRef<Path>,
+        yosys_wit: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let output = Command::new("yosys-witness")
+            .arg("wit2yw")
+            .arg(btor_wit.as_ref())
+            .arg(ywb_file.as_ref())
+            .arg(yosys_wit.as_ref())
+            .output()?;
+        if !output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+            println!("{}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!("yosys-witness execution failed")
+        }
+        Ok(())
+    }
+
+    pub fn yosys_wit_to_vcd(
+        rtlil: impl AsRef<Path>,
+        yw: impl AsRef<Path>,
+        vcd: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let mut yosys = Self::new();
+        yosys.add_command(&format!("read_rtlil {}", rtlil.as_ref().display()));
+        yosys.add_command(&format!(
+            "sim -r {} -vcd {}",
+            yw.as_ref().display(),
+            vcd.as_ref().display()
+        ));
+        yosys.execute(None)?;
+        Ok(())
     }
 }
