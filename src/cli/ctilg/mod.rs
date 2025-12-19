@@ -162,6 +162,7 @@ pub fn ctilg() -> anyhow::Result<()> {
             let vcd = rp.path("ctilg/cex.vcd");
             Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &vcd)?;
             info!("Counter example VCD generated at {}", vcd.display());
+            return Ok(());
         }
         McResult::Unknown(_) => {
             info!(
