@@ -57,24 +57,22 @@ impl Yosys {
         }
         yosys.add_command(&format!("prep -flatten -top {}", cfg.dut.top));
         yosys.add_command("hierarchy -smtcheck -nokeep_prints");
-        yosys.add_command("rename -witness");
         yosys.add_command("scc -select; simplemap; select -clear");
         yosys.add_command("memory_nordff");
         yosys.add_command("chformal -cover -remove");
         yosys.add_command("chformal -early");
         yosys.add_command("async2sync");
-        yosys.add_command("opt_clean");
         yosys.add_command("formalff -clk2ff -ff2anyinit -hierarchy -assume");
-        yosys.add_command("check");
+        yosys.add_command("memory_map -formal");
+        yosys.add_command("dffunmap");
         yosys.add_command("setundef -undriven -anyseq");
         yosys.add_command("opt -fast");
-        yosys.add_command("rename -witness");
         yosys.add_command("opt_clean");
-        yosys.add_command("memory_map -formal");
-        yosys.add_command("opt -fast");
         yosys.add_command("delete -output");
-        yosys.add_command("dffunmap");
+        yosys.add_command("rename -witness");
+        yosys.add_command("check");
         let dp = PathBuf::from("..");
+        yosys.add_command(&format!("write_rtlil {}", dp.join("dut.il").display()));
         yosys.add_command(&format!(
             "write_btor -i {} -ywmap {} {}",
             dp.join("dut.info").display(),
