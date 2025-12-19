@@ -74,8 +74,7 @@ impl Yosys {
         let dp = PathBuf::from("..");
         yosys.add_command(&format!("write_rtlil {}", dp.join("dut.il").display()));
         yosys.add_command(&format!(
-            "write_btor -i {} -ywmap {} {}",
-            dp.join("dut.info").display(),
+            "write_btor -ywmap {} {}",
             dp.join("dut.ywb").display(),
             dp.join("dut.btor").display(),
         ));

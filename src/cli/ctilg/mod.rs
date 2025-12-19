@@ -16,7 +16,7 @@ use rIC3::{
     wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
-use std::{env, fs, mem::take, path::Path, process::Command};
+use std::{env, fs, mem::take, path::Path};
 
 pub struct Ctilg {
     slv: Bitwuzla,
@@ -83,27 +83,6 @@ impl Ctilg {
         assert!(self.slv.solve(&[nb]));
         self.uts.witness(&mut self.slv)
     }
-}
-
-fn btorvcd(
-    cex: bool,
-    dut: impl AsRef<Path>,
-    witness: impl AsRef<Path>,
-    vcd: impl AsRef<Path>,
-) -> anyhow::Result<()> {
-    let mut btorvcd = if cex {
-        Command::new("btorsim")
-    } else {
-        Command::new("btorvcd")
-    };
-    btorvcd.args(["-c", "--vcd"]);
-    btorvcd.arg(vcd.as_ref());
-    btorvcd.args(["--hierarchical-symbols", "--info"]);
-    btorvcd.arg(dut.as_ref().join("dut.info"));
-    btorvcd.arg(dut.as_ref().join("dut.btor"));
-    btorvcd.arg(witness.as_ref());
-    btorvcd.output()?;
-    Ok(())
 }
 
 fn refresh_cti(cti_file: &Path, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
@@ -227,12 +206,7 @@ pub fn ctilg() -> anyhow::Result<()> {
     let witness_file = rp.path("ctilg/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
-    btorvcd(
-        false,
-        rp.path("dut"),
-        witness_file,
-        rp.path("ctilg/cti.vcd"),
-    )?;
+    Yosys::btor_wit_to_vcd(rp.path("dut"), &witness_file, rp.path("ctilg/cti.vcd"))?;
     info!(
         "Witness VCD generated at {}",
         rp.path("ctilg/cti.vcd").display()
