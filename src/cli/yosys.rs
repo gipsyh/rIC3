@@ -108,7 +108,7 @@ impl Yosys {
         let mut yosys = Self::new();
         yosys.add_command(&format!("read_rtlil {}", rtlil.as_ref().display()));
         yosys.add_command(&format!(
-            "sim -r {} -vcd {}",
+            "sim -r {} -vcd {} -hdlname",
             yw.as_ref().display(),
             vcd.as_ref().display()
         ));
