@@ -223,13 +223,13 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
-        wts.coi_refine(false);
+        wts.coi_refine();
         wts.simplify();
-        wts.coi_refine(false);
+        wts.coi_refine();
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
         let (mut bitblast, bb_rst) = wts.bitblast();
-        bitblast.coi_refine(true);
+        bitblast.coi_refine();
         // bitblast.simplify();
         // bitblast.coi_refine(true);
         let (ts, bbl_rst) = bitblast.lower_to_ts();

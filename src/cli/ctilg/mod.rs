@@ -26,7 +26,8 @@ pub struct Ctilg {
 }
 
 impl Ctilg {
-    pub fn new(wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
+    pub fn new(mut wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
+        wts.coi_refine();
         let mut slv = Bitwuzla::new();
         let mut uts = WlTransysUnroll::new(wts);
         uts.unroll_to(3);
