@@ -178,12 +178,9 @@ pub fn ctilg() -> anyhow::Result<()> {
             info!("{}", "All properties are SAFE.".green());
         }
         McResult::Unsafe(_) => {
-            info!(
-                "{}",
-                "A real counterexample was found for property p0.".red()
-            );
+            info!("{}", "A real counterexample was found.".red());
             let vcd = rp.path("ctilg/cex.vcd");
-            btorvcd(true, rp.path("dut"), cert_file, &vcd)?;
+            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &vcd)?;
             info!("Counter example VCD generated at {}", vcd.display());
         }
         McResult::Unknown(_) => {

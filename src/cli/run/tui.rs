@@ -239,15 +239,9 @@ impl Run {
                     format!("{}", btorfe.wl_unsafe_certificate(witness),),
                 )
                 .unwrap();
-                Yosys::btor_wit_to_yosys_wit(
+                Yosys::btor_wit_to_vcd(
+                    self.ric3_proj.path("dut"),
                     cert_path,
-                    self.ric3_proj.path("dut/dut.ywb"),
-                    self.ric3_proj.path(format!("res/p{bad_id}.yw")),
-                )
-                .unwrap();
-                Yosys::yosys_wit_to_vcd(
-                    self.ric3_proj.path("dut/dut.il"),
-                    self.ric3_proj.path(format!("res/p{bad_id}.yw")),
                     self.ric3_proj.path(format!("res/p{bad_id}.vcd")),
                 )
                 .unwrap();

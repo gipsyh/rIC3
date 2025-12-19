@@ -116,4 +116,16 @@ impl Yosys {
         yosys.execute(None)?;
         Ok(())
     }
+
+    pub fn btor_wit_to_vcd(
+        dut: impl AsRef<Path>,
+        btor_wit: impl AsRef<Path>,
+        vcd: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let dut = dut.as_ref();
+        let yw = tempfile::NamedTempFile::with_suffix(".yw")?;
+        Self::btor_wit_to_yosys_wit(&btor_wit, dut.join("dut.ywb"), &yw)?;
+        Self::yosys_wit_to_vcd(dut.join("dut.il"), &yw, vcd)?;
+        Ok(())
+    }
 }

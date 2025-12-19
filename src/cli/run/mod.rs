@@ -1,8 +1,7 @@
 mod tui;
 
-use crate::cli::run::tui::RunTask;
-
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::run::tui::RunTask;
 use anyhow::Ok;
 use btor::Btor;
 use giputils::{file::recreate_dir, hash::GHashMap};
