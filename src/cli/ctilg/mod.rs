@@ -94,10 +94,12 @@ fn refresh_cti(cti_file: &Path, dut_old: &Path, dut_new: &Path) -> anyhow::Resul
     let btorfe_old = BtorFrontend::new(btor_old.clone());
     let mut cti = btorfe_old.deserialize_wl_unsafe_certificate(fs::read_to_string(cti_file)?);
     let ywb_old = btor_old.witness_map(&fs::read_to_string(dut_old.join("dut.ywb"))?);
+    let ywb_old_inv: GHashMap<_, _> = ywb_old.into_iter().map(|(k, v)| (v, k)).collect();
+
     let btor_new = Btor::from_file(dut_new.join("dut.btor"));
     let mut btorfe_new = BtorFrontend::new(btor_new.clone());
     let ywb_new = btor_new.witness_map(&fs::read_to_string(dut_new.join("dut.ywb"))?);
-    let ywb_old_inv: GHashMap<_, _> = ywb_old.into_iter().map(|(k, v)| (v, k)).collect();
+
     let mut term_map = GHashMap::new();
     for (n, s) in ywb_new {
         if let Some(o) = ywb_old_inv.get(&s) {
@@ -145,6 +147,7 @@ pub fn ctilg() -> anyhow::Result<()> {
         fs::remove_dir_all(rp.path("dut"))?;
         fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
     }
+    rp.cache_dut(&rcfg.dut.src())?;
     info!("Starting portfolio engine for all properties with a 10s time limit.");
     let cfg = EngineConfig::parse_from(["", "portfolio", "--time-limit", "10"]);
     let config::Engine::Portfolio(cfg) = cfg.engine else {
@@ -160,6 +163,7 @@ pub fn ctilg() -> anyhow::Result<()> {
     match res {
         McResult::Safe => {
             info!("{}", "All properties are SAFE.".green());
+            return Ok(());
         }
         McResult::Unsafe(_) => {
             info!("{}", "A real counterexample was found.".red());
