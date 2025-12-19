@@ -153,15 +153,18 @@ pub fn ctilg() -> anyhow::Result<()> {
     let cert_file = rp.path("tmp/dut.cert");
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
+    let cex_vcd = rp.path("ctilg/cex.vcd");
+    if cex_vcd.exists() {
+        fs::remove_file(&cex_vcd)?;
+    }
     match res {
         McResult::Safe => {
             info!("{}", "All properties are SAFE.".green());
         }
         McResult::Unsafe(_) => {
             info!("{}", "A real counterexample was found.".red());
-            let vcd = rp.path("ctilg/cex.vcd");
-            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &vcd)?;
-            info!("Counter example VCD generated at {}", vcd.display());
+            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &cex_vcd)?;
+            info!("Counter example VCD generated at {}", cex_vcd.display());
             return Ok(());
         }
         McResult::Unknown(_) => {
