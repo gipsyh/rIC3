@@ -30,6 +30,11 @@ use tempfile::{NamedTempFile, TempDir};
 pub struct PortfolioConfig {
     #[command(flatten)]
     pub base: EngineConfigBase,
+
+    /// worker configuration
+    #[arg(long = "config")]
+    pub config: Option<String>,
+
     /// woker memory limit in GB
     #[arg(long = "worker-mem-limit", default_value_t = 16)]
     pub wmem_limit: usize,
@@ -39,6 +44,7 @@ impl Default for PortfolioConfig {
     fn default() -> Self {
         Self {
             base: Default::default(),
+            config: None,
             wmem_limit: 16,
         }
     }
@@ -113,18 +119,16 @@ impl Portfolio {
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
-        let portfolio_config = match model.extension() {
-            Some(ext) if (ext == "aig") | (ext == "aag") => portfolio_config["bl_default"].clone(),
-            Some(ext) if (ext == "btor") | (ext == "btor2") => {
-                portfolio_config["wl_default"].clone()
-            }
+        let config = cfg.config.as_deref().unwrap_or(match model.extension() {
+            Some(ext) if (ext == "aig") | (ext == "aag") => "bl_default",
+            Some(ext) if (ext == "btor") | (ext == "btor2") => "wl_default",
             _ => {
                 error!("Error: unsupported file format");
                 panic!();
             }
-        };
-        for (name, args) in portfolio_config {
-            new_engine(name, &args);
+        });
+        for (name, args) in portfolio_config[config].iter() {
+            new_engine(name.clone(), args);
         }
         Self {
             cert,

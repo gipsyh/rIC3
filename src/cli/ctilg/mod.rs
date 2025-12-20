@@ -149,7 +149,8 @@ pub fn ctilg() -> anyhow::Result<()> {
     }
     rp.cache_dut(&rcfg.dut.src())?;
     info!("Starting portfolio engine for all properties with a 10s time limit.");
-    let cfg = EngineConfig::parse_from(["", "portfolio", "--time-limit", "10"]);
+    let cfg =
+        EngineConfig::parse_from(["", "portfolio", "--config", "ctilg", "--time-limit", "10"]);
     let config::Engine::Portfolio(cfg) = cfg.engine else {
         panic!()
     };
