@@ -1,11 +1,16 @@
+use crate::cli::VcdConfig;
+
 use super::Ric3Config;
 use giputils::file::recreate_dir;
+use giputils::hash::GHashMap;
 use log::info;
 use std::{
     fs,
+    io::{BufReader, BufWriter},
     path::{Path, PathBuf},
     process::Command,
 };
+use vcd::IdCode;
 
 #[derive(Default)]
 pub struct Yosys {
@@ -120,11 +125,128 @@ impl Yosys {
         dut: impl AsRef<Path>,
         btor_wit: impl AsRef<Path>,
         vcd: impl AsRef<Path>,
+        vcd_cfg: Option<&VcdConfig>,
     ) -> anyhow::Result<()> {
         let dut = dut.as_ref();
         let yw = tempfile::NamedTempFile::with_suffix(".yw")?;
         Self::btor_wit_to_yosys_wit(&btor_wit, dut.join("dut.ywb"), &yw)?;
+        if let Some(VcdConfig { top: Some(top) }) = vcd_cfg {
+            let temp_vcd = tempfile::NamedTempFile::with_suffix(".vcd")?;
+            Self::yosys_wit_to_vcd(dut.join("dut.il"), &yw, &temp_vcd)?;
+            Self::filter_vcd(temp_vcd.path(), vcd.as_ref(), top)?;
+            return Ok(());
+        }
         Self::yosys_wit_to_vcd(dut.join("dut.il"), &yw, vcd)?;
+        Ok(())
+    }
+
+    fn filter_scope_item(
+        item: &vcd::ScopeItem,
+        writer: &mut vcd::Writer<impl std::io::Write>,
+        target_path: &[&str],
+        kept_ids: &mut GHashMap<IdCode, IdCode>,
+    ) -> anyhow::Result<()> {
+        if target_path.is_empty() {
+            match item {
+                vcd::ScopeItem::Scope(scope) => {
+                    writer.add_module(&scope.identifier)?;
+                    for child in &scope.items {
+                        Self::filter_scope_item(child, writer, &[], kept_ids)?;
+                    }
+                    writer.upscope()?;
+                }
+                vcd::ScopeItem::Var(var) => {
+                    let new_id =
+                        writer.add_var(var.var_type, var.size, &var.reference, var.index)?;
+                    kept_ids.insert(var.code, new_id);
+                }
+                _ => {}
+            }
+        } else {
+            // We are searching for the target scope.
+            if let vcd::ScopeItem::Scope(scope) = item
+                && scope.identifier == target_path[0]
+            {
+                let next_path = &target_path[1..];
+                if next_path.is_empty() {
+                    // Found the target scope. Keep it to ensure variables are in a scope.
+                    writer.add_module(&scope.identifier)?;
+                    for child in &scope.items {
+                        Self::filter_scope_item(child, writer, &[], kept_ids)?;
+                    }
+                    writer.upscope()?;
+                } else {
+                    // Keep searching
+                    for child in &scope.items {
+                        Self::filter_scope_item(child, writer, next_path, kept_ids)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn filter_vcd(input: &Path, output: &Path, top: &str) -> anyhow::Result<()> {
+        let file = fs::File::open(input)?;
+        let mut parser = vcd::Parser::new(BufReader::new(file));
+
+        let out_file = fs::File::create(output)?;
+        let mut writer = vcd::Writer::new(BufWriter::new(out_file));
+
+        let mut kept_ids = GHashMap::new();
+
+        let header = parser.parse_header()?;
+
+        if let Some(version) = &header.version {
+            writer.version(version)?;
+        }
+        if let Some(date) = &header.date {
+            writer.date(date)?;
+        }
+        if let Some(ts) = header.timescale {
+            writer.timescale(ts.0, ts.1)?;
+        }
+
+        let target_path: Vec<&str> = if top.is_empty() {
+            Vec::new()
+        } else {
+            top.split('.').collect()
+        };
+
+        for item in &header.items {
+            Self::filter_scope_item(item, &mut writer, &target_path, &mut kept_ids)?;
+        }
+
+        writer.enddefinitions()?;
+
+        for cmd in parser {
+            let cmd = cmd?;
+            match cmd {
+                vcd::Command::Timestamp(t) => writer.timestamp(t)?,
+                vcd::Command::ChangeScalar(id, v) => {
+                    if let Some(&new_id) = kept_ids.get(&id) {
+                        writer.change_scalar(new_id, v)?;
+                    }
+                }
+                vcd::Command::ChangeVector(id, v) => {
+                    if let Some(&new_id) = kept_ids.get(&id) {
+                        writer.change_vector(new_id, &v)?;
+                    }
+                }
+                vcd::Command::ChangeReal(id, v) => {
+                    if let Some(&new_id) = kept_ids.get(&id) {
+                        writer.change_real(new_id, v)?;
+                    }
+                }
+                vcd::Command::ChangeString(id, v) => {
+                    if let Some(&new_id) = kept_ids.get(&id) {
+                        writer.change_string(new_id, &v)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+
         Ok(())
     }
 }

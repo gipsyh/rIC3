@@ -1,7 +1,7 @@
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::cli::run::tui::RunTask;
+use crate::cli::{VcdConfig, run::tui::RunTask};
 use anyhow::Ok;
 use btor::Btor;
 use giputils::{file::recreate_dir, hash::GHashMap};
@@ -63,10 +63,16 @@ struct Run {
     mc: Vec<PropMcState>,
     solving: Option<RunTask>,
     should_quit: bool,
+    vcd: Option<VcdConfig>,
 }
 
 impl Run {
-    fn new(wts: WlTransys, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
+    fn new(
+        wts: WlTransys,
+        mc: Vec<PropMcState>,
+        ric3_proj: Ric3Proj,
+        vcd: Option<VcdConfig>,
+    ) -> anyhow::Result<Self> {
         fs::create_dir_all(ric3_proj.path("res"))?;
         recreate_dir(ric3_proj.path("tmp"))?;
         let mut table = TableState::default();
@@ -78,6 +84,7 @@ impl Run {
             wts,
             solving: None,
             should_quit: false,
+            vcd,
         })
     }
 }
@@ -105,7 +112,7 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::defalut_from_wts(&wts, &symbol));
-    let mut run = Run::new(wts, mc, ric3_proj)?;
+    let mut run = Run::new(wts, mc, ric3_proj, ric3_cfg.trace.clone())?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;

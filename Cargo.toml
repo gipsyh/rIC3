@@ -37,6 +37,7 @@ anyhow = "1.0.100"
 ron = "0.12.0"
 strum = "0.27.2"
 tabled = { version = "0.20.0", features = ["ansi"] }
+vcd = "0.7.0"
 
 [profile.dev]
 opt-level = 3

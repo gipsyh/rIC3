@@ -61,6 +61,12 @@ pub fn cli_main() -> anyhow::Result<()> {
 #[derive(Deserialize, Debug)]
 pub struct Ric3Config {
     pub dut: Dut,
+    pub trace: Option<VcdConfig>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct VcdConfig {
+    pub top: Option<String>,
 }
 
 impl Ric3Config {

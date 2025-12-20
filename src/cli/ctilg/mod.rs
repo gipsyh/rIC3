@@ -167,7 +167,7 @@ pub fn ctilg() -> anyhow::Result<()> {
         }
         McResult::Unsafe(_) => {
             info!("{}", "A real counterexample was found.".red());
-            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &cex_vcd)?;
+            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &cex_vcd, rcfg.trace.as_ref())?;
             info!("Counter example VCD generated at {}", cex_vcd.display());
             return Ok(());
         }
@@ -215,7 +215,12 @@ pub fn ctilg() -> anyhow::Result<()> {
     let witness_file = rp.path("ctilg/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
-    Yosys::btor_wit_to_vcd(rp.path("dut"), &witness_file, rp.path("ctilg/cti.vcd"))?;
+    Yosys::btor_wit_to_vcd(
+        rp.path("dut"),
+        &witness_file,
+        rp.path("ctilg/cti.vcd"),
+        rcfg.trace.as_ref(),
+    )?;
     info!(
         "Witness VCD generated at {}",
         rp.path("ctilg/cti.vcd").display()

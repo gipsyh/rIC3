@@ -243,6 +243,7 @@ impl Run {
                     self.ric3_proj.path("dut"),
                     cert_path,
                     self.ric3_proj.path(format!("res/p{bad_id}.vcd")),
+                    self.vcd.as_ref(),
                 )
                 .unwrap();
             }
