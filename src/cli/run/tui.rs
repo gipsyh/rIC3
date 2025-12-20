@@ -171,15 +171,15 @@ impl Run {
     }
 
     fn launch_task(&mut self) {
-        let mut wts = self.wts.clone();
-        wts.bad.clear();
+        let mut btor = self.btor.clone();
+        btor.bad.clear();
         let mut bad_id_map = GHashMap::new();
         for m in self.mc.iter_mut() {
             if let McResult::Unknown(_) = m.prop.res
                 && let McStatus::Wait = m.state
             {
-                bad_id_map.insert(wts.bad.len(), m.prop.id);
-                wts.bad.push(self.wts.bad[m.prop.id].clone());
+                bad_id_map.insert(btor.bad.len(), m.prop.id);
+                btor.bad.push(self.btor.bad[m.prop.id].clone());
                 m.state = McStatus::Solving;
             }
         }
@@ -187,7 +187,6 @@ impl Run {
             return;
         }
         let btor_path = self.ric3_proj.path("tmp/px.btor");
-        let btor = Btor::from(&wts);
         btor.to_file(&btor_path);
         let cfg = EngineConfig::parse_from(["", "portfolio"]);
         let config::Engine::Portfolio(pcfg) = &cfg.engine else {
@@ -221,22 +220,19 @@ impl Run {
                 for (_, &id) in task.bad_id_map.iter() {
                     self.mc[id].state = McStatus::Wait;
                 }
-                let btorfe = BtorFrontend::new(Btor::from_file(self.ric3_proj.path("tmp/px.btor")));
+                let mut btorfe =
+                    BtorFrontend::new(Btor::from_file(self.ric3_proj.path("tmp/px.btor")));
                 let cert_file = self.ric3_proj.path("tmp/px.cert");
                 let cert = fs::read_to_string(&cert_file).unwrap();
-                let witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
+                let mut witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
                 let bad_id = task.bad_id_map[&witness.bad_id];
                 self.mc[bad_id].prop.res = McResult::Unsafe(witness.len());
                 self.mc[bad_id].prop.config = Some(task.cfg.clone());
-
-                let mut btorfe =
-                    BtorFrontend::new(Btor::from_file(self.ric3_proj.path("dut/dut.btor")));
-                let mut witness = btorfe.deserialize_wl_unsafe_certificate(cert);
                 witness.bad_id = bad_id;
                 let cert_path = self.ric3_proj.path(format!("res/p{bad_id}.cert"));
                 fs::write(
                     &cert_path,
-                    format!("{}", btorfe.wl_unsafe_certificate(witness),),
+                    format!("{}", btorfe.wl_unsafe_certificate(witness)),
                 )
                 .unwrap();
                 Yosys::btor_wit_to_vcd(

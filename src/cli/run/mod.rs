@@ -57,9 +57,9 @@ impl PropMcState {
 }
 
 struct Run {
+    btor: Btor,
     table: TableState,
     ric3_proj: Ric3Proj,
-    wts: WlTransys,
     mc: Vec<PropMcState>,
     solving: Option<RunTask>,
     should_quit: bool,
@@ -68,7 +68,7 @@ struct Run {
 
 impl Run {
     fn new(
-        wts: WlTransys,
+        btor: Btor,
         mc: Vec<PropMcState>,
         ric3_proj: Ric3Proj,
         vcd: Option<VcdConfig>,
@@ -78,10 +78,10 @@ impl Run {
         let mut table = TableState::default();
         table.select(Some(0));
         Ok(Self {
+            btor,
             table,
             ric3_proj,
             mc,
-            wts,
             solving: None,
             should_quit: false,
             vcd,
@@ -99,7 +99,7 @@ pub fn run() -> anyhow::Result<()> {
         ric3_proj.cache_dut(&ric3_cfg.dut.src())?;
     }
     let btor = Btor::from_file(ric3_proj.path("dut/dut.btor"));
-    let mut btorfe = BtorFrontend::new(btor);
+    let mut btorfe = BtorFrontend::new(btor.clone());
     let (wts, symbol) = btorfe.wts();
     let mc = ric3_proj
         .check_cached_res()?
@@ -112,7 +112,7 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::defalut_from_wts(&wts, &symbol));
-    let mut run = Run::new(wts, mc, ric3_proj, ric3_cfg.trace.clone())?;
+    let mut run = Run::new(btor, mc, ric3_proj, ric3_cfg.trace.clone())?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;
