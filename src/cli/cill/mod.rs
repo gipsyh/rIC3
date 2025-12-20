@@ -134,18 +134,22 @@ pub fn cill() -> anyhow::Result<()> {
         .format_timestamp(None)
         .format_target(false)
         .init();
+
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     let rp = Ric3Proj::new()?;
     recreate_dir(rp.path("tmp"))?;
-    let cached = rp.check_cached_dut(&rcfg.dut.src())?;
-    if cached.is_none() {
-        Yosys::generate_btor(&rcfg, rp.path("dut"))?;
-        rp.cache_dut(&rcfg.dut.src())?;
-    } else if let Some(false) = cached {
-        Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
-        refresh_cti(&rp.path("cill/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
-        fs::remove_dir_all(rp.path("dut"))?;
-        fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
+    match rp.check_cached_dut(&rcfg.dut.src())? {
+        Some(false) => {
+            Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
+            refresh_cti(&rp.path("cill/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
+            fs::remove_dir_all(rp.path("dut"))?;
+            fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
+        }
+        None => {
+            Yosys::generate_btor(&rcfg, rp.path("dut"))?;
+            rp.cache_dut(&rcfg.dut.src())?;
+        }
+        Some(true) => (),
     }
     rp.cache_dut(&rcfg.dut.src())?;
     info!("Starting portfolio engine for all properties with a 10s time limit.");

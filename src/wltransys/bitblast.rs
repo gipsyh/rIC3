@@ -11,7 +11,7 @@ use logicrs::{
 };
 
 impl WlTransys {
-    pub fn bitblast(&self) -> (Self, GHashMap<Term, (Term, usize)>) {
+    fn bitblast(&self) -> (Self, GHashMap<Term, (Term, usize)>) {
         let mut rst = GHashMap::new();
         let mut map = GHashMap::new();
         let mut input = Vec::new();
@@ -80,7 +80,7 @@ impl WlTransys {
         )
     }
 
-    pub fn lower_to_ts(&self) -> (Transys, GHashMap<Var, Term>) {
+    fn lower_to_ts(&self) -> (Transys, GHashMap<Var, Term>) {
         let mut rst = GHashMap::new();
         let mut dc = DagCnf::new();
         let mut map = GHashMap::new();
@@ -129,5 +129,16 @@ impl WlTransys {
             },
             rst,
         )
+    }
+
+    pub fn bitblast_to_ts(&self) -> (Transys, GHashMap<Var, (Term, usize)>) {
+        let (mut bitblast, bb_rst) = self.bitblast();
+        bitblast.coi_refine();
+        let (ts, bbl_rst) = bitblast.lower_to_ts();
+        let mut rst_bb_rst = GHashMap::new();
+        for (k, v) in bbl_rst {
+            rst_bb_rst.insert(k, bb_rst[&v].clone());
+        }
+        (ts, rst_bb_rst)
     }
 }

@@ -1,11 +1,6 @@
-use std::ops::{Deref, DerefMut};
-
 use crate::wltransys::WlTransys;
-use giputils::hash::GHashMap;
-use logicrs::{
-    Var,
-    fol::{BvTermValue, Term, TermValue},
-};
+use logicrs::fol::{BvTermValue, Term, TermValue};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
 pub struct WlWitness {
@@ -55,7 +50,6 @@ impl DerefMut for WlProof {
 
 #[derive(Clone, Default)]
 pub struct Restore {
-    pub bb_rst: GHashMap<Var, (Term, usize)>,
     init_var: Option<Term>,
 }
 

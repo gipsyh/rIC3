@@ -1,6 +1,5 @@
-use crate::cli::VcdConfig;
-
 use super::Ric3Config;
+use crate::cli::VcdConfig;
 use giputils::file::recreate_dir;
 use giputils::hash::GHashMap;
 use log::info;
@@ -43,6 +42,7 @@ impl Yosys {
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
         info!("Yosys: parsing the DUT and generating BTOR.");
+        recreate_dir(&p.as_ref())?;
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
         let mut files = Vec::new();
