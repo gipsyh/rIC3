@@ -6,7 +6,7 @@ use giputils::hash::GHashMap;
 use log::info;
 use std::{
     fs,
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -34,8 +34,8 @@ impl Yosys {
         }
         let output = cmd.arg("-p").arg(&cmds).output()?;
         if !output.status.success() {
-            println!("{}", String::from_utf8_lossy(&output.stdout));
-            println!("{}", String::from_utf8_lossy(&output.stderr));
+            info!("{}", String::from_utf8_lossy(&output.stdout));
+            info!("{}", String::from_utf8_lossy(&output.stderr));
             anyhow::bail!("Yosys execution failed")
         }
         Ok(())
@@ -79,64 +79,44 @@ impl Yosys {
         let dp = PathBuf::from("..");
         yosys.add_command(&format!("write_rtlil {}", dp.join("dut.il").display()));
         yosys.add_command(&format!(
-            "write_btor -ywmap {} {}",
+            "write_btor -ywmap {} -i {} {}",
             dp.join("dut.ywb").display(),
+            dp.join("dut.info").display(),
             dp.join("dut.btor").display(),
         ));
         yosys.execute(Some(&src_dir))
     }
 
-    pub fn btor_wit_to_yosys_wit(
-        btor_wit: impl AsRef<Path>,
-        ywb_file: impl AsRef<Path>,
-        yosys_wit: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let output = Command::new("yosys-witness")
-            .arg("wit2yw")
-            .arg(btor_wit.as_ref())
-            .arg(ywb_file.as_ref())
-            .arg(yosys_wit.as_ref())
-            .output()?;
-        if !output.status.success() {
-            println!("{}", String::from_utf8_lossy(&output.stdout));
-            println!("{}", String::from_utf8_lossy(&output.stderr));
-            anyhow::bail!("yosys-witness execution failed")
-        }
-        Ok(())
-    }
-
-    pub fn yosys_wit_to_vcd(
-        rtlil: impl AsRef<Path>,
-        yw: impl AsRef<Path>,
-        vcd: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let mut yosys = Self::new();
-        yosys.add_command(&format!("read_rtlil {}", rtlil.as_ref().display()));
-        yosys.add_command(&format!(
-            "sim -r {} -vcd {} -hdlname",
-            yw.as_ref().display(),
-            vcd.as_ref().display()
-        ));
-        yosys.execute(None)?;
-        Ok(())
-    }
-
     pub fn btor_wit_to_vcd(
         dut: impl AsRef<Path>,
-        btor_wit: impl AsRef<Path>,
+        witness: impl AsRef<Path>,
         vcd: impl AsRef<Path>,
+        cex_check: bool,
         vcd_cfg: Option<&VcdConfig>,
     ) -> anyhow::Result<()> {
-        let dut = dut.as_ref();
-        let yw = tempfile::NamedTempFile::with_suffix(".yw")?;
-        Self::btor_wit_to_yosys_wit(&btor_wit, dut.join("dut.ywb"), &yw)?;
-        if let Some(VcdConfig { top: Some(top) }) = vcd_cfg {
-            let temp_vcd = tempfile::NamedTempFile::with_suffix(".vcd")?;
-            Self::yosys_wit_to_vcd(dut.join("dut.il"), &yw, &temp_vcd)?;
-            Self::filter_vcd(temp_vcd.path(), vcd.as_ref(), top)?;
-            return Ok(());
+        let mut btorvcd = if cex_check {
+            Command::new("btorsim")
+        } else {
+            Command::new("btorvcd")
+        };
+        btorvcd.args(["-c", "--vcd"]);
+        btorvcd.arg(vcd.as_ref());
+        btorvcd.args(["--hierarchical-symbols", "--info"]);
+        btorvcd.arg(dut.as_ref().join("dut.info"));
+        btorvcd.arg(dut.as_ref().join("dut.btor"));
+        btorvcd.arg(witness.as_ref());
+        let output = btorvcd.output()?;
+        if !output.status.success() {
+            info!("{}", String::from_utf8_lossy(&output.stdout));
+            info!("{}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!("Yosys execution failed")
         }
-        Self::yosys_wit_to_vcd(dut.join("dut.il"), &yw, vcd)?;
+        if let Some(VcdConfig { top: Some(top) }) = vcd_cfg {
+            let mut filter = Vec::new();
+            let vcd_file = fs::File::open(&vcd)?;
+            Self::filter_vcd(vcd_file, &mut filter, top)?;
+            fs::write(vcd.as_ref(), filter)?;
+        }
         Ok(())
     }
 
@@ -186,12 +166,9 @@ impl Yosys {
         Ok(())
     }
 
-    fn filter_vcd(input: &Path, output: &Path, top: &str) -> anyhow::Result<()> {
-        let file = fs::File::open(input)?;
-        let mut parser = vcd::Parser::new(BufReader::new(file));
-
-        let out_file = fs::File::create(output)?;
-        let mut writer = vcd::Writer::new(BufWriter::new(out_file));
+    fn filter_vcd(vcd: impl Read, out: impl Write, top: &str) -> anyhow::Result<()> {
+        let mut parser = vcd::Parser::new(BufReader::new(vcd));
+        let mut writer = vcd::Writer::new(BufWriter::new(out));
 
         let mut kept_ids = GHashMap::new();
 

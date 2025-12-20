@@ -226,7 +226,7 @@ impl Run {
                 let cert = fs::read_to_string(&cert_file).unwrap();
                 let mut witness = btorfe.deserialize_wl_unsafe_certificate(cert.clone());
                 let bad_id = task.bad_id_map[&witness.bad_id];
-                self.mc[bad_id].prop.res = McResult::Unsafe(witness.len());
+                self.mc[bad_id].prop.res = McResult::Unsafe(witness.len() - 1);
                 self.mc[bad_id].prop.config = Some(task.cfg.clone());
                 witness.bad_id = bad_id;
                 let cert_path = self.ric3_proj.path(format!("res/p{bad_id}.cert"));
@@ -239,6 +239,7 @@ impl Run {
                     self.ric3_proj.path("dut"),
                     cert_path,
                     self.ric3_proj.path(format!("res/p{bad_id}.vcd")),
+                    true,
                     self.vcd.as_ref(),
                 )
                 .unwrap();

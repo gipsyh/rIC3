@@ -183,7 +183,13 @@ pub fn ctilg() -> anyhow::Result<()> {
                 "{}",
                 format!("A real counterexample violating {name} was found.").red()
             );
-            Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &cex_vcd, rcfg.trace.as_ref())?;
+            Yosys::btor_wit_to_vcd(
+                rp.path("dut"),
+                cert_file,
+                &cex_vcd,
+                true,
+                rcfg.trace.as_ref(),
+            )?;
             info!("Counterexample VCD generated at {}", cex_vcd.display());
             return Ok(());
         }
@@ -233,6 +239,7 @@ pub fn ctilg() -> anyhow::Result<()> {
         rp.path("dut"),
         &witness_file,
         rp.path("ctilg/cti.vcd"),
+        false,
         rcfg.trace.as_ref(),
     )?;
     info!(
