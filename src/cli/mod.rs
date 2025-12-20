@@ -1,11 +1,11 @@
 mod cache;
 mod check;
+mod cill;
 mod clean;
-mod ctilg;
 mod run;
 mod yosys;
 
-use crate::cli::{check::CheckConfig, clean::clean, ctilg::ctilg};
+use crate::cli::{check::CheckConfig, cill::cill, clean::clean};
 use clap::{Parser, Subcommand};
 use giputils::hash::GHashSet;
 use rIC3::config::EngineConfig;
@@ -45,7 +45,7 @@ pub enum Commands {
     Clean,
 
     /// CTI Guided Interactive Lemma Generation
-    Ctilg,
+    Cill,
 }
 
 pub fn cli_main() -> anyhow::Result<()> {
@@ -54,7 +54,7 @@ pub fn cli_main() -> anyhow::Result<()> {
         Commands::Run => run::run(),
         Commands::Check { chk, cfg } => check::check(chk, cfg),
         Commands::Clean => clean(),
-        Commands::Ctilg => ctilg(),
+        Commands::Cill => cill(),
     }
 }
 

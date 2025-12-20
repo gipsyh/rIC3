@@ -54,7 +54,7 @@ bmc_kissat_65 = "bmc --kissat --step 65 --rseed 14"
 bmc_kissat_dyn = "bmc --kissat --dyn-step --rseed 15"
 kind = "kind --step 1 --rseed 16"
 
-[ctilg]
+[cill]
 ic3 = "ic3 --frts=false --scorr=false --rseed 1"
 ic3_no_preproc = "ic3 --ctg=false --frts=false --scorr=false --drop-po=false --rseed 2"
 ic3_no_parent = "ic3 --frts=false --scorr=false --drop-po=false --parent-lemma=false --rseed 3"

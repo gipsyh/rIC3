@@ -1,4 +1,4 @@
-use super::Ctilg;
+use super::Cill;
 use ratatui::crossterm::style::Stylize;
 use std::io::{self, Write};
 use tabled::{
@@ -16,7 +16,7 @@ struct InductiveResult {
     result: String,
 }
 
-impl Ctilg {
+impl Cill {
     pub fn tui_run(&mut self) -> anyhow::Result<Option<usize>> {
         let mut results = Vec::new();
         for (i, &res) in self.res.iter().enumerate() {

@@ -18,14 +18,14 @@ use rIC3::{
 use ratatui::crossterm::style::Stylize;
 use std::{env, fs, mem::take, path::Path};
 
-pub struct Ctilg {
+pub struct Cill {
     slv: Bitwuzla,
     uts: WlTransysUnroll,
     symbol: GHashMap<Term, String>,
     res: Vec<bool>,
 }
 
-impl Ctilg {
+impl Cill {
     pub fn new(wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
         // wts.coi_refine();
         let mut slv = Bitwuzla::new();
@@ -126,7 +126,7 @@ fn refresh_cti(cti_file: &Path, dut_old: &Path, dut_new: &Path) -> anyhow::Resul
     Ok(())
 }
 
-pub fn ctilg() -> anyhow::Result<()> {
+pub fn cill() -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
     }
@@ -143,14 +143,13 @@ pub fn ctilg() -> anyhow::Result<()> {
         rp.cache_dut(&rcfg.dut.src())?;
     } else if let Some(false) = cached {
         Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
-        refresh_cti(&rp.path("ctilg/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
+        refresh_cti(&rp.path("cill/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
         fs::remove_dir_all(rp.path("dut"))?;
         fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
     }
     rp.cache_dut(&rcfg.dut.src())?;
     info!("Starting portfolio engine for all properties with a 10s time limit.");
-    let cfg =
-        EngineConfig::parse_from(["", "portfolio", "--config", "ctilg", "--time-limit", "10"]);
+    let cfg = EngineConfig::parse_from(["", "portfolio", "--config", "cill", "--time-limit", "10"]);
     let config::Engine::Portfolio(cfg) = cfg.engine else {
         panic!()
     };
@@ -161,7 +160,7 @@ pub fn ctilg() -> anyhow::Result<()> {
 
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
-    let cex_vcd = rp.path("ctilg/cex.vcd");
+    let cex_vcd = rp.path("cill/cex.vcd");
     if cex_vcd.exists() {
         fs::remove_file(&cex_vcd)?;
     }
@@ -196,14 +195,14 @@ pub fn ctilg() -> anyhow::Result<()> {
         }
         McResult::Unknown(_) => {
             info!(
-                "The portfolio engine failed to obtain a result and will continue with the CTILG engine."
+                "The portfolio engine failed to obtain a result and will continue with the CILL engine."
             );
         }
     };
 
     let (wts, symbol) = btorfe.wts();
-    fs::create_dir_all(rp.path("ctilg"))?;
-    let cti_file = rp.path("ctilg/cti");
+    fs::create_dir_all(rp.path("cill"))?;
+    let cti_file = rp.path("cill/cti");
     let cti = if cti_file.exists() {
         let cti = fs::read_to_string(&cti_file)?;
         Some(btorfe.deserialize_wl_unsafe_certificate(cti))
@@ -211,9 +210,9 @@ pub fn ctilg() -> anyhow::Result<()> {
         None
     };
 
-    let mut ctilg = Ctilg::new(wts, symbol);
+    let mut cill = Cill::new(wts, symbol);
     if let Some(cti_val) = &cti {
-        if ctilg.check_cti(cti_val) {
+        if cill.check_cti(cti_val) {
             info!("{}", "The CTI has been successfully blocked.".green());
             fs::remove_file(cti_file)?;
         } else {
@@ -221,31 +220,31 @@ pub fn ctilg() -> anyhow::Result<()> {
             return Ok(());
         }
     }
-    if ctilg.check_inductive() {
+    if cill.check_inductive() {
         info!(
             "{}",
             "All properties are inductive. Proof succeeded.".green()
         );
         return Ok(());
     }
-    let cti = ctilg.tui_run()?;
+    let cti = cill.tui_run()?;
     let Some(cti) = cti else {
         return Ok(());
     };
-    let witness = ctilg.witness(cti);
-    let witness_file = rp.path("ctilg/cti");
+    let witness = cill.witness(cti);
+    let witness_file = rp.path("cill/cti");
     let witness = btorfe.wl_unsafe_certificate(witness);
     fs::write(&witness_file, format!("{}", witness))?;
     Yosys::btor_wit_to_vcd(
         rp.path("dut"),
         &witness_file,
-        rp.path("ctilg/cti.vcd"),
+        rp.path("cill/cti.vcd"),
         false,
         rcfg.trace.as_ref(),
     )?;
     info!(
         "Witness VCD generated at {}",
-        rp.path("ctilg/cti.vcd").display()
+        rp.path("cill/cti.vcd").display()
     );
     Ok(())
 }
