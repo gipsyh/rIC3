@@ -8,7 +8,6 @@ COPY . .
 RUN git submodule update --init
 RUN cargo clean && cargo build --release
 
-FROM ghcr.io/gipsyh/btorsim:latest AS btorsim
 FROM ghcr.io/gipsyh/yosys:latest AS yosys
 
 FROM ubuntu:24.04
@@ -17,6 +16,5 @@ RUN apt install -y libmpfr6 libgmp10 tcl libreadline-dev
 RUN apt autoclean && apt clean && apt -y autoremove
 RUN rm -rf /var/lib/apt/lists
 COPY --from=builder /root/rIC3/target/release/ric3 /usr/local/bin/
-COPY --from=yosys /usr/local/bin/yosys /usr/local/bin/
-COPY --from=btorsim /usr/local/bin/btor* /usr/local/bin/
+COPY --from=yosys /usr/local/bin/yosys* /usr/local/bin/
 ENTRYPOINT ["ric3"]

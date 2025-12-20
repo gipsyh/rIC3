@@ -154,6 +154,10 @@ pub fn ctilg() -> anyhow::Result<()> {
         panic!()
     };
     let cert_file = rp.path("tmp/dut.cert");
+
+    let btor = Btor::from_file(rp.path("dut/dut.btor"));
+    let mut btorfe = BtorFrontend::new(btor.clone());
+
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
     let cex_vcd = rp.path("ctilg/cex.vcd");
@@ -166,9 +170,21 @@ pub fn ctilg() -> anyhow::Result<()> {
             return Ok(());
         }
         McResult::Unsafe(_) => {
-            info!("{}", "A real counterexample was found.".red());
+            let bid = btorfe
+                .deserialize_wl_unsafe_certificate(fs::read_to_string(&cert_file)?)
+                .bad_id;
+            let bad = btor.bad.get(bid).unwrap();
+            let name = btor
+                .symbols
+                .get(bad)
+                .map(|s| s.as_str())
+                .unwrap_or("Unknown");
+            info!(
+                "{}",
+                format!("A real counterexample violating {name} was found.").red()
+            );
             Yosys::btor_wit_to_vcd(rp.path("dut"), cert_file, &cex_vcd, rcfg.trace.as_ref())?;
-            info!("Counter example VCD generated at {}", cex_vcd.display());
+            info!("Counterexample VCD generated at {}", cex_vcd.display());
             return Ok(());
         }
         McResult::Unknown(_) => {
@@ -178,8 +194,6 @@ pub fn ctilg() -> anyhow::Result<()> {
         }
     };
 
-    let btor = Btor::from_file(rp.path("dut/dut.btor"));
-    let mut btorfe = BtorFrontend::new(btor);
     let (wts, symbol) = btorfe.wts();
     fs::create_dir_all(rp.path("ctilg"))?;
     let cti_file = rp.path("ctilg/cti");
