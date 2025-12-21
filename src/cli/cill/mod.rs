@@ -87,7 +87,8 @@ impl Cill {
     fn check_inductive(&mut self) -> bool {
         let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
-        cfg.time_limit = Some(5);
+        cfg.time_limit = Some(10);
+        cfg.inn = true;
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
         with_log_level(LevelFilter::Warn, || {
@@ -95,6 +96,11 @@ impl Cill {
             for i in 0..self.ts.bad.len() {
                 let mut ts = self.ts.clone();
                 ts.bad = LitVec::from(self.ts.bad[i]);
+                for j in 0..self.ts.bad.len() {
+                    if i != j {
+                        ts.constraint.push(!self.ts.bad[j]);
+                    }
+                }
                 let cfg = cfg.clone();
                 joins.push(spawn(move || {
                     let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
