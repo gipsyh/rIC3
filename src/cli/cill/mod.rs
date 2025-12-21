@@ -1,10 +1,14 @@
+mod cti;
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
-use giputils::{file::recreate_dir, hash::GHashMap};
+use giputils::{
+    file::{recreate_dir, remove_if_exists},
+    hash::GHashMap,
+};
 use log::{LevelFilter, info};
 use logicrs::{
     LitVec, VarSymbols,
@@ -24,16 +28,25 @@ use ratatui::crossterm::style::Stylize;
 use std::{env, fs, mem::take, path::Path, thread::spawn};
 
 pub struct Cill {
-    slv: Bitwuzla,
+    rcfg: Ric3Config,
+    rp: Ric3Proj,
     ts: Transys,
     _bb_rst: BitblastRestore,
+    btorfe: BtorFrontend,
+    slv: Bitwuzla,
     uts: WlTransysUnroll,
     symbol: GHashMap<Term, String>,
     res: Vec<bool>,
 }
 
 impl Cill {
-    pub fn new(mut wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
+    pub fn new(
+        rcfg: Ric3Config,
+        rp: Ric3Proj,
+        btorfe: BtorFrontend,
+        mut wts: WlTransys,
+        symbol: GHashMap<Term, String>,
+    ) -> Self {
         wts.coi_refine();
         let mut slv = Bitwuzla::new();
         let (ts, bb_rst) = wts.bitblast_to_ts();
@@ -50,6 +63,9 @@ impl Cill {
             }
         }
         Self {
+            rcfg,
+            rp,
+            btorfe,
             slv,
             ts,
             _bb_rst: bb_rst,
@@ -59,10 +75,20 @@ impl Cill {
         }
     }
 
+    fn get_prop_name(&self, id: usize) -> Option<String> {
+        self.uts
+            .ts
+            .bad
+            .get(id)
+            .and_then(|t| self.symbol.get(t).cloned())
+    }
+
     fn check_inductive(&mut self) -> bool {
         let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
         cfg.time_limit = Some(5);
+        cfg.preproc.scorr = false;
+        cfg.preproc.frts = false;
         let prev_level = log::max_level();
         log::set_max_level(LevelFilter::Warn);
         let mut joins = Vec::new();
@@ -202,9 +228,7 @@ pub fn cill() -> anyhow::Result<()> {
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
     let res = engine.check();
     let cex_vcd = rp.path("cill/cex.vcd");
-    if cex_vcd.exists() {
-        fs::remove_file(&cex_vcd)?;
-    }
+    remove_if_exists(&cex_vcd)?;
     match res {
         McResult::Safe => {
             info!("{}", "All properties are SAFE.".green());
@@ -251,16 +275,21 @@ pub fn cill() -> anyhow::Result<()> {
         None
     };
 
-    let mut cill = Cill::new(wts, symbol);
+    let mut cill = Cill::new(rcfg, rp, btorfe, wts, symbol);
     if let Some(cti_val) = &cti {
         if cill.check_cti(cti_val) {
             info!("{}", "The CTI has been successfully blocked.".green());
-            fs::remove_file(cti_file)?;
+            cill.clear_cti()?;
         } else {
-            info!("{}", "The CTI has NOT been blocked yet.".red());
+            let cti_info = cill.get_cti_info()?;
+            info!(
+                "{}",
+                format!("The CTI of {} has NOT been blocked yet.", cti_info.prop).red()
+            );
             return Ok(());
         }
     }
+    info!("Re-checking inductiveness of all properties.");
     if cill.check_inductive() {
         info!(
             "{}",
@@ -273,19 +302,6 @@ pub fn cill() -> anyhow::Result<()> {
         return Ok(());
     };
     let witness = cill.witness(cti);
-    let witness_file = rp.path("cill/cti");
-    let witness = btorfe.wl_unsafe_certificate(witness);
-    fs::write(&witness_file, format!("{}", witness))?;
-    Yosys::btor_wit_to_vcd(
-        rp.path("dut"),
-        &witness_file,
-        rp.path("cill/cti.vcd"),
-        false,
-        rcfg.trace.as_ref(),
-    )?;
-    info!(
-        "Witness VCD generated at {}",
-        rp.path("cill/cti.vcd").display()
-    );
+    cill.save_cti(witness)?;
     Ok(())
 }

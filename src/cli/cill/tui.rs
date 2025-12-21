@@ -20,14 +20,7 @@ impl Cill {
     pub fn tui_run(&mut self) -> anyhow::Result<Option<usize>> {
         let mut results = Vec::new();
         for (i, &res) in self.res.iter().enumerate() {
-            let name = if let Some(term) = self.uts.ts.bad.get(i) {
-                self.symbol
-                    .get(term)
-                    .map(|s| s.as_str())
-                    .unwrap_or("Unknown")
-            } else {
-                "Unknown"
-            };
+            let name = self.get_prop_name(i).unwrap_or("Unknown".to_string());
             let status = if res {
                 "Inductive".green().to_string()
             } else {
@@ -40,7 +33,7 @@ impl Cill {
             });
         }
 
-        let mut table = Table::new(results);
+        let mut table = Table::new(&results);
         table.with(Style::empty()).with(
             Modify::new(Rows::first()).with(Format::content(|s| s.yellow().bold().to_string())),
         );
@@ -62,8 +55,12 @@ impl Cill {
                 Ok(id) => {
                     if id < self.res.len() {
                         if self.res[id] {
-                            println!("Property {} is inductive, cannot generate CTI.", id);
+                            println!(
+                                "{} is inductive, cannot generate CTI.",
+                                results[id].property
+                            );
                         } else {
+                            println!("{} is selected for CTI generation.", results[id].property);
                             return Ok(Some(id));
                         }
                     } else {
