@@ -144,7 +144,9 @@ impl Cill {
         let b = &self.uts.ts.bad[id];
         let nb = self.uts.next(b, self.uts.num_unroll);
         assert!(self.slv.solve(&[nb]));
-        self.uts.witness(&mut self.slv)
+        let mut wit = self.uts.witness(&mut self.slv);
+        wit.bad_id = id;
+        wit
     }
 }
 
