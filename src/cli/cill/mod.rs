@@ -157,12 +157,21 @@ impl CIll {
                 info!("IC3 proved p{id} is inductive");
             }
         }
-        for (i, b) in self.uts.ts.bad.iter().enumerate() {
+        let mut assume: Vec<Term> = self
+            .uts
+            .ts
+            .bad
+            .iter()
+            .map(|t| !self.uts.next(t, self.uts.num_unroll))
+            .collect();
+        for i in 0..self.uts.ts.bad.len() {
             if res[i] {
                 continue;
             }
-            let nb = self.uts.next(b, self.uts.num_unroll);
-            res[i] = !self.slv.solve(&[nb]);
+            let nb = assume[i].clone();
+            assume[i] = !&nb;
+            res[i] = !self.slv.solve(&assume);
+            assume[i] = nb;
         }
         self.res = res;
         self.res.iter().all(|l| *l)
