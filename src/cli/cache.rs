@@ -1,4 +1,5 @@
 use crate::cli::run::PropMcInfo;
+use giputils::file::create_dir_if_not_exists;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -25,9 +26,7 @@ pub struct Ric3Proj {
 impl Ric3Proj {
     pub fn new() -> anyhow::Result<Self> {
         let path = PathBuf::from("ric3proj");
-        if !Path::new(&path).exists() {
-            fs::create_dir(&path)?;
-        }
+        create_dir_if_not_exists(&path)?;
         Ok(Self { path })
     }
 
