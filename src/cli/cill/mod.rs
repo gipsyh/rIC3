@@ -277,7 +277,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
         } else {
             info!(
                 "{}",
-                format!("The CTI of {} has NOT been blocked yet.", prop).red()
+                format!("The CTI of {prop} has not been blocked yet. Please continue to analyze the CTI to adjust the helper assertion.").red()
             );
             return Ok(());
         };
