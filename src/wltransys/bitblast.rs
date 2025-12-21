@@ -9,6 +9,7 @@ use logicrs::{
         bitblast::{bitblast_terms, cnf_encode_terms},
     },
 };
+use std::ops::{Deref, DerefMut};
 
 impl WlTransys {
     fn bitblast(&self) -> (Self, GHashMap<Term, (Term, usize)>) {
@@ -131,7 +132,7 @@ impl WlTransys {
         )
     }
 
-    pub fn bitblast_to_ts(&self) -> (Transys, GHashMap<Var, (Term, usize)>) {
+    pub fn bitblast_to_ts(&self) -> (Transys, BitblastRestore) {
         let (mut bitblast, bb_rst) = self.bitblast();
         bitblast.coi_refine();
         let (ts, bbl_rst) = bitblast.lower_to_ts();
@@ -139,6 +140,25 @@ impl WlTransys {
         for (k, v) in bbl_rst {
             rst_bb_rst.insert(k, bb_rst[&v].clone());
         }
-        (ts, rst_bb_rst)
+        (ts, BitblastRestore(rst_bb_rst))
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct BitblastRestore(GHashMap<Var, (Term, usize)>);
+
+impl Deref for BitblastRestore {
+    type Target = GHashMap<Var, (Term, usize)>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BitblastRestore {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

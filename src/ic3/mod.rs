@@ -1,13 +1,13 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::{EngineConfigBase, PreprocConfig},
+    config::{self, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
 use activity::Activity;
-use clap::{ArgAction, Args};
+use clap::{ArgAction, Args, Parser};
 use frame::{Frame, Frames};
 use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, error, info, trace};
@@ -15,7 +15,10 @@ use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::{ops::Deref, time::Instant};
+use std::{
+    ops::{Deref, DerefMut},
+    time::Instant,
+};
 use utils::Statistic;
 
 mod activity;
@@ -93,6 +96,22 @@ impl Deref for IC3Config {
 
     fn deref(&self) -> &Self::Target {
         &self.base
+    }
+}
+
+impl DerefMut for IC3Config {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl Default for IC3Config {
+    fn default() -> Self {
+        let cfg = config::EngineConfig::parse_from(["", "ic3"]);
+        let config::Engine::IC3(cfg) = cfg.engine else {
+            unreachable!()
+        };
+        cfg
     }
 }
 

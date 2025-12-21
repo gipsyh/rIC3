@@ -3,13 +3,12 @@ use crate::cli::{
     yosys::Yosys,
 };
 use btor::Btor;
-use clap::Parser;
 use giputils::hash::GHashMap;
 use rIC3::{
     McResult,
     config::{self, EngineConfig},
     frontend::{Frontend, btor::BtorFrontend},
-    portfolio::Portfolio,
+    portfolio::{Portfolio, PortfolioConfig},
 };
 use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -188,12 +187,12 @@ impl Run {
         }
         let btor_path = self.ric3_proj.path("tmp/px.btor");
         btor.to_file(&btor_path);
-        let cfg = EngineConfig::parse_from(["", "portfolio"]);
-        let config::Engine::Portfolio(pcfg) = &cfg.engine else {
-            panic!()
+        let pcfg = PortfolioConfig::default();
+        let cfg = EngineConfig {
+            engine: config::Engine::Portfolio(pcfg.clone()),
         };
         let cert_file = self.ric3_proj.path("tmp/px.cert");
-        let mut engine = Portfolio::new(btor_path, Some(cert_file), pcfg.clone());
+        let mut engine = Portfolio::new(btor_path, Some(cert_file), pcfg);
         let stop = engine.get_stop_signal();
         let join = spawn(move || engine.check());
         self.solving = Some(RunTask {

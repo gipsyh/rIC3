@@ -4,31 +4,39 @@ use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
-use clap::Parser;
 use giputils::{file::recreate_dir, hash::GHashMap};
-use log::info;
-use logicrs::fol::{BvTermValue, Term, TermValue};
+use log::{LevelFilter, info};
+use logicrs::{
+    LitVec, VarSymbols,
+    fol::{BvTermValue, Term, TermValue},
+};
 use rIC3::{
-    McResult,
-    config::{self, EngineConfig},
+    Engine, McResult,
     frontend::{Frontend, btor::BtorFrontend},
-    portfolio::Portfolio,
-    wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
+    ic3::{IC3, IC3Config},
+    portfolio::{Portfolio, PortfolioConfig},
+    transys::Transys,
+    wltransys::{
+        WlTransys, bitblast::BitblastRestore, certify::WlWitness, unroll::WlTransysUnroll,
+    },
 };
 use ratatui::crossterm::style::Stylize;
-use std::{env, fs, mem::take, path::Path};
+use std::{env, fs, mem::take, path::Path, thread::spawn};
 
 pub struct Cill {
     slv: Bitwuzla,
+    ts: Transys,
+    _bb_rst: BitblastRestore,
     uts: WlTransysUnroll,
     symbol: GHashMap<Term, String>,
     res: Vec<bool>,
 }
 
 impl Cill {
-    pub fn new(wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
-        // wts.coi_refine();
+    pub fn new(mut wts: WlTransys, symbol: GHashMap<Term, String>) -> Self {
+        wts.coi_refine();
         let mut slv = Bitwuzla::new();
+        let (ts, bb_rst) = wts.bitblast_to_ts();
         let mut uts = WlTransysUnroll::new(wts);
         uts.unroll_to(3);
         for k in 0..=uts.num_unroll {
@@ -43,6 +51,8 @@ impl Cill {
         }
         Self {
             slv,
+            ts,
+            _bb_rst: bb_rst,
             uts,
             symbol,
             res: Vec::new(),
@@ -50,10 +60,36 @@ impl Cill {
     }
 
     fn check_inductive(&mut self) -> bool {
-        let mut res = Vec::new();
-        for b in self.uts.ts.bad.iter() {
+        let mut res = vec![false; self.ts.bad.len()];
+        let mut cfg = IC3Config::default();
+        cfg.time_limit = Some(5);
+        let prev_level = log::max_level();
+        log::set_max_level(LevelFilter::Warn);
+        let mut joins = Vec::new();
+        for i in 0..self.ts.bad.len() {
+            let mut ts = self.ts.clone();
+            ts.bad = LitVec::from(self.ts.bad[i]);
+            let cfg = cfg.clone();
+            joins.push(spawn(move || {
+                let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
+                ic3.check()
+            }));
+        }
+        for (j, r) in joins.into_iter().zip(res.iter_mut()) {
+            *r = matches!(j.join().unwrap(), McResult::Safe);
+        }
+        log::set_max_level(prev_level);
+        for (id, r) in res.iter().enumerate() {
+            if *r {
+                info!("IC3 proved p{id} is inductive");
+            }
+        }
+        for (i, b) in self.uts.ts.bad.iter().enumerate() {
+            if res[i] {
+                continue;
+            }
             let nb = self.uts.next(b, self.uts.num_unroll);
-            res.push(!self.slv.solve(&[nb]));
+            res[i] = !self.slv.solve(&[nb]);
         }
         self.res = res;
         self.res.iter().all(|l| *l)
@@ -153,10 +189,11 @@ pub fn cill() -> anyhow::Result<()> {
     }
     rp.cache_dut(&rcfg.dut.src())?;
     info!("Starting portfolio engine for all properties with a 10s time limit.");
-    let cfg = EngineConfig::parse_from(["", "portfolio", "--config", "cill", "--time-limit", "10"]);
-    let config::Engine::Portfolio(cfg) = cfg.engine else {
-        panic!()
-    };
+
+    let mut cfg = PortfolioConfig::default();
+    cfg.config = Some("cill".to_string());
+    cfg.time_limit = Some(10);
+
     let cert_file = rp.path("tmp/dut.cert");
 
     let btor = Btor::from_file(rp.path("dut/dut.btor"));

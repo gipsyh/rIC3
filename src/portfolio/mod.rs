@@ -1,12 +1,12 @@
-use crate::McResult;
 use crate::config::EngineConfigBase;
-use clap::Args;
+use crate::{McResult, config};
+use clap::{Args, Parser};
 use log::{error, info};
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 use std::time::Instant;
@@ -40,21 +40,27 @@ pub struct PortfolioConfig {
     pub wmem_limit: usize,
 }
 
-impl Default for PortfolioConfig {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-            config: None,
-            wmem_limit: 16,
-        }
-    }
-}
-
 impl Deref for PortfolioConfig {
     type Target = EngineConfigBase;
 
     fn deref(&self) -> &Self::Target {
         &self.base
+    }
+}
+
+impl DerefMut for PortfolioConfig {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl Default for PortfolioConfig {
+    fn default() -> Self {
+        let cfg = config::EngineConfig::parse_from(["", "portfolio"]);
+        let config::Engine::Portfolio(cfg) = cfg.engine else {
+            unreachable!()
+        };
+        cfg
     }
 }
 

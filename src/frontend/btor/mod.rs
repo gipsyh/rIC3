@@ -6,6 +6,7 @@ use crate::{
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
+        bitblast::BitblastRestore,
         certify::{Restore, WlProof, WlWitness},
     },
 };
@@ -68,7 +69,7 @@ pub struct BtorFrontend {
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
-    bb_rst: GHashMap<Var, (Term, usize)>,
+    bb_rst: BitblastRestore,
 }
 
 impl BtorFrontend {
@@ -91,7 +92,7 @@ impl BtorFrontend {
             idmap,
             no_next,
             rst,
-            bb_rst: GHashMap::default(),
+            bb_rst: BitblastRestore::default(),
         }
     }
 }

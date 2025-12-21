@@ -1,4 +1,4 @@
-mod bitblast;
+pub mod bitblast;
 pub mod certify;
 mod preproc;
 mod simplify;

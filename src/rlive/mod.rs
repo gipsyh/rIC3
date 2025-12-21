@@ -5,7 +5,7 @@ use crate::{
     transys::{Transys, TransysIf, certify::Restore},
 };
 use clap::{Args, Parser};
-use log::{debug, error, warn};
+use log::{LevelFilter, debug, error, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
 use serde::{Deserialize, Serialize};
 use std::{mem::take, ops::Deref};
@@ -95,7 +95,11 @@ impl Rlive {
             rts.init.insert(l.var(), Lit::constant(l.polarity()));
         }
         let mut ic3 = IC3::new(self.rcfg.clone(), rts, VarSymbols::new());
-        if let McResult::Safe = ic3.check() {
+        let prev_level = log::max_level();
+        log::set_max_level(LevelFilter::Warn);
+        let res = ic3.check();
+        log::set_max_level(prev_level);
+        if let McResult::Safe = res {
             return Ok(ic3.invariant());
         }
         let wit = ic3.witness();
@@ -174,7 +178,11 @@ impl Engine for Rlive {
             let mut ts = self.ts.clone();
             ts.bad = take(&mut ts.justice);
             let mut ic3 = IC3::new(self.rcfg.clone(), ts, VarSymbols::new());
-            if let McResult::Safe = ic3.check() {
+            let prev_level = log::max_level();
+            log::set_max_level(LevelFilter::Warn);
+            let res = ic3.check();
+            log::set_max_level(prev_level);
+            if let McResult::Safe = res {
                 return McResult::Safe;
             }
             let wit = ic3.witness();
