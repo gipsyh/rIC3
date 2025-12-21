@@ -5,7 +5,10 @@ mod clean;
 mod run;
 mod yosys;
 
-use crate::cli::{check::CheckConfig, cill::cill, clean::clean};
+use crate::cli::{
+    check::CheckConfig,
+    cill::{CIllCommands, cill},
+};
 use clap::{Parser, Subcommand};
 use giputils::hash::GHashSet;
 use rIC3::config::EngineConfig;
@@ -41,11 +44,14 @@ pub enum Commands {
         cfg: EngineConfig,
     },
 
-    /// Clean up verification cache and artifacts
+    /// Clean up verification cache (ric3proj)
     Clean,
 
     /// CTI Guided Interactive Lemma Generation
-    Cill,
+    Cill {
+        #[command(subcommand)]
+        cmd: CIllCommands,
+    },
 }
 
 pub fn cli_main() -> anyhow::Result<()> {
@@ -53,8 +59,8 @@ pub fn cli_main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Run => run::run(),
         Commands::Check { chk, cfg } => check::check(chk, cfg),
-        Commands::Clean => clean(),
-        Commands::Cill => cill(),
+        Commands::Clean => clean::clean(),
+        Commands::Cill { cmd } => cill(cmd),
     }
 }
 

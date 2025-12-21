@@ -19,6 +19,7 @@ struct SourceCache {
     files: HashMap<PathBuf, FileEntry>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Ric3Proj {
     path: PathBuf,
 }

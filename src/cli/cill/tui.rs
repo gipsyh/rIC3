@@ -1,6 +1,5 @@
-use super::Cill;
+use super::CIll;
 use ratatui::crossterm::style::Stylize;
-use std::io::{self, Write};
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
@@ -16,8 +15,8 @@ struct InductiveResult {
     result: String,
 }
 
-impl Cill {
-    pub fn tui_run(&mut self) -> anyhow::Result<Option<usize>> {
+impl CIll {
+    pub fn print_ind_res(&mut self) -> anyhow::Result<()> {
         let mut results = Vec::new();
         for (i, &res) in self.res.iter().enumerate() {
             let name = self.get_prop_name(i).unwrap_or("Unknown".to_string());
@@ -40,37 +39,39 @@ impl Cill {
 
         println!("{}", table);
 
-        loop {
-            print!("Please enter the ID of the property to generate CTI (or 'q' to quit): ");
-            io::stdout().flush()?;
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-            let input = input.trim();
+        Ok(())
 
-            if input == "q" {
-                return Ok(None);
-            }
+        // loop {
+        //     print!("Please enter the ID of the property to generate CTI (or 'q' to quit): ");
+        //     io::stdout().flush()?;
+        //     let mut input = String::new();
+        //     io::stdin().read_line(&mut input)?;
+        //     let input = input.trim();
 
-            match input.parse::<usize>() {
-                Ok(id) => {
-                    if id < self.res.len() {
-                        if self.res[id] {
-                            println!(
-                                "{} is inductive, cannot generate CTI.",
-                                results[id].property
-                            );
-                        } else {
-                            println!("{} is selected for CTI generation.", results[id].property);
-                            return Ok(Some(id));
-                        }
-                    } else {
-                        println!("Invalid ID.");
-                    }
-                }
-                Err(_) => {
-                    println!("Invalid input.");
-                }
-            }
-        }
+        //     if input == "q" {
+        //         return Ok(None);
+        //     }
+
+        //     match input.parse::<usize>() {
+        //         Ok(id) => {
+        //             if id < self.res.len() {
+        //                 if self.res[id] {
+        //                     println!(
+        //                         "{} is inductive, cannot generate CTI.",
+        //                         results[id].property
+        //                     );
+        //                 } else {
+        //                     println!("{} is selected for CTI generation.", results[id].property);
+        //                     return Ok(Some(id));
+        //                 }
+        //             } else {
+        //                 println!("Invalid ID.");
+        //             }
+        //         }
+        //         Err(_) => {
+        //             println!("Invalid input.");
+        //         }
+        //     }
+        // }
     }
 }
