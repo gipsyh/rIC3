@@ -8,6 +8,7 @@ use btor::Btor;
 use giputils::{
     file::{recreate_dir, remove_if_exists},
     hash::GHashMap,
+    logger::with_log_level,
 };
 use log::{LevelFilter, info};
 use logicrs::{
@@ -89,22 +90,21 @@ impl Cill {
         cfg.time_limit = Some(5);
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
-        let prev_level = log::max_level();
-        log::set_max_level(LevelFilter::Warn);
-        let mut joins = Vec::new();
-        for i in 0..self.ts.bad.len() {
-            let mut ts = self.ts.clone();
-            ts.bad = LitVec::from(self.ts.bad[i]);
-            let cfg = cfg.clone();
-            joins.push(spawn(move || {
-                let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
-                ic3.check()
-            }));
-        }
-        for (j, r) in joins.into_iter().zip(res.iter_mut()) {
-            *r = matches!(j.join().unwrap(), McResult::Safe);
-        }
-        log::set_max_level(prev_level);
+        with_log_level(LevelFilter::Warn, || {
+            let mut joins = Vec::new();
+            for i in 0..self.ts.bad.len() {
+                let mut ts = self.ts.clone();
+                ts.bad = LitVec::from(self.ts.bad[i]);
+                let cfg = cfg.clone();
+                joins.push(spawn(move || {
+                    let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
+                    ic3.check()
+                }));
+            }
+            for (j, r) in joins.into_iter().zip(res.iter_mut()) {
+                *r = matches!(j.join().unwrap(), McResult::Safe);
+            }
+        });
         for (id, r) in res.iter().enumerate() {
             if *r {
                 info!("IC3 proved p{id} is inductive");
@@ -226,7 +226,7 @@ pub fn cill() -> anyhow::Result<()> {
     let mut btorfe = BtorFrontend::new(btor.clone());
 
     let mut engine = Portfolio::new(rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
-    let res = engine.check();
+    let res = with_log_level(LevelFilter::Warn, || engine.check());
     let cex_vcd = rp.path("cill/cex.vcd");
     remove_if_exists(&cex_vcd)?;
     match res {
