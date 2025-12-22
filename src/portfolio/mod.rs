@@ -57,10 +57,7 @@ impl DerefMut for PortfolioConfig {
 impl Default for PortfolioConfig {
     fn default() -> Self {
         let cfg = EngineConfig::parse_from(["", "portfolio"]);
-        let EngineConfig::Portfolio(cfg) = cfg else {
-            unreachable!()
-        };
-        cfg
+        cfg.into_portfolio().unwrap()
     }
 }
 

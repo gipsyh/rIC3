@@ -155,9 +155,7 @@ impl Rlive {
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
         let rcfg =
             EngineConfig::parse_from("ic3 --no-pred-prop --full-bad --no-preproc".split(' '));
-        let EngineConfig::IC3(rcfg) = rcfg else {
-            unreachable!()
-        };
+        let rcfg = rcfg.into_ic3().unwrap();
         Self {
             cfg,
             ts,

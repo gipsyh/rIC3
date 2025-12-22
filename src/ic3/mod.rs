@@ -108,10 +108,7 @@ impl DerefMut for IC3Config {
 impl Default for IC3Config {
     fn default() -> Self {
         let cfg = EngineConfig::parse_from(["", "ic3"]);
-        let EngineConfig::IC3(cfg) = cfg else {
-            unreachable!()
-        };
-        cfg
+        cfg.into_ic3().unwrap()
     }
 }
 

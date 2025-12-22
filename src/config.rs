@@ -3,6 +3,7 @@ use crate::{
     rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
 };
 use clap::{ArgAction, Args, Parser};
+use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
@@ -41,7 +42,7 @@ impl Default for EngineConfigBase {
     }
 }
 
-#[derive(Parser, Clone, Debug, Serialize, Deserialize, AsRefStr)]
+#[derive(Parser, Clone, Debug, Serialize, Deserialize, AsRefStr, EnumAsInner)]
 pub enum EngineConfig {
     /// ic3
     IC3(IC3Config),
