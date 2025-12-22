@@ -9,12 +9,16 @@ use rIC3::{
 use std::{fs, mem::take, path::Path};
 
 impl CIll {
-    pub fn check_cti(&mut self) -> anyhow::Result<bool> {
+    pub fn check_cti(&mut self, prop: &str) -> anyhow::Result<Option<bool>> {
         let cti_file = self.rp.path("cill/cti");
         let cti = fs::read_to_string(&cti_file)?;
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
-
         assert!(cti.len() == self.uts.num_unroll + 1);
+
+        let bad = &self.uts.ts.bad[cti.bad_id];
+        if self.symbol.get(bad).is_none_or(|s| s != prop) {
+            return Ok(None);
+        }
         let mut assume = Vec::new();
         for k in 0..self.uts.num_unroll {
             for input in cti.input[k].iter() {
@@ -27,7 +31,7 @@ impl CIll {
                 assume.push(kt.teq(Term::bv_const(state.v().clone())));
             }
         }
-        Ok(!self.slv.solve(&assume))
+        Ok(Some(!self.slv.solve(&assume)))
     }
 
     pub fn get_cti(&mut self, id: usize) -> WlWitness {

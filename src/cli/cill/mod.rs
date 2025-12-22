@@ -271,16 +271,23 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     }
 
     if let CIllState::WaitBlock(prop) = state {
-        if cill.check_cti()? {
-            info!("{}", "The CTI has been successfully blocked.".green());
-            rp.clear_cti()?;
-        } else {
-            info!(
-                "{}",
-                format!("The CTI of {prop} has not been blocked yet. Please continue to analyze the CTI to adjust the helper assertion.").red()
-            );
-            return Ok(());
-        };
+        match cill.check_cti(&prop)? {
+            Some(true) => {
+                println!("{}", "The CTI has been successfully blocked.".green());
+                rp.clear_cti()?;
+            }
+            Some(false) => {
+                println!(
+                    "{}",
+                    format!("The CTI of {prop} has not been blocked yet.").red()
+                );
+                return Ok(());
+            }
+            None => {
+                println!("{prop} changed, aborted CTI");
+                rp.clear_cti()?;
+            }
+        }
     }
 
     info!("Checking inductiveness of all properties.");
