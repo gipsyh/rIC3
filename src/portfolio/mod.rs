@@ -1,5 +1,5 @@
-use crate::config::EngineConfigBase;
-use crate::{McResult, config};
+use crate::McResult;
+use crate::config::{EngineConfig, EngineConfigBase};
 use clap::{Args, Parser};
 use log::{error, info};
 use nix::errno::Errno;
@@ -56,8 +56,8 @@ impl DerefMut for PortfolioConfig {
 
 impl Default for PortfolioConfig {
     fn default() -> Self {
-        let cfg = config::EngineConfig::parse_from(["", "portfolio"]);
-        let config::Engine::Portfolio(cfg) = cfg.engine else {
+        let cfg = EngineConfig::parse_from(["", "portfolio"]);
+        let EngineConfig::Portfolio(cfg) = cfg else {
             unreachable!()
         };
         cfg

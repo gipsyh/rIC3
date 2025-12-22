@@ -2,9 +2,8 @@ use crate::{
     bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, portfolio::PortfolioConfig,
     rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
 };
-use clap::{ArgAction, Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use strum::AsRefStr;
 
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
@@ -42,23 +41,8 @@ impl Default for EngineConfigBase {
     }
 }
 
-#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
-pub struct EngineConfig {
-    /// model checking engine
-    #[command(subcommand)]
-    pub engine: Engine,
-}
-
-impl Deref for EngineConfig {
-    type Target = Engine;
-
-    fn deref(&self) -> &Self::Target {
-        &self.engine
-    }
-}
-
-#[derive(Subcommand, Clone, Debug, Serialize, Deserialize, AsRefStr)]
-pub enum Engine {
+#[derive(Parser, Clone, Debug, Serialize, Deserialize, AsRefStr)]
+pub enum EngineConfig {
     /// ic3
     IC3(IC3Config),
     /// k-induction
@@ -75,9 +59,9 @@ pub enum Engine {
     Portfolio(PortfolioConfig),
 }
 
-impl Engine {
+impl EngineConfig {
     pub fn is_wl(&self) -> bool {
-        matches!(self, Engine::WlBMC(_) | Engine::WlKind(_))
+        matches!(self, EngineConfig::WlBMC(_) | EngineConfig::WlKind(_))
     }
 }
 

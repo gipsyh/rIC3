@@ -1,6 +1,6 @@
 use crate::{
     Engine, McResult, Witness,
-    config::{self, EngineConfig, EngineConfigBase, PreprocConfig},
+    config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     transys::{Transys, TransysIf, certify::Restore},
 };
@@ -155,7 +155,7 @@ impl Rlive {
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
         let rcfg =
             EngineConfig::parse_from("ic3 --no-pred-prop --full-bad --no-preproc".split(' '));
-        let config::Engine::IC3(rcfg) = rcfg.deref() else {
+        let EngineConfig::IC3(rcfg) = rcfg else {
             unreachable!()
         };
         Self {

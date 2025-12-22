@@ -5,7 +5,7 @@ use log::{error, info};
 use rIC3::{
     Engine, McResult,
     bmc::BMC,
-    config::{self, EngineConfig},
+    config::EngineConfig,
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
     ic3::IC3,
     kind::Kind,
@@ -82,7 +82,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         chk.cert = Some(PathBuf::from(tmp_cert_file.path()));
         tmp_cert = Some(tmp_cert_file);
     }
-    if let config::Engine::Portfolio(cfg) = cfg.engine {
+    if let EngineConfig::Portfolio(cfg) = cfg {
         let res = portfolio_main(chk, cfg);
         drop(tmp_cert);
         return res;
@@ -105,19 +105,19 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     let mut engine: Box<dyn Engine> = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
         // info!("origin ts has {}", ts.statistic());
-        match cfg.engine {
-            config::Engine::WlBMC(cfg) => Box::new(WlBMC::new(cfg, wts)),
-            config::Engine::WlKind(cfg) => Box::new(WlKind::new(cfg.clone(), wts)),
+        match cfg {
+            EngineConfig::WlBMC(cfg) => Box::new(WlBMC::new(cfg, wts)),
+            EngineConfig::WlKind(cfg) => Box::new(WlKind::new(cfg.clone(), wts)),
             _ => unreachable!(),
         }
     } else {
         let (ts, symbols) = frontend.ts();
         info!("origin ts has {}", ts.statistic());
-        match cfg.engine {
-            config::Engine::IC3(cfg) => Box::new(IC3::new(cfg.clone(), ts, symbols)),
-            config::Engine::Kind(cfg) => Box::new(Kind::new(cfg.clone(), ts)),
-            config::Engine::BMC(cfg) => Box::new(BMC::new(cfg.clone(), ts)),
-            config::Engine::Rlive(cfg) => Box::new(Rlive::new(cfg.clone(), ts)),
+        match cfg {
+            EngineConfig::IC3(cfg) => Box::new(IC3::new(cfg.clone(), ts, symbols)),
+            EngineConfig::Kind(cfg) => Box::new(Kind::new(cfg.clone(), ts)),
+            EngineConfig::BMC(cfg) => Box::new(BMC::new(cfg.clone(), ts)),
+            EngineConfig::Rlive(cfg) => Box::new(Rlive::new(cfg.clone(), ts)),
             _ => unreachable!(),
         }
     };

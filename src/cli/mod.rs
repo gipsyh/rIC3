@@ -40,7 +40,7 @@ pub enum Commands {
         #[command(flatten)]
         chk: CheckConfig,
 
-        #[command(flatten)]
+        #[command(subcommand)]
         cfg: EngineConfig,
     },
 

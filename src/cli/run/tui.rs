@@ -6,7 +6,7 @@ use btor::Btor;
 use giputils::hash::GHashMap;
 use rIC3::{
     McResult,
-    config::{self, EngineConfig},
+    config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     portfolio::{Portfolio, PortfolioConfig},
 };
@@ -188,9 +188,7 @@ impl Run {
         let btor_path = self.ric3_proj.path("tmp/px.btor");
         btor.to_file(&btor_path);
         let pcfg = PortfolioConfig::default();
-        let cfg = EngineConfig {
-            engine: config::Engine::Portfolio(pcfg.clone()),
-        };
+        let cfg = EngineConfig::Portfolio(pcfg.clone());
         let cert_file = self.ric3_proj.path("tmp/px.cert");
         let mut engine = Portfolio::new(btor_path, Some(cert_file), pcfg);
         let stop = engine.get_stop_signal();

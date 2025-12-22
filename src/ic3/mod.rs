@@ -1,6 +1,6 @@
 use crate::{
     Engine, McResult, Proof, Witness,
-    config::{self, EngineConfigBase, PreprocConfig},
+    config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
     tracer::{Tracer, TracerIf},
@@ -107,8 +107,8 @@ impl DerefMut for IC3Config {
 
 impl Default for IC3Config {
     fn default() -> Self {
-        let cfg = config::EngineConfig::parse_from(["", "ic3"]);
-        let config::Engine::IC3(cfg) = cfg.engine else {
+        let cfg = EngineConfig::parse_from(["", "ic3"]);
+        let EngineConfig::IC3(cfg) = cfg else {
             unreachable!()
         };
         cfg
