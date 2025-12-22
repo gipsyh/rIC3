@@ -128,7 +128,7 @@ impl CIll {
     fn check_inductive(&mut self) -> bool {
         let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
-        cfg.time_limit = Some(10);
+        cfg.time_limit = Some(30);
         cfg.inn = true;
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
@@ -181,7 +181,7 @@ impl CIll {
         info!("Starting checking safety for all properties with a 10s time limit.");
         let mut cfg = PortfolioConfig::default();
         cfg.config = Some("cill".to_string());
-        cfg.time_limit = Some(10);
+        cfg.time_limit = Some(20);
         let cert_file = self.rp.path("tmp/dut.cert");
         let mut engine = Portfolio::new(self.rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
         let res = with_log_level(LevelFilter::Warn, || engine.check());
