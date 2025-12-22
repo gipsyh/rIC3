@@ -30,6 +30,21 @@ impl CIll {
         Ok(!self.slv.solve(&assume))
     }
 
+    pub fn get_cti(&mut self, id: usize) -> WlWitness {
+        let mut assume: Vec<Term> = self
+            .uts
+            .ts
+            .bad
+            .iter()
+            .map(|t| !self.uts.next(t, self.uts.num_unroll))
+            .collect();
+        assume[id] = !&assume[id];
+        assert!(self.slv.solve(&assume));
+        let mut wit = self.uts.witness(&mut self.slv);
+        wit.bad_id = id;
+        wit
+    }
+
     pub fn save_cti(&mut self, witness: WlWitness) -> anyhow::Result<()> {
         let cti_file = self.rp.path("cill/cti");
         let witness = self.btorfe.wl_unsafe_certificate(witness);

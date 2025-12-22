@@ -20,7 +20,7 @@ use rIC3::{
     ic3::{IC3, IC3Config},
     portfolio::{Portfolio, PortfolioConfig},
     transys::Transys,
-    wltransys::{bitblast::BitblastRestore, certify::WlWitness, unroll::WlTransysUnroll},
+    wltransys::{bitblast::BitblastRestore, unroll::WlTransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
@@ -177,15 +177,6 @@ impl CIll {
         self.res.iter().all(|l| *l)
     }
 
-    fn witness(&mut self, id: usize) -> WlWitness {
-        let b = &self.uts.ts.bad[id];
-        let nb = self.uts.next(b, self.uts.num_unroll);
-        assert!(self.slv.solve(&[nb]));
-        let mut wit = self.uts.witness(&mut self.slv);
-        wit.bad_id = id;
-        wit
-    }
-
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
         info!("Starting checking safety for all properties with a 10s time limit.");
         let mut cfg = PortfolioConfig::default();
@@ -322,7 +313,7 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     let btorfe = BtorFrontend::new(btor);
     let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
 
-    let witness = cill.witness(id);
+    let witness = cill.get_cti(id);
     let name = cill
         .get_prop_name(witness.bad_id)
         .unwrap_or("Unknown".to_string());
