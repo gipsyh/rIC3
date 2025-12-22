@@ -93,7 +93,7 @@ impl CIll {
         let mut slv = Bitwuzla::new();
         let (ts, bb_rst) = wts.bitblast_to_ts();
         let mut uts = WlTransysUnroll::new(wts);
-        uts.unroll_to(3);
+        uts.unroll_to(4);
         for k in 0..=uts.num_unroll {
             if k != uts.num_unroll {
                 for b in uts.ts.bad.iter() {
