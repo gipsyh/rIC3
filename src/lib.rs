@@ -17,7 +17,7 @@ pub mod wltransys;
 
 use crate::{
     tracer::TracerIf,
-    transys::certify::{Proof, Witness},
+    transys::certify::{BlProof, BlWitness},
     wltransys::certify::{WlProof, WlWitness},
 };
 use serde::{Deserialize, Serialize};
@@ -51,11 +51,11 @@ pub trait Engine {
         false
     }
 
-    fn proof(&mut self) -> Proof {
+    fn proof(&mut self) -> BlProof {
         panic!("unsupport proof");
     }
 
-    fn witness(&mut self) -> Witness {
+    fn witness(&mut self) -> BlWitness {
         panic!("unsupport witness");
     }
 

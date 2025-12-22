@@ -3,13 +3,13 @@ use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 
 #[derive(Clone, Debug, Default)]
-pub struct Witness {
+pub struct BlWitness {
     pub input: Vec<LitVec>,
     pub state: Vec<LitVec>,
     pub bad_id: usize,
 }
 
-impl Witness {
+impl BlWitness {
     #[inline]
     pub fn new() -> Self {
         Self::default()
@@ -61,7 +61,7 @@ impl Witness {
         }
     }
 
-    pub fn concat(iter: impl IntoIterator<Item = Witness>) -> Self {
+    pub fn concat(iter: impl IntoIterator<Item = BlWitness>) -> Self {
         let mut res = Self::new();
         for witness in iter {
             res.input.extend(witness.input);
@@ -121,7 +121,7 @@ impl Witness {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct Proof {
+pub struct BlProof {
     pub proof: Transys,
 }
 

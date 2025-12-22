@@ -1,6 +1,6 @@
 use super::IC3;
 use crate::{
-    Witness,
+    BlWitness,
     ic3::IC3Config,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
@@ -58,7 +58,7 @@ impl LocalAbs {
         }
     }
 
-    pub fn witness(&self) -> Option<Witness> {
+    pub fn witness(&self) -> Option<BlWitness> {
         if !self.foundcex {
             return None;
         }

@@ -1,5 +1,5 @@
 use super::{Transys, TransysIf};
-use crate::transys::certify::Witness;
+use crate::transys::certify::BlWitness;
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
 
@@ -216,8 +216,8 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
     }
 
-    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> Witness {
-        let mut wit = Witness::default();
+    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> BlWitness {
+        let mut wit = BlWitness::default();
         for k in 0..=self.num_unroll {
             let mut w = LitVec::new();
             for l in self.ts.input() {

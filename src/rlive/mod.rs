@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McResult, Witness,
+    BlWitness, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     transys::{Transys, TransysIf, certify::Restore},
@@ -18,7 +18,7 @@ pub struct Rlive {
     rts: Transys,    // reach check ts
     base_var: Var,   // base var
     trace: Vec<LitOrdVec>,
-    witness: Vec<Witness>,
+    witness: Vec<BlWitness>,
     shoals: Vec<LitVec>,
     rst: Restore,
 }
@@ -48,7 +48,7 @@ impl Rlive {
     }
 
     #[inline]
-    fn add_trace(&mut self, mut w: Witness) -> bool {
+    fn add_trace(&mut self, mut w: BlWitness) -> bool {
         for s in w.state.iter_mut().chain(w.input.iter_mut()) {
             s.retain(|l| l.var() != self.base_var);
         }
@@ -88,7 +88,7 @@ impl Rlive {
         self.witness.pop();
     }
 
-    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, Witness> {
+    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, BlWitness> {
         let mut rts = self.rts.clone();
         for l in s {
             assert!(l.var() != self.base_var);
@@ -192,8 +192,8 @@ impl Engine for Rlive {
         }
     }
 
-    fn witness(&mut self) -> Witness {
-        let witness = Witness::concat(self.witness.clone());
+    fn witness(&mut self) -> BlWitness {
+        let witness = BlWitness::concat(self.witness.clone());
         witness.map_var(|v| self.rst.restore_var(v))
     }
 }

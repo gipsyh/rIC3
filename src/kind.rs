@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McResult, Proof, Witness,
+    BlProof, BlWitness, Engine, McResult,
     config::{EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
@@ -126,7 +126,7 @@ impl Engine for Kind {
         self.tracer.add_tracer(tracer);
     }
 
-    fn proof(&mut self) -> Proof {
+    fn proof(&mut self) -> BlProof {
         if self.cfg.simple_path {
             //TODO: support certifaiger with simple path constraint
             error!("k-induction with simple path constraint not support certifaiger");
@@ -244,10 +244,10 @@ impl Engine for Kind {
         bads.push(!aux_latchs[0]);
         proof.bad = LitVec::from(proof.rel.new_or(bads));
         assert!(proof.input.len() + proof.latch.len() == sum + k);
-        Proof { proof }
+        BlProof { proof }
     }
 
-    fn witness(&mut self) -> Witness {
+    fn witness(&mut self) -> BlWitness {
         let mut wit = self.uts.witness(self.solver.as_ref());
         let iv = self.rst.init_var();
         wit = wit.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));

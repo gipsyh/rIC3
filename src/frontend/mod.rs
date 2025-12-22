@@ -1,5 +1,5 @@
 use crate::{
-    Proof, Witness,
+    BlProof, BlWitness,
     frontend::{aig::certifaiger_check, btor::cerbtora_check},
     transys::Transys,
     wltransys::{
@@ -25,9 +25,9 @@ pub trait Frontend {
         panic!("frontend unsupported for wltransys")
     }
 
-    fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display>;
+    fn safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display>;
 
-    fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display>;
+    fn unsafe_certificate(&mut self, witness: BlWitness) -> Box<dyn Display>;
 
     fn wl_safe_certificate(&mut self, _proof: WlProof) -> Box<dyn Display> {
         panic!("frontend unsupported for word level certificate")

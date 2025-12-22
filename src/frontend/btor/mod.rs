@@ -2,7 +2,7 @@ mod array;
 
 use super::Frontend;
 use crate::{
-    Proof, Witness,
+    BlProof, BlWitness,
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
@@ -237,7 +237,7 @@ impl Frontend for BtorFrontend {
         (self.wts.clone(), self.symbols.clone())
     }
 
-    fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
+    fn safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display> {
         let ts = proof.proof;
         let mut btor = self.owts.clone();
         if let Some(iv) = self.rst.init_var() {
@@ -294,7 +294,7 @@ impl Frontend for BtorFrontend {
         Box::new(Btor::from(&btor))
     }
 
-    fn unsafe_certificate(&mut self, mut witness: Witness) -> Box<dyn Display> {
+    fn unsafe_certificate(&mut self, mut witness: BlWitness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
         for i in 0..witness.len() {
             if let Some(iv) = self.rst.init_var() {

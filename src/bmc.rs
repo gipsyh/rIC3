@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McResult, Witness,
+    BlWitness, Engine, McResult,
     config::{EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
@@ -154,7 +154,7 @@ impl Engine for BMC {
         self.tracer.add_tracer(tracer);
     }
 
-    fn witness(&mut self) -> Witness {
+    fn witness(&mut self) -> BlWitness {
         let mut wit = self.uts.witness(self.solver.as_ref());
         wit = wit.map(|l| self.rst.restore(l));
         for s in wit.state.iter_mut() {

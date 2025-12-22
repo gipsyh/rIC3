@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McResult, Proof, Witness,
+    BlProof, BlWitness, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
@@ -282,7 +282,7 @@ impl Engine for IC3 {
         self.tracer.add_tracer(tracer);
     }
 
-    fn proof(&mut self) -> Proof {
+    fn proof(&mut self) -> BlProof {
         let mut proof = self.ots.clone();
         if let Some(iv) = self.rst.init_var() {
             let piv = proof.add_init_var();
@@ -305,14 +305,14 @@ impl Engine for IC3 {
         let invariants = proof.rel.new_or(certifaiger_dnf);
         let bad = proof.rel.new_or(proof.bad);
         proof.bad = LitVec::from(proof.rel.new_or([invariants, bad]));
-        Proof { proof }
+        BlProof { proof }
     }
 
-    fn witness(&mut self) -> Witness {
+    fn witness(&mut self) -> BlWitness {
         let mut res = if let Some(res) = self.localabs.witness() {
             res
         } else {
-            let mut res = Witness::default();
+            let mut res = BlWitness::default();
             let b = self.obligations.peak().unwrap();
             assert!(b.frame == 0);
             let mut b = Some(b);
