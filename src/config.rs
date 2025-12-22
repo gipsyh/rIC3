@@ -19,8 +19,11 @@ pub struct Config {
     /// for btor model, the file name should be suffixed with .btor or .btor2.
     pub model: PathBuf,
 
-    /// certificate path
-    pub certificate: Option<PathBuf>,
+    /// SAT certificate path (counterexample). Also used for UNSAT if second path not specified.
+    pub sat_certificate: Option<PathBuf>,
+
+    /// UNSAT certificate path (invariant proof). If omitted, uses first certificate path.
+    pub unsat_certificate: Option<PathBuf>,
 
     /// certify with certifaiger or cerbtora
     #[arg(long, default_value_t = false)]

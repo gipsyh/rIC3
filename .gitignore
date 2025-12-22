@@ -1,2 +1,10 @@
 /target
-build/
+.cache
+# certifaiger output
+bugs
+bug.aag
+options
+# AI
+CLAUDE.md
+AGENTS.md
+.claude
