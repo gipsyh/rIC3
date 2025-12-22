@@ -1,6 +1,7 @@
-use crate::McResult;
 use crate::config::{EngineConfig, EngineConfigBase};
+use crate::{Engine, McResult};
 use clap::{Args, Parser};
+use giputils::logger::with_log_level;
 use log::{error, info};
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
@@ -8,7 +9,7 @@ use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::Sender;
-use std::thread::JoinHandle;
+use std::thread::{JoinHandle, spawn};
 use std::time::Instant;
 use std::{
     collections::HashMap,
@@ -64,7 +65,7 @@ impl Default for PortfolioConfig {
 pub struct Portfolio {
     cert: Option<PathBuf>,
     cfg: PortfolioConfig,
-    engines: Vec<Engine>,
+    engines: Vec<Worker>,
     engine_pids: Vec<Pid>,
     stop_flag: Arc<AtomicBool>,
     monitor: Option<JoinHandle<()>>,
@@ -72,7 +73,7 @@ pub struct Portfolio {
     temp_dir: TempDir,
 }
 
-struct Engine {
+struct Worker {
     name: String,
     cmd: Command,
     cert: Option<NamedTempFile>,
@@ -117,7 +118,7 @@ impl Portfolio {
             for a in args_split {
                 cmd.arg(a);
             }
-            engines.push(Engine { name, cmd, cert });
+            engines.push(Worker { name, cmd, cert });
         };
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
@@ -253,5 +254,34 @@ impl Portfolio {
 
     pub fn get_stop_signal(&self) -> Arc<AtomicBool> {
         self.stop_flag.clone()
+    }
+}
+
+#[derive(Default)]
+pub struct MultiEngine {
+    engines: Vec<Box<dyn Engine>>,
+}
+
+impl MultiEngine {
+    pub fn new(engines: Vec<Box<dyn Engine>>) -> Self {
+        Self { engines }
+    }
+}
+
+impl Engine for MultiEngine {
+    fn check(&mut self) -> McResult {
+        let engines = take(&mut self.engines);
+        let mut joins = Vec::new();
+        with_log_level(log::LevelFilter::Warn, || {
+            for mut e in engines {
+                let join = spawn(move || e.check());
+                joins.push(join);
+            }
+            let mut res = McResult::Unknown(None);
+            for j in joins {
+                res = j.join().unwrap();
+            }
+            res
+        })
     }
 }

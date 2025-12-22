@@ -73,10 +73,6 @@ impl WlKind {
 }
 
 impl Engine for WlKind {
-    fn is_wl(&self) -> bool {
-        true
-    }
-
     fn check(&mut self) -> McResult {
         let step = self.cfg.step as usize;
         if step != 1 {

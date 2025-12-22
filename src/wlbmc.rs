@@ -64,10 +64,6 @@ impl WlBMC {
 }
 
 impl Engine for WlBMC {
-    fn is_wl(&self) -> bool {
-        true
-    }
-
     fn check(&mut self) -> McResult {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.cfg.step as usize) {
             self.uts.unroll_to(k);

@@ -168,20 +168,13 @@ pub fn certificate(
     if chk.cert.is_none() {
         return;
     }
-    let certificate = if engine.is_wl() {
-        if res {
-            frontend.safe_certificate(engine.proof())
-        } else {
-            let witness = engine.witness();
-            frontend.unsafe_certificate(witness)
-        }
-    } else if res {
+    let cert = if res {
         frontend.safe_certificate(engine.proof())
     } else {
         let witness = engine.witness();
         frontend.unsafe_certificate(witness)
     };
-    fs::write(chk.cert.as_ref().unwrap(), format!("{certificate}")).unwrap();
+    fs::write(chk.cert.as_ref().unwrap(), format!("{cert}")).unwrap();
 }
 
 pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {

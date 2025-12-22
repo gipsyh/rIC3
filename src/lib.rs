@@ -51,7 +51,7 @@ pub enum McWitness {
     Wl(WlWitness),
 }
 
-pub trait Engine {
+pub trait Engine: Send {
     fn check(&mut self) -> McResult;
 
     fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {
@@ -59,10 +59,6 @@ pub trait Engine {
     }
 
     fn statistic(&mut self) {}
-
-    fn is_wl(&self) -> bool {
-        false
-    }
 
     fn proof(&mut self) -> McProof {
         panic!("unsupport proof");
