@@ -51,6 +51,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let mut cfg = Config::parse();
     cfg.validate();
     cfg.model = cfg.model.canonicalize()?;
+    // If only sat_certificate is specified, use it for unsat_certificate too
+    if cfg.unsat_certificate.is_none() && cfg.sat_certificate.is_some() {
+        cfg.unsat_certificate = cfg.sat_certificate.clone();
+    }
     info!("the model to be checked: {}", cfg.model.display());
     if let config::Engine::Portfolio = cfg.engine {
         portfolio_main(cfg);
@@ -118,7 +122,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engine: &mut dyn Engine, res: bool) {
-    if cfg.certificate.is_none() && !cfg.certify && (!cfg.witness || res) {
+    let cert_path = if res {
+        &cfg.unsat_certificate
+    } else {
+        &cfg.sat_certificate
+    };
+    if cert_path.is_none() && !cfg.certify && (!cfg.witness || res) {
         return;
     }
     let certificate = if engine.is_wl() {
@@ -139,7 +148,7 @@ pub fn certificate(cfg: &Config, frontend: &mut dyn Frontend, engine: &mut dyn E
     if cfg.witness && !res {
         println!("{certificate}");
     }
-    if let Some(cert_path) = &cfg.certificate {
+    if let Some(cert_path) = cert_path {
         fs::write(cert_path, format!("{certificate}")).unwrap();
     }
     if cfg.certify {

@@ -86,7 +86,7 @@ impl BtorFrontend {
         let btor = Btor::from_file(&cfg.model);
         if btor.bad.is_empty() {
             warn!("no property to be checked");
-            if let Some(certificate) = &cfg.certificate {
+            if let Some(certificate) = &cfg.unsat_certificate {
                 btor.to_file(certificate);
             }
             println!("UNSAT");

@@ -131,7 +131,7 @@ impl Portfolio {
         let lock = self.state.0.lock().unwrap();
         for mut engine in take(&mut self.engines) {
             let certificate =
-                if self.cfg.certificate.is_some() || self.cfg.certify || self.cfg.witness {
+                if self.cfg.sat_certificate.is_some() || self.cfg.certify || self.cfg.witness {
                     let certificate =
                         tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
                     let certify_path = certificate.path().as_os_str().to_str().unwrap();
@@ -224,14 +224,14 @@ impl Portfolio {
 
     fn certificate(&mut self, cfg: &Config, res: bool) {
         if res {
-            if cfg.certificate.is_none() && !cfg.certify {
+            if cfg.unsat_certificate.is_none() && !cfg.certify {
                 return;
             }
-            if let Some(certificate_path) = &cfg.certificate {
+            if let Some(certificate_path) = &cfg.unsat_certificate {
                 std::fs::copy(self.certificate.as_ref().unwrap(), certificate_path).unwrap();
             }
         } else {
-            if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
+            if cfg.sat_certificate.is_none() && !cfg.certify && !cfg.witness {
                 return;
             }
             let mut witness = String::new();
@@ -250,7 +250,7 @@ impl Portfolio {
             if cfg.witness {
                 println!("{witness}");
             }
-            if let Some(certificate_path) = &cfg.certificate {
+            if let Some(certificate_path) = &cfg.sat_certificate {
                 let mut file: File = File::create(certificate_path).unwrap();
                 file.write_all(witness.as_bytes()).unwrap();
             }

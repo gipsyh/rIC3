@@ -165,7 +165,7 @@ impl AigFrontend {
             }
             if aig.bads.is_empty() {
                 warn!("no property to be checked");
-                if let Some(certificate) = &cfg.certificate {
+                if let Some(certificate) = &cfg.unsat_certificate {
                     let mut map = aig.inputs.clone();
                     map.extend(aig.latchs.iter().map(|l| l.input));
                     for x in map {
