@@ -1,6 +1,6 @@
 use super::Frontend;
 use crate::{
-    BlProof, BlWitness,
+    McProof, McWitness,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
@@ -187,7 +187,8 @@ impl Frontend for AigFrontend {
         (self.ts.clone(), self.ts_symbols.clone())
     }
 
-    fn safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display> {
+    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
+        let proof = proof.into_bl().unwrap();
         if !self.is_safety() {
             error!("rIC3 does not support certificate generation for safe liveness properties");
             panic!();
@@ -208,7 +209,8 @@ impl Frontend for AigFrontend {
         Box::new(certifaiger)
     }
 
-    fn unsafe_certificate(&mut self, witness: BlWitness) -> Box<dyn Display> {
+    fn unsafe_certificate(&mut self, witness: McWitness) -> Box<dyn Display> {
+        let witness = witness.into_bl().unwrap();
         let mut wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string()];
         if self.is_safety() {

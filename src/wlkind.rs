@@ -1,12 +1,8 @@
 use crate::{
-    Engine, McResult,
+    Engine, McProof, McResult, McWitness,
     config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
-    wltransys::{
-        WlTransys,
-        certify::{WlProof, WlWitness},
-        unroll::WlTransysUnroll,
-    },
+    wltransys::{WlTransys, certify::WlProof, unroll::WlTransysUnroll},
 };
 use clap::Args;
 use giputils::hash::GHashMap;
@@ -124,7 +120,7 @@ impl Engine for WlKind {
         self.tracer.add_tracer(tracer);
     }
 
-    fn wl_witness(&mut self) -> WlWitness {
+    fn witness(&mut self) -> McWitness {
         let mut witness = self.uts.witness(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
@@ -141,10 +137,10 @@ impl Engine for WlKind {
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        witness
+        McWitness::Wl(witness)
     }
 
-    fn wl_proof(&mut self) -> WlProof {
+    fn proof(&mut self) -> McProof {
         let mut proof = self.uts.ts.clone();
         let mut up = WlTransysUnroll::new(proof.clone());
         up.enable_new_next_latch();
@@ -205,6 +201,6 @@ impl Engine for WlKind {
         }
         bads.push(!&aux_vars[0]);
         proof.bad = vec![Term::new_op_fold(op::Or, bads)];
-        WlProof { proof }
+        McProof::Wl(WlProof { proof })
     }
 }

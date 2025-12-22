@@ -5,7 +5,7 @@ use crate::cli::{
 use btor::Btor;
 use giputils::hash::GHashMap;
 use rIC3::{
-    McResult,
+    McResult, McWitness,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     portfolio::{Portfolio, PortfolioConfig},
@@ -229,7 +229,7 @@ impl Run {
                 let cert_path = self.ric3_proj.path(format!("res/p{bad_id}.cert"));
                 fs::write(
                     &cert_path,
-                    format!("{}", btorfe.wl_unsafe_certificate(witness)),
+                    format!("{}", btorfe.unsafe_certificate(McWitness::Wl(witness))),
                 )
                 .unwrap();
                 Yosys::btor_wit_to_vcd(

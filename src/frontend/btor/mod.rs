@@ -2,7 +2,7 @@ mod array;
 
 use super::Frontend;
 use crate::{
-    BlProof, BlWitness,
+    BlProof, BlWitness, McProof,
     transys::{self as bl, TransysIf},
     wltransys::{
         WlTransys,
@@ -237,7 +237,27 @@ impl Frontend for BtorFrontend {
         (self.wts.clone(), self.symbols.clone())
     }
 
-    fn safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display> {
+    fn certify(&mut self, model: &Path, cert: &Path) -> bool {
+        cerbtora_check(model, cert)
+    }
+
+    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
+        match proof {
+            McProof::Bl(bl_proof) => self.bl_safe_certificate(bl_proof),
+            McProof::Wl(wl_proof) => self.wl_safe_certificate(wl_proof),
+        }
+    }
+
+    fn unsafe_certificate(&mut self, witness: crate::McWitness) -> Box<dyn Display> {
+        match witness {
+            crate::McWitness::Bl(bl_witness) => self.bl_unsafe_certificate(bl_witness),
+            crate::McWitness::Wl(wl_witness) => self.wl_unsafe_certificate(wl_witness),
+        }
+    }
+}
+
+impl BtorFrontend {
+    fn bl_safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display> {
         let ts = proof.proof;
         let mut btor = self.owts.clone();
         if let Some(iv) = self.rst.init_var() {
@@ -294,7 +314,7 @@ impl Frontend for BtorFrontend {
         Box::new(Btor::from(&btor))
     }
 
-    fn unsafe_certificate(&mut self, mut witness: BlWitness) -> Box<dyn Display> {
+    fn bl_unsafe_certificate(&mut self, mut witness: BlWitness) -> Box<dyn Display> {
         let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
         for i in 0..witness.len() {
             if let Some(iv) = self.rst.init_var() {
@@ -387,10 +407,6 @@ impl Frontend for BtorFrontend {
         }
         res.push(".\n".to_string());
         Box::new(res.join("\n"))
-    }
-
-    fn certify(&mut self, model: &Path, cert: &Path) -> bool {
-        cerbtora_check(model, cert)
     }
 }
 

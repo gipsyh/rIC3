@@ -1,5 +1,5 @@
 use crate::{
-    BlWitness, Engine, McResult,
+    BlWitness, Engine, McResult, McWitness,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     transys::{Transys, TransysIf, certify::Restore},
@@ -102,7 +102,7 @@ impl Rlive {
         if let McResult::Safe = res {
             return Ok(ic3.invariant());
         }
-        let wit = ic3.witness();
+        let wit = ic3.witness().into_bl().unwrap();
         assert!(wit.input.len() > 1);
         Err(wit)
     }
@@ -183,7 +183,7 @@ impl Engine for Rlive {
             if let McResult::Safe = res {
                 return McResult::Safe;
             }
-            let wit = ic3.witness();
+            let wit = ic3.witness().into_bl().unwrap();
             assert!(self.level() == 0);
             self.add_trace(wit);
             if !self.block() {
@@ -192,8 +192,8 @@ impl Engine for Rlive {
         }
     }
 
-    fn witness(&mut self) -> BlWitness {
+    fn witness(&mut self) -> McWitness {
         let witness = BlWitness::concat(self.witness.clone());
-        witness.map_var(|v| self.rst.restore_var(v))
+        McWitness::Bl(witness.map_var(|v| self.rst.restore_var(v)))
     }
 }

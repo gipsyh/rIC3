@@ -1,8 +1,8 @@
 use crate::{
-    Engine, McResult,
+    Engine, McResult, McWitness,
     config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
-    wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
+    wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
 use clap::Args;
 use giputils::hash::GHashMap;
@@ -87,7 +87,7 @@ impl Engine for WlBMC {
         self.tracer.add_tracer(tracer);
     }
 
-    fn wl_witness(&mut self) -> WlWitness {
+    fn witness(&mut self) -> McWitness {
         let mut witness = self.uts.witness(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
@@ -104,6 +104,6 @@ impl Engine for WlBMC {
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        witness
+        McWitness::Wl(witness)
     }
 }

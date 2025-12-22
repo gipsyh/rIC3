@@ -20,6 +20,7 @@ use crate::{
     transys::certify::{BlProof, BlWitness},
     wltransys::certify::{WlProof, WlWitness},
 };
+use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
@@ -38,6 +39,18 @@ impl Default for McResult {
     }
 }
 
+#[derive(Clone, Debug, EnumAsInner)]
+pub enum McProof {
+    Bl(BlProof),
+    Wl(WlProof),
+}
+
+#[derive(Clone, Debug, EnumAsInner)]
+pub enum McWitness {
+    Bl(BlWitness),
+    Wl(WlWitness),
+}
+
 pub trait Engine {
     fn check(&mut self) -> McResult;
 
@@ -51,21 +64,11 @@ pub trait Engine {
         false
     }
 
-    fn proof(&mut self) -> BlProof {
+    fn proof(&mut self) -> McProof {
         panic!("unsupport proof");
     }
 
-    fn witness(&mut self) -> BlWitness {
-        panic!("unsupport witness");
-    }
-
-    fn wl_proof(&mut self) -> WlProof {
-        assert!(self.is_wl());
-        panic!("unsupport proof");
-    }
-
-    fn wl_witness(&mut self) -> WlWitness {
-        assert!(self.is_wl());
+    fn witness(&mut self) -> McWitness {
         panic!("unsupport witness");
     }
 }

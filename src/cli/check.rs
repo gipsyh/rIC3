@@ -170,17 +170,15 @@ pub fn certificate(
     }
     let certificate = if engine.is_wl() {
         if res {
-            frontend.wl_safe_certificate(engine.wl_proof())
+            frontend.safe_certificate(engine.proof())
         } else {
-            let witness = engine.wl_witness();
-            debug_assert!(witness.state.len() == witness.input.len());
-            frontend.wl_unsafe_certificate(witness)
+            let witness = engine.witness();
+            frontend.unsafe_certificate(witness)
         }
     } else if res {
         frontend.safe_certificate(engine.proof())
     } else {
         let witness = engine.witness();
-        debug_assert!(witness.state.len() == witness.input.len());
         frontend.unsafe_certificate(witness)
     };
     fs::write(chk.cert.as_ref().unwrap(), format!("{certificate}")).unwrap();

@@ -3,6 +3,7 @@ use btor::Btor;
 use giputils::hash::GHashMap;
 use logicrs::fol::{BvTermValue, Term, TermValue};
 use rIC3::{
+    McWitness,
     frontend::{Frontend, btor::BtorFrontend},
     wltransys::certify::WlWitness,
 };
@@ -51,7 +52,7 @@ impl CIll {
 
     pub fn save_cti(&mut self, witness: WlWitness) -> anyhow::Result<()> {
         let cti_file = self.rp.path("cill/cti");
-        let witness = self.btorfe.wl_unsafe_certificate(witness);
+        let witness = self.btorfe.unsafe_certificate(McWitness::Wl(witness));
         fs::write(&cti_file, format!("{}", witness))?;
         let vcd = self.rp.path("cill/cti.vcd");
         Yosys::btor_wit_to_vcd(
@@ -101,7 +102,7 @@ pub fn refresh_cti(cti_file: &Path, dut_old: &Path, dut_new: &Path) -> anyhow::R
     }
     fs::write(
         cti_file,
-        format!("{}", btorfe_new.wl_unsafe_certificate(cti)),
+        format!("{}", btorfe_new.unsafe_certificate(McWitness::Wl(cti))),
     )?;
     Ok(())
 }

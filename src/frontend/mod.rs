@@ -1,11 +1,8 @@
 use crate::{
-    BlProof, BlWitness,
+    McProof, McWitness,
     frontend::{aig::certifaiger_check, btor::cerbtora_check},
     transys::Transys,
-    wltransys::{
-        WlTransys,
-        certify::{WlProof, WlWitness},
-    },
+    wltransys::WlTransys,
 };
 use giputils::hash::GHashMap;
 use log::{error, info};
@@ -25,17 +22,9 @@ pub trait Frontend {
         panic!("frontend unsupported for wltransys")
     }
 
-    fn safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display>;
+    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display>;
 
-    fn unsafe_certificate(&mut self, witness: BlWitness) -> Box<dyn Display>;
-
-    fn wl_safe_certificate(&mut self, _proof: WlProof) -> Box<dyn Display> {
-        panic!("frontend unsupported for word level certificate")
-    }
-
-    fn wl_unsafe_certificate(&mut self, _witness: WlWitness) -> Box<dyn Display> {
-        panic!("frontend unsupported for word level certificate")
-    }
+    fn unsafe_certificate(&mut self, witness: McWitness) -> Box<dyn Display>;
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool;
 }
