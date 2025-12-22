@@ -35,7 +35,7 @@ pub enum Commands {
     /// Run verification using 'ric3.toml' (requires the file in the current directory)
     Run,
 
-    /// Verify properties for AIGER/BTOR files with custom configurations
+    /// Verify properties for AIGER/BTOR files
     Check {
         #[command(flatten)]
         chk: CheckConfig,

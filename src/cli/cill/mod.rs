@@ -178,7 +178,7 @@ impl CIll {
     }
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
-        info!("Starting checking safety for all properties with a 10s time limit.");
+        info!("Starting checking safety for all properties.");
         let mut cfg = PortfolioConfig::default();
         cfg.config = Some("cill".to_string());
         cfg.time_limit = Some(20);
