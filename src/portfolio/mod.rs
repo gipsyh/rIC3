@@ -271,15 +271,40 @@ impl MultiEngine {
 impl Engine for MultiEngine {
     fn check(&mut self) -> McResult {
         let engines = take(&mut self.engines);
+        let mut stops = Vec::new();
+        for e in engines.iter() {
+            stops.push(e.get_stop_ctrl());
+        }
+        let (tx, rx) = mpsc::channel();
         let mut joins = Vec::new();
         with_log_level(log::LevelFilter::Warn, || {
+            let num_engines = engines.len();
             for mut e in engines {
-                let join = spawn(move || e.check());
+                let tx = tx.clone();
+                let join = spawn(move || {
+                    let res = e.check();
+                    let _ = tx.send(res);
+                    res
+                });
                 joins.push(join);
             }
             let mut res = McResult::Unknown(None);
+            let mut finished = 0;
+            while finished < num_engines {
+                let r = rx.recv().unwrap();
+                finished += 1;
+                if !matches!(r, McResult::Unknown(_)) {
+                    res = r;
+                    break;
+                }
+            }
+
+            for s in stops {
+                s.store(true, Ordering::Relaxed);
+            }
+
             for j in joins {
-                res = j.join().unwrap();
+                let _ = j.join().unwrap();
             }
             res
         })

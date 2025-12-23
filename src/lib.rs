@@ -22,6 +22,7 @@ use crate::{
 };
 use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, atomic::AtomicBool};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum McResult {
@@ -66,5 +67,9 @@ pub trait Engine: Send {
 
     fn witness(&mut self) -> McWitness {
         panic!("unsupport witness");
+    }
+
+    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
+        panic!("unsupport getting stop ctrl");
     }
 }
