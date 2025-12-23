@@ -237,13 +237,13 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let cill_state = rp.get_cill_state()?;
     match cmd {
         CIllCommands::State => state(rp, cill_state),
-        CIllCommands::Check => check(rp, cill_state),
+        CIllCommands::Check => check(rp),
         CIllCommands::Abort => abort(rp, cill_state),
         CIllCommands::Select { id } => select(rp, cill_state, id),
     }
 }
 
-fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
+fn check(rp: Ric3Proj) -> anyhow::Result<()> {
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     recreate_dir(rp.path("tmp"))?;
     match rp.check_cached_dut(&rcfg.dut.src())? {
@@ -269,7 +269,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if let CIllState::Block(prop) = state {
+    if let CIllState::Block(prop) = rp.get_cill_state()? {
         if cill.check_cti()? {
             println!("{}", "The CTI has been successfully blocked.".green());
             rp.clear_cti()?;
