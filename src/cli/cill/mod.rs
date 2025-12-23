@@ -237,13 +237,19 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let cill_state = rp.get_cill_state()?;
     match cmd {
         CIllCommands::State => state(rp, cill_state),
-        CIllCommands::Check => check(rp),
+        CIllCommands::Check => check(rp, cill_state),
         CIllCommands::Abort => abort(rp, cill_state),
         CIllCommands::Select { id } => select(rp, cill_state, id),
     }
 }
 
-fn check(rp: Ric3Proj) -> anyhow::Result<()> {
+fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
+    if matches!(state, CIllState::Select) {
+        println!(
+            "please `select` a non-inductive assertion for CTI generation instead of `check`."
+        );
+        return Ok(());
+    }
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     recreate_dir(rp.path("tmp"))?;
     match rp.check_cached_dut(&rcfg.dut.src())? {
