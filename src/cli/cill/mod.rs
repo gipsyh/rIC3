@@ -2,7 +2,6 @@ mod cti;
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::cli::cill::cti::refresh_cti;
 use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
@@ -45,8 +44,8 @@ pub enum CIllCommands {
 #[derive(Serialize, Deserialize, AsRefStr)]
 enum CIllState {
     Check,
-    WaitBlock(String),
-    WaitSelect,
+    Block(String),
+    Select,
 }
 
 impl Ric3Proj {
@@ -250,7 +249,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     match rp.check_cached_dut(&rcfg.dut.src())? {
         Some(false) => {
             Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
-            refresh_cti(&rp.path("cill/cti"), &rp.path("dut"), &rp.path("tmp/dut"))?;
+            rp.refresh_cti(&rp.path("dut"), &rp.path("tmp/dut"))?;
             fs::remove_dir_all(rp.path("dut"))?;
             fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
             rp.cache_dut(&rcfg.dut.src())?;
@@ -270,23 +269,16 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if let CIllState::WaitBlock(prop) = state {
-        match cill.check_cti(&prop)? {
-            Some(true) => {
-                println!("{}", "The CTI has been successfully blocked.".green());
-                rp.clear_cti()?;
-            }
-            Some(false) => {
-                println!(
-                    "{}",
-                    format!("The CTI of {prop} has not been blocked yet.").red()
-                );
-                return Ok(());
-            }
-            None => {
-                println!("{prop} changed, aborted CTI");
-                rp.clear_cti()?;
-            }
+    if let CIllState::Block(prop) = state {
+        if cill.check_cti()? {
+            println!("{}", "The CTI has been successfully blocked.".green());
+            rp.clear_cti()?;
+        } else {
+            println!(
+                "{}",
+                format!("The CTI of {prop} has not been blocked yet.").red()
+            );
+            return Ok(());
         }
     }
 
@@ -302,11 +294,11 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     println!(
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
-    rp.set_cill_state(CIllState::WaitSelect)
+    rp.set_cill_state(CIllState::Select)
 }
 
 fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
-    let CIllState::WaitSelect = state else {
+    let CIllState::Select = state else {
         println!("No need to select a non-inductive assertion for CTI generation.");
         return Ok(());
     };
@@ -328,14 +320,14 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     println!(
         "Please analyze the CTI, generate an assertion to block it, and run 'cill check' to confirm the CTI is blocked."
     );
-    rp.set_cill_state(CIllState::WaitBlock(name))
+    rp.set_cill_state(CIllState::Block(name))
 }
 
 fn state(_rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     let s = match state {
         CIllState::Check => "waiting to check the inductiveness of assertions",
-        CIllState::WaitBlock(p) => &format!("waiting for helper assertions to block CTI of {p}"),
-        CIllState::WaitSelect => "waiting to select a non-inductive assertion for CTI generation",
+        CIllState::Block(p) => &format!("waiting for helper assertions to block CTI of {p}"),
+        CIllState::Select => "waiting to select a non-inductive assertion for CTI generation",
     };
     println!("CIll state: {s}");
     Ok(())
@@ -346,12 +338,12 @@ fn abort(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
         CIllState::Check => {
             println!("Currently in checking state, no abort required.")
         }
-        CIllState::WaitBlock(_) => {
+        CIllState::Block(_) => {
             rp.clear_cti()?;
             println!("Successfully aborted the CTI.");
             rp.set_cill_state(CIllState::Check)?;
         }
-        CIllState::WaitSelect => {
+        CIllState::Select => {
             println!(
                 "Waiting to select a non-inductive assertion for CTI generation, no abort required."
             )
