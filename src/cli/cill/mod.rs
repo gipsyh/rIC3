@@ -245,10 +245,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
 
 fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     if matches!(state, CIllState::Select) {
-        println!(
-            "please `select` a non-inductive assertion for CTI generation instead of `check`."
-        );
-        return Ok(());
+        rp.set_cill_state(CIllState::Check)?;
     }
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     recreate_dir(rp.path("tmp"))?;
