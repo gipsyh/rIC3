@@ -19,7 +19,14 @@ impl CIll {
         let cti = fs::read_to_string(&cti_file)?;
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
         assert!(cti.len() == self.uts.num_unroll + 1);
-        let mut assume = Vec::new();
+        let mut assume: Vec<Term> = self
+            .uts
+            .ts
+            .bad
+            .iter()
+            .map(|t| !self.uts.next(t, self.uts.num_unroll))
+            .collect();
+        assume[cti.bad_id] = !&assume[cti.bad_id];
         for k in 0..self.uts.num_unroll {
             for input in cti.input[k].iter() {
                 let kt = self.uts.next(input.t(), k);
