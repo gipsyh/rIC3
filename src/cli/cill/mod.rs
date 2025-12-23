@@ -2,6 +2,7 @@ mod cti;
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::logger_init;
 use anyhow::Ok;
 use bitwuzla::Bitwuzla;
 use btor::Btor;
@@ -228,10 +229,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
         unsafe { env::set_var("RUST_LOG", "info") };
     }
-    env_logger::Builder::from_default_env()
-        .format_timestamp(None)
-        .format_target(false)
-        .init();
+    logger_init();
 
     let rp = Ric3Proj::new()?;
     let cill_state = rp.get_cill_state()?;
