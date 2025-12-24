@@ -15,7 +15,7 @@ use giputils::{
     bitvec::BitVec,
     hash::{GHashMap, GHashSet},
 };
-use log::{debug, error};
+use log::{debug, error, warn};
 use logicrs::{
     Lit, Var, VarSymbols,
     fol::{
@@ -74,7 +74,11 @@ pub struct BtorFrontend {
 
 impl BtorFrontend {
     pub fn new(btor: Btor) -> Self {
-        let (owts, symbols) = WlTransys::from_btor(&btor);
+        let (mut owts, symbols) = WlTransys::from_btor(&btor);
+        if owts.bad.is_empty() {
+            warn!("empty property in btor");
+            owts.bad.push(Term::bool_const(false));
+        }
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);

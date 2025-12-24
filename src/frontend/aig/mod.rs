@@ -144,6 +144,9 @@ impl AigFrontend {
                 warn!("outputs in aiger are ignored");
                 oaig.outputs.clear();
             }
+        } else if oaig.bads.is_empty() {
+            warn!("empty property in aiger");
+            oaig.bads.push(AigEdge::constant(false));
         }
         let mut aig = oaig.clone();
         if !aig.justice.is_empty() {
