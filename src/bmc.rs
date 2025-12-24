@@ -1,6 +1,7 @@
 use crate::{
     Engine, McResult, McWitness,
     config::{EngineConfigBase, PreprocConfig},
+    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
@@ -9,7 +10,7 @@ use log::info;
 use logicrs::satif::Satif;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::{ops::Deref, time::Duration};
+use std::time::Duration;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct BMCConfig {
@@ -33,13 +34,7 @@ pub struct BMCConfig {
     pub dyn_step: bool,
 }
 
-impl Deref for BMCConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+impl_config_deref!(BMCConfig);
 
 pub struct BMC {
     ots: Transys,

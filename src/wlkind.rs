@@ -1,6 +1,7 @@
 use crate::{
     Engine, McProof, McResult, McWitness,
     config::EngineConfigBase,
+    impl_config_deref,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, certify::WlProof, unroll::WlTransysUnroll},
 };
@@ -9,7 +10,6 @@ use giputils::hash::GHashMap;
 use log::{error, info};
 use logicrs::fol::{Sort, Term, op};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct WlKindConfig {
@@ -17,13 +17,7 @@ pub struct WlKindConfig {
     pub base: EngineConfigBase,
 }
 
-impl Deref for WlKindConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+impl_config_deref!(WlKindConfig);
 
 pub struct WlKind {
     uts: WlTransysUnroll,

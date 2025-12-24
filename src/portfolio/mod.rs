@@ -1,5 +1,5 @@
 use crate::config::{EngineConfig, EngineConfigBase};
-use crate::{Engine, McResult};
+use crate::{Engine, McResult, impl_config_deref};
 use clap::{Args, Parser};
 use giputils::logger::with_log_level;
 use log::{error, info};
@@ -7,7 +7,6 @@ use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::Sender;
 use std::thread::{JoinHandle, spawn};
 use std::time::Instant;
@@ -41,19 +40,7 @@ pub struct PortfolioConfig {
     pub wmem_limit: usize,
 }
 
-impl Deref for PortfolioConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl DerefMut for PortfolioConfig {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+impl_config_deref!(PortfolioConfig, mut);
 
 impl Default for PortfolioConfig {
     fn default() -> Self {

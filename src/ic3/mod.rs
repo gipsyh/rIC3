@@ -3,6 +3,7 @@ use crate::{
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs},
+    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
 };
@@ -15,10 +16,7 @@ use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Deref, DerefMut},
-    time::Instant,
-};
+use std::time::Instant;
 use utils::Statistic;
 
 mod activity;
@@ -91,19 +89,7 @@ pub struct IC3Config {
     pub parent_lemma: bool,
 }
 
-impl Deref for IC3Config {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl DerefMut for IC3Config {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+impl_config_deref!(IC3Config, mut);
 
 impl Default for IC3Config {
     fn default() -> Self {
