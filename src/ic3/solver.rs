@@ -32,6 +32,12 @@ impl IC3 {
     pub(super) fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
         !self.solvers[frame].solve(lemma)
     }
+    
+    #[inline]
+    #[allow(unused)]
+    pub(super) fn blocked(&mut self, frame: usize, cube: &LitVec, strengthen: bool) -> bool {
+        self.solvers[frame - 1].inductive(&cube, strengthen)
+    }
 
     pub(super) fn blocked_with_ordered(
         &mut self,
@@ -87,8 +93,7 @@ impl IC3 {
             }
         }
         let inn: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
-            cube.sort();
-            cube.reverse();
+            cube.sort_by(|a, b| b.cmp(a));
         });
         let act: Box<dyn FnMut(&mut LitVec)> = Box::new(|cube: &mut LitVec| {
             self.activity.sort_by_activity(cube, false);
