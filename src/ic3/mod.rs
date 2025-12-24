@@ -58,7 +58,7 @@ pub struct IC3Config {
     #[arg(long = "ctp", default_value_t = false)]
     pub ctp: bool,
 
-    /// internal signals (FMCAD'21)
+    /// internal signals (FMCAD'21 https://doi.org/10.34727/2021/isbn.978-3-85448-046-4_14)
     #[arg(long = "inn", default_value_t = false)]
     pub inn: bool,
 
@@ -84,7 +84,7 @@ pub struct IC3Config {
     #[arg(long = "abs-array", default_value_t = false)]
     pub abs_array: bool,
 
-    /// finding parent lemma in mic
+    /// finding parent lemma in mic (CAV'23 https://doi.org/10.1007/978-3-031-37703-7_14)
     #[arg(long = "parent-lemma", action = ArgAction::Set, default_value_t = true)]
     pub parent_lemma: bool,
 }
