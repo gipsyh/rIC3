@@ -2,8 +2,9 @@ use super::{Transys, TransysIf};
 use crate::transys::certify::BlWitness;
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
+use std::ops::Deref;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransysUnroll<T: TransysIf> {
     pub ts: T,
     pub num_unroll: usize,
@@ -13,6 +14,15 @@ pub struct TransysUnroll<T: TransysIf> {
     pub opt: GHashMap<Var, Var>,
     pub connect: Option<Vec<LitVvec>>,
     pub optcst: Option<Vec<LitVvec>>,
+}
+
+impl<T: TransysIf> Deref for TransysUnroll<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.ts
+    }
 }
 
 impl<T: TransysIf> TransysUnroll<T> {
@@ -245,6 +255,9 @@ impl<T: TransysIf> TransysUnroll<T> {
 }
 impl TransysUnroll<Transys> {
     pub fn compile(&self) -> Transys {
+        if self.num_unroll == 0 {
+            return self.ts.clone();
+        }
         let mut input = Vec::new();
         let mut constraint = LitVec::new();
         let mut rel = self.ts.rel.clone();

@@ -401,4 +401,9 @@ impl Satif for DagCnfSolver {
     fn unsat_has(&self, lit: Lit) -> bool {
         self.unsat_core.has(lit)
     }
+
+    #[inline]
+    fn flip_to_none(&mut self, var: Var) -> bool {
+        self.flip_to_none_inner(var)
+    }
 }

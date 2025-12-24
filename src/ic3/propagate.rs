@@ -73,7 +73,12 @@ impl IC3 {
                 return true;
             } else {
                 let target = self.tsctx.lits_next(lemma.cube());
-                let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
+                let (ctp, _) = self.lift.lift(
+                    &mut self.inf_solver,
+                    &target,
+                    &self.tsctx.constraint,
+                    |i, _| i == 0,
+                );
                 if !self.propagete_to_inf_rec(lastf, ctp) {
                     return false;
                 }
@@ -95,7 +100,12 @@ impl IC3 {
                     break;
                 } else {
                     let target = self.tsctx.lits_next(lemma.cube());
-                    let (ctp, _) = self.lift.get_pred(&self.inf_solver, &target, false);
+                    let (ctp, _) = self.lift.lift(
+                        &mut self.inf_solver,
+                        &target,
+                        &self.tsctx.constraint,
+                        |i, _| i == 0,
+                    );
                     if !self.propagete_to_inf_rec(&mut lastf, ctp) {
                         break;
                     }

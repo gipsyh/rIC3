@@ -2,6 +2,7 @@ mod aux;
 pub mod certify;
 mod ctx;
 pub mod frts;
+pub mod lift;
 mod live;
 pub mod nodep;
 mod others;

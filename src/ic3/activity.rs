@@ -52,7 +52,7 @@ impl Activity {
         cube.iter().for_each(|l| self.bump(l.var()));
     }
 
-    pub fn sort_by_activity(&self, cube: &mut LitVec, ascending: bool) {
+    pub fn sort_by_activity(&self, cube: &mut [Lit], ascending: bool) {
         let ascending_func =
             |a: &Lit, b: &Lit| self.activity[*a].partial_cmp(&self.activity[*b]).unwrap();
         if ascending {

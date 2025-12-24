@@ -3,9 +3,7 @@ use crate::{
     transys::{TransysCtx, TransysIf},
 };
 use giputils::grc::Grc;
-use log::error;
 use logicrs::{Lit, LitVec, Var, satif::Satif};
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 
 #[derive(Clone)]
 pub struct TransysSolver {
@@ -13,82 +11,24 @@ pub struct TransysSolver {
     ts: Grc<TransysCtx>,
 
     relind: LitVec,
-    rng: StdRng,
 }
 
 impl TransysSolver {
-    pub fn new(ts: &Grc<TransysCtx>, assert_cst: bool) -> Self {
+    pub fn new(ts: &Grc<TransysCtx>) -> Self {
         let mut dcs = DagCnfSolver::new(&ts.rel);
-        if assert_cst {
-            for c in ts.constraint.iter() {
-                dcs.add_clause(&[*c]);
-            }
+        for c in ts.constraint.iter() {
+            dcs.add_clause(&[*c]);
         }
         Self {
             dcs,
             ts: ts.clone(),
             relind: Default::default(),
-            rng: StdRng::seed_from_u64(0),
         }
     }
 
     #[inline]
     pub fn get_assump(&self) -> &LitVec {
         &self.dcs.assump
-    }
-
-    pub fn get_pred(
-        &mut self,
-        solver: &impl Satif,
-        target: &[Lit],
-        strengthen: bool,
-    ) -> (LitVec, LitVec) {
-        let mut cls: LitVec = target.into();
-        cls.extend_from_slice(&self.ts.constraint);
-        if cls.is_empty() {
-            return (LitVec::new(), LitVec::new());
-        }
-        let cls = !cls;
-        let mut inputs = LitVec::new();
-        for input in self.ts.input.iter() {
-            let lit = input.lit();
-            if let Some(v) = solver.sat_value(lit) {
-                inputs.push(lit.not_if(!v));
-            }
-        }
-        self.dcs.set_domain(cls.iter().cloned());
-        let mut latchs = LitVec::new();
-        for latch in self.ts.latch.iter() {
-            let lit = latch.lit();
-            if self.dcs.domain.has(lit.var())
-                && let Some(v) = solver.sat_value(lit)
-            {
-                latchs.push(lit.not_if(!v));
-            }
-        }
-        for _ in 0.. {
-            if latchs.is_empty() {
-                break;
-            }
-            latchs.shuffle(&mut self.rng);
-            let olen = latchs.len();
-            if let Some(n) = self.dcs.minimal_premise(&inputs, &latchs, &cls) {
-                latchs = n;
-            } else {
-                let fail = target
-                    .iter()
-                    .chain(self.ts.constraint.iter())
-                    .find(|l| !self.sat_value(**l).unwrap())
-                    .unwrap();
-                error!("assert {fail} failed in lift, please report this bug");
-                panic!();
-            };
-            if latchs.len() == olen || !strengthen {
-                break;
-            }
-        }
-        self.dcs.unset_domain();
-        (latchs, inputs)
     }
 
     #[allow(unused)]
@@ -161,11 +101,6 @@ impl TransysSolver {
     }
 
     #[inline]
-    pub fn domain_has(&self, var: Var) -> bool {
-        self.dcs.domain_has(var)
-    }
-
-    #[inline]
     pub fn set_domain(&mut self, domain: impl IntoIterator<Item = Lit>) {
         self.dcs.set_domain(domain);
     }
@@ -221,5 +156,10 @@ impl Satif for TransysSolver {
     #[inline]
     fn unsat_has(&self, lit: Lit) -> bool {
         self.dcs.unsat_has(lit)
+    }
+
+    #[inline]
+    fn flip_to_none(&mut self, var: Var) -> bool {
+        self.dcs.flip_to_none(var)
     }
 }

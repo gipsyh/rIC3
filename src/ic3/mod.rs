@@ -5,7 +5,9 @@ use crate::{
     ic3::{block::BlockResult, localabs::LocalAbs},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
-    transys::{Transys, TransysCtx, TransysIf, certify::Restore, unroll::TransysUnroll},
+    transys::{
+        Transys, TransysCtx, TransysIf, certify::Restore, lift::TsLift, unroll::TransysUnroll,
+    },
 };
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
@@ -114,7 +116,7 @@ pub struct IC3 {
     tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
-    lift: TransysSolver,
+    lift: TsLift,
     frame: Frames,
     obligations: ProofObligationQueue,
     activity: Activity,
@@ -180,9 +182,9 @@ impl IC3 {
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
-        let mut inf_solver = TransysSolver::new(&tsctx, true);
+        let mut inf_solver = TransysSolver::new(&tsctx);
         inf_solver.dcs.set_rseed(rng.random());
-        let lift = TransysSolver::new(&tsctx, false);
+        let lift = TsLift::new(TransysUnroll::new(&ts));
         let localabs = LocalAbs::new(&ts, &cfg);
         Self {
             cfg,
