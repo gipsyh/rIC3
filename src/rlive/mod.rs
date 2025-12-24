@@ -2,13 +2,14 @@ use crate::{
     BlWitness, Engine, McResult, McWitness,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
+    impl_config_deref,
     transys::{Transys, TransysIf, certify::Restore},
 };
 use clap::{Args, Parser};
 use log::{LevelFilter, debug, error, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
 use serde::{Deserialize, Serialize};
-use std::{mem::take, ops::Deref};
+use std::mem::take;
 
 pub struct Rlive {
     #[allow(unused)]
@@ -32,13 +33,7 @@ pub struct RliveConfig {
     pub preproc: PreprocConfig,
 }
 
-impl Deref for RliveConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+impl_config_deref!(RliveConfig);
 
 impl Rlive {
     #[inline]

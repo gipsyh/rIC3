@@ -1,6 +1,7 @@
 use crate::{
     BlProof, Engine, McProof, McResult, McWitness,
     config::{EngineConfigBase, PreprocConfig},
+    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
@@ -8,7 +9,6 @@ use clap::Args;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, satif::Satif};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct KindConfig {
@@ -23,13 +23,7 @@ pub struct KindConfig {
     pub simple_path: bool,
 }
 
-impl Deref for KindConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+impl_config_deref!(KindConfig);
 
 pub struct Kind {
     uts: TransysUnroll<NoDepTransys>,

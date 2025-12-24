@@ -1,6 +1,7 @@
 use crate::{
     Engine, McResult, McWitness,
     config::EngineConfigBase,
+    impl_config_deref,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
@@ -8,7 +9,6 @@ use clap::Args;
 use giputils::hash::GHashMap;
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct WlBMCConfig {
@@ -16,13 +16,7 @@ pub struct WlBMCConfig {
     pub base: EngineConfigBase,
 }
 
-impl Deref for WlBMCConfig {
-    type Target = EngineConfigBase;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+impl_config_deref!(WlBMCConfig);
 
 pub struct WlBMC {
     cfg: WlBMCConfig,
