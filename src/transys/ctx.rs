@@ -7,7 +7,7 @@ pub struct TransysCtx {
     pub latch: Vec<Var>,
     pub init: LitVvec,
     pub init_map: VarMap<Option<Lit>>,
-    pub bad: Lit,
+    pub bad: LitVec,
     pub constraint: LitVec,
     pub rel: DagCnf,
     is_latch: VarMap<bool>,
@@ -123,13 +123,12 @@ impl Transys {
                 }
             }
         }
-        assert!(self.bad.len() == 1);
         TransysCtx {
             input,
             latch,
             init,
             init_map,
-            bad: self.bad[0],
+            bad: self.bad.clone(),
             constraint: self.constraint.clone(),
             rel: self.rel.clone(),
             is_latch,

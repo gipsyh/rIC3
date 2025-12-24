@@ -7,6 +7,7 @@ pub mod frontend;
 mod gipsat;
 pub mod ic3;
 pub mod kind;
+pub mod mp;
 pub mod portfolio;
 pub mod rlive;
 pub mod tracer;
@@ -55,9 +56,7 @@ pub enum McWitness {
 pub trait Engine: Send {
     fn check(&mut self) -> McResult;
 
-    fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {
-        panic!("unsupport adding tracer");
-    }
+    fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {}
 
     fn statistic(&mut self) {}
 

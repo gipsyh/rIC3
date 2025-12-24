@@ -13,7 +13,7 @@ use giputils::{
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::{LitVec, VarSymbols, fol::Term};
+use logicrs::{VarSymbols, fol::Term};
 use rIC3::{
     Engine, McResult,
     frontend::{Frontend, btor::BtorFrontend},
@@ -129,20 +129,16 @@ impl CIll {
         let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
         cfg.time_limit = Some(20);
-        cfg.inn = true;
+        cfg.pred_prop = true;
+        cfg.local_proof = true;
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
         with_log_level(LevelFilter::Warn, || {
             let mut joins = Vec::new();
             for i in 0..self.ts.bad.len() {
-                let mut ts = self.ts.clone();
-                ts.bad = LitVec::from(self.ts.bad[i]);
-                for j in 0..self.ts.bad.len() {
-                    if i != j {
-                        ts.constraint.push(!self.ts.bad[j]);
-                    }
-                }
-                let cfg = cfg.clone();
+                let ts = self.ts.clone();
+                let mut cfg = cfg.clone();
+                cfg.prop = Some(i);
                 joins.push(spawn(move || {
                     let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
                     ic3.check()
@@ -157,21 +153,12 @@ impl CIll {
                 info!("IC3 proved p{id} is inductive");
             }
         }
-        let mut assume: Vec<Term> = self
-            .uts
-            .ts
-            .bad
-            .iter()
-            .map(|t| !self.uts.next(t, self.uts.num_unroll))
-            .collect();
-        for i in 0..self.uts.ts.bad.len() {
-            if res[i] {
+        for (r, b) in res.iter_mut().zip(self.uts.ts.bad.iter()) {
+            if *r {
                 continue;
             }
-            let nb = assume[i].clone();
-            assume[i] = !&nb;
-            res[i] = !self.slv.solve(&assume);
-            assume[i] = nb;
+            let bad = self.uts.next(b, self.uts.num_unroll);
+            *r = !self.slv.solve(&[bad]);
         }
         self.res = res;
         self.res.iter().all(|l| *l)

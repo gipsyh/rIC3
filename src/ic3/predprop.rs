@@ -16,10 +16,13 @@ pub struct PredProp {
 }
 
 impl PredProp {
-    pub fn new(ts: &Transys) -> Self {
+    pub fn new(ts: &Transys, local_proof: Option<usize>) -> Self {
         let mut uts = TransysUnroll::new(ts);
         uts.unroll();
         let mut bts = uts.compile();
+        if let Some(lp) = local_proof {
+            bts.bad = LitVec::from([bts.bad[lp]]);
+        }
         bts.constraint.extend(!&ts.bad);
         let slv = TransysSolver::new(&Grc::new(bts.ctx()));
         let lift = TsLift::new(uts);
@@ -44,8 +47,13 @@ impl IC3 {
         if self.predprop.is_none() {
             return true;
         }
-        let bad = self.tsctx.bad;
-        if self.solvers[0].solve(&self.tsctx.bad.cube()) {
+        let bad = self.tsctx.bad.clone();
+        let id = if self.cfg.local_proof {
+            self.cfg.prop.unwrap()
+        } else {
+            0
+        };
+        if self.solvers[0].solve(&[self.tsctx.bad[id]]) {
             let (input, bad) = self.solvers[0].trivial_pred();
             self.add_obligation(ProofObligation::new(
                 0,
@@ -57,8 +65,8 @@ impl IC3 {
             info!("counter-example found in base checking");
             return false;
         }
-        self.tsctx.constraint.push(!bad);
-        self.ts.constraint.push(!bad);
+        self.tsctx.constraint.extend(!&bad);
+        self.ts.constraint.extend(!bad);
         self.lift = TsLift::new(TransysUnroll::new(&self.ts));
         self.inf_solver = TransysSolver::new(&self.tsctx);
         true

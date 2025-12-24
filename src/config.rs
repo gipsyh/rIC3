@@ -1,6 +1,6 @@
 use crate::{
-    bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, portfolio::PortfolioConfig,
-    rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
+    bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, mp::MultiPropConfig,
+    portfolio::PortfolioConfig, rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
 };
 use clap::{ArgAction, Args, Parser};
 use enum_as_inner::EnumAsInner;
@@ -29,23 +29,27 @@ macro_rules! impl_config_deref {
 
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfigBase {
-    /// start bound
+    /// Property ID. If not specified, all properties are checked.
+    #[arg(long = "prop")]
+    pub prop: Option<usize>,
+
+    /// Start bound
     #[arg(long = "start", default_value_t = 0)]
     pub start: usize,
 
-    /// max bound to check
+    /// Max bound to check
     #[arg(long = "end", default_value_t = usize::MAX)]
     pub end: usize,
 
-    /// step length
+    /// Step length
     #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     pub step: u32,
 
-    /// random seed
+    /// Random seed
     #[arg(long, default_value_t = 0)]
     pub rseed: u64,
 
-    /// time limit in seconds
+    /// Time limit in seconds
     #[arg(long)]
     pub time_limit: Option<u64>,
 }
@@ -53,6 +57,7 @@ pub struct EngineConfigBase {
 impl Default for EngineConfigBase {
     fn default() -> Self {
         Self {
+            prop: None,
             start: 0,
             end: usize::MAX,
             step: 1,
@@ -76,6 +81,8 @@ pub enum EngineConfig {
     WlKind(WlKindConfig),
     /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive(RliveConfig),
+    /// Multi Properties
+    MultiProp(MultiPropConfig),
     /// portfolio
     Portfolio(PortfolioConfig),
 }

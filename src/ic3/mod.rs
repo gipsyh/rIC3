@@ -94,6 +94,10 @@ pub struct IC3Config {
     /// predicate property
     #[arg(long = "pred-prop", default_value_t = false)]
     pub pred_prop: bool,
+
+    /// local proof (can only used in multi-prop)
+    #[arg(long = "local-proof", default_value_t = false)]
+    pub local_proof: bool,
 }
 
 impl_config_deref!(IC3Config);
@@ -123,8 +127,18 @@ impl IC3Config {
             }
         }
         if self.full_bad {
-            error!("full-bad can't be used no");
+            error!("full-bad can't be used now");
             panic!();
+        }
+        if self.local_proof {
+            if !self.pred_prop {
+                error!("local-proof should used with pred-prop");
+                panic!();
+            }
+            if self.prop.is_none() {
+                error!("A property ID must be specified for local proof.");
+                panic!();
+            }
         }
     }
 }
@@ -192,7 +206,13 @@ impl IC3 {
     pub fn new(cfg: IC3Config, mut ts: Transys, symbols: VarSymbols) -> Self {
         cfg.validate();
         let ots = ts.clone();
-        ts.compress_bads();
+        if let Some(prop) = cfg.prop {
+            if !cfg.local_proof {
+                ts.bad = LitVec::from(ts.bad[prop]);
+            }
+        } else {
+            ts.compress_bads();
+        }
         let rst = Restore::new(&ts);
         let rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
@@ -209,7 +229,9 @@ impl IC3 {
         let inf_solver = TransysSolver::new(&tsctx);
         let lift = TsLift::new(TransysUnroll::new(&ts));
         let localabs = LocalAbs::new(&ts, &cfg);
-        let predprop = cfg.pred_prop.then(|| PredProp::new(&ts));
+        let predprop = cfg
+            .pred_prop
+            .then(|| PredProp::new(&ts, cfg.local_proof.then_some(cfg.prop.unwrap())));
         Self {
             cfg,
             ts,

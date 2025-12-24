@@ -12,11 +12,8 @@ impl IC3 {
             self.pred_prop_get_bad()
         } else {
             let start = Instant::now();
-            let res = self
-                .solvers
-                .last_mut()
-                .unwrap()
-                .solve(&self.tsctx.bad.cube());
+            assert!(self.tsctx.bad.len() == 1);
+            let res = self.solvers.last_mut().unwrap().solve(&[self.tsctx.bad[0]]);
             self.statistic.block.get_bad_time += start.elapsed();
             res.then(|| {
                 if self.cfg.full_bad {

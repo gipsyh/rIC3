@@ -10,6 +10,7 @@ use rIC3::{
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
     ic3::IC3,
     kind::Kind,
+    mp::MultiProp,
     portfolio::{Portfolio, PortfolioConfig},
     rlive::Rlive,
     tracer::LogTracer,
@@ -115,6 +116,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             EngineConfig::IC3(cfg) => Box::new(IC3::new(cfg.clone(), ts, symbols)),
             EngineConfig::Kind(cfg) => Box::new(Kind::new(cfg.clone(), ts)),
             EngineConfig::BMC(cfg) => Box::new(BMC::new(cfg.clone(), ts)),
+            EngineConfig::MultiProp(cfg) => Box::new(MultiProp::new(cfg.clone(), ts)),
             EngineConfig::Rlive(cfg) => Box::new(Rlive::new(cfg.clone(), ts)),
             _ => unreachable!(),
         }
