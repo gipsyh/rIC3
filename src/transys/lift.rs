@@ -30,12 +30,14 @@ impl TsLift {
         cls = !cls;
         let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let mut inputs = Vec::new();
+        let mut inputs_flatten = LitVec::new();
         for k in 0..=self.ts.num_unroll {
             let mut input = LitVec::new();
             for i in self.ts.input() {
                 let lit = self.ts.lit_next(i.lit(), k);
                 if let Some(v) = satif.sat_value(lit) {
-                    input.push(lit.not_if(!v));
+                    input.push(i.lit().not_if(!v));
+                    inputs_flatten.push(lit.not_if(!v));
                 }
             }
             inputs.push(input);
@@ -51,7 +53,6 @@ impl TsLift {
                 latchs.push(lit.not_if(!v));
             }
         }
-        let inputs_flatten: LitVec = inputs.iter().flatten().copied().collect();
         for i in 0.. {
             if latchs.is_empty() {
                 break;
