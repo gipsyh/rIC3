@@ -40,7 +40,7 @@ pub struct PortfolioConfig {
     pub wmem_limit: usize,
 }
 
-impl_config_deref!(PortfolioConfig, mut);
+impl_config_deref!(PortfolioConfig);
 
 impl Default for PortfolioConfig {
     fn default() -> Self {

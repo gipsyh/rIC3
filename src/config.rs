@@ -18,15 +18,6 @@ macro_rules! impl_config_deref {
                 &self.base
             }
         }
-    };
-    ($config_type:ty, mut) => {
-        impl std::ops::Deref for $config_type {
-            type Target = $crate::config::EngineConfigBase;
-
-            fn deref(&self) -> &Self::Target {
-                &self.base
-            }
-        }
 
         impl std::ops::DerefMut for $config_type {
             fn deref_mut(&mut self) -> &mut Self::Target {

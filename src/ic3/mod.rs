@@ -89,7 +89,7 @@ pub struct IC3Config {
     pub parent_lemma: bool,
 }
 
-impl_config_deref!(IC3Config, mut);
+impl_config_deref!(IC3Config);
 
 impl Default for IC3Config {
     fn default() -> Self {
