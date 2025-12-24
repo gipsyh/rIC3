@@ -32,7 +32,7 @@ impl IC3 {
     pub(super) fn sat_contained(&mut self, frame: usize, lemma: &LitOrdVec) -> bool {
         !self.solvers[frame].solve(lemma)
     }
-    
+
     #[inline]
     #[allow(unused)]
     pub(super) fn blocked(&mut self, frame: usize, cube: &LitVec, strengthen: bool) -> bool {

@@ -7,7 +7,7 @@ use crate::{
 };
 use clap::Args;
 use log::info;
-use logicrs::satif::Satif;
+use logicrs::{LitVec, satif::Satif};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -113,7 +113,7 @@ impl Engine for BMC {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
-            let mut assump = self.uts.lits_next(&self.uts.ts.bad, k);
+            let mut assump: LitVec = self.uts.lits_next(&self.uts.ts.bad, k).collect();
             if self.cfg.kissat {
                 for b in assump.iter() {
                     self.solver.add_clause(&[*b]);

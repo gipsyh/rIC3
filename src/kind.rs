@@ -75,8 +75,11 @@ impl Kind {
 
     pub fn load_bad_to(&mut self, k: usize) {
         while self.slv_bad_k < k + 1 {
-            self.solver
-                .add_clause(&!self.uts.lits_next(&self.uts.ts.bad, self.slv_bad_k));
+            let bad: LitVec = self
+                .uts
+                .lits_next(&self.uts.ts.bad, self.slv_bad_k)
+                .collect();
+            self.solver.add_clause(&!bad);
             self.slv_bad_k += 1;
         }
     }
@@ -98,14 +101,15 @@ impl Engine for Kind {
             self.load_trans_to(k);
             if k > 0 {
                 self.load_bad_to(k - 1);
-                let res = self.solver.solve(&self.uts.lits_next(&self.uts.ts.bad, k));
+                let assump: LitVec = self.uts.lits_next(&self.uts.ts.bad, k).collect();
+                let res = self.solver.solve(&assump);
                 if !res {
                     self.tracer.trace_res(McResult::Safe);
                     return McResult::Safe;
                 }
             }
             let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
-            assump.extend_from_slice(&self.uts.lits_next(&self.uts.ts.bad, k));
+            assump.extend(self.uts.lits_next(&self.uts.ts.bad, k));
             if self.solver.solve(&assump) {
                 self.tracer.trace_res(McResult::Unsafe(k));
                 return McResult::Unsafe(k);

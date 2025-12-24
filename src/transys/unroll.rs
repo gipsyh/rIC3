@@ -98,11 +98,13 @@ impl<T: TransysIf> TransysUnroll<T> {
 
     #[inline]
     #[allow(unused)]
-    pub fn lits_next<R: FromIterator<Lit> + AsRef<[Lit]>>(&self, lits: &R, num: usize) -> R {
-        lits.as_ref()
-            .iter()
-            .map(|l| self.lit_next(*l, num))
-            .collect()
+    pub fn lits_next(
+        &self,
+        lits: impl IntoIterator<Item = impl AsRef<Lit>>,
+        num: usize,
+    ) -> impl Iterator<Item = Lit> {
+        lits.into_iter()
+            .map(move |l| self.lit_next(*l.as_ref(), num))
     }
 
     fn single_simple_path(&mut self, i: usize, j: usize) {
@@ -259,7 +261,7 @@ impl TransysUnroll<Transys> {
                 if v <= rel.max_var() && rel.has_rel(v) {
                     continue;
                 }
-                let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, u)).collect();
+                let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, u).collect()).collect();
                 rel.add_rel(v, &cls);
             }
         }
@@ -270,7 +272,7 @@ impl TransysUnroll<Transys> {
             .map(|(v, n)| (*v, self.lit_next(*n, self.num_unroll)))
             .collect();
         assert!(self.ts.justice.is_empty());
-        let bad = self.lits_next(&self.ts.bad, self.num_unroll);
+        let bad = self.lits_next(&self.ts.bad, self.num_unroll).collect();
         Transys {
             input,
             latch: self.ts.latch.clone(),
@@ -295,7 +297,7 @@ impl TransysUnroll<Transys> {
             if v <= rel.max_var() && rel.has_rel(v) {
                 continue;
             }
-            let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, 1)).collect();
+            let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, 1).collect()).collect();
             rel.add_rel(v, &cls);
         }
         let mut latch = Vec::new();
