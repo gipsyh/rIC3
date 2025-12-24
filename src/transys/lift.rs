@@ -21,15 +21,9 @@ impl TsLift {
         &mut self,
         satif: &mut impl Satif,
         target: impl IntoIterator<Item = impl AsRef<Lit>>,
-        constraint: impl IntoIterator<Item = impl AsRef<Lit>>,
         mut order: impl FnMut(usize, &mut [Lit]) -> bool,
     ) -> (LitVec, Vec<LitVec>) {
         let mut cls: LitVec = target.into_iter().map(|l| *l.as_ref()).collect();
-        for c in constraint {
-            for k in 0..=self.ts.num_unroll {
-                cls.push(self.ts.lit_next(*c.as_ref(), k));
-            }
-        }
         if cls.is_empty() {
             return (LitVec::new(), vec![]);
         }

@@ -2,7 +2,7 @@ use crate::{
     BlProof, BlWitness, Engine, McProof, McResult, McWitness,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
-    ic3::{block::BlockResult, localabs::LocalAbs},
+    ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{
@@ -16,7 +16,7 @@ use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, error, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use utils::Statistic;
@@ -27,6 +27,7 @@ mod block;
 mod frame;
 mod localabs;
 mod mic;
+mod predprop;
 mod proofoblig;
 mod propagate;
 mod solver;
@@ -89,6 +90,10 @@ pub struct IC3Config {
     /// finding parent lemma in mic (CAV'23 https://doi.org/10.1007/978-3-031-37703-7_14)
     #[arg(long = "parent-lemma", action = ArgAction::Set, default_value_t = true)]
     pub parent_lemma: bool,
+
+    /// predicate property
+    #[arg(long = "pred-prop", default_value_t = false)]
+    pub pred_prop: bool,
 }
 
 impl_config_deref!(IC3Config);
@@ -103,7 +108,22 @@ impl Default for IC3Config {
 impl IC3Config {
     fn validate(&self) {
         if self.dynamic && self.drop_po {
-            error!("cannot enable both ic3-dynamic and ic3-drop-po");
+            error!("cannot enable both dynamic and drop-po");
+            panic!();
+        }
+        if self.inn {
+            let pre = "cannot enable both inn and";
+            if self.pred_prop {
+                error!("{pre} pred-prop");
+                panic!();
+            }
+            if self.abs_cst || self.abs_trans {
+                error!("{pre} (abs_cst or abs_trans)");
+                panic!();
+            }
+        }
+        if self.full_bad {
+            error!("full-bad can't be used no");
             panic!();
         }
     }
@@ -125,8 +145,9 @@ pub struct IC3 {
     ots: Transys,
     rst: Restore,
     auxiliary_var: Vec<Var>,
-    rng: StdRng,
+    predprop: Option<PredProp>,
 
+    rng: StdRng,
     filog: IntervalLogger,
     tracer: Tracer,
 }
@@ -140,6 +161,9 @@ impl IC3 {
     fn extend(&mut self) {
         let nl = self.solvers.len();
         debug!("extending IC3 to level {nl}");
+        if let Some(predprop) = self.predprop.as_mut() {
+            predprop.extend(self.frame.inf.iter().map(|l| l.cube()));
+        }
         let solver = self.inf_solver.clone();
         self.solvers.push(solver);
         self.frame.push(Frame::new());
@@ -170,7 +194,7 @@ impl IC3 {
         let ots = ts.clone();
         ts.compress_bads();
         let rst = Restore::new(&ts);
-        let mut rng = StdRng::seed_from_u64(cfg.rseed);
+        let rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut uts = TransysUnroll::new(&ts);
@@ -182,10 +206,10 @@ impl IC3 {
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
-        let mut inf_solver = TransysSolver::new(&tsctx);
-        inf_solver.dcs.set_rseed(rng.random());
+        let inf_solver = TransysSolver::new(&tsctx);
         let lift = TsLift::new(TransysUnroll::new(&ts));
         let localabs = LocalAbs::new(&ts, &cfg);
+        let predprop = cfg.pred_prop.then(|| PredProp::new(&ts));
         Self {
             cfg,
             ts,
@@ -202,6 +226,7 @@ impl IC3 {
             auxiliary_var: Vec::new(),
             ots,
             rst,
+            predprop,
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
@@ -220,6 +245,10 @@ impl IC3 {
 impl Engine for IC3 {
     fn check(&mut self) -> McResult {
         self.extend();
+        if !self.prep_prop_base() {
+            self.tracer.trace_res(McResult::Unsafe(0));
+            return McResult::Unsafe(0);
+        }
         loop {
             let start = Instant::now();
             debug!("blocking phase begin");
@@ -245,7 +274,14 @@ impl Engine for IC3 {
                     debug!("bad state found in frame {}", self.level());
                     trace!("bad = {bad}");
                     let bad = LitOrdVec::new(bad);
-                    self.add_obligation(ProofObligation::new(self.level(), bad, inputs, 0, None))
+                    let depth = inputs.len() - 1;
+                    self.add_obligation(ProofObligation::new(
+                        self.level(),
+                        bad,
+                        inputs,
+                        depth,
+                        None,
+                    ))
                 } else {
                     break;
                 }
@@ -305,8 +341,12 @@ impl Engine for IC3 {
             assert!(b.frame == 0);
             let mut b = Some(b);
             while let Some(bad) = b {
-                res.state.push(bad.state.iter().cloned().collect());
-                res.input.push(bad.input.iter().cloned().collect());
+                res.state.push(bad.state.cube().clone());
+                res.input.push(bad.input[0].clone());
+                for i in &bad.input[1..] {
+                    res.input.push(i.clone());
+                    res.state.push(LitVec::new());
+                }
                 b = bad.next.clone();
             }
             res

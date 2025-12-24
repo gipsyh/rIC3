@@ -240,6 +240,11 @@ impl IC3 {
         trace!("add F{frame} lemma {:?}", self.lits_symbols(lemma.clone()));
         if frame == 0 {
             assert!(self.frame.len() == 1);
+            if self.level() == frame
+                && let Some(predprop) = self.predprop.as_mut()
+            {
+                predprop.add_lemma(&lemma);
+            }
             self.solvers[0].add_clause(&!lemma.cube());
             self.frame[0].push(FrameLemma::new(lemma, po, None));
             return false;
@@ -259,6 +264,11 @@ impl IC3 {
                         let clause = !lemma.cube();
                         for k in i + 1..=frame {
                             self.solvers[k].add_clause(&clause);
+                        }
+                        if self.level() == frame
+                            && let Some(predprop) = self.predprop.as_mut()
+                        {
+                            predprop.add_lemma(&lemma);
                         }
                         self.frame[frame].push(FrameLemma::new(lemma, po, None));
                         self.frame.early = self.frame.early.min(i + 1);
@@ -283,6 +293,11 @@ impl IC3 {
         let begin = begin.unwrap_or(1);
         for i in begin..=frame {
             self.solvers[i].add_clause(&clause);
+        }
+        if self.level() == frame
+            && let Some(predprop) = self.predprop.as_mut()
+        {
+            predprop.add_lemma(&lemma);
         }
         self.frame[frame].push(FrameLemma::new(lemma, po, None));
         self.frame.early = self.frame.early.min(begin);

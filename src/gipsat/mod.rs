@@ -2,7 +2,6 @@ mod analyze;
 mod cdb;
 mod domain;
 mod eq;
-mod lift;
 mod propagate;
 mod search;
 mod simplify;
@@ -341,6 +340,25 @@ impl DagCnfSolver {
     pub fn sat_value_iter(&self) -> impl Iterator<Item = &'_ Lit> {
         let constrain_act = self.constrain_act;
         self.trail.iter().filter(move |l| l.var() != constrain_act)
+    }
+
+    pub fn minimal_premise(
+        &mut self,
+        assump: &[Lit],
+        premise: &[Lit],
+        consequent: &[Lit],
+    ) -> Option<LitVec> {
+        let assump = LitVec::from_iter(assump.iter().chain(premise.iter()).copied());
+        if self.solve_with_constraint(&assump, vec![LitVec::from(consequent)]) {
+            return None;
+        }
+        Some(
+            premise
+                .iter()
+                .filter(|l| self.unsat_has(**l))
+                .copied()
+                .collect(),
+        )
     }
 }
 

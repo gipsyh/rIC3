@@ -6,22 +6,26 @@ use rand::{Rng, seq::SliceRandom};
 use std::time::Instant;
 
 impl IC3 {
-    pub(super) fn get_bad(&mut self) -> Option<(LitVec, LitVec)> {
+    pub(super) fn get_bad(&mut self) -> Option<(LitVec, Vec<LitVec>)> {
         trace!("getting bad state in frame {}", self.level());
-        let start = Instant::now();
-        let res = self
-            .solvers
-            .last_mut()
-            .unwrap()
-            .solve(&self.tsctx.bad.cube());
-        self.statistic.block.get_bad_time += start.elapsed();
-        res.then(|| {
-            if self.cfg.full_bad {
-                self.get_full_pred(self.solvers.len())
-            } else {
-                self.get_pred(self.solvers.len(), true)
-            }
-        })
+        if self.predprop.is_some() {
+            self.pred_prop_get_bad()
+        } else {
+            let start = Instant::now();
+            let res = self
+                .solvers
+                .last_mut()
+                .unwrap()
+                .solve(&self.tsctx.bad.cube());
+            self.statistic.block.get_bad_time += start.elapsed();
+            res.then(|| {
+                if self.cfg.full_bad {
+                    self.get_full_pred(self.solvers.len())
+                } else {
+                    self.get_pred(self.solvers.len(), true)
+                }
+            })
+        }
     }
 }
 
@@ -62,7 +66,7 @@ impl IC3 {
         self.solvers[frame - 1].inductive_with_constrain(&ordered_cube, strengthen, constraint)
     }
 
-    pub(super) fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, LitVec) {
+    pub(super) fn get_pred(&mut self, frame: usize, strengthen: bool) -> (LitVec, Vec<LitVec>) {
         let start = Instant::now();
         let solver = &mut self.solvers[frame - 1];
         let mut cls: LitVec = solver.get_assump().clone();
@@ -93,12 +97,12 @@ impl IC3 {
             };
             true
         };
-        let (state, input) = self.lift.lift(solver, cls, cst, order);
+        let (state, input) = self.lift.lift(solver, cls.iter().chain(cst.iter()), order);
         self.statistic.block.get_pred_time += start.elapsed();
-        (state, input[0].clone())
+        (state, input)
     }
 
-    pub(super) fn get_full_pred(&mut self, frame: usize) -> (LitVec, LitVec) {
+    pub(super) fn get_full_pred(&mut self, frame: usize) -> (LitVec, Vec<LitVec>) {
         let solver = &mut self.solvers[frame - 1];
         let mut inputs = LitVec::new();
         for input in self.tsctx.input.iter() {
@@ -118,7 +122,7 @@ impl IC3 {
                 latchs.push(lit.not_if(self.rng.random_bool(0.5)));
             }
         }
-        (latchs, inputs)
+        (latchs, vec![inputs])
     }
 
     #[allow(unused)]
