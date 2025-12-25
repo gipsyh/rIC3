@@ -231,7 +231,7 @@ impl IC3 {
         let localabs = LocalAbs::new(&ts, &cfg);
         let predprop = cfg
             .pred_prop
-            .then(|| PredProp::new(&ts, cfg.local_proof.then_some(cfg.prop.unwrap())));
+            .then(|| PredProp::new(&ts, cfg.local_proof.then(|| cfg.prop.unwrap())));
         Self {
             cfg,
             ts,
