@@ -110,4 +110,24 @@ impl WlTransysUnroll {
         }
         witness
     }
+
+    /// Helper function to compute bad_id for a witness given the original WlTransys.
+    /// This function determines which bad property is violated by evaluating each bad
+    /// property at the last unroll step and finding which one evaluates to true.
+    pub fn compute_bad_id(&self, witness: &mut WlWitness, owts: &WlTransys, slv: &mut Bitwuzla) {
+        let mut cache = GHashMap::new();
+        let mut ilmap = GHashMap::new();
+        for i in owts.input.iter().chain(owts.latch.iter()) {
+            ilmap.insert(i, self.next(i, self.num_unroll));
+        }
+        let bads: Vec<_> = owts
+            .bad
+            .iter()
+            .map(|b| b.cached_apply(&|t| ilmap.get(t).cloned(), &mut cache))
+            .collect();
+        witness.bad_id = bads
+            .into_iter()
+            .position(|b| slv.sat_value(&b).is_some_and(|v| v.bool()))
+            .unwrap();
+    }
 }
