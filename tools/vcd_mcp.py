@@ -125,6 +125,27 @@ def _value_at(times: Sequence[int], values: Sequence[str], t: int) -> str:
     return values[idx]
 
 
+def _format_hex(val: str) -> str:
+    if val is None:
+        return "x"
+
+    s = str(val).strip()
+    if not s:
+        return s
+
+    # vcdvcd may return vectors as "0101" or "b0101"; normalize.
+    if (s.startswith("b") or s.startswith("B")) and len(s) > 1:
+        s_bits = s[1:]
+    elif s.startswith("0b") or s.startswith("0B"):
+        s_bits = s[2:]
+    else:
+        s_bits = s
+
+    if s_bits and all(c in "01" for c in s_bits):
+        return hex(int(s_bits, 2))
+    return s
+
+
 def _steps_markdown_table(
     vcd_path: str,
     signals: Sequence[str],
@@ -155,7 +176,7 @@ def _steps_markdown_table(
     lines: List[str] = [header, sep]
     for s in signal_names:
         times, values = sig_indexes[s]
-        row_vals = [_value_at(times, values, t) for t in step_times]
+        row_vals = [_format_hex(_value_at(times, values, t)) for t in step_times]
         lines.append("| " + s + " | " + " | ".join(row_vals) + " |")
 
     return "\n".join(lines)
