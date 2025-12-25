@@ -5,6 +5,7 @@ use crate::ic3::{
 };
 use log::{debug, info};
 use logicrs::{LitOrdVec, LitVec, satif::Satif};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 pub enum BlockResult {
@@ -84,6 +85,9 @@ impl IC3 {
                 && noc as f64 > limit
             {
                 return BlockResult::BlockLimitExceeded;
+            }
+            if self.stop_ctrl.load(Ordering::Relaxed) {
+                return BlockResult::OverallTimeLimitExceeded;
             }
             if let Some(limit) = self.cfg.time_limit
                 && self.statistic.time.time().as_secs() > limit
