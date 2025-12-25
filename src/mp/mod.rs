@@ -40,10 +40,10 @@ impl MultiProp {
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
         let mut ic3_cfg = IC3Config::default();
-        // ic3_cfg.time_limit = Some(200);
         ic3_cfg.local_proof = true;
         ic3_cfg.pred_prop = true;
-        ic3_cfg.preproc.preproc = false;
+        ic3_cfg.preproc.frts = false;
+        ic3_cfg.preproc.scorr = false;
         Self {
             ots,
             ts,
@@ -76,8 +76,6 @@ impl Engine for MultiProp {
         proof.bad.clear();
         for ic3 in self.ic3.iter_mut() {
             let subp = ic3.proof().into_bl().unwrap().proof;
-            assert!(subp.input == proof.input);
-            assert!(subp.latch == proof.latch);
             let mut map = self.rst.vmap.clone();
             proof.rel.migrate(&subp.rel, subp.bad[0].var(), &mut map);
             dbg!(proof.rel.max_var());

@@ -117,10 +117,6 @@ impl IC3Config {
         }
         if self.inn {
             let pre = "cannot enable both inn and";
-            if self.pred_prop {
-                error!("{pre} pred-prop");
-                panic!();
-            }
             if self.abs_cst || self.abs_trans {
                 error!("{pre} (abs_cst or abs_trans)");
                 panic!();
@@ -217,21 +213,21 @@ impl IC3 {
         let rng = StdRng::seed_from_u64(cfg.rseed);
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
+        ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
+        let predprop = cfg
+            .pred_prop
+            .then(|| PredProp::new(&ts, cfg.local_proof.then(|| cfg.prop.unwrap())));
         if cfg.inn {
             ts = uts.interal_signals();
         }
-        ts.remove_gate_init(&mut rst);
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);
         let inf_solver = TransysSolver::new(&tsctx);
         let lift = TsLift::new(TransysUnroll::new(&ts));
         let localabs = LocalAbs::new(&ts, &cfg);
-        let predprop = cfg
-            .pred_prop
-            .then(|| PredProp::new(&ts, cfg.local_proof.then(|| cfg.prop.unwrap())));
         Self {
             cfg,
             ts,
@@ -374,7 +370,11 @@ impl Engine for IC3 {
             res
         };
         let iv = self.rst.init_var();
-        res = res.filter_map(|l| (iv != Some(l.var())).then(|| self.rst.restore(l)));
+        res = res.filter_map(|l| {
+            (iv != Some(l.var()))
+                .then(|| self.rst.try_restore(l))
+                .flatten()
+        });
         for s in res.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
