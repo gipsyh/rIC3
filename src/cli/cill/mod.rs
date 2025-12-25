@@ -18,7 +18,7 @@ use rIC3::{
     Engine, McResult,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
-    portfolio::{Portfolio, PortfolioConfig},
+    portfolio::{LightPortfolio, LightPortfolioConfig, Portfolio, PortfolioConfig},
     transys::Transys,
     wltransys::{bitblast::BitblastRestore, unroll::WlTransysUnroll},
 };
@@ -128,20 +128,28 @@ impl CIll {
     fn check_inductive(&mut self) -> bool {
         let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
-        cfg.time_limit = Some(20);
         cfg.pred_prop = true;
         cfg.local_proof = true;
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
+        let lpcfg = LightPortfolioConfig {
+            time_limit: Some(20),
+        };
         with_log_level(LevelFilter::Warn, || {
             let mut joins = Vec::new();
             for i in 0..self.ts.bad.len() {
                 let ts = self.ts.clone();
                 let mut cfg = cfg.clone();
+                let lpcfg = lpcfg.clone();
                 cfg.prop = Some(i);
                 joins.push(spawn(move || {
-                    let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
-                    ic3.check()
+                    let w0 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
+                    cfg.inn = true;
+                    let w1 = IC3::new(cfg, ts, VarSymbols::default());
+                    let mut lp = LightPortfolio::new(lpcfg.clone(), Vec::new());
+                    lp.add_engine(w0);
+                    lp.add_engine(w1);
+                    lp.check()
                 }));
             }
             for (j, r) in joins.into_iter().zip(res.iter_mut()) {

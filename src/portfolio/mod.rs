@@ -244,18 +244,28 @@ impl Portfolio {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct LightPortfolioConfig {
+    pub time_limit: Option<usize>,
+}
+
 #[derive(Default)]
-pub struct MultiEngine {
+pub struct LightPortfolio {
+    cfg: LightPortfolioConfig,
     engines: Vec<Box<dyn Engine>>,
 }
 
-impl MultiEngine {
-    pub fn new(engines: Vec<Box<dyn Engine>>) -> Self {
-        Self { engines }
+impl LightPortfolio {
+    pub fn new(cfg: LightPortfolioConfig, engines: Vec<Box<dyn Engine>>) -> Self {
+        Self { cfg, engines }
+    }
+
+    pub fn add_engine(&mut self, e: impl Engine + 'static) {
+        self.engines.push(Box::new(e));
     }
 }
 
-impl Engine for MultiEngine {
+impl Engine for LightPortfolio {
     fn check(&mut self) -> McResult {
         let engines = take(&mut self.engines);
         let mut stops = Vec::new();
@@ -265,6 +275,7 @@ impl Engine for MultiEngine {
         let (tx, rx) = mpsc::channel();
         let mut joins = Vec::new();
         with_log_level(log::LevelFilter::Warn, || {
+            let start = Instant::now();
             let num_engines = engines.len();
             for mut e in engines {
                 let tx = tx.clone();
@@ -278,18 +289,30 @@ impl Engine for MultiEngine {
             let mut res = McResult::Unknown(None);
             let mut finished = 0;
             while finished < num_engines {
-                let r = rx.recv().unwrap();
-                finished += 1;
-                if !matches!(r, McResult::Unknown(_)) {
-                    res = r;
+                if let Some(t) = self.cfg.time_limit
+                    && start.elapsed().as_secs() >= t as u64
+                {
+                    info!("LightPortfolio terminated by timeout.");
                     break;
+                }
+                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                    Ok(r) => {
+                        finished += 1;
+                        if !matches!(r, McResult::Unknown(_)) {
+                            res = r;
+                            break;
+                        }
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        break;
+                    }
                 }
             }
 
             for s in stops {
                 s.store(true, Ordering::Relaxed);
             }
-
             for j in joins {
                 let _ = j.join().unwrap();
             }
