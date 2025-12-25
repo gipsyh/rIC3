@@ -66,11 +66,7 @@ impl Kind {
     }
 
     pub fn load_trans_to(&mut self, k: usize) {
-        while self.slv_trans_k < k + 1 {
-            self.uts
-                .load_trans(self.solver.as_mut(), self.slv_trans_k, true);
-            self.slv_trans_k += 1;
-        }
+        self.slv_trans_k = self.uts.load_trans_to(self.solver.as_mut(), self.slv_trans_k, k);
     }
 
     pub fn load_bad_to(&mut self, k: usize) {

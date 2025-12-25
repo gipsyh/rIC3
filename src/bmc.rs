@@ -87,11 +87,7 @@ impl BMC {
     }
 
     pub fn load_trans_to(&mut self, k: usize) {
-        while self.solver_k < k + 1 {
-            self.uts
-                .load_trans(self.solver.as_mut(), self.solver_k, true);
-            self.solver_k += 1;
-        }
+        self.solver_k = self.uts.load_trans_to(self.solver.as_mut(), self.solver_k, k);
     }
 
     pub fn reset_solver(&mut self) {

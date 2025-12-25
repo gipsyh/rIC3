@@ -228,6 +228,18 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
     }
 
+    /// Helper function to load transition constraints up to step k into a SAT solver.
+    /// This loads all constraints for steps from `current_k` (inclusive) to `k` (inclusive).
+    /// Returns the new value of current_k (which will be k + 1).
+    pub fn load_trans_to<S: Satif + ?Sized>(&self, satif: &mut S, current_k: usize, k: usize) -> usize {
+        let mut current = current_k;
+        while current < k + 1 {
+            self.load_trans(satif, current, true);
+            current += 1;
+        }
+        current
+    }
+
     pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> BlWitness {
         let mut wit = BlWitness::default();
         for k in 0..=self.num_unroll {
