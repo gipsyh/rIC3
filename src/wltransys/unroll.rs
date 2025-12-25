@@ -130,4 +130,18 @@ impl WlTransysUnroll {
             .position(|b| slv.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
     }
+
+    /// Helper function to load transition constraints up to step k into a solver.
+    /// This loads all constraints for steps from `current_k` (inclusive) to `k` (inclusive).
+    /// Returns the new value of current_k (which will be k + 1).
+    pub fn load_trans_to(&self, slv: &mut Bitwuzla, current_k: usize, k: usize) -> usize {
+        let mut current = current_k;
+        while current < k + 1 {
+            for c in self.ts.constraint.iter() {
+                slv.assert(&self.next(c, current));
+            }
+            current += 1;
+        }
+        current
+    }
 }

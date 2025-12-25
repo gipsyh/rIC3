@@ -46,12 +46,7 @@ impl WlKind {
     }
 
     pub fn load_trans_to(&mut self, k: usize) {
-        while self.solver_trans_k < k + 1 {
-            for c in self.uts.ts.constraint.iter() {
-                self.solver.assert(&self.uts.next(c, self.solver_trans_k));
-            }
-            self.solver_trans_k += 1;
-        }
+        self.solver_trans_k = self.uts.load_trans_to(&mut self.solver, self.solver_trans_k, k);
     }
 
     pub fn load_bad_to(&mut self, k: usize) {
