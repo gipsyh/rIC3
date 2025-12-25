@@ -21,6 +21,16 @@ impl TsLift {
         &mut self,
         satif: &mut impl Satif,
         target: impl IntoIterator<Item = impl AsRef<Lit>>,
+        order: impl FnMut(usize, &mut [Lit]) -> bool,
+    ) -> (LitVec, Vec<LitVec>) {
+        self.complex_lift(satif, self.ts.latch.clone(), target, order)
+    }
+
+    pub fn complex_lift(
+        &mut self,
+        satif: &mut impl Satif,
+        state: impl IntoIterator<Item = impl AsRef<Var>>,
+        target: impl IntoIterator<Item = impl AsRef<Lit>>,
         mut order: impl FnMut(usize, &mut [Lit]) -> bool,
     ) -> (LitVec, Vec<LitVec>) {
         let mut cls: LitVec = target.into_iter().map(|l| *l.as_ref()).collect();
@@ -43,33 +53,34 @@ impl TsLift {
             inputs.push(input);
         }
         self.slv.set_domain(cls.iter().cloned());
-        let mut latchs = LitVec::new();
-        for latch in self.ts.latch() {
-            let lit = latch.lit();
+        let mut states = LitVec::new();
+        for s in state.into_iter() {
+            let s = *s.as_ref();
+            let lit = s.lit();
             if self.slv.domain_has(lit.var())
                 && let Some(v) = satif.sat_value(lit)
-                && (in_cls.contains(&latch) || !satif.flip_to_none(latch))
+                && (in_cls.contains(&s) || !satif.flip_to_none(s))
             {
-                latchs.push(lit.not_if(!v));
+                states.push(lit.not_if(!v));
             }
         }
         for i in 0.. {
-            if latchs.is_empty() {
+            if states.is_empty() {
                 break;
             }
-            if !order(i, &mut latchs) {
+            if !order(i, &mut states) {
                 break;
             }
-            let olen = latchs.len();
-            latchs = self
+            let olen = states.len();
+            states = self
                 .slv
-                .minimal_premise(&inputs_flatten, &latchs, &cls)
+                .minimal_premise(&inputs_flatten, &states, &cls)
                 .unwrap();
-            if latchs.len() == olen {
+            if states.len() == olen {
                 break;
             }
         }
         self.slv.unset_domain();
-        (latchs, inputs)
+        (states, inputs)
     }
 }

@@ -216,12 +216,16 @@ impl IC3 {
         ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
-        let predprop = cfg
-            .pred_prop
-            .then(|| PredProp::new(&ts, cfg.local_proof.then(|| cfg.prop.unwrap())));
         if cfg.inn {
             ts = uts.interal_signals();
         }
+        let predprop = cfg.pred_prop.then(|| {
+            PredProp::new(
+                uts.clone(),
+                cfg.local_proof.then(|| cfg.prop.unwrap()),
+                cfg.inn,
+            )
+        });
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);

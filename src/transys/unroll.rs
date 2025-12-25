@@ -336,4 +336,47 @@ impl TransysUnroll<Transys> {
             rel,
         }
     }
+
+    pub fn internal_signals_with_full_prime(&self) -> Transys {
+        assert!(self.num_unroll == 1);
+        let keep = self.ts.rel.fanouts(self.ts.input());
+        let mut rel = self.ts.rel.clone();
+
+        let mut input = self.ts.input.clone();
+        input.extend(self.ts.input().map(|v| self.var_next(v, 1)));
+        let mut constraint = self.ts.constraint.clone();
+        constraint.extend(self.lits_next(self.ts.constraint(), 1));
+
+        for (v, cls) in self.ts.rel.iter() {
+            let v = self.var_next(v, 1);
+            if v <= rel.max_var() && rel.has_rel(v) {
+                continue;
+            }
+            let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, 1).collect()).collect();
+            rel.add_rel(v, &cls);
+        }
+
+        let mut latch = Vec::new();
+        let mut next = GHashMap::new();
+        for v in Var::new(1)..=self.ts.max_var() {
+            if !keep.contains(&v) {
+                latch.push(v);
+                next.insert(v, self.lit_next(v.lit(), 1));
+            }
+        }
+
+        assert!(self.ts.justice.is_empty());
+
+        let bad = self.lits_next(&self.ts.bad, 1).collect();
+        Transys {
+            input,
+            latch,
+            next,
+            init: self.ts.init.clone(),
+            bad,
+            constraint,
+            justice: Default::default(),
+            rel,
+        }
+    }
 }
