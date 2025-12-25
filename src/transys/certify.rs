@@ -158,8 +158,10 @@ impl Restore {
     #[inline]
     pub fn remove(&mut self, v: Var) {
         self.vmap.remove(&v);
-        if let Some(iv) = self.init_var {
-            assert!(iv != v);
+        if let Some(iv) = self.init_var
+            && iv == v
+        {
+            self.init_var = None;
         }
     }
 
@@ -218,9 +220,13 @@ impl Restore {
         self.init_var
     }
 
-    pub fn set_init_var(&mut self, iv: Var) {
-        assert!(self.init_var.is_none());
+    pub fn get_init_var(&mut self, ts: &mut Transys) -> Var {
+        if let Some(iv) = self.init_var {
+            return iv;
+        }
+        let iv = ts.add_init_var();
         self.init_var = Some(iv);
+        iv
     }
 
     pub fn restore_eq_state(&self, s: &LitVec) -> LitVec {

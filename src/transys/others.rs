@@ -80,8 +80,7 @@ impl Transys {
             return;
         }
         self.init = init;
-        let iv = self.add_init_var();
-        rst.set_init_var(iv);
+        let iv = rst.get_init_var(self);
         for (v, i) in eq {
             let e = self.rel.new_xnor(v.lit(), i);
             let c = self.rel.new_imply(iv.lit(), e);
@@ -117,8 +116,9 @@ impl Transys {
                 if let Some(init) = self.init.get_mut(&y.var()) {
                     let c = self.rel.new_xnor(*init, y_init);
                     if !c.is_constant(true) {
-                        // self.constraint.push(c);
-                        todo!();
+                        let iv = rst.get_init_var(self);
+                        let c = self.rel.new_imply(iv.lit(), c);
+                        self.constraint.push(c);
                     }
                 } else {
                     self.init.insert(y.var(), y_init);
@@ -153,10 +153,4 @@ impl Transys {
         let m = m.inverse();
         self.map(|v| m[v], rst);
     }
-
-    // pub fn add_init_var(&mut self) -> Var {
-    //     let iv = self.new_var();
-    //     self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
-    //     iv
-    // }
 }
