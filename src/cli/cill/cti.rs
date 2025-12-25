@@ -38,15 +38,8 @@ impl CIll {
     }
 
     pub fn get_cti(&mut self, id: usize) -> WlWitness {
-        let mut assume: Vec<Term> = self
-            .uts
-            .ts
-            .bad
-            .iter()
-            .map(|t| !self.uts.next(t, self.uts.num_unroll))
-            .collect();
-        assume[id] = !&assume[id];
-        assert!(self.slv.solve(&assume));
+        let b = self.uts.next(&self.uts.ts.bad[id], self.uts.num_unroll);
+        assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&mut self.slv);
         wit.bad_id = id;
         wit
