@@ -10,7 +10,7 @@ use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{
     DagCnf, Lit, LitVec, Var,
     fol::{
-        Sort, Term, TermValue, TermVec, Value,
+        BvTermValue, Sort, Term, TermValue, TermVec, Value,
         bitblast::{bitblast_terms, cnf_encode_terms},
         op,
     },
@@ -211,6 +211,14 @@ impl BitblastMap {
         map.into_iter().map(|(t, v)| TermValue::new(t, v)).collect()
     }
 
+    pub fn map_termval(&self, tv: &BvTermValue) -> LitVec {
+        let b = &self.w2b[tv.t()];
+        b.iter()
+            .zip(tv.v().iter())
+            .map(|(s, v)| Lit::new(*s, v))
+            .collect()
+    }
+
     pub fn restore_var(&self, v: Var) -> Term {
         let (w, b) = &self.restore(v);
         match w.sort() {
@@ -236,6 +244,24 @@ impl BitblastMap {
                     .collect(),
             );
             res.state.push(self.restore_lits(&witness.state[t]));
+        }
+        res
+    }
+
+    pub fn bitblast_witness(&self, witness: &WlWitness) -> BlWitness {
+        let mut res = BlWitness::new();
+        res.bad_id = witness.bad_id;
+        for t in 0..witness.len() {
+            let lv: LitVec = witness.input[t]
+                .iter()
+                .flat_map(|t| self.map_termval(t))
+                .collect();
+            res.input.push(lv);
+            let lv: LitVec = witness.state[t]
+                .iter()
+                .flat_map(|t| self.map_termval(t.as_bv().unwrap()))
+                .collect();
+            res.state.push(lv);
         }
         res
     }

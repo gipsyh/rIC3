@@ -5,7 +5,10 @@ use crate::cli::{
 };
 use btor::Btor;
 use giputils::hash::GHashMap;
-use logicrs::fol::{BvTermValue, Term, TermValue};
+use logicrs::{
+    fol::{BvTermValue, TermValue},
+    satif::Satif,
+};
 use rIC3::{
     McWitness,
     frontend::{Frontend, btor::BtorFrontend},
@@ -19,30 +22,26 @@ impl CIll {
         let cti = fs::read_to_string(&cti_file)?;
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
         assert!(cti.len() == self.uts.num_unroll + 1);
+        let cti = self.bb_map.bitblast_witness(&cti);
         let mut assume = vec![
             self.uts
-                .next(&self.uts.ts.bad[cti.bad_id], self.uts.num_unroll),
+                .lit_next(self.uts.ts.bad[cti.bad_id], self.uts.num_unroll),
         ];
-        for k in 0..self.uts.num_unroll {
-            for input in cti.input[k].iter() {
-                let kt = self.uts.next(input.t(), k);
-                assume.push(kt.teq(Term::bv_const(input.v().clone())));
-            }
-            for state in cti.state[k].iter() {
-                let state = state.as_bv().unwrap();
-                let kt = self.uts.next(state.t(), k);
-                assume.push(kt.teq(Term::bv_const(state.v().clone())));
-            }
+        for k in 0..=self.uts.num_unroll {
+            assume.extend(
+                self.uts
+                    .lits_next(cti.input[k].iter().chain(cti.state[k].iter()), k),
+            );
         }
         Ok(!self.slv.solve(&assume))
     }
 
     pub fn get_cti(&mut self, id: usize) -> WlWitness {
-        let b = self.uts.next(&self.uts.ts.bad[id], self.uts.num_unroll);
+        let b = self.uts.lit_next(self.uts.ts.bad[id], self.uts.num_unroll);
         assert!(self.slv.solve(&[b]));
-        let mut wit = self.uts.witness(&mut self.slv);
+        let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
-        wit
+        self.bb_map.restore_witness(&wit)
     }
 
     pub fn save_cti(&mut self, witness: WlWitness) -> anyhow::Result<()> {

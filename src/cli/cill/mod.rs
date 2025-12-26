@@ -4,23 +4,22 @@ mod tui;
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use crate::logger_init;
 use anyhow::Ok;
-use bitwuzla::Bitwuzla;
 use btor::Btor;
+use cadical::CaDiCaL;
 use clap::Subcommand;
 use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
-    hash::GHashMap,
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::{VarSymbols, fol::Term};
+use logicrs::{VarSymbols, satif::Satif};
 use rIC3::{
     Engine, McResult,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
     portfolio::{LightPortfolio, LightPortfolioConfig, Portfolio, PortfolioConfig},
-    transys::Transys,
-    wltransys::{bitblast::BitblastMap, unroll::WlTransysUnroll},
+    transys::{Transys, unroll::TransysUnroll},
+    wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
@@ -76,12 +75,14 @@ impl Ric3Proj {
 pub struct CIll {
     rcfg: Ric3Config,
     rp: Ric3Proj,
+    #[allow(unused)]
+    wts: WlTransys,
     ts: Transys,
-    _bb_rst: BitblastMap,
+    bb_map: BitblastMap,
     btorfe: BtorFrontend,
-    slv: Bitwuzla,
-    uts: WlTransysUnroll,
-    symbol: GHashMap<Term, String>,
+    slv: CaDiCaL,
+    uts: TransysUnroll<Transys>,
+    prop_name: Vec<Option<String>>,
     res: Vec<bool>,
 }
 
@@ -90,39 +91,35 @@ impl CIll {
         create_dir_if_not_exists(rp.path("cill"))?;
         let (mut wts, symbol) = btorfe.wts();
         wts.coi_refine();
-        let mut slv = Bitwuzla::new();
+        let mut slv = CaDiCaL::new();
         let (ts, bb_rst) = wts.bitblast_to_ts();
-        let mut uts = WlTransysUnroll::new(wts);
+        let mut uts = TransysUnroll::new(&ts);
         uts.unroll_to(4);
         for k in 0..=uts.num_unroll {
-            if k != uts.num_unroll {
-                for b in uts.ts.bad.iter() {
-                    slv.assert(&!uts.next(b, k));
-                }
-            }
-            for c in uts.ts.constraint.iter() {
-                slv.assert(&uts.next(c, k));
+            uts.load_trans(&mut slv, k, true);
+        }
+        for k in 0..uts.num_unroll {
+            for b in uts.ts.bad.iter() {
+                slv.add_clause(&[!uts.lit_next(*b, k)]);
             }
         }
+        let prop_name: Vec<_> = wts.bad.iter().map(|t| symbol.get(t).cloned()).collect();
         Ok(Self {
             rcfg,
             rp,
             btorfe,
             slv,
+            wts,
             ts,
-            _bb_rst: bb_rst,
+            bb_map: bb_rst,
             uts,
-            symbol,
+            prop_name,
             res: Vec::new(),
         })
     }
 
     fn get_prop_name(&self, id: usize) -> Option<String> {
-        self.uts
-            .ts
-            .bad
-            .get(id)
-            .and_then(|t| self.symbol.get(t).cloned())
+        self.prop_name[id].clone()
     }
 
     fn check_inductive(&mut self) -> bool {
@@ -165,7 +162,7 @@ impl CIll {
             if *r {
                 continue;
             }
-            let bad = self.uts.next(b, self.uts.num_unroll);
+            let bad = self.uts.lit_next(*b, self.uts.num_unroll);
             *r = !self.slv.solve(&[bad]);
         }
         self.res = res;
