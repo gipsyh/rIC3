@@ -20,7 +20,7 @@ use rIC3::{
     ic3::{IC3, IC3Config},
     portfolio::{LightPortfolio, LightPortfolioConfig, Portfolio, PortfolioConfig},
     transys::Transys,
-    wltransys::{bitblast::BitblastRestore, unroll::WlTransysUnroll},
+    wltransys::{bitblast::BitblastMap, unroll::WlTransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
@@ -77,7 +77,7 @@ pub struct CIll {
     rcfg: Ric3Config,
     rp: Ric3Proj,
     ts: Transys,
-    _bb_rst: BitblastRestore,
+    _bb_rst: BitblastMap,
     btorfe: BtorFrontend,
     slv: Bitwuzla,
     uts: WlTransysUnroll,

@@ -2,11 +2,11 @@ mod array;
 
 use super::Frontend;
 use crate::{
-    BlProof, BlWitness, McProof,
-    transys::{self as bl, TransysIf},
+    McProof, McWitness,
+    transys::{self as bl},
     wltransys::{
         WlTransys,
-        bitblast::BitblastRestore,
+        bitblast::BitblastMap,
         certify::{Restore, WlProof, WlWitness},
     },
 };
@@ -17,13 +17,10 @@ use giputils::{
 };
 use log::{debug, error, warn};
 use logicrs::{
-    Lit, Var, VarSymbols,
-    fol::{
-        BvTermValue, Sort, Term, TermValue, Value,
-        op::{self, Read},
-    },
+    VarSymbols,
+    fol::{BvTermValue, Term, TermValue},
 };
-use std::{collections::hash_map::Entry, fmt::Display, mem::take, path::Path, process::Command};
+use std::{fmt::Display, mem::take, path::Path, process::Command};
 
 impl WlTransys {
     fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, String>) {
@@ -69,7 +66,7 @@ pub struct BtorFrontend {
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
-    bb_rst: BitblastRestore,
+    bb_rst: Option<BitblastMap>,
 }
 
 impl BtorFrontend {
@@ -96,73 +93,12 @@ impl BtorFrontend {
             idmap,
             no_next,
             rst,
-            bb_rst: BitblastRestore::default(),
+            bb_rst: None,
         }
     }
 }
 
 impl BtorFrontend {
-    fn restore_state(&self, state: &[Lit], only_no_next: bool, init: bool) -> Vec<String> {
-        let mut map = GHashMap::new();
-        if init {
-            for (l, i) in self.owts.init.iter() {
-                if let Some(c) = i.try_bv_const() {
-                    map.insert(l.clone(), Value::Bv(c.clone()));
-                }
-            }
-        }
-        for l in state.iter() {
-            let (w, b) = &self.bb_rst[&l.var()];
-            if only_no_next && !self.no_next.contains(w) {
-                continue;
-            }
-            let sort = w.sort();
-            let entry = map
-                .entry(w.clone())
-                .or_insert_with(|| Value::default_from(&w.sort()));
-            match entry {
-                Value::Bv(bv) => bv.set(*b, l.polarity()),
-                Value::Array(array) => {
-                    let (_, e_len) = sort.array();
-                    let idx = *b / e_len;
-                    array
-                        .entry(idx)
-                        .or_insert_with(|| BitVec::from_elem(e_len, false))
-                        .set(*b % e_len, l.polarity());
-                }
-            }
-        }
-        let mut res: Vec<(usize, String)> = Vec::new();
-        for (t, v) in map {
-            let id = self.idmap[&t];
-            match &v {
-                Value::Bv(bv) => res.push((self.idmap[&t], format!("{id} {bv:b}"))),
-                Value::Array(array) => {
-                    let (i_len, _) = t.sort().array();
-                    for (i, bv) in array.iter() {
-                        res.push((self.idmap[&t], format!("{id} [{:0i_len$b}] {bv:b}", *i)));
-                    }
-                }
-            };
-        }
-        res.sort();
-        res.into_iter().map(|(_, v)| v).collect()
-    }
-
-    fn bb_get_term(&self, i: Var) -> Term {
-        let (w, b) = &self.bb_rst[&i];
-        match w.sort() {
-            Sort::Bv(_) => w.slice(*b, *b),
-            Sort::Array(idxw, elew) => {
-                let idx = b / elew;
-                let eidx = b % elew;
-                let read_idx = Term::bv_const(BitVec::from_usize(idxw, idx));
-                let read = Term::new_op(Read, [w.clone(), read_idx]);
-                read.slice(eidx, eidx)
-            }
-        }
-    }
-
     pub fn deserialize_wl_unsafe_certificate(&self, content: String) -> WlWitness {
         let mut lines = content.lines();
         let first = lines.next().unwrap();
@@ -214,7 +150,7 @@ impl BtorFrontend {
         for k in 0..witness.len() {
             for s in take(&mut witness.state[k]) {
                 if self.no_next.contains(s.t()) {
-                    witness.input[k].push(s.try_bv().unwrap());
+                    witness.input[k].push(s.into_bv().unwrap());
                 } else {
                     witness.state[k].push(s);
                 }
@@ -233,7 +169,7 @@ impl Frontend for BtorFrontend {
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
         let (ts, bb_rst) = wts.bitblast_to_ts();
-        self.bb_rst = bb_rst;
+        self.bb_rst = Some(bb_rst);
         (ts, VarSymbols::new())
     }
 
@@ -247,114 +183,30 @@ impl Frontend for BtorFrontend {
 
     fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
         match proof {
-            McProof::Bl(bl_proof) => self.bl_safe_certificate(bl_proof),
+            McProof::Bl(bl_proof) => {
+                let wl_proof = self
+                    .bb_rst
+                    .as_ref()
+                    .unwrap()
+                    .restore_proof(&self.wts, &bl_proof);
+                self.wl_safe_certificate(wl_proof)
+            }
             McProof::Wl(wl_proof) => self.wl_safe_certificate(wl_proof),
         }
     }
 
     fn unsafe_certificate(&mut self, witness: crate::McWitness) -> Box<dyn Display> {
         match witness {
-            crate::McWitness::Bl(bl_witness) => self.bl_unsafe_certificate(bl_witness),
-            crate::McWitness::Wl(wl_witness) => self.wl_unsafe_certificate(wl_witness),
+            McWitness::Bl(bl_witness) => {
+                let wl_witness = self.bb_rst.as_ref().unwrap().restore_witness(&bl_witness);
+                self.wl_unsafe_certificate(wl_witness)
+            }
+            McWitness::Wl(wl_witness) => self.wl_unsafe_certificate(wl_witness),
         }
     }
 }
 
 impl BtorFrontend {
-    fn bl_safe_certificate(&mut self, proof: BlProof) -> Box<dyn Display> {
-        let ts = proof.proof;
-        let mut btor = self.owts.clone();
-        if let Some(iv) = self.rst.init_var() {
-            btor.add_latch(
-                iv.clone(),
-                Some(Term::bool_const(true)),
-                Term::bool_const(false),
-            );
-        }
-        btor.bad.clear();
-        let mut map: GHashMap<Var, Term> = GHashMap::new();
-        map.insert(Var::CONST, Term::bool_const(false));
-        for i in ts.input() {
-            map.insert(i, self.bb_get_term(i));
-        }
-        let mut new_latch = Vec::new();
-        for l in ts.latch() {
-            if let Entry::Vacant(e) = self.bb_rst.entry(l) {
-                let nl = Term::new_var(Sort::Bv(1));
-                e.insert((nl.clone(), 0));
-                new_latch.push((l, nl));
-            }
-            map.insert(l, self.bb_get_term(l));
-        }
-        for (v, rel) in ts.rel.iter() {
-            if ts.rel.has_rel(v) && !v.is_constant() {
-                assert!(!map.contains_key(&v));
-                let mut r = Vec::new();
-                for rel in rel {
-                    let last = rel.last();
-                    assert!(last.var() == v);
-                    if last.polarity() {
-                        let mut rel = !rel;
-                        rel.pop();
-                        r.push(Term::new_op_fold(
-                            op::And,
-                            rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
-                        ));
-                    }
-                }
-                let n = Term::new_op_fold(op::Or, r);
-                map.insert(v, n);
-            }
-        }
-        let map_lit = |l: Lit| map[&l.var()].not_if(!l.polarity());
-        for &b in ts.bad.iter() {
-            btor.bad.push(map_lit(b));
-        }
-        for (l, n) in new_latch {
-            let init = ts.init(l).map(map_lit);
-            let next = map_lit(ts.next(l.lit()));
-            btor.add_latch(n, init, next);
-        }
-        Box::new(Btor::from(&btor))
-    }
-
-    fn bl_unsafe_certificate(&mut self, mut witness: BlWitness) -> Box<dyn Display> {
-        let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
-        for i in 0..witness.len() {
-            if let Some(iv) = self.rst.init_var() {
-                witness.state[i].retain(|l| self.bb_rst[&l.var()].0 != iv);
-            }
-            let input = take(&mut witness.input[i]);
-            for l in input {
-                let (w, _) = &self.bb_rst[&l.var()];
-                if self.no_next.contains(w) {
-                    witness.state[i].push(l);
-                } else {
-                    witness.input[i].push(l);
-                }
-            }
-        }
-        let init = self.restore_state(&witness.state[0], false, true);
-        if !init.is_empty() {
-            res.push("#0".to_string());
-            res.extend(init);
-        }
-        for t in 0..witness.len() {
-            if t > 0 {
-                let state = self.restore_state(&witness.state[t], true, false);
-                if !state.is_empty() {
-                    res.push(format!("#{t}"));
-                    res.extend(state);
-                }
-            }
-            let input = self.restore_state(&witness.input[t], false, false);
-            res.push(format!("@{t}"));
-            res.extend(input);
-        }
-        res.push(".\n".to_string());
-        Box::new(res.join("\n"))
-    }
-
     fn wl_safe_certificate(&mut self, proof: WlProof) -> Box<dyn Display> {
         let mut btor = self.owts.clone();
         for l in proof.input.iter() {

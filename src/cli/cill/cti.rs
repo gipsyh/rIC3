@@ -29,7 +29,7 @@ impl CIll {
                 assume.push(kt.teq(Term::bv_const(input.v().clone())));
             }
             for state in cti.state[k].iter() {
-                let state = state.try_bv().unwrap();
+                let state = state.as_bv().unwrap();
                 let kt = self.uts.next(state.t(), k);
                 assume.push(kt.teq(Term::bv_const(state.v().clone())));
             }
@@ -114,7 +114,7 @@ impl Ric3Proj {
             }
             for x in take(&mut cti.state[k]) {
                 if let Some(n) = term_map.get(x.t()) {
-                    let x = x.try_bv().unwrap();
+                    let x = x.into_bv().unwrap();
                     cti.state[k].push(TermValue::Bv(BvTermValue::new(n.clone(), x.v().clone())));
                 }
             }

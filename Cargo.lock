@@ -690,6 +690,7 @@ name = "logicrs"
 version = "0.6.1"
 dependencies = [
  "ahash",
+ "enum-as-inner",
  "giputils",
  "inventory",
  "lazy_static",
