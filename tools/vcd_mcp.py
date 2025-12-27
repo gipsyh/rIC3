@@ -189,9 +189,8 @@ mcp = FastMCP("vcd-tools")
     name="list_signals",
     description="List all signals in a VCD file.",
 )
-def list_signals(vcd_path: str) -> str:
-    signals = _load_vcd_signals(vcd_path)
-    return "\n".join(signals)
+def list_signals(vcd_path: str) -> List[str]:
+    return _load_vcd_signals(vcd_path)
 
 
 @mcp.tool(
