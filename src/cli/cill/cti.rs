@@ -1,7 +1,7 @@
 use crate::cli::{
     cache::Ric3Proj,
     cill::{CIll, CIllState},
-    yosys::Yosys,
+    vcd::wlwitness_vcd,
 };
 use btor::Btor;
 use giputils::hash::GHashMap;
@@ -14,7 +14,12 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     wltransys::certify::WlWitness,
 };
-use std::{fs, mem::take, path::Path};
+use std::{
+    fs::{self, File},
+    io::BufWriter,
+    mem::take,
+    path::Path,
+};
 
 impl CIll {
     pub fn check_cti(&mut self) -> anyhow::Result<bool> {
@@ -47,16 +52,20 @@ impl CIll {
 
     pub fn save_cti(&mut self, witness: WlWitness) -> anyhow::Result<()> {
         let cti_file = self.rp.path("cill/cti");
-        let witness = self.btorfe.unsafe_certificate(McWitness::Wl(witness));
-        fs::write(&cti_file, format!("{}", witness))?;
+        let bwit = self
+            .btorfe
+            .unsafe_certificate(McWitness::Wl(witness.clone()));
+        fs::write(&cti_file, format!("{}", bwit))?;
         let vcd = self.rp.path("cill/cti.vcd");
-        Yosys::btor_wit_to_vcd(
-            self.rp.path("dut"),
-            &cti_file,
-            &vcd,
-            false,
-            self.rcfg.trace.as_ref(),
-        )?;
+        let vcd_file = BufWriter::new(File::create_buffered(&vcd)?);
+        wlwitness_vcd(&witness, &self.wsym, vcd_file)?;
+        // Yosys::btor_wit_to_vcd(
+        //     self.rp.path("dut"),
+        //     &cti_file,
+        //     &vcd,
+        //     false,
+        //     self.rcfg.trace.as_ref(),
+        // )?;
         println!("Witness VCD generated at {}", vcd.display());
         Ok(())
     }

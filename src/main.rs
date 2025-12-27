@@ -1,4 +1,4 @@
-#![feature(ptr_metadata)]
+#![feature(ptr_metadata, file_buffered)]
 
 mod cli;
 

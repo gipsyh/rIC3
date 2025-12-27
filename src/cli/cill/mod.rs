@@ -9,10 +9,11 @@ use cadical::CaDiCaL;
 use clap::Subcommand;
 use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
+    hash::GHashMap,
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::{VarSymbols, satif::Satif};
+use logicrs::{VarSymbols, fol::Term, satif::Satif};
 use rIC3::{
     Engine, McResult,
     frontend::{Frontend, btor::BtorFrontend},
@@ -77,6 +78,7 @@ pub struct CIll {
     rp: Ric3Proj,
     #[allow(unused)]
     wts: WlTransys,
+    wsym: GHashMap<Term, String>,
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
@@ -90,7 +92,7 @@ pub struct CIll {
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj, mut btorfe: BtorFrontend) -> anyhow::Result<Self> {
         create_dir_if_not_exists(rp.path("cill"))?;
-        let (mut wts, symbol) = btorfe.wts();
+        let (mut wts, wsym) = btorfe.wts();
         wts.coi_refine();
         let mut slv = CaDiCaL::new();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
@@ -106,11 +108,12 @@ impl CIll {
                 slv.add_clause(&[!uts.lit_next(*b, k)]);
             }
         }
-        let prop_name: Vec<_> = wts.bad.iter().map(|t| symbol.get(t).cloned()).collect();
+        let prop_name: Vec<_> = wts.bad.iter().map(|t| wsym.get(t).cloned()).collect();
         Ok(Self {
             rcfg,
             rp,
             btorfe,
+            wsym,
             slv,
             wts,
             ts,
