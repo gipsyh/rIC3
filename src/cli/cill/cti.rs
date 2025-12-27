@@ -1,4 +1,5 @@
 use crate::cli::{
+    VcdConfig,
     cache::Ric3Proj,
     cill::{CIll, CIllState},
     vcd::wlwitness_vcd,
@@ -58,7 +59,12 @@ impl CIll {
         fs::write(&cti_file, format!("{}", bwit))?;
         let vcd = self.rp.path("cill/cti.vcd");
         let vcd_file = BufWriter::new(File::create_buffered(&vcd)?);
-        wlwitness_vcd(&witness, &self.wsym, vcd_file)?;
+        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
+            t.as_str()
+        } else {
+            ""
+        };
+        wlwitness_vcd(&witness, &self.wsym, vcd_file, filter)?;
         // Yosys::btor_wit_to_vcd(
         //     self.rp.path("dut"),
         //     &cti_file,

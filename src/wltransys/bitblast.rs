@@ -215,7 +215,8 @@ impl BitblastMap {
         let b = &self.w2b[tv.t()];
         b.iter()
             .zip(tv.v().iter())
-            .filter_map(|(s, v)| (!v).is_none().then(|| Lit::new(*s, v.is_true())))
+            .filter(|&(_, v)| (!v).is_none())
+            .map(|(s, v)| Lit::new(*s, v.is_true()))
             .collect()
     }
 

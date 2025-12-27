@@ -5,7 +5,7 @@ use rIC3::wltransys::certify::WlWitness;
 use std::io::{self, Write};
 use vcd::{TimescaleUnit, Value, VarType};
 
-#[derive(EnumAsInner)]
+#[derive(EnumAsInner, Debug)]
 enum Scope {
     Node(GHashMap<String, Scope>),
     Var(Term),
@@ -63,7 +63,7 @@ impl Scope {
     ) -> io::Result<()> {
         let node = self.as_node().unwrap();
         if node.values().any(|s| s.is_var()) {
-            writer.add_module("top")?;
+            writer.add_module("")?;
             self.define_scope_rec(writer, term_ids)?;
             writer.upscope()?;
         } else {
@@ -77,6 +77,7 @@ pub fn wlwitness_vcd(
     wit: &WlWitness,
     sym: &GHashMap<Term, String>,
     out: impl Write,
+    filter: &str,
 ) -> io::Result<()> {
     let mut writer = vcd::Writer::new(out);
     writer.timescale(1, TimescaleUnit::NS)?;
@@ -93,11 +94,26 @@ pub fn wlwitness_vcd(
         }
     }
     let mut root = Scope::default();
+    // Strip the parent of `filter` so the dumped hierarchy starts at `filter`.
+    // Example: filter="a.b.c" => parent="a.b" => signal "a.b.c.d" becomes "c.d".
+    let filter_parent = filter.rsplit_once('.').map(|(p, _)| p).unwrap_or("");
     for (term, name) in sym.iter() {
         if !present_terms.contains(term) {
             continue;
         }
-        let parts: Vec<&str> = name.split('.').collect();
+        if !filter.is_empty() && !name.starts_with(filter) {
+            continue;
+        }
+
+        let relative = if filter_parent.is_empty() {
+            name.as_str()
+        } else {
+            name.strip_prefix(filter_parent)
+                .unwrap_or(name.as_str())
+                .trim_start_matches('.')
+        };
+
+        let parts: Vec<&str> = relative.split('.').filter(|s| !s.is_empty()).collect();
         if !parts.is_empty() {
             root.insert(&parts, term.clone());
         }
