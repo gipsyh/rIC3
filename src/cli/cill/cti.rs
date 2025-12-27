@@ -73,6 +73,9 @@ impl CIll {
         let vcd_file = BufWriter::new(File::create_buffered(&vcd)?);
         let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
             t.as_str()
+                .strip_prefix(&self.rcfg.dut.top)
+                .map(|s| s.strip_prefix('.').unwrap_or(s))
+                .unwrap()
         } else {
             ""
         };
