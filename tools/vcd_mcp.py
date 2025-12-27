@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from bisect import bisect_right
 from typing import Dict, List, Sequence, Tuple
-
 from mcp.server.fastmcp import FastMCP
 from vcdvcd import VCDVCD
 
@@ -95,17 +94,11 @@ def _extract_time_markers(vcd_path: str) -> List[int]:
     return times
 
 
-def _sample_times_every_two_timeframes(vcd_path: str) -> List[int]:
-    # Match the reference parser behavior:
-    # - build the timeline from *all* time markers
-    # - skip the very last timepoint
-    # - take every 2nd timepoint (0,2,4,...)
+def _sample_times(vcd_path: str) -> List[int]:
     times = _extract_time_markers(vcd_path)
     if not times:
         raise ValueError("No timepoints found in VCD")
-    if len(times) >= 2:
-        times = times[:-1]
-    return times[::2]
+    return times
 
 
 def _build_tv_index(tv: Sequence[Tuple[int, str]]) -> Tuple[List[int], List[str]]:
@@ -141,8 +134,15 @@ def _format_hex(val: str) -> str:
     else:
         s_bits = s
 
+    # If there are any unknown/high-impedance bits, keep it as a binary bitstring.
+    # (Do not attempt hex conversion, since hex would be ambiguous.)
+    lowered = s_bits.lower()
+    if any(c in lowered for c in ("x", "z")):
+        return "0b" + s_bits
+
     if s_bits and all(c in "01" for c in s_bits):
         return hex(int(s_bits, 2))
+
     return s
 
 
@@ -157,7 +157,7 @@ def _steps_markdown_table(
     vcd = VCDVCD(vcd_path, only_sigs=False)
     available = sorted(getattr(vcd, "signals", []))
     signal_names = _expand_signal_names(available, signals)
-    step_times = _sample_times_every_two_timeframes(vcd_path)
+    step_times = _sample_times(vcd_path)
 
     if not step_times:
         raise ValueError("No steps found (no sampled timepoints)")
