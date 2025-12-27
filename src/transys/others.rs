@@ -85,7 +85,6 @@ impl Transys {
             let e = self.rel.new_xnor(v.lit(), i);
             let c = self.rel.new_imply(iv.lit(), e);
             self.constraint.push(c);
-            // rst.add_custom_constraint(c);
         }
     }
 
@@ -104,7 +103,7 @@ impl Transys {
         self.bad = self.bad.map_var(map);
         self.constraint = self.constraint.map_var(map);
         self.justice = self.justice.map_var(map);
-        rst.map_var(map);
+        rst.map_var(&map);
     }
 
     pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {

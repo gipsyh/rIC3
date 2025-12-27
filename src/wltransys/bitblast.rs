@@ -213,9 +213,10 @@ impl BitblastMap {
 
     pub fn map_termval(&self, tv: &BvTermValue) -> LitVec {
         let b = &self.w2b[tv.t()];
+        assert!(b.len() == tv.v().len());
         b.iter()
             .zip(tv.v().iter())
-            .filter(|&(_, v)| (!v).is_none())
+            .filter(|&(_, v)| !(v.is_none()))
             .map(|(s, v)| Lit::new(*s, v.is_true()))
             .collect()
     }

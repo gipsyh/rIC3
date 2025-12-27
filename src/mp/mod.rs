@@ -76,7 +76,7 @@ impl Engine for MultiProp {
         proof.bad.clear();
         for ic3 in self.ic3.iter_mut() {
             let subp = ic3.proof().into_bl().unwrap().proof;
-            let mut map = self.rst.vmap.clone();
+            let mut map = self.rst.bvmap.clone();
             proof.rel.migrate(&subp.rel, subp.bad[0].var(), &mut map);
             dbg!(proof.rel.max_var());
             proof.bad.push(map.lit_map(subp.bad[0]).unwrap());

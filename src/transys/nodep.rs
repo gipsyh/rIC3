@@ -65,7 +65,7 @@ impl NoDepTransys {
             .collect();
         self.bad = self.bad.iter().map(map_lit).collect();
         self.constraint = self.constraint.iter().map(map_lit).collect();
-        rst.filter_map_var(|v| domain_map.get(&v).copied());
+        rst.filter_map_var(&|v| domain_map.get(&v).copied());
     }
 }
 

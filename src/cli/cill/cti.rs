@@ -30,6 +30,7 @@ impl CIll {
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
         assert!(cti.len() == self.uts.num_unroll + 1);
         let cti = self.bb_map.bitblast_witness(&cti);
+        let cti = self.ts_rst.forward_witness(&cti);
         let mut assume = vec![
             self.uts
                 .lit_next(self.uts.ts.bad[cti.bad_id], self.uts.num_unroll),

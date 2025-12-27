@@ -108,7 +108,7 @@ impl Transys {
         self.bad = self.bad.map(map_lit);
         self.constraint = self.constraint.map(map_lit);
         self.justice = self.justice.map(map_lit);
-        rst.filter_map_var(|v| domain_map.get(&v).copied());
+        rst.filter_map_var(&|v| domain_map.get(&v).copied());
     }
 
     pub fn simplify(&mut self, rst: &mut Restore) {

@@ -151,37 +151,47 @@ pub struct BlProof {
 
 #[derive(Debug, Clone)]
 pub struct Restore {
-    pub(crate) vmap: VarVMap,
+    pub(crate) bvmap: VarVMap,
+    pub(crate) fvmap: VarVMap,
     eqmap: GHashMap<Var, LitVec>,
     init_var: Option<Var>,
-    custom_cst: LitVec,
 }
 
 impl Restore {
     pub fn new(ts: &Transys) -> Self {
         Self {
-            vmap: VarVMap::new_self_map(ts.max_var()),
+            bvmap: VarVMap::new_self_map(ts.max_var()),
+            fvmap: VarVMap::new_self_map(ts.max_var()),
             eqmap: GHashMap::default(),
             init_var: None,
-            custom_cst: LitVec::new(),
         }
     }
 
+    pub fn forward(&self, l: Lit) -> Lit {
+        self.fvmap.lit_map(l).unwrap()
+    }
+
     pub fn restore(&self, l: Lit) -> Lit {
-        self.vmap.lit_map(l).unwrap()
+        self.bvmap.lit_map(l).unwrap()
+    }
+
+    pub fn try_forward(&self, l: Lit) -> Option<Lit> {
+        self.fvmap.lit_map(l)
     }
 
     pub fn try_restore(&self, l: Lit) -> Option<Lit> {
-        self.vmap.lit_map(l)
+        self.bvmap.lit_map(l)
     }
 
     pub fn restore_var(&self, v: Var) -> Var {
-        self.vmap[v]
+        self.bvmap[v]
     }
 
     #[inline]
     pub fn remove(&mut self, v: Var) {
-        self.vmap.remove(&v);
+        if let Some(rv) = self.bvmap.remove(&v) {
+            self.fvmap.remove(&rv);
+        }
         if let Some(iv) = self.init_var
             && iv == v
         {
@@ -191,25 +201,29 @@ impl Restore {
 
     #[inline]
     pub fn add_restore(&mut self, v: Var, l: Var) {
-        assert!(!self.vmap.contains_key(&v));
-        self.vmap.insert(v, l);
+        assert!(!self.bvmap.contains_key(&v));
+        self.bvmap.insert(v, l);
+        self.fvmap.insert(l, v);
     }
 
     #[inline]
-    pub fn map_var(&mut self, map: impl Fn(Var) -> Var) {
+    pub fn map_var(&mut self, map: &impl Fn(Var) -> Var) {
         self.init_var = self.init_var.map(&map);
-        self.vmap.map_key(map);
+        self.bvmap.map_key(map);
+        self.fvmap.map_value(map);
     }
 
     #[inline]
-    pub fn filter_map_var(&mut self, map: impl Fn(Var) -> Option<Var>) {
+    pub fn filter_map_var(&mut self, map: &impl Fn(Var) -> Option<Var>) {
         self.init_var = self.init_var.map(|l| map(l).unwrap());
-        self.vmap.filter_map_key(map);
+        self.bvmap.filter_map_key(map);
+        self.fvmap.filter_map_value(map);
     }
 
     #[inline]
     pub fn retain(&mut self, f: impl Fn(Var) -> bool) {
-        self.vmap.retain(|&k, _| f(k));
+        self.bvmap.retain(|&k, _| f(k));
+        self.fvmap.retain(|_, k| f(*k));
         if let Some(iv) = self.init_var {
             assert!(f(iv));
         }
@@ -217,10 +231,12 @@ impl Restore {
 
     #[inline]
     pub fn replace(&mut self, x: Var, y: Lit) {
-        let xm = self.vmap[x].lit().not_if(!y.polarity());
-        let ym = self.vmap[y.var()];
+        let xm = self.bvmap[x].lit().not_if(!y.polarity());
+        let ym = self.bvmap[y.var()];
         self.eqmap.entry(ym).or_default().push(xm);
-        self.vmap.remove(&x);
+        if let Some(fv) = self.bvmap.remove(&x) {
+            self.fvmap.remove(&fv);
+        }
         if let Some(iv) = self.init_var
             && iv == x
         {
@@ -267,15 +283,27 @@ impl Restore {
         res
     }
 
-    pub fn add_custom_constraint(&mut self, gi: Lit) {
-        self.custom_cst.push(gi);
-    }
-
     pub fn restore_witness(&self, wit: &BlWitness) -> BlWitness {
         let mut wit = wit.map(|l| self.restore(l));
         for s in wit.state.iter_mut() {
             *s = self.restore_eq_state(s);
         }
         wit
+    }
+
+    pub fn forward_witness(&self, wit: &BlWitness) -> BlWitness {
+        assert!(self.eqmap.is_empty());
+        let mut res = wit.clone();
+        for k in 0..res.len() {
+            res.input[k] = res.input[k]
+                .iter()
+                .filter_map(|l| self.try_forward(*l))
+                .collect();
+            res.state[k] = res.state[k]
+                .iter()
+                .filter_map(|l| self.try_forward(*l))
+                .collect();
+        }
+        res
     }
 }
