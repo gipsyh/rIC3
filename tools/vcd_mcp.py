@@ -119,8 +119,8 @@ def _value_at(times: Sequence[int], values: Sequence[str], t: int) -> str:
 
 
 def _format_hex(val: str) -> str:
-    if val is None:
-        return "x"
+    if val is None or val == "x":
+        return "X"
 
     s = str(val).strip()
     if not s:
@@ -138,10 +138,13 @@ def _format_hex(val: str) -> str:
     # (Do not attempt hex conversion, since hex would be ambiguous.)
     lowered = s_bits.lower()
     if any(c in lowered for c in ("x", "z")):
-        return "0b" + s_bits
+        return "0b_" + s_bits
 
     if s_bits and all(c in "01" for c in s_bits):
-        return hex(int(s_bits, 2))
+        h = hex(int(s_bits, 2))
+        if h.startswith("0x"):
+            return "0x_" + h[2:]
+        return h
 
     return s
 
