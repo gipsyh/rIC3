@@ -1,4 +1,7 @@
-use crate::transys::{Transys, TransysIf, unroll::TransysUnroll};
+use crate::{
+    gipsat::DagCnfSolver,
+    transys::{Transys, TransysIf, unroll::TransysUnroll},
+};
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 
@@ -117,6 +120,27 @@ impl BlWitness {
                     .is_some_and(|v| v)
             })
             .unwrap();
+    }
+
+    pub fn lift(&mut self, ts: &Transys, additional_target: Option<impl Fn(usize) -> LitVec>) {
+        let mut slv = DagCnfSolver::new(&ts.rel);
+        let mut last_target = LitVec::from(ts.bad[self.bad_id]);
+        for k in (0..self.len()).rev() {
+            let assump: LitVec = self.input[k]
+                .iter()
+                .chain(self.state[k].iter())
+                .copied()
+                .collect();
+            let mut cls = ts.constraint.clone();
+            if let Some(at) = additional_target.as_ref() {
+                cls.extend(at(k));
+            }
+            cls.extend(last_target);
+            cls = !cls;
+            assert!(!slv.solve_with_constraint(&assump, vec![cls]));
+            self.state[k].retain(|l| slv.unsat_has(*l));
+            last_target = ts.lits_next(&self.state[k]);
+        }
     }
 }
 

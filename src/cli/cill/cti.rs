@@ -7,6 +7,7 @@ use crate::cli::{
 use btor::Btor;
 use giputils::hash::GHashMap;
 use logicrs::{
+    LitVec,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
@@ -47,6 +48,16 @@ impl CIll {
         assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
+        wit.lift(
+            &self.uts.ts,
+            Some(|i| {
+                if i == self.uts.num_unroll {
+                    LitVec::new()
+                } else {
+                    !(self.uts.ts.bad.clone())
+                }
+            }),
+        );
         wit = self.ts_rst.restore_witness(&wit);
         self.bb_map.restore_witness(&wit)
     }
