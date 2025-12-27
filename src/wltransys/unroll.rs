@@ -1,7 +1,10 @@
 use crate::wltransys::{WlTransys, certify::WlWitness};
 use bitwuzla::Bitwuzla;
 use giputils::hash::GHashMap;
-use logicrs::fol::{BvTermValue, Term, TermValue};
+use logicrs::{
+    LboolVec,
+    fol::{self, BvTermValue, Term, TermValue},
+};
 
 #[derive(Clone)]
 pub struct WlTransysUnroll {
@@ -95,7 +98,7 @@ impl WlTransysUnroll {
             for i in self.ts.input.iter() {
                 let ni = self.next(i, k);
                 if let Some(val) = slv.sat_value(&ni) {
-                    w.push(BvTermValue::new(i.clone(), val));
+                    w.push(BvTermValue::new(i.clone(), LboolVec::from(val)));
                 }
             }
             witness.input.push(w);
@@ -103,7 +106,10 @@ impl WlTransysUnroll {
             for l in self.ts.latch.iter() {
                 let nl = self.next(l, k);
                 if let Some(val) = slv.sat_value(&nl) {
-                    w.push(TermValue::Bv(BvTermValue::new(l.clone(), val)));
+                    w.push(TermValue::new(
+                        l.clone(),
+                        fol::Value::Bv(LboolVec::from(val)),
+                    ));
                 }
             }
             witness.state.push(w);

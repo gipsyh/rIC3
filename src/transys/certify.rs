@@ -246,4 +246,12 @@ impl Restore {
     pub fn add_custom_constraint(&mut self, gi: Lit) {
         self.custom_cst.push(gi);
     }
+
+    pub fn restore_witness(&self, wit: &BlWitness) -> BlWitness {
+        let mut wit = wit.map(|l| self.restore(l));
+        for s in wit.state.iter_mut() {
+            *s = self.restore_eq_state(s);
+        }
+        wit
+    }
 }

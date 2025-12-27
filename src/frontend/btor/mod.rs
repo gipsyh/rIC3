@@ -11,14 +11,11 @@ use crate::{
     },
 };
 use btor::Btor;
-use giputils::{
-    bitvec::BitVec,
-    hash::{GHashMap, GHashSet},
-};
+use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, error, warn};
 use logicrs::{
-    VarSymbols,
-    fol::{BvTermValue, Term, TermValue},
+    LboolVec, VarSymbols,
+    fol::{self, BvTermValue, Term, TermValue},
 };
 use std::{fmt::Display, mem::take, path::Path, process::Command};
 
@@ -136,10 +133,10 @@ impl BtorFrontend {
             let parts: Vec<&str> = line.split_whitespace().collect();
             assert!(parts.len() == 2);
             let id = parts[0].parse::<usize>().unwrap();
-            let val = BitVec::from(parts[1]);
+            let val = LboolVec::from(parts[1]);
             if is_state {
                 let term = self.owts.latch[id].clone();
-                let tv = TermValue::Bv(BvTermValue::new(term, val));
+                let tv = TermValue::new(term, fol::Value::Bv(val));
                 witness.state[current_frame].push(tv);
             } else {
                 let term = self.owts.input[id].clone();
@@ -150,7 +147,7 @@ impl BtorFrontend {
         for k in 0..witness.len() {
             for s in take(&mut witness.state[k]) {
                 if self.no_next.contains(s.t()) {
-                    witness.input[k].push(s.into_bv().unwrap());
+                    witness.input[k].push(s.into_bv());
                 } else {
                     witness.state[k].push(s);
                 }
@@ -232,7 +229,7 @@ impl BtorFrontend {
             let input = take(&mut witness.input[i]);
             for lv in input {
                 if self.no_next.contains(lv.t()) {
-                    witness.state[i].push(TermValue::Bv(lv));
+                    witness.state[i].push(TermValue::from(lv));
                 } else {
                     witness.input[i].push(lv);
                 }
@@ -243,12 +240,8 @@ impl BtorFrontend {
             let mut idw = Vec::new();
             for tv in state {
                 let id = self.idmap[tv.t()];
-                match tv {
-                    TermValue::Bv(bv) => idw.push((id, format!("{id} {:b}", bv.v()))),
-                    TermValue::Array(_) => {
-                        todo!()
-                    }
-                }
+                let bv = tv.into_bv();
+                idw.push((id, format!("{id} {:b}", bv.v())));
             }
             idw.sort();
             res.extend(idw.into_iter().map(|(_, v)| v));

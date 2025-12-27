@@ -8,7 +8,7 @@ use crate::{
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{
-    DagCnf, Lit, LitVec, Var,
+    DagCnf, Lbool, LboolVec, Lit, LitVec, Var,
     fol::{
         BvTermValue, Sort, Term, TermValue, TermVec, Value,
         bitblast::{bitblast_terms, cnf_encode_terms},
@@ -197,14 +197,14 @@ impl BitblastMap {
                 .entry(w.clone())
                 .or_insert_with(|| Value::default_from(&w.sort()));
             match entry {
-                Value::Bv(bv) => bv.set(*b, l.polarity()),
+                Value::Bv(bv) => bv.set_bool(*b, l.polarity()),
                 Value::Array(array) => {
                     let (_, e_len) = sort.array();
                     let idx = *b / e_len;
                     array
                         .entry(idx)
-                        .or_insert_with(|| BitVec::from_elem(e_len, false))
-                        .set(*b % e_len, l.polarity());
+                        .or_insert_with(|| LboolVec::from_elem(Lbool::NONE, e_len))
+                        .set_bool(*b % e_len, l.polarity());
                 }
             }
         }
@@ -215,7 +215,7 @@ impl BitblastMap {
         let b = &self.w2b[tv.t()];
         b.iter()
             .zip(tv.v().iter())
-            .map(|(s, v)| Lit::new(*s, v))
+            .filter_map(|(s, v)| (!v).is_none().then(|| Lit::new(*s, v.is_true())))
             .collect()
     }
 
@@ -240,7 +240,7 @@ impl BitblastMap {
             res.input.push(
                 self.restore_lits(&witness.input[t])
                     .into_iter()
-                    .map(|t| t.into_bv().unwrap())
+                    .map(|t| t.into_bv())
                     .collect(),
             );
             res.state.push(self.restore_lits(&witness.state[t]));
@@ -259,7 +259,7 @@ impl BitblastMap {
             res.input.push(lv);
             let lv: LitVec = witness.state[t]
                 .iter()
-                .flat_map(|t| self.map_termval(t.as_bv().unwrap()))
+                .flat_map(|t| self.map_termval(&t.into_bv()))
                 .collect();
             res.state.push(lv);
         }

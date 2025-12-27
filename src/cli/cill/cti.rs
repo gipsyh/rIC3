@@ -6,7 +6,7 @@ use crate::cli::{
 use btor::Btor;
 use giputils::hash::GHashMap;
 use logicrs::{
-    fol::{BvTermValue, TermValue},
+    fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
 use rIC3::{
@@ -41,6 +41,7 @@ impl CIll {
         assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
+        wit = self.ts_rst.restore_witness(&wit);
         self.bb_map.restore_witness(&wit)
     }
 
@@ -113,8 +114,8 @@ impl Ric3Proj {
             }
             for x in take(&mut cti.state[k]) {
                 if let Some(n) = term_map.get(x.t()) {
-                    let x = x.into_bv().unwrap();
-                    cti.state[k].push(TermValue::Bv(BvTermValue::new(n.clone(), x.v().clone())));
+                    let x = x.into_bv();
+                    cti.state[k].push(TermValue::new(n.clone(), fol::Value::Bv(x.v().clone())));
                 }
             }
         }

@@ -2,7 +2,6 @@ use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
-use log::trace;
 use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
 use std::{
     fmt::Write,
@@ -237,7 +236,6 @@ impl IC3 {
         po: Option<ProofObligation>,
     ) -> bool {
         let lemma = LitOrdVec::new(lemma);
-        trace!("add F{frame} lemma {:?}", self.lits_symbols(lemma.clone()));
         if frame == 0 {
             assert!(self.frame.len() == 1);
             if self.level() == frame

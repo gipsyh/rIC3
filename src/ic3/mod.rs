@@ -145,6 +145,7 @@ impl IC3Config {
 pub struct IC3 {
     cfg: IC3Config,
     ts: Transys,
+    #[allow(unused)]
     symbols: VarSymbols,
     tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,

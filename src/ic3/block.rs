@@ -41,11 +41,6 @@ impl IC3 {
         self.statistic.avg_po_cube_len += po.state.len();
         po.push_to(frame);
         self.add_obligation(po.clone());
-        debug!(
-            "generalized lemma {:?} in F{}",
-            self.lits_symbols(mic.clone()),
-            frame - 1
-        );
         if self.add_lemma(frame - 1, mic.clone(), false, Some(po)) {
             return true;
         }
@@ -131,12 +126,6 @@ impl IC3 {
             let blocked = self.blocked_with_ordered(po.frame, &po.state, false);
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
-                debug!(
-                    "blocked {:?} in F{} with depth {}",
-                    self.lits_symbols(po.state.clone()),
-                    po.frame,
-                    po.depth
-                );
                 noc += 1;
                 let mic_type = if self.cfg.dynamic {
                     if let Some(mut n) = po.next.as_mut() {

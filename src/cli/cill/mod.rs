@@ -18,7 +18,7 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
     portfolio::{LightPortfolio, LightPortfolioConfig, Portfolio, PortfolioConfig},
-    transys::{Transys, unroll::TransysUnroll},
+    transys::{Transys, certify::Restore, unroll::TransysUnroll},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use ratatui::crossterm::style::Stylize;
@@ -79,6 +79,7 @@ pub struct CIll {
     wts: WlTransys,
     ts: Transys,
     bb_map: BitblastMap,
+    ts_rst: Restore,
     btorfe: BtorFrontend,
     slv: CaDiCaL,
     uts: TransysUnroll<Transys>,
@@ -92,7 +93,9 @@ impl CIll {
         let (mut wts, symbol) = btorfe.wts();
         wts.coi_refine();
         let mut slv = CaDiCaL::new();
-        let (ts, bb_rst) = wts.bitblast_to_ts();
+        let (mut ts, bb_map) = wts.bitblast_to_ts();
+        let mut ts_rst = Restore::new(&ts);
+        ts.simplify(&mut ts_rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll_to(4);
         for k in 0..=uts.num_unroll {
@@ -111,7 +114,8 @@ impl CIll {
             slv,
             wts,
             ts,
-            bb_map: bb_rst,
+            ts_rst,
+            bb_map,
             uts,
             prop_name,
             res: Vec::new(),
@@ -127,10 +131,9 @@ impl CIll {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.local_proof = true;
-        cfg.preproc.scorr = false;
-        cfg.preproc.frts = false;
+        cfg.preproc.preproc = false;
         let lpcfg = LightPortfolioConfig {
-            time_limit: Some(20),
+            time_limit: Some(15),
         };
         with_log_level(LevelFilter::Warn, || {
             let mut joins = Vec::new();
