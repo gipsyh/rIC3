@@ -75,7 +75,7 @@ impl Scope {
 
 pub fn wlwitness_vcd(
     wit: &WlWitness,
-    sym: &GHashMap<Term, String>,
+    sym: &GHashMap<Term, Vec<String>>,
     out: impl Write,
     filter: &str,
 ) -> io::Result<()> {
@@ -98,24 +98,26 @@ pub fn wlwitness_vcd(
     // Example: filter="a.b.c" => parent="a.b" => signal "a.b.c.d" becomes "c.d".
     let filter_parent = filter.rsplit_once('.').map(|(p, _)| p).unwrap_or("");
     for (term, name) in sym.iter() {
-        if !present_terms.contains(term) {
-            continue;
-        }
-        if !filter.is_empty() && !name.starts_with(filter) {
-            continue;
-        }
+        for name in name.iter() {
+            if !present_terms.contains(term) {
+                continue;
+            }
+            if !filter.is_empty() && !name.starts_with(filter) {
+                continue;
+            }
 
-        let relative = if filter_parent.is_empty() {
-            name.as_str()
-        } else {
-            name.strip_prefix(filter_parent)
-                .unwrap_or(name.as_str())
-                .trim_start_matches('.')
-        };
+            let relative = if filter_parent.is_empty() {
+                name.as_str()
+            } else {
+                name.strip_prefix(filter_parent)
+                    .unwrap_or(name.as_str())
+                    .trim_start_matches('.')
+            };
 
-        let parts: Vec<&str> = relative.split('.').filter(|s| !s.is_empty()).collect();
-        if !parts.is_empty() {
-            root.insert(&parts, term.clone());
+            let parts: Vec<&str> = relative.split('.').filter(|s| !s.is_empty()).collect();
+            if !parts.is_empty() {
+                root.insert(&parts, term.clone());
+            }
         }
     }
     let mut term_ids = GHashMap::default();

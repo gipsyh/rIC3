@@ -18,7 +18,7 @@ pub mod btor;
 pub trait Frontend {
     fn ts(&mut self) -> (Transys, VarSymbols);
 
-    fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
+    fn wts(&mut self) -> (WlTransys, GHashMap<Term, Vec<String>>) {
         panic!("frontend unsupported for wltransys")
     }
 

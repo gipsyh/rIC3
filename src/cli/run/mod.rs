@@ -39,13 +39,17 @@ struct PropMcState {
 }
 
 impl PropMcState {
-    fn defalut_from_wts(wts: &WlTransys, symbols: &GHashMap<Term, String>) -> Vec<Self> {
+    fn defalut_from_wts(wts: &WlTransys, symbols: &GHashMap<Term, Vec<String>>) -> Vec<Self> {
         let mut mc = Vec::new();
         for (id, b) in wts.bad.iter().enumerate() {
             mc.push(PropMcState {
                 prop: PropMcInfo {
                     id,
-                    name: symbols.get(b).cloned().unwrap_or("anonymous".to_string()),
+                    name: symbols
+                        .get(b)
+                        .cloned()
+                        .map(|l| l[0].clone())
+                        .unwrap_or("anonymous".to_string()),
                     res: McResult::default(),
                     config: Default::default(),
                 },

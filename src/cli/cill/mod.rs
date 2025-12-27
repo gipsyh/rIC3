@@ -78,7 +78,7 @@ pub struct CIll {
     rp: Ric3Proj,
     #[allow(unused)]
     wts: WlTransys,
-    wsym: GHashMap<Term, String>,
+    wsym: GHashMap<Term, Vec<String>>,
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
@@ -108,7 +108,11 @@ impl CIll {
                 slv.add_clause(&[!uts.lit_next(*b, k)]);
             }
         }
-        let prop_name: Vec<_> = wts.bad.iter().map(|t| wsym.get(t).cloned()).collect();
+        let prop_name: Vec<_> = wts
+            .bad
+            .iter()
+            .map(|t| wsym.get(t).map(|l| l[0].clone()))
+            .collect();
         Ok(Self {
             rcfg,
             rp,
@@ -136,7 +140,7 @@ impl CIll {
         cfg.local_proof = true;
         cfg.preproc.preproc = false;
         let lpcfg = LightPortfolioConfig {
-            time_limit: Some(15),
+            time_limit: Some(10),
         };
         with_log_level(LevelFilter::Warn, || {
             let mut joins = Vec::new();

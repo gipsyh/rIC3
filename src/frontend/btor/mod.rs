@@ -20,7 +20,7 @@ use logicrs::{
 use std::{fmt::Display, mem::take, path::Path, process::Command};
 
 impl WlTransys {
-    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, String>) {
+    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, Vec<String>>) {
         assert!(
             btor.input
                 .iter()
@@ -59,7 +59,7 @@ impl From<&WlTransys> for Btor {
 pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
-    symbols: GHashMap<Term, String>,
+    symbols: GHashMap<Term, Vec<String>>,
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
@@ -170,7 +170,7 @@ impl Frontend for BtorFrontend {
         (ts, VarSymbols::new())
     }
 
-    fn wts(&mut self) -> (WlTransys, GHashMap<Term, String>) {
+    fn wts(&mut self) -> (WlTransys, GHashMap<Term, Vec<String>>) {
         (self.wts.clone(), self.symbols.clone())
     }
 
