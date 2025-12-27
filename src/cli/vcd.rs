@@ -32,7 +32,7 @@ impl Scope {
     fn define_scope_rec(
         &self,
         writer: &mut vcd::Writer<impl Write>,
-        term_ids: &mut GHashMap<Term, vcd::IdCode>,
+        term_ids: &mut GHashMap<Term, Vec<vcd::IdCode>>,
     ) -> io::Result<()> {
         match self {
             Scope::Node(node) => {
@@ -46,7 +46,7 @@ impl Scope {
                         Scope::Var(t) => {
                             let id =
                                 writer.add_var(VarType::Wire, t.sort().bv() as _, name, None)?;
-                            term_ids.insert(t.clone(), id);
+                            term_ids.entry(t.clone()).or_default().push(id);
                         }
                     }
                 }
@@ -59,7 +59,7 @@ impl Scope {
     fn define_scope(
         &self,
         writer: &mut vcd::Writer<impl Write>,
-        term_ids: &mut GHashMap<Term, vcd::IdCode>,
+        term_ids: &mut GHashMap<Term, Vec<vcd::IdCode>>,
     ) -> io::Result<()> {
         let node = self.as_node().unwrap();
         if node.values().any(|s| s.is_var()) {
@@ -136,8 +136,7 @@ pub fn wlwitness_vcd(
                 frame_values.insert(bv_tv.t().clone(), bv_tv.v().clone());
             }
         }
-
-        for (term, id) in term_ids.iter() {
+        for (term, ids) in term_ids.iter() {
             if let Some(val) = frame_values.get(term) {
                 let len = val.len();
                 let vcd_val: Vec<Value> = (0..len)
@@ -154,7 +153,9 @@ pub fn wlwitness_vcd(
                         }
                     })
                     .collect();
-                writer.change_vector(*id, vcd_val)?;
+                for id in ids {
+                    writer.change_vector(*id, vcd_val.clone())?;
+                }
             }
         }
     }
