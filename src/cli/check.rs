@@ -18,7 +18,7 @@ use rIC3::{
     wlbmc::WlBMC,
     wlkind::WlKind,
 };
-use std::{env, fs, mem::transmute, path::PathBuf, process::exit, ptr};
+use std::{env, fs, mem::transmute, path::PathBuf, process::exit};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -144,14 +144,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
 
 fn interrupt_statistic(chk: &CheckConfig, engine: &mut dyn Engine) {
     if chk.interrupt_statistic {
-        let e: (usize, usize) = unsafe { transmute((engine as *mut dyn Engine).to_raw_parts()) };
+        let e: [usize; 2] = unsafe { transmute(engine as *mut dyn Engine) };
         let _ = ctrlc::set_handler(move || {
-            let e: *mut dyn Engine = unsafe {
-                ptr::from_raw_parts_mut(
-                    e.0 as *mut (),
-                    transmute::<usize, std::ptr::DynMetadata<dyn rIC3::Engine>>(e.1),
-                )
-            };
+            let e: *mut dyn Engine = unsafe { transmute(e) };
             let e = unsafe { &mut *e };
             e.statistic();
             exit(124);

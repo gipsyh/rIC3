@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, VarLMap};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarRange};
 use std::mem::take;
 
 impl Transys {
@@ -34,7 +34,7 @@ impl Transys {
         };
         self.new_var_to(map(other.max_var()));
         let lmap = |x: Lit| Lit::new(map(x.var()), x.polarity());
-        for v in Var(1)..=other.max_var() {
+        for v in VarRange::new_inclusive(Var(1), other.max_var()) {
             let rel: Vec<LitVec> = other.rel[v]
                 .iter()
                 .map(|cls| cls.iter().map(|l| lmap(*l)).collect())

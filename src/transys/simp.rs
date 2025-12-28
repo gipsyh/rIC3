@@ -5,7 +5,7 @@ use crate::{
 };
 use giputils::hash::GHashSet;
 use log::{debug, info};
-use logicrs::{Lit, Var};
+use logicrs::{Lit, Var, VarRange};
 
 impl Transys {
     pub fn coi_refine(&mut self, rst: &mut Restore) {
@@ -62,7 +62,7 @@ impl Transys {
         self.input.retain(|i| mark.contains(i));
         self.latch.retain(|i| mark.contains(i));
         let mut removed = 0;
-        for v in Var::CONST + 1..=self.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST + 1, self.max_var()) {
             if !mark.contains(&v) {
                 removed += self.rel[v].len();
                 self.rel.del_rel(v);

@@ -17,7 +17,7 @@ use domain::Domain;
 use giputils::bitvec::BitVec;
 use giputils::gvec::Gvec;
 use logicrs::satif::Satif;
-use logicrs::{DagCnf, Lbool, VarAssign};
+use logicrs::{DagCnf, Lbool, VarAssign, VarRange};
 use logicrs::{Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::Rng;
@@ -326,7 +326,7 @@ impl DagCnfSolver {
     #[allow(unused)]
     pub fn sat_value_bitvet(&mut self) -> BitVec {
         let mut res = BitVec::new();
-        for v in Var::CONST..=self.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, self.max_var()) {
             if let Some(v) = self.sat_value(v.lit()) {
                 res.push(v);
             } else {

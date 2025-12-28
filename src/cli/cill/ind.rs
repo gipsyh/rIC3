@@ -120,7 +120,7 @@ impl CIll {
             .unsafe_certificate(McWitness::Wl(witness.clone()));
         fs::write(&cti_file, format!("{}", bwit))?;
         let vcd = self.rp.path("cill/cti.vcd");
-        let vcd_file = BufWriter::new(File::create_buffered(&vcd)?);
+        let vcd_file = BufWriter::new(File::create(&vcd)?);
         let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
             t.as_str()
                 .strip_prefix(&self.rcfg.dut.top)

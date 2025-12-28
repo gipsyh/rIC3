@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::BlWitness;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
+use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
@@ -32,7 +32,7 @@ impl<T: TransysIf> TransysUnroll<T> {
     {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
         next_map.reserve(ts.max_var());
-        for v in Var::CONST..=ts.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, ts.max_var()) {
             let l = v.lit();
             next_map[l].push(l);
             next_map[!l].push(!l);
@@ -153,7 +153,7 @@ impl<T: TransysIf> TransysUnroll<T> {
                 self.next_map[!l].push(!next);
             }
         }
-        for v in Var::CONST..=self.ts.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, self.ts.max_var()) {
             let l = v.lit();
             if self.next_map[l].len() == self.num_unroll + 1 {
                 self.max_var += 1;
@@ -315,7 +315,7 @@ impl TransysUnroll<Transys> {
         }
         let mut latch = Vec::new();
         let mut next = GHashMap::new();
-        for v in Var::new(1)..=self.ts.max_var() {
+        for v in VarRange::new_inclusive(Var::new(1), self.ts.max_var()) {
             if !keep.contains(&v) {
                 latch.push(v);
                 next.insert(v, self.lit_next(v.lit(), 1));
@@ -358,7 +358,7 @@ impl TransysUnroll<Transys> {
 
         let mut latch = Vec::new();
         let mut next = GHashMap::new();
-        for v in Var::new(1)..=self.ts.max_var() {
+        for v in VarRange::new_inclusive(Var::new(1), self.ts.max_var()) {
             if !keep.contains(&v) {
                 latch.push(v);
                 next.insert(v, self.lit_next(v.lit(), 1));

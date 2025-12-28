@@ -1,5 +1,3 @@
-#![feature(ptr_metadata, file_buffered)]
-
 mod cli;
 
 use crate::cli::cli_main;

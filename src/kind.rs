@@ -7,7 +7,7 @@ use crate::{
 };
 use clap::Args;
 use log::{error, info};
-use logicrs::{Lit, LitVec, Var, satif::Satif};
+use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -159,7 +159,7 @@ impl Engine for Kind {
             };
             proof.new_var_to(map(ts.max_var()));
             let lmap = |x: Lit| Lit::new(map(x.var()), x.polarity());
-            for v in Var(1)..=ts.max_var() {
+            for v in VarRange::new_inclusive(Var(1), ts.max_var()) {
                 let rel: Vec<LitVec> = ts.rel[v].iter().map(|cls| cls.map(lmap)).collect();
                 let mv = map(v);
                 proof.rel.add_rel(mv, &rel);

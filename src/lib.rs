@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![feature(get_mut_unchecked, likely_unlikely)]
 
 pub mod bmc;
 pub mod config;
