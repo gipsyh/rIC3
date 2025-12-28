@@ -5,15 +5,18 @@ use crate::cli::{
     vcd::wlwitness_vcd,
 };
 use btor::Btor;
-use giputils::hash::GHashMap;
+use giputils::{hash::GHashMap, logger::with_log_level};
+use log::{LevelFilter, info};
 use logicrs::{
-    LitVec,
+    LitVec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
 use rIC3::{
-    McWitness,
+    Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
+    ic3::{IC3, IC3Config},
+    portfolio::{LightPortfolio, LightPortfolioConfig},
     wltransys::certify::WlWitness,
 };
 use std::{
@@ -21,9 +24,56 @@ use std::{
     io::BufWriter,
     mem::take,
     path::Path,
+    thread::spawn,
 };
 
 impl CIll {
+    pub fn check_inductive(&mut self) -> bool {
+        let mut res = vec![false; self.ts.bad.len()];
+        let mut cfg = IC3Config::default();
+        cfg.pred_prop = true;
+        cfg.local_proof = true;
+        cfg.preproc.preproc = false;
+        let lpcfg = LightPortfolioConfig {
+            time_limit: Some(10),
+        };
+        with_log_level(LevelFilter::Warn, || {
+            let mut joins = Vec::new();
+            for i in 0..self.ts.bad.len() {
+                let ts = self.ts.clone();
+                let mut cfg = cfg.clone();
+                let lpcfg = lpcfg.clone();
+                cfg.prop = Some(i);
+                joins.push(spawn(move || {
+                    let w0 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
+                    cfg.inn = true;
+                    let w1 = IC3::new(cfg, ts, VarSymbols::default());
+                    let mut lp = LightPortfolio::new(lpcfg.clone(), Vec::new());
+                    lp.add_engine(w0);
+                    lp.add_engine(w1);
+                    lp.check()
+                }));
+            }
+            for (j, r) in joins.into_iter().zip(res.iter_mut()) {
+                *r = matches!(j.join().unwrap(), McResult::Safe);
+            }
+        });
+        for (id, r) in res.iter().enumerate() {
+            if *r {
+                info!("IC3 proved p{id} is inductive");
+            }
+        }
+        for (r, b) in res.iter_mut().zip(self.uts.ts.bad.iter()) {
+            if *r {
+                continue;
+            }
+            let bad = self.uts.lit_next(*b, self.uts.num_unroll);
+            *r = !self.slv.solve(&[bad]);
+        }
+        self.res = res;
+        self.res.iter().all(|l| *l)
+    }
+
     pub fn check_cti(&mut self) -> anyhow::Result<bool> {
         let cti_file = self.rp.path("cill/cti");
         let cti = fs::read_to_string(&cti_file)?;

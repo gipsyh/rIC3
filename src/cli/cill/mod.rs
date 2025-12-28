@@ -1,4 +1,4 @@
-mod cti;
+mod ind;
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
@@ -13,18 +13,17 @@ use giputils::{
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::{VarSymbols, fol::Term, satif::Satif};
+use logicrs::{fol::Term, satif::Satif};
 use rIC3::{
-    Engine, McResult,
+    McResult,
     frontend::{Frontend, btor::BtorFrontend},
-    ic3::{IC3, IC3Config},
-    portfolio::{LightPortfolio, LightPortfolioConfig, Portfolio, PortfolioConfig},
+    portfolio::{Portfolio, PortfolioConfig},
     transys::{Transys, certify::Restore, unroll::TransysUnroll},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
-use std::{env, fs, thread::spawn};
+use std::{env, fs};
 use strum::AsRefStr;
 
 #[derive(Subcommand, Debug, Clone)]
@@ -130,52 +129,6 @@ impl CIll {
 
     fn get_prop_name(&self, id: usize) -> Option<String> {
         self.prop_name[id].clone()
-    }
-
-    fn check_inductive(&mut self) -> bool {
-        let mut res = vec![false; self.ts.bad.len()];
-        let mut cfg = IC3Config::default();
-        cfg.pred_prop = true;
-        cfg.local_proof = true;
-        cfg.preproc.preproc = false;
-        let lpcfg = LightPortfolioConfig {
-            time_limit: Some(10),
-        };
-        with_log_level(LevelFilter::Warn, || {
-            let mut joins = Vec::new();
-            for i in 0..self.ts.bad.len() {
-                let ts = self.ts.clone();
-                let mut cfg = cfg.clone();
-                let lpcfg = lpcfg.clone();
-                cfg.prop = Some(i);
-                joins.push(spawn(move || {
-                    let w0 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
-                    cfg.inn = true;
-                    let w1 = IC3::new(cfg, ts, VarSymbols::default());
-                    let mut lp = LightPortfolio::new(lpcfg.clone(), Vec::new());
-                    lp.add_engine(w0);
-                    lp.add_engine(w1);
-                    lp.check()
-                }));
-            }
-            for (j, r) in joins.into_iter().zip(res.iter_mut()) {
-                *r = matches!(j.join().unwrap(), McResult::Safe);
-            }
-        });
-        for (id, r) in res.iter().enumerate() {
-            if *r {
-                info!("IC3 proved p{id} is inductive");
-            }
-        }
-        for (r, b) in res.iter_mut().zip(self.uts.ts.bad.iter()) {
-            if *r {
-                continue;
-            }
-            let bad = self.uts.lit_next(*b, self.uts.num_unroll);
-            *r = !self.slv.solve(&[bad]);
-        }
-        self.res = res;
-        self.res.iter().all(|l| *l)
     }
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
