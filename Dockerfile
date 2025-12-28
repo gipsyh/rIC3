@@ -1,7 +1,7 @@
 FROM ubuntu:24.04 AS builder
 RUN apt update
 RUN apt install -y curl build-essential git cmake zlib1g-dev pkg-config libssl-dev libmpfr-dev meson clang && apt-get clean
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /root/rIC3
 COPY . .
