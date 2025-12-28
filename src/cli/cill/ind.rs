@@ -113,7 +113,7 @@ impl CIll {
         self.bb_map.restore_witness(&wit)
     }
 
-    pub fn save_cti(&mut self, witness: WlWitness) -> anyhow::Result<()> {
+    pub fn save_cti(&mut self, mut witness: WlWitness) -> anyhow::Result<()> {
         let cti_file = self.rp.path("cill/cti");
         let bwit = self
             .btorfe
@@ -129,6 +129,7 @@ impl CIll {
         } else {
             ""
         };
+        witness.enrich(&self.wts);
         wlwitness_vcd(&witness, &self.wsym, vcd_file, filter)?;
         // Yosys::btor_wit_to_vcd(
         //     self.rp.path("dut"),

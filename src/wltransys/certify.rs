@@ -1,5 +1,6 @@
 use crate::wltransys::WlTransys;
-use logicrs::fol::{BvTermValue, Term, TermValue};
+use giputils::hash::{GHashMap, GHashSet};
+use logicrs::fol::{self, BvTermValue, Term, TermValue};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
@@ -24,6 +25,32 @@ impl WlWitness {
     pub fn resize(&mut self, size: usize) {
         self.input.resize(size, Vec::new());
         self.state.resize(size, Vec::new());
+    }
+
+    pub fn enrich(&mut self, wts: &WlTransys) {
+        let mut last = vec![wts.bad[self.bad_id].clone()];
+        for k in (0..self.len()).rev() {
+            let mut val = GHashMap::new();
+            let mut has = GHashSet::new();
+            for v in self.input[k].iter() {
+                val.insert(v.t().clone(), fol::Value::Bv(v.v().clone()));
+                has.insert(v.t().clone());
+            }
+            for v in self.state[k].iter() {
+                val.insert(v.t().clone(), v.v().clone());
+                has.insert(v.t().clone());
+            }
+            for t in wts.constraint.iter().chain(last.iter()) {
+                t.simulate(&mut val);
+            }
+            last = self.state[k].iter().map(|l| wts.next(l.t())).collect();
+            for (t, v) in val {
+                if has.contains(&t) || t.is_const() || v.as_bv().unwrap().all_x() {
+                    continue;
+                }
+                self.state[k].push(TermValue::new(t, v));
+            }
+        }
     }
 }
 
