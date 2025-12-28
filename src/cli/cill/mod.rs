@@ -92,10 +92,9 @@ pub struct CIll {
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj, mut btorfe: BtorFrontend) -> anyhow::Result<Self> {
         create_dir_if_not_exists(rp.path("cill"))?;
-        let (mut wts, wsym) = btorfe.wts();
-        wts.coi_refine();
-        let mut slv = CaDiCaL::new();
+        let (wts, wsym) = btorfe.wts();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
+        let mut slv = CaDiCaL::new();
         let mut ts_rst = Restore::new(&ts);
         ts.simplify(&mut ts_rst);
         let mut uts = TransysUnroll::new(&ts);
