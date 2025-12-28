@@ -42,6 +42,7 @@ impl MultiProp {
         let mut ic3_cfg = IC3Config::default();
         ic3_cfg.local_proof = true;
         ic3_cfg.pred_prop = true;
+        ic3_cfg.inn = true;
         ic3_cfg.preproc.frts = false;
         ic3_cfg.preproc.scorr = false;
         Self {
