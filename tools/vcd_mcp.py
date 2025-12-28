@@ -98,6 +98,7 @@ def _sample_times(vcd_path: str) -> List[int]:
     times = _extract_time_markers(vcd_path)
     if not times:
         raise ValueError("No timepoints found in VCD")
+    times = times[:-1]
     return times
 
 
@@ -149,10 +150,10 @@ def _format_hex(val: str) -> str:
     return s
 
 
-def _steps_markdown_table(
+def _steps_json(
     vcd_path: str,
     signals: Sequence[str],
-) -> str:
+) -> Dict[str, List[str]]:
     _require_file(vcd_path)
     if not signals:
         raise ValueError("signals must be a non-empty list")
@@ -172,17 +173,13 @@ def _steps_markdown_table(
             raise ValueError(f"No data for signal: {s}")
         sig_indexes[s] = _build_tv_index(tv)
 
-    step_headers = [str(i) for i in range(len(step_times))]
-    header = "| signal | " + " | ".join(step_headers) + " |"
-    sep = "| --- | " + " | ".join(["---"] * len(step_times)) + " |"
-
-    lines: List[str] = [header, sep]
+    result: Dict[str, List[str]] = {}
     for s in signal_names:
         times, values = sig_indexes[s]
         row_vals = [_format_hex(_value_at(times, values, t)) for t in step_times]
-        lines.append("| " + s + " | " + " | ".join(row_vals) + " |")
+        result[s] = row_vals
 
-    return "\n".join(lines)
+    return result
 
 
 mcp = FastMCP("vcd-tools")
@@ -199,14 +196,14 @@ def list_signals(vcd_path: str) -> List[str]:
 @mcp.tool(
     name="signal_values",
     description=(
-        "Given selected signals, return their values as a Markdown table (signals as rows, steps as columns)."
+        "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step."
     ),
 )
 def signal_values(
     vcd_path: str,
     signals: List[str],
-) -> str:
-    return _steps_markdown_table(
+) -> Dict[str, List[str]]:
+    return _steps_json(
         vcd_path,
         signals,
     )
