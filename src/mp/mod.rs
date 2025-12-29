@@ -9,7 +9,7 @@ use crate::{
         certify::{BlProof, Restore},
     },
 };
-use clap::Args;
+use clap::{ArgAction, Args};
 use giputils::logger::with_log_level;
 use log::LevelFilter;
 use logicrs::{LitVec, VarSymbols};
@@ -24,7 +24,8 @@ pub struct MultiPropConfig {
     #[command(flatten)]
     preproc: PreprocConfig,
 
-    #[arg(long = "parallel", default_value_t = false)]
+    /// Disable parallel checking
+    #[arg(long = "no-parallel", action = ArgAction::SetFalse, default_value_t = true)]
     parallel: bool,
 }
 
