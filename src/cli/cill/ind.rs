@@ -146,7 +146,7 @@ impl Ric3Proj {
             CIllState::Block(_) => {
                 assert!(self.path("cill/cti").exists());
             }
-            CIllState::Select => unreachable!(),
+            CIllState::Select(_) => unreachable!(),
         }
         let btor_old = Btor::from_file(dut_old.join("dut.btor"));
         let btorfe_old = BtorFrontend::new(btor_old.clone());

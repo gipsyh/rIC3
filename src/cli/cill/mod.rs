@@ -45,7 +45,7 @@ pub enum CIllCommands {
 enum CIllState {
     Check,
     Block(String),
-    Select,
+    Select(Vec<bool>),
 }
 
 impl Ric3Proj {
@@ -84,7 +84,6 @@ pub struct CIll {
     btorfe: BtorFrontend,
     slv: CaDiCaL,
     uts: TransysUnroll<Transys>,
-    prop_name: Vec<Option<String>>,
     res: Vec<bool>,
 }
 
@@ -106,11 +105,6 @@ impl CIll {
                 slv.add_clause(&[!uts.lit_next(*b, k)]);
             }
         }
-        let prop_name: Vec<_> = wts
-            .bad
-            .iter()
-            .map(|t| wsym.get(t).map(|l| l[0].clone()))
-            .collect();
         Ok(Self {
             rcfg,
             rp,
@@ -122,13 +116,12 @@ impl CIll {
             ts_rst,
             bb_map,
             uts,
-            prop_name,
             res: Vec::new(),
         })
     }
 
     fn get_prop_name(&self, id: usize) -> Option<String> {
-        self.prop_name[id].clone()
+        self.wsym.get(&self.wts.bad[id]).map(|l| l[0].clone())
     }
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
@@ -196,7 +189,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
 }
 
 fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
-    if matches!(state, CIllState::Select) {
+    if matches!(state, CIllState::Select(_)) {
         rp.set_cill_state(CIllState::Check)?;
     }
     let rcfg = Ric3Config::from_file("ric3.toml")?;
@@ -249,11 +242,11 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     println!(
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
-    rp.set_cill_state(CIllState::Select)
+    rp.set_cill_state(CIllState::Select(cill.res.clone()))
 }
 
 fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
-    let CIllState::Select = state else {
+    let CIllState::Select(res) = state else {
         println!("No need to select a non-inductive assertion for CTI generation.");
         return Ok(());
     };
@@ -266,7 +259,15 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     let btor = Btor::from_file(rp.path("dut/dut.btor"));
     let btorfe = BtorFrontend::new(btor);
     let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
-
+    cill.res = res;
+    if cill.res[id] {
+        cill.print_ind_res()?;
+        println!(
+            "{} is inductive, please select a non-inductive assertion.",
+            cill.get_prop_name(id).unwrap()
+        );
+        return Ok(());
+    }
     let witness = cill.get_cti(id);
     let name = cill
         .get_prop_name(witness.bad_id)
@@ -282,7 +283,7 @@ fn state(_rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     let s = match state {
         CIllState::Check => "waiting to check the inductiveness of assertions",
         CIllState::Block(p) => &format!("waiting for helper assertions to block CTI of {p}"),
-        CIllState::Select => "waiting to select a non-inductive assertion for CTI generation",
+        CIllState::Select(_) => "waiting to select a non-inductive assertion for CTI generation",
     };
     println!("CIll state: {s}");
     Ok(())
@@ -298,7 +299,7 @@ fn abort(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
             println!("Successfully aborted the CTI.");
             rp.set_cill_state(CIllState::Check)?;
         }
-        CIllState::Select => {
+        CIllState::Select(_) => {
             println!(
                 "Waiting to select a non-inductive assertion for CTI generation, no abort required."
             )
