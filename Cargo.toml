@@ -22,7 +22,7 @@ clap = { version = "4.5.52", features = ["derive"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
 bitfield-struct = "0.12.1"
-tempfile = "3.10.1"
+tempfile = "3.24.0"
 process_control = "5.0.0"
 nix = { version = "0.30.1", features = ["signal"] }
 env_logger = "0.11.8"
