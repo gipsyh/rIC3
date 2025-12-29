@@ -390,7 +390,7 @@ impl Engine for IC3 {
         for s in res.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
-        res.exact_state(&self.ots);
+        res.exact_state(&self.ots, true);
         McWitness::Bl(res)
     }
 

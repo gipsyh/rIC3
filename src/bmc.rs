@@ -155,7 +155,7 @@ impl Engine for BMC {
         for s in wit.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
-        wit.exact_state(&self.ots);
+        wit.exact_state(&self.ots, true);
         McWitness::Bl(wit)
     }
 }
