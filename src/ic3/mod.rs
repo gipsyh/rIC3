@@ -326,7 +326,7 @@ impl Engine for IC3 {
                 self.tracer.trace_res(McResult::Safe);
                 return McResult::Safe;
             }
-            self.propagete_to_inf();
+            self.propagate_to_inf();
         }
     }
 

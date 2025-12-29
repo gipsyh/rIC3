@@ -5,18 +5,19 @@ use crate::cli::{
     vcd::wlwitness_vcd,
 };
 use btor::Btor;
-use giputils::{hash::GHashMap, logger::with_log_level};
+use giputils::{grc::Grc, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
-    LitVec, VarSymbols,
+    LitVec, LitVvec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
 use rIC3::{
     Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
+    gipsat::TransysSolver,
     ic3::{IC3, IC3Config},
-    portfolio::{LightPortfolio, LightPortfolioConfig},
+    transys::{TransysIf, unroll::TransysUnroll},
     wltransys::certify::WlWitness,
 };
 use rayon::prelude::*;
@@ -29,41 +30,61 @@ use std::{
 
 impl CIll {
     pub fn check_inductive(&mut self) -> bool {
-        let mut res = vec![false; self.ts.bad.len()];
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.local_proof = true;
         cfg.preproc.preproc = false;
-        let lpcfg = LightPortfolioConfig {
-            time_limit: Some(10),
-        };
-        with_log_level(LevelFilter::Warn, || {
-            let results: Vec<_> = (0..self.ts.bad.len())
+        cfg.time_limit = Some(10);
+        cfg.inn = true;
+        let mut results: Vec<_> = with_log_level(LevelFilter::Warn, || {
+            (0..self.ts.bad.len())
                 .into_par_iter()
                 .map(|i| {
                     let mut cfg = cfg.clone();
                     cfg.prop = Some(i);
-                    let w0 = IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
-                    cfg.inn = true;
-                    let w1 = IC3::new(cfg, self.ts.clone(), VarSymbols::default());
-                    let mut lp = LightPortfolio::new(lpcfg.clone(), Vec::new());
-                    lp.add_engine(w0);
-                    lp.add_engine(w1);
-                    matches!(lp.check(), McResult::Safe)
+                    let mut ic3 = IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
+                    let res = ic3.check();
+                    (matches!(res, McResult::Safe), ic3)
                 })
-                .collect();
-            for (r, result) in res.iter_mut().zip(results) {
-                *r = result;
-            }
+                .collect()
         });
-        for (r, b) in res.iter_mut().zip(self.uts.ts.bad.iter()) {
+        let mut invariants = LitVvec::new();
+        for (_, ic3) in results.iter_mut() {
+            invariants.extend(ic3.invariant());
+        }
+        invariants.subsume_simplify();
+        let mut uts = TransysUnroll::new(&self.ts);
+        uts.unroll();
+        let nts = uts.interal_signals();
+        let tsctx = Grc::new(nts.ctx());
+        let mut slv = TransysSolver::new(&tsctx);
+        for i in invariants.iter() {
+            slv.add_clause(&!i);
+        }
+        for b in self.ts.bad.iter() {
+            slv.add_clause(&[!b]);
+        }
+        for i in invariants.iter() {
+            assert!(slv.inductive(i, false));
+        }
+        for i in invariants.iter() {
+            self.slv.add_clause(&!i);
+        }
+        for ((r, _), b) in results.iter_mut().zip(self.uts.ts.bad.iter()) {
             if *r {
                 continue;
             }
             let bad = self.uts.lit_next(*b, self.uts.num_unroll);
             *r = !self.slv.solve(&[bad]);
+            let mut cti = LitVec::new();
+            for s in self.ts.latch() {
+                if let Some(s) = self.slv.sat_value_lit(s) {
+                    cti.push(s);
+                }
+            }
+            assert!(slv.solve(&cti));
         }
-        self.res = res;
+        self.res = results.into_iter().map(|(r, _)| r).collect();
         self.res.iter().all(|l| *l)
     }
 

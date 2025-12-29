@@ -85,7 +85,7 @@ impl IC3 {
         }
     }
 
-    pub fn propagete_to_inf(&mut self) {
+    pub fn propagate_to_inf(&mut self) {
         let level = self.level();
         self.frame[level].shuffle(&mut self.rng);
         let mut lastf = self.frame[level].clone();

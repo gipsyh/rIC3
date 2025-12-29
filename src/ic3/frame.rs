@@ -122,14 +122,14 @@ impl Frames {
     }
 
     pub fn invariant(&self) -> Vec<LitVec> {
-        let invariant = self.iter().position(|frame| frame.is_empty()).unwrap();
-        let mut invariants = Vec::new();
-        for i in invariant..self.len() {
-            for cube in self[i].iter() {
-                invariants.push(cube.cube().clone());
+        let mut invariants: Vec<_> = self.inf.iter().map(|c| c.cube()).cloned().collect();
+        if let Some(invariant) = self.iter().position(|frame| frame.is_empty()) {
+            for i in invariant..self.len() {
+                for cube in self[i].iter() {
+                    invariants.push(cube.cube().clone());
+                }
             }
         }
-        invariants.extend(self.inf.iter().map(|c| c.cube()).cloned());
         invariants
     }
 
