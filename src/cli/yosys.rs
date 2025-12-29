@@ -111,12 +111,12 @@ impl Yosys {
             info!("{}", String::from_utf8_lossy(&output.stderr));
             anyhow::bail!("Yosys execution failed")
         }
-        if let Some(VcdConfig { top: Some(top) }) = vcd_cfg {
-            let mut filter = Vec::new();
-            let vcd_file = fs::File::open(&vcd)?;
-            Self::filter_vcd(vcd_file, &mut filter, top)?;
-            fs::write(vcd.as_ref(), filter)?;
-        }
+        let vcd_file = fs::File::open(&vcd)?;
+        let mut filtered = Vec::new();
+        let top = vcd_cfg.and_then(|c| c.top.as_deref());
+        Self::filter_vcd(vcd_file, &mut filtered, top, Some(|i| i % 2 == 1))?;
+        fs::write(vcd.as_ref(), &filtered)?;
+
         Ok(())
     }
 
@@ -166,7 +166,12 @@ impl Yosys {
         Ok(())
     }
 
-    fn filter_vcd(vcd: impl Read, out: impl Write, top: &str) -> anyhow::Result<()> {
+    fn filter_vcd(
+        vcd: impl Read,
+        out: impl Write,
+        top: Option<&str>,
+        skip_timestamp: Option<impl Fn(usize) -> bool>,
+    ) -> anyhow::Result<()> {
         let mut parser = vcd::Parser::new(BufReader::new(vcd));
         let mut writer = vcd::Writer::new(BufWriter::new(out));
 
@@ -184,10 +189,9 @@ impl Yosys {
             writer.timescale(ts.0, ts.1)?;
         }
 
-        let target_path: Vec<&str> = if top.is_empty() {
-            Vec::new()
-        } else {
-            top.split('.').collect()
+        let target_path: Vec<&str> = match top {
+            Some(t) if !t.is_empty() => t.split('.').collect(),
+            _ => Vec::new(),
         };
 
         for item in &header.items {
@@ -196,28 +200,53 @@ impl Yosys {
 
         writer.enddefinitions()?;
 
+        let mut timestamp_index = 0usize;
+        let mut skip_current = false;
+
         for cmd in parser {
             let cmd = cmd?;
             match cmd {
-                vcd::Command::Timestamp(t) => writer.timestamp(t)?,
+                vcd::Command::Timestamp(t) => {
+                    skip_current = skip_timestamp.as_ref().is_some_and(|f| f(timestamp_index));
+                    if !skip_current {
+                        writer.timestamp(t)?;
+                    }
+                    timestamp_index += 1;
+                }
                 vcd::Command::ChangeScalar(id, v) => {
-                    if let Some(&new_id) = kept_ids.get(&id) {
-                        writer.change_scalar(new_id, v)?;
+                    if !skip_current {
+                        if let Some(&new_id) = kept_ids.get(&id) {
+                            writer.change_scalar(new_id, v)?;
+                        } else if kept_ids.is_empty() {
+                            writer.change_scalar(id, v)?;
+                        }
                     }
                 }
                 vcd::Command::ChangeVector(id, v) => {
-                    if let Some(&new_id) = kept_ids.get(&id) {
-                        writer.change_vector(new_id, &v)?;
+                    if !skip_current {
+                        if let Some(&new_id) = kept_ids.get(&id) {
+                            writer.change_vector(new_id, &v)?;
+                        } else if kept_ids.is_empty() {
+                            writer.change_vector(id, &v)?;
+                        }
                     }
                 }
                 vcd::Command::ChangeReal(id, v) => {
-                    if let Some(&new_id) = kept_ids.get(&id) {
-                        writer.change_real(new_id, v)?;
+                    if !skip_current {
+                        if let Some(&new_id) = kept_ids.get(&id) {
+                            writer.change_real(new_id, v)?;
+                        } else if kept_ids.is_empty() {
+                            writer.change_real(id, v)?;
+                        }
                     }
                 }
                 vcd::Command::ChangeString(id, v) => {
-                    if let Some(&new_id) = kept_ids.get(&id) {
-                        writer.change_string(new_id, &v)?;
+                    if !skip_current {
+                        if let Some(&new_id) = kept_ids.get(&id) {
+                            writer.change_string(new_id, &v)?;
+                        } else if kept_ids.is_empty() {
+                            writer.change_string(id, &v)?;
+                        }
                     }
                 }
                 _ => {}
