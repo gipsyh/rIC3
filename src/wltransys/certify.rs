@@ -27,8 +27,7 @@ impl WlWitness {
         self.state.resize(size, Vec::new());
     }
 
-    pub fn enrich(&mut self, wts: &WlTransys) {
-        let mut last = vec![wts.bad[self.bad_id].clone()];
+    pub fn enrich(&mut self, observe: &GHashSet<Term>) {
         for k in (0..self.len()).rev() {
             let mut val = GHashMap::new();
             let mut has = GHashSet::new();
@@ -40,15 +39,14 @@ impl WlWitness {
                 val.insert(v.t().clone(), v.v().clone());
                 has.insert(v.t().clone());
             }
-            for t in wts.constraint.iter().chain(last.iter()) {
-                t.simulate(&mut val);
-            }
-            last = self.state[k].iter().map(|l| wts.next(l.t())).collect();
-            for (t, v) in val {
-                if has.contains(&t) || t.is_const() || v.as_bv().unwrap().all_x() {
+            for t in observe.iter() {
+                if has.contains(t) {
                     continue;
                 }
-                self.state[k].push(TermValue::new(t, v));
+                let val = t.simulate(&mut val);
+                if !val.as_bv().unwrap().all_x() {
+                    self.state[k].push(TermValue::new(t.clone(), val));
+                }
             }
         }
     }

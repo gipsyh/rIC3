@@ -113,16 +113,6 @@ impl CIll {
         assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
-        wit.lift(
-            &self.uts.ts,
-            Some(|i| {
-                if i == self.uts.num_unroll {
-                    LitVec::new()
-                } else {
-                    !(self.uts.ts.bad.clone())
-                }
-            }),
-        );
         wit = self.ts_rst.restore_witness(&wit);
         self.bb_map.restore_witness(&wit)
     }
@@ -143,9 +133,9 @@ impl CIll {
         } else {
             ""
         };
-        witness.enrich(&self.wts);
+        witness.enrich(&self.wsym.keys().cloned().collect());
         wlwitness_vcd(&witness, &self.wsym, vcd_file, filter)?;
-        // Yosys::btor_wit_to_vcd(
+        // crate::cli::yosys::Yosys::btor_wit_to_vcd(
         //     self.rp.path("dut"),
         //     &cti_file,
         //     &vcd,

@@ -75,9 +75,10 @@ impl Ric3Proj {
 pub struct CIll {
     rcfg: Ric3Config,
     rp: Ric3Proj,
-    #[allow(unused)]
     wts: WlTransys,
     wsym: GHashMap<Term, Vec<String>>,
+    #[allow(unused)]
+    ots: Transys,
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
@@ -92,6 +93,7 @@ impl CIll {
         create_dir_if_not_exists(rp.path("cill"))?;
         let (wts, wsym) = btorfe.wts();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
+        let ots = ts.clone();
         let mut slv = CaDiCaL::new();
         let mut ts_rst = Restore::new(&ts);
         ts.simplify(&mut ts_rst);
@@ -112,6 +114,7 @@ impl CIll {
             wsym,
             slv,
             wts,
+            ots,
             ts,
             ts_rst,
             bb_map,
