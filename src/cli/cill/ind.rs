@@ -6,7 +6,7 @@ use btor::Btor;
 use giputils::{file::remove_if_exists, grc::Grc, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
-    LitVec, LitVvec, VarSymbols,
+    LitVvec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
@@ -15,7 +15,7 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     gipsat::TransysSolver,
     ic3::{IC3, IC3Config},
-    transys::{TransysIf, certify::BlWitness, unroll::TransysUnroll},
+    transys::{certify::BlWitness, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
 use std::{
@@ -86,13 +86,6 @@ impl CIll {
             }
             let bad = self.uts.lit_next(*b, self.uts.num_unroll);
             *r = !self.slv.solve(&[bad]);
-            let mut cti = LitVec::new();
-            for s in self.ts.latch() {
-                if let Some(s) = self.slv.sat_value_lit(s) {
-                    cti.push(s);
-                }
-            }
-            assert!(slv.solve(&cti));
         }
         self.res = results.into_iter().map(|(r, _)| r).collect();
         Ok(self.res.iter().all(|l| *l))
