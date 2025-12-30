@@ -5,7 +5,7 @@ use crate::cli::{
     vcd::wlwitness_vcd,
 };
 use btor::Btor;
-use giputils::{grc::Grc, hash::GHashMap, logger::with_log_level};
+use giputils::{file::remove_if_exists, grc::Grc, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
     LitVec, LitVvec, VarSymbols,
@@ -29,7 +29,20 @@ use std::{
 };
 
 impl CIll {
-    pub fn check_inductive(&mut self) -> bool {
+    fn save_invariants(&mut self, invariants: &LitVvec) -> anyhow::Result<()> {
+        let inv = self.rp.path("cill/inv.ron");
+        remove_if_exists(&inv)?;
+        fs::write(inv, ron::to_string(&invariants).unwrap())?;
+        Ok(())
+    }
+
+    fn load_invariants(&mut self) -> anyhow::Result<LitVvec> {
+        let inv = self.rp.path("cill/inv.ron");
+        let inv: LitVvec = ron::from_str(&fs::read_to_string(&inv)?)?;
+        Ok(inv)
+    }
+
+    pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.local_proof = true;
@@ -70,6 +83,7 @@ impl CIll {
         for i in invariants.iter() {
             self.slv.add_clause(&!i);
         }
+        self.save_invariants(&invariants)?;
         for ((r, _), b) in results.iter_mut().zip(self.uts.ts.bad.iter()) {
             if *r {
                 continue;
@@ -85,7 +99,7 @@ impl CIll {
             assert!(slv.solve(&cti));
         }
         self.res = results.into_iter().map(|(r, _)| r).collect();
-        self.res.iter().all(|l| *l)
+        Ok(self.res.iter().all(|l| *l))
     }
 
     pub fn check_cti(&mut self) -> anyhow::Result<bool> {
@@ -108,13 +122,17 @@ impl CIll {
         Ok(!self.slv.solve(&assume))
     }
 
-    pub fn get_cti(&mut self, id: usize) -> WlWitness {
+    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<WlWitness> {
+        let invariants = self.load_invariants()?;
+        for i in invariants.iter() {
+            self.slv.add_clause(&!i);
+        }
         let b = self.uts.lit_next(self.uts.ts.bad[id], self.uts.num_unroll);
         assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
         wit = self.ts_rst.restore_witness(&wit);
-        self.bb_map.restore_witness(&wit)
+        Ok(self.bb_map.restore_witness(&wit))
     }
 
     pub fn save_cti(&mut self, mut witness: WlWitness) -> anyhow::Result<()> {

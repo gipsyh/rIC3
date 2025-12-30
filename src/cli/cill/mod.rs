@@ -234,7 +234,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     }
 
     info!("Checking inductiveness of all properties.");
-    if cill.check_inductive() {
+    if cill.check_inductive()? {
         info!(
             "{}",
             "All properties are inductive. Proof succeeded.".green()
@@ -271,7 +271,7 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
         );
         return Ok(());
     }
-    let witness = cill.get_cti(id);
+    let witness = cill.get_cti(id)?;
     let name = cill
         .get_prop_name(witness.bad_id)
         .unwrap_or("Unknown".to_string());
