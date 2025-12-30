@@ -1,11 +1,11 @@
 use crate::{
     BlProof, Engine, McProof, McResult, McWitness,
-    config::{EngineConfigBase, PreprocConfig},
+    config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
-use clap::Args;
+use clap::{Args, Parser};
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
@@ -18,16 +18,23 @@ pub struct KindConfig {
     #[command(flatten)]
     pub preproc: PreprocConfig,
 
-    /// simple path constraint
+    /// Simple path constraint
     #[arg(long = "simple-path", default_value_t = false)]
     pub simple_path: bool,
 
-    /// local proof
+    /// Local proof (can only used in multi-prop)
     #[arg(long = "local-proof", default_value_t = false)]
     pub local_proof: bool,
 }
 
 impl_config_deref!(KindConfig);
+
+impl Default for KindConfig {
+    fn default() -> Self {
+        let cfg = EngineConfig::parse_from(["", "kind"]);
+        cfg.into_kind().unwrap()
+    }
+}
 
 impl KindConfig {
     fn validate(&self) {

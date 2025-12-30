@@ -22,7 +22,10 @@ use crate::{
 };
 use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, atomic::AtomicBool};
+use std::{
+    ops::BitOr,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum McResult {
@@ -37,6 +40,41 @@ pub enum McResult {
 impl Default for McResult {
     fn default() -> Self {
         McResult::Unknown(None)
+    }
+}
+
+impl McResult {
+    pub fn is_safe(&self) -> bool {
+        matches!(self, McResult::Safe)
+    }
+
+    pub fn is_unsafe(&self) -> bool {
+        matches!(self, McResult::Unsafe(_))
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, McResult::Unknown(_))
+    }
+}
+
+impl BitOr for McResult {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        use McResult::*;
+        match (self, rhs) {
+            (Safe, Unsafe(_)) | (Unsafe(_), Safe) => {
+                panic!("conflicting results: safe and unsafe")
+            }
+            (Safe, _) | (_, Safe) => Safe,
+            (Unsafe(a), Unsafe(b)) => Unsafe(a.max(b)),
+            (Unsafe(a), Unknown(_)) | (Unknown(_), Unsafe(a)) => Unsafe(a),
+            (Unknown(a), Unknown(b)) => Unknown(match (a, b) {
+                (Some(x), Some(y)) => Some(x.max(y)),
+                (Some(x), None) | (None, Some(x)) => Some(x),
+                (None, None) => None,
+            }),
+        }
     }
 }
 
