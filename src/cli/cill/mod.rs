@@ -1,5 +1,5 @@
 mod ind;
-mod tui;
+mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use crate::logger_init;
@@ -15,9 +15,9 @@ use giputils::{
 use log::{LevelFilter, info};
 use logicrs::{fol::Term, satif::Satif};
 use rIC3::{
-    McResult,
+    Engine, McResult,
+    bmc::{BMC, BMCConfig},
     frontend::{Frontend, btor::BtorFrontend},
-    portfolio::{Portfolio, PortfolioConfig},
     transys::{Transys, certify::Restore, unroll::TransysUnroll},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
@@ -129,14 +129,16 @@ impl CIll {
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
         info!("Starting checking safety for all properties.");
-        let mut cfg = PortfolioConfig::default();
-        cfg.config = Some("cill".to_string());
+        let mut cfg = BMCConfig::default();
         cfg.time_limit = Some(10);
-        let cert_file = self.rp.path("tmp/dut.cert");
-        let mut engine = Portfolio::new(self.rp.path("dut/dut.btor"), Some(cert_file.clone()), cfg);
-        let res = with_log_level(LevelFilter::Warn, || engine.check());
+        cfg.preproc.scorr = false;
+        cfg.preproc.frts = false;
+        let mut bmc = BMC::new(cfg, self.ts.clone());
+        let res = with_log_level(LevelFilter::Warn, || bmc.check());
 
+        let cex = self.rp.path("cill/cex");
         let cex_vcd = self.rp.path("cill/cex.vcd");
+        remove_if_exists(&cex)?;
         remove_if_exists(&cex_vcd)?;
 
         match res {
@@ -144,18 +146,11 @@ impl CIll {
                 info!("{}", "All properties are SAFE.".green());
             }
             McResult::Unsafe(_) => {
-                let bid = self
-                    .btorfe
-                    .deserialize_wl_unsafe_certificate(fs::read_to_string(&cert_file)?)
-                    .bad_id;
-                let name = self.get_prop_name(bid).unwrap_or("Unknown".to_string());
-                Yosys::btor_wit_to_vcd(
-                    self.rp.path("dut"),
-                    cert_file,
-                    &cex_vcd,
-                    true,
-                    self.rcfg.trace.as_ref(),
-                )?;
+                let witness = bmc.witness().into_bl().unwrap();
+                let name = self
+                    .get_prop_name(witness.bad_id)
+                    .unwrap_or("Unknown".to_string());
+                self.save_witness(&witness, cex, Some(&cex_vcd))?;
                 println!(
                     "{}",
                     format!(
@@ -275,7 +270,7 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     let name = cill
         .get_prop_name(witness.bad_id)
         .unwrap_or("Unknown".to_string());
-    cill.save_cti(witness)?;
+    cill.save_witness(&witness, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
     println!(
         "Please analyze the CTI, generate an assertion to block it, and run 'cill check' to confirm the CTI is blocked."
     );

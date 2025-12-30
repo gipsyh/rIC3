@@ -1,8 +1,6 @@
 use crate::cli::{
-    VcdConfig,
     cache::Ric3Proj,
     cill::{CIll, CIllState},
-    vcd::wlwitness_vcd,
 };
 use btor::Btor;
 use giputils::{file::remove_if_exists, grc::Grc, hash::GHashMap, logger::with_log_level};
@@ -17,13 +15,11 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     gipsat::TransysSolver,
     ic3::{IC3, IC3Config},
-    transys::{TransysIf, unroll::TransysUnroll},
-    wltransys::certify::WlWitness,
+    transys::{TransysIf, certify::BlWitness, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
 use std::{
-    fs::{self, File},
-    io::BufWriter,
+    fs::{self},
     mem::take,
     path::Path,
 };
@@ -122,7 +118,7 @@ impl CIll {
         Ok(!self.slv.solve(&assume))
     }
 
-    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<WlWitness> {
+    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
         let invariants = self.load_invariants()?;
         for i in invariants.iter() {
             self.slv.add_clause(&!i);
@@ -131,37 +127,7 @@ impl CIll {
         assert!(self.slv.solve(&[b]));
         let mut wit = self.uts.witness(&self.slv);
         wit.bad_id = id;
-        wit = self.ts_rst.restore_witness(&wit);
-        Ok(self.bb_map.restore_witness(&wit))
-    }
-
-    pub fn save_cti(&mut self, mut witness: WlWitness) -> anyhow::Result<()> {
-        let cti_file = self.rp.path("cill/cti");
-        let bwit = self
-            .btorfe
-            .unsafe_certificate(McWitness::Wl(witness.clone()));
-        fs::write(&cti_file, format!("{}", bwit))?;
-        let vcd = self.rp.path("cill/cti.vcd");
-        let vcd_file = BufWriter::new(File::create(&vcd)?);
-        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
-            t.as_str()
-                .strip_prefix(&self.rcfg.dut.top)
-                .map(|s| s.strip_prefix('.').unwrap_or(s))
-                .unwrap()
-        } else {
-            ""
-        };
-        witness.enrich(&self.wsym.keys().cloned().collect());
-        wlwitness_vcd(&witness, &self.wsym, vcd_file, filter)?;
-        // crate::cli::yosys::Yosys::btor_wit_to_vcd(
-        //     self.rp.path("dut"),
-        //     &cti_file,
-        //     &vcd,
-        //     false,
-        //     self.rcfg.trace.as_ref(),
-        // )?;
-        println!("Witness VCD generated at {}", vcd.display());
-        Ok(())
+        Ok(wit)
     }
 }
 

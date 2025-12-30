@@ -1,9 +1,51 @@
-use super::CIll;
+use crate::cli::{VcdConfig, cill::CIll, vcd::wlwitness_vcd};
+use rIC3::{McWitness, frontend::Frontend, transys::certify::BlWitness};
 use ratatui::crossterm::style::Stylize;
+use std::{
+    fs::{self, File},
+    io::BufWriter,
+    path::Path,
+};
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
 };
+
+impl CIll {
+    pub fn save_witness(
+        &mut self,
+        wit: &BlWitness,
+        p: impl AsRef<Path>,
+        vcd: Option<impl AsRef<Path>>,
+    ) -> anyhow::Result<()> {
+        let wit = self.ts_rst.restore_witness(wit);
+        let mut wit = self.bb_map.restore_witness(&wit);
+        let bwit = self.btorfe.unsafe_certificate(McWitness::Wl(wit.clone()));
+        fs::write(&p, format!("{}", bwit))?;
+        let Some(vcd) = vcd else {
+            return Ok(());
+        };
+        let vcd_file = BufWriter::new(File::create(&vcd)?);
+        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
+            t.as_str()
+                .strip_prefix(&self.rcfg.dut.top)
+                .map(|s| s.strip_prefix('.').unwrap_or(s))
+                .unwrap()
+        } else {
+            ""
+        };
+        wit.enrich(&self.wsym.keys().cloned().collect());
+        wlwitness_vcd(&wit, &self.wsym, vcd_file, filter)?;
+        // crate::cli::yosys::Yosys::btor_wit_to_vcd(
+        //     self.rp.path("dut"),
+        //     &cti_file,
+        //     &vcd,
+        //     false,
+        //     self.rcfg.trace.as_ref(),
+        // )?;
+        Ok(())
+    }
+}
 
 #[derive(Tabled)]
 struct InductiveResult {

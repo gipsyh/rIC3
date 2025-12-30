@@ -1,16 +1,16 @@
 use crate::{
     Engine, McResult, McWitness,
-    config::{EngineConfigBase, PreprocConfig},
+    config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
-use clap::Args;
+use clap::{Args, Parser};
 use log::info;
 use logicrs::{LitVec, satif::Satif};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct BMCConfig {
@@ -35,6 +35,13 @@ pub struct BMCConfig {
 }
 
 impl_config_deref!(BMCConfig);
+
+impl Default for BMCConfig {
+    fn default() -> Self {
+        let cfg = EngineConfig::parse_from(["", "bmc"]);
+        cfg.into_bmc().unwrap()
+    }
+}
 
 pub struct BMC {
     ots: Transys,
@@ -110,7 +117,13 @@ impl BMC {
 
 impl Engine for BMC {
     fn check(&mut self) -> McResult {
+        let start = Instant::now();
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
+            if let Some(limit) = self.cfg.time_limit
+                && start.elapsed().as_secs() > limit
+            {
+                return McResult::Unknown(k.checked_sub(1));
+            }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let mut assump: LitVec = self.uts.lits_next(&self.uts.ts.bad, k).collect();
