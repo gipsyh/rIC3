@@ -272,7 +272,8 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
         .unwrap_or("Unknown".to_string());
     cill.save_witness(&witness, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
     println!(
-        "Please analyze the CTI, generate an assertion to block it, and run 'cill check' to confirm the CTI is blocked."
+        "CTI VCD generated in {}. Please analyze it, generate an assertion to block it, and run 'cill check' to confirm the CTI is blocked.",
+        rp.path("cill/cti.vcd").display()
     );
     rp.set_cill_state(CIllState::Block(name))
 }
