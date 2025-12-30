@@ -38,11 +38,9 @@ impl Default for KindConfig {
 
 impl KindConfig {
     fn validate(&self) {
-        if self.local_proof {
-            if self.prop.is_none() {
-                error!("A property ID must be specified for local proof.");
-                panic!();
-            }
+        if self.local_proof && self.prop.is_none() {
+            error!("A property ID must be specified for local proof.");
+            panic!();
         }
     }
 }

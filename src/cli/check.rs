@@ -5,18 +5,12 @@ use clap::Parser;
 use log::{error, info};
 use rIC3::{
     Engine, McResult,
-    bmc::BMC,
     config::EngineConfig,
+    create_bl_engine, create_wl_engine,
     frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
-    ic3::IC3,
-    kind::Kind,
-    mp::MultiProp,
     portfolio::{Portfolio, PortfolioConfig},
-    rlive::Rlive,
     tracer::LogTracer,
     transys::TransysIf,
-    wlbmc::WlBMC,
-    wlkind::WlKind,
 };
 use std::{env, fs, mem::transmute, path::PathBuf, process::exit};
 
@@ -104,22 +98,11 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     let mut engine: Box<dyn Engine> = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
         // info!("origin ts has {}", ts.statistic());
-        match cfg {
-            EngineConfig::WlBMC(cfg) => Box::new(WlBMC::new(cfg, wts)),
-            EngineConfig::WlKind(cfg) => Box::new(WlKind::new(cfg.clone(), wts)),
-            _ => unreachable!(),
-        }
+        create_wl_engine(cfg.clone(), wts)
     } else {
         let (ts, symbols) = frontend.ts();
         info!("origin ts has {}", ts.statistic());
-        match cfg {
-            EngineConfig::IC3(cfg) => Box::new(IC3::new(cfg.clone(), ts, symbols)),
-            EngineConfig::Kind(cfg) => Box::new(Kind::new(cfg.clone(), ts)),
-            EngineConfig::BMC(cfg) => Box::new(BMC::new(cfg.clone(), ts)),
-            EngineConfig::MultiProp(cfg) => Box::new(MultiProp::new(cfg.clone(), ts)),
-            EngineConfig::Rlive(cfg) => Box::new(Rlive::new(cfg.clone(), ts)),
-            _ => unreachable!(),
-        }
+        create_bl_engine(cfg.clone(), ts, symbols)
     };
     engine.add_tracer(log_tracer);
     interrupt_statistic(&chk, engine.as_mut());
