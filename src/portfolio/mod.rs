@@ -1,11 +1,14 @@
 use crate::config::{EngineConfig, EngineConfigBase};
-use crate::{Engine, McResult, impl_config_deref};
+use crate::transys::Transys;
+use crate::{Engine, McResult, create_bl_engine, impl_config_deref};
 use clap::{Args, Parser};
 use giputils::logger::with_log_level;
 use log::{error, info};
+use logicrs::VarSymbols;
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::Sender;
 use std::thread::{JoinHandle, spawn};
@@ -249,29 +252,42 @@ pub struct LightPortfolioConfig {
     pub time_limit: Option<usize>,
 }
 
-#[derive(Default)]
 pub struct LightPortfolio {
+    ts: Transys,
+    sym: VarSymbols,
     cfg: LightPortfolioConfig,
+    ecfgs: Vec<EngineConfig>,
     engines: Vec<Box<dyn Engine>>,
+    stop_flag: Arc<AtomicBool>,
 }
 
 impl LightPortfolio {
-    pub fn new(cfg: LightPortfolioConfig, engines: Vec<Box<dyn Engine>>) -> Self {
-        Self { cfg, engines }
-    }
-
-    pub fn add_engine(&mut self, e: impl Engine + 'static) {
-        self.engines.push(Box::new(e));
+    pub fn new(
+        cfg: LightPortfolioConfig,
+        ts: Transys,
+        sym: VarSymbols,
+        ecfgs: Vec<EngineConfig>,
+    ) -> Self {
+        Self {
+            cfg,
+            ecfgs,
+            ts,
+            sym,
+            engines: Vec::new(),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+        }
     }
 }
 
 impl Engine for LightPortfolio {
     fn check(&mut self) -> McResult {
-        let engines = take(&mut self.engines);
-        let mut stops = Vec::new();
-        for e in engines.iter() {
-            stops.push(e.get_stop_ctrl());
-        }
+        let engines: Vec<_> = self
+            .ecfgs
+            .clone()
+            .into_par_iter()
+            .map(|ecfg| create_bl_engine(ecfg, self.ts.clone(), self.sym.clone()))
+            .collect();
+        let stops: Vec<_> = engines.iter().map(|e| e.get_stop_ctrl()).collect();
         let (tx, rx) = mpsc::channel();
         let mut joins = Vec::new();
         with_log_level(log::LevelFilter::Warn, || {
@@ -282,13 +298,17 @@ impl Engine for LightPortfolio {
                 let join = spawn(move || {
                     let res = e.check();
                     let _ = tx.send(res);
-                    res
+                    (e, res)
                 });
                 joins.push(join);
             }
             let mut res = McResult::Unknown(None);
             let mut finished = 0;
             while finished < num_engines {
+                if self.stop_flag.load(Ordering::Relaxed) {
+                    info!("LightPortfolio interrupted by external signal.");
+                    break;
+                }
                 if let Some(t) = self.cfg.time_limit
                     && start.elapsed().as_secs() >= t as u64
                 {
@@ -298,7 +318,7 @@ impl Engine for LightPortfolio {
                 match rx.recv_timeout(std::time::Duration::from_millis(100)) {
                     Ok(r) => {
                         finished += 1;
-                        if !matches!(r, McResult::Unknown(_)) {
+                        if !r.is_unknown() {
                             res = r;
                             break;
                         }
@@ -309,14 +329,18 @@ impl Engine for LightPortfolio {
                     }
                 }
             }
-
             for s in stops {
                 s.store(true, Ordering::Relaxed);
             }
             for j in joins {
-                let _ = j.join().unwrap();
+                let (e, _) = j.join().unwrap();
+                self.engines.push(e);
             }
             res
         })
+    }
+
+    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
+        self.stop_flag.clone()
     }
 }
