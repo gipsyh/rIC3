@@ -187,7 +187,8 @@ impl Run {
         }
         let btor_path = self.ric3_proj.path("tmp/px.btor");
         btor.to_file(&btor_path);
-        let pcfg = PortfolioConfig::default();
+        let mut pcfg = PortfolioConfig::default();
+        pcfg.config = Some("light".to_string());
         let cfg = EngineConfig::Portfolio(pcfg.clone());
         let cert_file = self.ric3_proj.path("tmp/px.cert");
         let mut engine = Portfolio::new(btor_path, Some(cert_file), pcfg);

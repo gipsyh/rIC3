@@ -36,6 +36,16 @@ bmc_kissat_dyn = "bmc --kissat --dyn-step --rseed 14"
 wlbmc = "wl-bmc --rseed 15"
 wlkind = "wl-kind --step 1 --rseed 16"
 
+[light]
+ic3_no_preproc = "ic3 --ctg=false --frts=false --scorr=false --drop-po=false --rseed 2"
+ic3_abs_all = "ic3 --abs-cst --abs-trans --rseed 5"
+ic3_predprop = "ic3 --pred-prop --rseed 6"
+ic3_inn = "ic3 --inn --rseed 8"
+ic3_inn_ctp = "ic3 --inn --ctp --rseed 9"
+ic3_inn_noctg = "ic3 --inn --ctg=false --rseed 10"
+bmc = "bmc --step 1 --rseed 12"
+bmc_kissat_10 = "bmc --kissat --step 10 --rseed 13"
+
 [bl_hwmcc]
 ic3 = "ic3 --rseed 1"
 ic3_no_preproc = "ic3 --ctg=false --frts=false --scorr=false --drop-po=false --rseed 2"
