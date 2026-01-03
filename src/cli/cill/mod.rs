@@ -18,6 +18,7 @@ use rIC3::{
     Engine, McResult,
     bmc::{BMC, BMCConfig},
     frontend::{Frontend, btor::BtorFrontend},
+    kind::KindConfig,
     transys::{Transys, certify::Restore, unroll::TransysUnroll},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
@@ -86,6 +87,7 @@ pub struct CIll {
     slv: CaDiCaL,
     uts: TransysUnroll<Transys>,
     res: Vec<bool>,
+    kind_cfg: KindConfig,
 }
 
 impl CIll {
@@ -107,6 +109,12 @@ impl CIll {
                 slv.add_clause(&[!uts.lit_next(*b, k)]);
             }
         }
+        let mut kind_cfg = KindConfig::default();
+        kind_cfg.start = uts.num_unroll;
+        kind_cfg.end = uts.num_unroll;
+        kind_cfg.preproc.preproc = false;
+        kind_cfg.local_proof = true;
+        kind_cfg.skip_bmc = true;
         Ok(Self {
             rcfg,
             rp,
@@ -120,6 +128,7 @@ impl CIll {
             bb_map,
             uts,
             res: Vec::new(),
+            kind_cfg,
         })
     }
 

@@ -15,6 +15,7 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     gipsat::TransysSolver,
     ic3::{IC3, IC3Config},
+    kind::Kind,
     transys::{certify::BlWitness, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
@@ -76,16 +77,18 @@ impl CIll {
         for i in invariants.iter() {
             assert!(slv.inductive(i, false));
         }
-        for i in invariants.iter() {
-            self.slv.add_clause(&!i);
-        }
         self.save_invariants(&invariants)?;
-        for ((r, _), b) in results.iter_mut().zip(self.uts.ts.bad.iter()) {
+        for ((r, _), b) in results.iter_mut().zip(0..self.ts.bad.len()) {
             if *r {
                 continue;
             }
-            let bad = self.uts.lit_next(*b, self.uts.num_unroll);
-            *r = !self.slv.solve(&[bad]);
+            let mut kind_cfg = self.kind_cfg.clone();
+            kind_cfg.prop = Some(b);
+            let mut kind = Kind::new(kind_cfg, self.ts.clone());
+            for i in invariants.iter() {
+                kind.add_local_constraint(&!i);
+            }
+            *r = kind.check().is_safe();
         }
         self.res = results.into_iter().map(|(r, _)| r).collect();
         Ok(self.res.iter().all(|l| *l))
@@ -113,13 +116,14 @@ impl CIll {
 
     pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
         let invariants = self.load_invariants()?;
+        let mut kind_cfg = self.kind_cfg.clone();
+        kind_cfg.prop = Some(id);
+        let mut kind = Kind::new(kind_cfg, self.ts.clone());
         for i in invariants.iter() {
-            self.slv.add_clause(&!i);
+            kind.add_local_constraint(&!i);
         }
-        let b = self.uts.lit_next(self.uts.ts.bad[id], self.uts.num_unroll);
-        assert!(self.slv.solve(&[b]));
-        let mut wit = self.uts.witness(&self.slv);
-        wit.bad_id = id;
+        assert!(kind.check().is_unknown());
+        let wit = kind.witness().into_bl().unwrap();
         Ok(wit)
     }
 }

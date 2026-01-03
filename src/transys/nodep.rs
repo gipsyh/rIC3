@@ -67,6 +67,14 @@ impl NoDepTransys {
         self.constraint = self.constraint.iter().map(map_lit).collect();
         rst.filter_map_var(&|v| domain_map.get(&v).copied());
     }
+
+    pub fn compress_bads(&mut self) {
+        if self.bad.len() <= 1 {
+            return;
+        }
+        let bad = take(&mut self.bad);
+        self.bad = LitVec::from(self.rel.new_or(bad));
+    }
 }
 
 impl TransysIf for NoDepTransys {

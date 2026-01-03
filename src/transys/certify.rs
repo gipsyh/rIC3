@@ -286,7 +286,8 @@ impl Restore {
     }
 
     pub fn restore_witness(&self, wit: &BlWitness) -> BlWitness {
-        let mut wit = wit.map(|l| self.restore(l));
+        let iv = self.init_var();
+        let mut wit = wit.filter_map(|l| (iv != Some(l.var())).then(|| self.restore(l)));
         for s in wit.state.iter_mut() {
             *s = self.restore_eq_state(s);
         }
