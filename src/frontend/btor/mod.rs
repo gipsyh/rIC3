@@ -260,19 +260,20 @@ impl BtorFrontend {
 }
 
 pub fn cerbtora_check<M: AsRef<Path>, C: AsRef<Path>>(model: M, certificate: C) -> bool {
-    let certificate = certificate.as_ref();
+    let model = model.as_ref().to_path_buf().canonicalize().unwrap();
+    let certificate = certificate.as_ref().to_path_buf().canonicalize().unwrap();
     let output = Command::new("docker")
         .args([
             "run",
             "--rm",
             "--pull=never",
             "-v",
-            &format!("{}:{}", model.as_ref().display(), model.as_ref().display()),
+            &format!("{}:{}", model.display(), model.display()),
             "-v",
             &format!("{}:{}", certificate.display(), certificate.display()),
             "ghcr.io/gipsyh/cerbtora:latest",
         ])
-        .arg(model.as_ref())
+        .arg(model)
         .arg(certificate)
         .output()
         .unwrap();

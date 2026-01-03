@@ -99,6 +99,8 @@ impl CIll {
         let mut slv = CaDiCaL::new();
         let mut ts_rst = Restore::new(&ts);
         ts.simplify(&mut ts_rst);
+        ts.remove_gate_init(&mut ts_rst);
+        assert!(ts_rst.init_var().is_none());
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll_to(4);
         for k in 0..=uts.num_unroll {

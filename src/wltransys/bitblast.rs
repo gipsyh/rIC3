@@ -297,13 +297,12 @@ impl BitblastMap {
                     if last.polarity() {
                         let mut rel = !rel;
                         rel.pop();
-                        r.push(Term::new_op_fold(
-                            op::And,
+                        r.push(Term::new_ands(
                             rel.iter().map(|l| map[&l.var()].not_if(!l.polarity())),
                         ));
                     }
                 }
-                let n = Term::new_op_fold(op::Or, r);
+                let n = Term::new_ors(r);
                 map.insert(v, n);
             }
         }

@@ -169,6 +169,10 @@ impl DerefMut for BlProof {
 }
 
 impl BlProof {
+    pub fn new(p: Transys) -> Self {
+        Self { proof: p }
+    }
+
     pub fn merge(&mut self, other: &Self, ts: &Transys) {
         self.proof.merge(
             &other.proof,

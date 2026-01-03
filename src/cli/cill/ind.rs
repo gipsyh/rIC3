@@ -6,7 +6,7 @@ use btor::Btor;
 use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
-    LitVvec, VarSymbols,
+    LitVec, LitVvec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
@@ -14,8 +14,12 @@ use rIC3::{
     Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
-    kind::Kind,
-    transys::{certify::BlWitness, unroll::TransysUnroll},
+    kind::{Kind, KindConfig},
+    tracer::LogTracer,
+    transys::{
+        certify::{BlProof, BlWitness},
+        unroll::TransysUnroll,
+    },
 };
 use rayon::prelude::*;
 use std::{
@@ -45,7 +49,7 @@ impl CIll {
         cfg.preproc.preproc = false;
         cfg.time_limit = Some(10);
         cfg.inn = true;
-        let mut results: Vec<_> = with_log_level(LevelFilter::Warn, || {
+        let mut ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..self.ts.bad.len())
                 .into_par_iter()
                 .map(|i| {
@@ -58,27 +62,72 @@ impl CIll {
                 .collect()
         });
         let mut invariants = LitVvec::new();
-        for (_, ic3) in results.iter_mut() {
+        let mut results = Vec::new();
+        for (r, ic3) in ic3_results.iter_mut() {
+            results.push(*r);
             invariants.extend(ic3.invariant());
         }
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
         self.save_invariants(&invariants)?;
-        for ((r, _), b) in results.iter_mut().zip(0..self.ts.bad.len()) {
-            if *r {
-                continue;
-            }
-            let mut kind_cfg = self.kind_cfg.clone();
-            kind_cfg.prop = Some(b);
-            let mut kind = Kind::new(kind_cfg, self.ts.clone());
-            for i in invariants.iter() {
-                kind.add_local_constraint(&!i);
-            }
-            *r = kind.check().is_safe();
+        let kind_results: Vec<_> = results
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| !**r)
+            .map(|(b, _)| b)
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .map(|b| {
+                let mut kind_cfg = self.kind_cfg.clone();
+                kind_cfg.prop = Some(b);
+                let mut kind = Kind::new(kind_cfg, self.ts.clone());
+                for i in invariants.iter() {
+                    kind.add_local_constraint(&!i);
+                }
+                let r = kind.check().is_safe();
+                (b, r, kind)
+            })
+            .collect();
+
+        let mut kinds = Vec::new();
+        for (b, r, kind) in kind_results {
+            results[b] = r;
+            kinds.push(kind);
         }
-        self.res = results.into_iter().map(|(r, _)| r).collect();
-        Ok(self.res.iter().all(|l| *l))
+        self.res = results;
+        let res = self.res.iter().all(|l| *l);
+        if res {
+            let mut proof = BlProof::new(self.ts.clone());
+            let inv: LitVec = invariants
+                .iter()
+                .map(|inv| proof.rel.new_and(inv))
+                .collect();
+            proof.bad.extend(inv);
+            for (r, mut ic3) in ic3_results {
+                if r {
+                    let sp = ic3.proof().into_bl().unwrap();
+                    proof.merge(&sp, &self.ts);
+                }
+            }
+            if !kinds.is_empty() {
+                let sp = kinds[0].proof().into_bl().unwrap();
+                proof.merge(&sp, &self.ts);
+            }
+            let proof = self.ts_rst.restore_proof(proof, &self.ots);
+            let cfg = KindConfig::default();
+            let mut kind = Kind::new(cfg, proof.proof.clone());
+            kind.add_tracer(Box::new(LogTracer::new("kind")));
+            dbg!(kind.check());
+            // let proof = self.bb_map.restore_proof(&self.wts, &proof);
+            // let proof = format!("{}", self.btorfe.safe_certificate(rIC3::McProof::Wl(proof)));
+            // fs::write(&self.rp.path("cill/cert"), proof)?;
+            // assert!(
+            //     self.btorfe
+            //         .certify(&self.rp.path("dut/dut.btor"), &self.rp.path("cill/cert"))
+            // );
+        }
+        Ok(res)
     }
 
     pub fn check_cti(&mut self) -> anyhow::Result<bool> {

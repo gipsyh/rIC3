@@ -188,6 +188,9 @@ impl Engine for Kind {
         for cube in eqi {
             certifaiger_dnf.push(ts.rel.new_and(cube));
         }
+        for lc in self.local_cst.iter() {
+            certifaiger_dnf.push(ts.rel.new_and(!lc));
+        }
         certifaiger_dnf.extend(ts.bad);
         let invariants = ts.rel.new_or(certifaiger_dnf);
         ts.bad = LitVec::from(invariants);
