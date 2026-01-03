@@ -79,9 +79,9 @@ pub enum EngineConfig {
     WlBMC(WlBMCConfig),
     /// word level k-induction
     WlKind(WlKindConfig),
-    /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
+    /// rlive (CAV'24 https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive(RliveConfig),
-    /// Multi Properties
+    /// Multi-Property (DATE'18 https://doi.org/10.23919/DATE.2018.8341977)
     MultiProp(MultiPropConfig),
     /// portfolio
     Portfolio(PortfolioConfig),

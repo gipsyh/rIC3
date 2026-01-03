@@ -113,7 +113,7 @@ impl Engine for MultiProp {
                 match result {
                     McResult::Safe => (),
                     McResult::Unsafe(_) => return result,
-                    McResult::Unknown(_) => todo!(),
+                    McResult::Unknown(_) => unreachable!(),
                 }
             }
         }
