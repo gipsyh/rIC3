@@ -82,8 +82,8 @@ pub struct IC3Config {
     )]
     pub drop_po: bool,
 
-    /// full assignment of last bad (used in rlive)
-    #[arg(long = "full-bad", default_value_t = false)]
+    /// full assignment of last bad (internal parameter)
+    #[arg(skip)]
     pub full_bad: bool,
 
     /// abstract array
@@ -98,8 +98,8 @@ pub struct IC3Config {
     #[arg(long = "pred-prop", default_value_t = false)]
     pub pred_prop: bool,
 
-    /// local proof (can only used in multi-prop)
-    #[arg(long = "local-proof", default_value_t = false)]
+    /// Local proof (internal parameter)
+    #[arg(skip)]
     pub local_proof: bool,
 }
 

@@ -22,8 +22,8 @@ pub struct KindConfig {
     #[arg(long = "simple-path", default_value_t = false)]
     pub simple_path: bool,
 
-    /// Local proof (can only used in multi-prop)
-    #[arg(long = "local-proof", default_value_t = false)]
+    /// Local proof (internal parameter)
+    #[arg(skip)]
     pub local_proof: bool,
 }
 
@@ -38,6 +38,14 @@ impl Default for KindConfig {
 
 impl KindConfig {
     fn validate(&self) {
+        if self.step != 1 {
+            error!("k-induction step should be 1, got {}", self.step);
+            panic!();
+        }
+        if self.start != 0 {
+            error!("k-induction start should be 0, got {}", self.start);
+            panic!();
+        }
         if self.local_proof && self.prop.is_none() {
             error!("A property ID must be specified for local proof.");
             panic!();
@@ -51,6 +59,8 @@ pub struct Kind {
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
+    /// local constraint
+    local_cst: LitVec,
     ots: Transys,
     rst: Restore,
     tracer: Tracer,
@@ -86,10 +96,15 @@ impl Kind {
             solver,
             slv_trans_k: 0,
             slv_bad_k: 0,
+            local_cst: LitVec::new(),
             ots,
             rst,
             tracer: Tracer::new(),
         }
+    }
+
+    pub fn add_local_constraint(&mut self, c: impl IntoIterator<Item = Lit>) {
+        self.local_cst.extend(c);
     }
 
     fn load_trans_to(&mut self, k: usize) {
@@ -104,6 +119,9 @@ impl Kind {
         while self.slv_bad_k < k + 1 {
             for b in self.uts.lits_next(&self.uts.ts.bad, self.slv_bad_k) {
                 self.solver.add_clause(&[!b]);
+            }
+            for c in self.uts.lits_next(&self.local_cst, self.slv_bad_k) {
+                self.solver.add_clause(&[c]);
             }
             self.slv_bad_k += 1;
         }
@@ -121,15 +139,6 @@ impl Kind {
 
 impl Engine for Kind {
     fn check(&mut self) -> McResult {
-        let step = self.cfg.step as usize;
-        if step != 1 {
-            error!("k-induction step should be 1, got {step}");
-            panic!();
-        }
-        if self.cfg.start != 0 {
-            error!("k-induction start should be 0, got {}", self.cfg.start);
-            panic!();
-        }
         for k in 0..=self.cfg.end {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
