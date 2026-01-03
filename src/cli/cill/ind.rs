@@ -6,7 +6,7 @@ use btor::Btor;
 use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
-    LitVec, LitVvec, VarSymbols,
+    LitVvec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
     satif::Satif,
 };
@@ -14,12 +14,8 @@ use rIC3::{
     Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
-    kind::{Kind, KindConfig},
-    tracer::LogTracer,
-    transys::{
-        certify::{BlProof, BlWitness},
-        unroll::TransysUnroll,
-    },
+    kind::Kind,
+    transys::{certify::BlWitness, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
 use std::{
@@ -97,36 +93,36 @@ impl CIll {
         }
         self.res = results;
         let res = self.res.iter().all(|l| *l);
-        if res {
-            let mut proof = BlProof::new(self.ts.clone());
-            let inv: LitVec = invariants
-                .iter()
-                .map(|inv| proof.rel.new_and(inv))
-                .collect();
-            proof.bad.extend(inv);
-            for (r, mut ic3) in ic3_results {
-                if r {
-                    let sp = ic3.proof().into_bl().unwrap();
-                    proof.merge(&sp, &self.ts);
-                }
-            }
-            if !kinds.is_empty() {
-                let sp = kinds[0].proof().into_bl().unwrap();
-                proof.merge(&sp, &self.ts);
-            }
-            let proof = self.ts_rst.restore_proof(proof, &self.ots);
-            let cfg = KindConfig::default();
-            let mut kind = Kind::new(cfg, proof.proof.clone());
-            kind.add_tracer(Box::new(LogTracer::new("kind")));
-            dbg!(kind.check());
-            // let proof = self.bb_map.restore_proof(&self.wts, &proof);
-            // let proof = format!("{}", self.btorfe.safe_certificate(rIC3::McProof::Wl(proof)));
-            // fs::write(&self.rp.path("cill/cert"), proof)?;
-            // assert!(
-            //     self.btorfe
-            //         .certify(&self.rp.path("dut/dut.btor"), &self.rp.path("cill/cert"))
-            // );
-        }
+        // if res {
+        // let mut proof = BlProof::new(self.ts.clone());
+        // let inv: LitVec = invariants
+        //     .iter()
+        //     .map(|inv| proof.rel.new_and(inv))
+        //     .collect();
+        // proof.bad.extend(inv);
+        // for (r, mut ic3) in ic3_results {
+        //     if r {
+        //         let sp = ic3.proof().into_bl().unwrap();
+        //         proof.merge(&sp, &self.ts);
+        //     }
+        // }
+        // if !kinds.is_empty() {
+        //     let sp = kinds[0].proof().into_bl().unwrap();
+        //     proof.merge(&sp, &self.ts);
+        // }
+        // let proof = self.ts_rst.restore_proof(proof, &self.ots);
+        // let cfg = KindConfig::default();
+        // let mut kind = Kind::new(cfg, proof.proof.clone());
+        // kind.add_tracer(Box::new(LogTracer::new("kind")));
+
+        // let proof = self.bb_map.restore_proof(&self.wts, &proof);
+        // let proof = format!("{}", self.btorfe.safe_certificate(rIC3::McProof::Wl(proof)));
+        // fs::write(&self.rp.path("cill/cert"), proof)?;
+        // assert!(
+        //     self.btorfe
+        //         .certify(&self.rp.path("dut/dut.btor"), &self.rp.path("cill/cert"))
+        // );
+        // }
         Ok(res)
     }
 
