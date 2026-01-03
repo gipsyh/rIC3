@@ -51,7 +51,7 @@ impl PredProp {
 
 impl IC3 {
     pub fn prep_prop_base(&mut self) -> bool {
-        assert!(self.level() == 0);
+        assert!(self.solvers.len() == 0);
         if self.predprop.is_none() {
             return true;
         }
@@ -61,8 +61,12 @@ impl IC3 {
         } else {
             0
         };
-        if self.solvers[0].solve(&[self.tsctx.bad[id]]) {
-            let (input, bad) = self.solvers[0].trivial_pred();
+        let mut slv = TransysSolver::new(&self.tsctx);
+        for init in self.tsctx.init.clone() {
+            slv.add_clause(&init);
+        }
+        if slv.solve(&[self.tsctx.bad[id]]) {
+            let (input, bad) = slv.trivial_pred();
             self.add_obligation(ProofObligation::new(
                 0,
                 LitOrdVec::new(bad),

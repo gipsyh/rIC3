@@ -4,6 +4,7 @@ use crate::{
 };
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
 pub struct BlWitness {
@@ -151,6 +152,33 @@ pub struct BlProof {
     pub proof: Transys,
 }
 
+impl Deref for BlProof {
+    type Target = Transys;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.proof
+    }
+}
+
+impl DerefMut for BlProof {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.proof
+    }
+}
+
+impl BlProof {
+    pub fn merge(&mut self, other: &Self, ts: &Transys) {
+        self.proof.merge(
+            &other.proof,
+            |v| {
+                if v <= ts.max_var() { Some(v) } else { None }
+            },
+        );
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Restore {
     pub(crate) bvmap: VarVMap,
@@ -292,6 +320,17 @@ impl Restore {
             *s = self.restore_eq_state(s);
         }
         wit
+    }
+
+    pub fn restore_proof(&self, mut proof: BlProof, ts: &Transys) -> BlProof {
+        let mut res = ts.clone();
+        proof.constraint.clear();
+        res.merge(&proof, |v| self.bvmap.get(&v).copied());
+        let eqi = self.eq_invariant();
+        for cube in eqi {
+            res.bad.push(res.rel.new_and(cube));
+        }
+        BlProof { proof: res }
     }
 
     pub fn forward_witness(&self, wit: &BlWitness) -> BlWitness {

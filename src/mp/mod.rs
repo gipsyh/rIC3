@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McProof, McResult,
+    Engine, McProof, McResult, McWitness,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -11,8 +11,8 @@ use crate::{
 };
 use clap::{ArgAction, Args};
 use giputils::logger::with_log_level;
-use log::LevelFilter;
-use logicrs::{LitVec, VarSymbols};
+use log::{LevelFilter, error};
+use logicrs::VarSymbols;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +31,15 @@ pub struct MultiPropConfig {
 
 impl_config_deref!(MultiPropConfig);
 
+impl MultiPropConfig {
+    pub fn validate(&self) {
+        if self.prop.is_some() {
+            error!("Cannot specify prop in a multi-prop engine.");
+            panic!();
+        }
+    }
+}
+
 pub struct MultiProp {
     ots: Transys,
     ts: Transys,
@@ -39,10 +48,12 @@ pub struct MultiProp {
     ic3_cfg: IC3Config,
     tracer: Tracer,
     parallel: bool,
+    results: Vec<McResult>,
 }
 
 impl MultiProp {
     pub fn new(cfg: MultiPropConfig, ts: Transys) -> Self {
+        cfg.validate();
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
@@ -56,6 +67,7 @@ impl MultiProp {
         let parallel = cfg.parallel;
         Self {
             ots,
+            results: vec![McResult::default(); ts.bad.len()],
             ts,
             rst,
             ic3: Vec::new(),
@@ -81,41 +93,50 @@ impl Engine for MultiProp {
                     })
                     .collect()
             });
-            for (ic3, result) in results {
+            for (bad, (ic3, result)) in results.into_iter().enumerate() {
+                self.ic3.push(ic3);
+                self.results[bad] = result;
                 match result {
                     McResult::Safe => (),
-                    McResult::Unsafe(_) => todo!(),
-                    McResult::Unknown(_) => todo!(),
+                    McResult::Unsafe(_) => return result,
+                    McResult::Unknown(_) => unreachable!(),
                 }
-                self.ic3.push(ic3);
             }
         } else {
             for i in 0..self.ts.bad.len() {
                 let mut cfg = self.ic3_cfg.clone();
                 cfg.prop = Some(i);
                 let mut ic3 = IC3::new(cfg, self.ts.clone(), VarSymbols::default());
-                match ic3.check() {
+                let result = ic3.check();
+                self.ic3.push(ic3);
+                self.results[i] = result;
+                match result {
                     McResult::Safe => (),
-                    McResult::Unsafe(_) => todo!(),
+                    McResult::Unsafe(_) => return result,
                     McResult::Unknown(_) => todo!(),
                 }
-                self.ic3.push(ic3);
             }
         }
         McResult::Safe
     }
 
     fn proof(&mut self) -> McProof {
-        let mut proof = self.ots.clone();
-        proof.bad.clear();
+        let mut proof = BlProof {
+            proof: self.ts.clone(),
+        };
         for ic3 in self.ic3.iter_mut() {
-            let subp = ic3.proof().into_bl().unwrap().proof;
-            let mut map = self.rst.bvmap.clone();
-            proof.rel.migrate(&subp.rel, subp.bad[0].var(), &mut map);
-            proof.bad.push(map.lit_map(subp.bad[0]).unwrap());
+            let subp = ic3.proof().into_bl().unwrap();
+            proof.merge(&subp, &self.ts);
         }
-        proof.bad = LitVec::from(proof.rel.new_or(proof.bad));
-        McProof::Bl(BlProof { proof })
+        let proof = self.rst.restore_proof(proof, &self.ots);
+        McProof::Bl(proof)
+    }
+
+    fn witness(&mut self) -> McWitness {
+        let bid = self.results.iter().position(|r| r.is_unsafe()).unwrap();
+        let wit = self.ic3[bid].witness().into_bl().unwrap();
+        let wit = self.rst.restore_witness(&wit);
+        McWitness::Bl(wit)
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

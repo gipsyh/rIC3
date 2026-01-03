@@ -272,11 +272,11 @@ impl IC3 {
 
 impl Engine for IC3 {
     fn check(&mut self) -> McResult {
-        self.extend();
         if !self.prep_prop_base() {
             self.tracer.trace_res(McResult::Unsafe(0));
             return McResult::Unsafe(0);
         }
+        self.extend();
         loop {
             let start = Instant::now();
             debug!("blocking phase begin");
