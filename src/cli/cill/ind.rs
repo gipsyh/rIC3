@@ -3,7 +3,7 @@ use crate::cli::{
     cill::{CIll, CIllState},
 };
 use btor::Btor;
-use giputils::{file::remove_if_exists, grc::Grc, hash::GHashMap, logger::with_log_level};
+use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
 use log::LevelFilter;
 use logicrs::{
     LitVvec, VarSymbols,
@@ -13,7 +13,6 @@ use logicrs::{
 use rIC3::{
     Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
-    gipsat::TransysSolver,
     ic3::{IC3, IC3Config},
     kind::Kind,
     transys::{certify::BlWitness, unroll::TransysUnroll},
@@ -65,18 +64,6 @@ impl CIll {
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
-        let nts = uts.interal_signals();
-        let tsctx = Grc::new(nts.ctx());
-        let mut slv = TransysSolver::new(&tsctx);
-        for i in invariants.iter() {
-            slv.add_clause(&!i);
-        }
-        for b in self.ts.bad.iter() {
-            slv.add_clause(&[!b]);
-        }
-        for i in invariants.iter() {
-            assert!(slv.inductive(i, false));
-        }
         self.save_invariants(&invariants)?;
         for ((r, _), b) in results.iter_mut().zip(0..self.ts.bad.len()) {
             if *r {
