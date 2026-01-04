@@ -67,24 +67,26 @@ impl CIll {
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
         self.save_invariants(&invariants)?;
-        let kind_results: Vec<_> = results
-            .iter()
-            .enumerate()
-            .filter(|(_, r)| !**r)
-            .map(|(b, _)| b)
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .map(|b| {
-                let mut kind_cfg = self.kind_cfg.clone();
-                kind_cfg.prop = Some(b);
-                let mut kind = Kind::new(kind_cfg, self.ts.clone());
-                for i in invariants.iter() {
-                    kind.add_local_constraint(&!i);
-                }
-                let r = kind.check().is_safe();
-                (b, r, kind)
-            })
-            .collect();
+        let kind_results: Vec<_> = with_log_level(LevelFilter::Error, || {
+            results
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| !**r)
+                .map(|(b, _)| b)
+                .collect::<Vec<_>>()
+                .into_par_iter()
+                .map(|b| {
+                    let mut kind_cfg = self.kind_cfg.clone();
+                    kind_cfg.prop = Some(b);
+                    let mut kind = Kind::new(kind_cfg, self.ts.clone());
+                    for i in invariants.iter() {
+                        kind.add_local_constraint(&!i);
+                    }
+                    let r = kind.check().is_safe();
+                    (b, r, kind)
+                })
+                .collect()
+        });
 
         let mut kinds = Vec::new();
         for (b, r, kind) in kind_results {
