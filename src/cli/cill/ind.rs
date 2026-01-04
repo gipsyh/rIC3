@@ -177,7 +177,11 @@ impl Ric3Proj {
         let ywbc_old = fs::read_to_string(dut_old.join("dut.ywb"))?;
         let ywb_old = btor_old.ywb(&ywbc_old);
         let wb_old = btor_old.witness_map(&ywbc_old);
-        let wb_old: GHashMap<_, _> = wb_old.into_iter().map(|(k, v)| (v, k)).collect();
+        let wb_old: GHashMap<_, _> = wb_old
+            .into_iter()
+            .filter(|(_, v)| v[0].path[0] != "\\_witness_")
+            .map(|(k, v)| (v, k))
+            .collect();
 
         let btor_new = Btor::from_file(dut_new.join("dut.btor"));
         let mut btorfe_new = BtorFrontend::new(btor_new.clone());
