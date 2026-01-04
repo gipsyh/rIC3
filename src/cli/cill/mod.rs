@@ -209,7 +209,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
         } else {
             println!(
                 "{}",
-                format!("The CTI of {prop} has not been blocked yet.").red()
+                format!("The CTI of {prop} has not been blocked yet. cti.vcd refreshed.").red()
             );
             return Ok(());
         }

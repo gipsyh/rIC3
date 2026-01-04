@@ -133,7 +133,17 @@ impl CIll {
         let cti = self.bb_map.bitblast_witness(&cti);
         let cti = self.ts_rst.forward_witness(&cti);
         let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), LitVvec::new(), Some(cti));
-        Ok(kind.check().is_safe())
+        if kind.check().is_safe() {
+            return Ok(true);
+        }
+        self.rp.clear_cti()?;
+        let witness = kind.witness().into_bl().unwrap();
+        self.save_witness(
+            &witness,
+            self.rp.path("cill/cti"),
+            Some(self.rp.path("cill/cti.vcd")),
+        )?;
+        Ok(false)
     }
 
     pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
