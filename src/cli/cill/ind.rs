@@ -65,7 +65,9 @@ impl CIll {
             results.push(*r);
             invariants.extend(ic3.invariant());
         }
-        info!("IC3 proved {:?}", ic3_proved);
+        if !ic3_proved.is_empty() {
+            info!("IC3 proved {:?} prop.", ic3_proved);
+        }
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
