@@ -51,7 +51,7 @@ impl PredProp {
 
 impl IC3 {
     pub fn prep_prop_base(&mut self) -> bool {
-        assert!(self.solvers.len() == 0);
+        assert!(self.solvers.is_empty());
         if self.predprop.is_none() {
             return true;
         }

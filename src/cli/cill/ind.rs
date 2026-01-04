@@ -1,20 +1,18 @@
 use crate::cli::{
     cache::Ric3Proj,
-    cill::{CIll, CIllState},
+    cill::{CIll, CIllState, kind::CIllKind},
 };
 use btor::Btor;
 use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
-use log::LevelFilter;
+use log::{LevelFilter, info};
 use logicrs::{
     LitVvec, VarSymbols,
     fol::{self, BvTermValue, TermValue},
-    satif::Satif,
 };
 use rIC3::{
     Engine, McResult, McWitness,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
-    kind::Kind,
     transys::{certify::BlWitness, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
@@ -43,7 +41,7 @@ impl CIll {
         cfg.pred_prop = true;
         cfg.local_proof = true;
         cfg.preproc.preproc = false;
-        cfg.time_limit = Some(10);
+        cfg.time_limit = Some(15);
         cfg.inn = true;
         let mut ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..self.ts.bad.len())
@@ -59,10 +57,15 @@ impl CIll {
         });
         let mut invariants = LitVvec::new();
         let mut results = Vec::new();
-        for (r, ic3) in ic3_results.iter_mut() {
+        let mut ic3_proved = Vec::new();
+        for (id, (r, ic3)) in ic3_results.iter_mut().enumerate() {
+            if *r {
+                ic3_proved.push(id);
+            }
             results.push(*r);
             invariants.extend(ic3.invariant());
         }
+        info!("IC3 proved {:?}", ic3_proved);
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
@@ -76,12 +79,7 @@ impl CIll {
                 .collect::<Vec<_>>()
                 .into_par_iter()
                 .map(|b| {
-                    let mut kind_cfg = self.kind_cfg.clone();
-                    kind_cfg.prop = Some(b);
-                    let mut kind = Kind::new(kind_cfg, self.ts.clone());
-                    for i in invariants.iter() {
-                        kind.add_local_constraint(&!i);
-                    }
+                    let mut kind = CIllKind::new(b, self.ts.clone(), invariants.clone(), None);
                     let r = kind.check().is_safe();
                     (b, r, kind)
                 })
@@ -132,30 +130,15 @@ impl CIll {
         let cti_file = self.rp.path("cill/cti");
         let cti = fs::read_to_string(&cti_file)?;
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
-        assert!(cti.len() == self.uts.num_unroll + 1);
         let cti = self.bb_map.bitblast_witness(&cti);
         let cti = self.ts_rst.forward_witness(&cti);
-        let mut assume = vec![
-            self.uts
-                .lit_next(self.uts.ts.bad[cti.bad_id], self.uts.num_unroll),
-        ];
-        for k in 0..=self.uts.num_unroll {
-            assume.extend(
-                self.uts
-                    .lits_next(cti.input[k].iter().chain(cti.state[k].iter()), k),
-            );
-        }
-        Ok(!self.slv.solve(&assume))
+        let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), LitVvec::new(), Some(cti));
+        Ok(kind.check().is_safe())
     }
 
     pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
         let invariants = self.load_invariants()?;
-        let mut kind_cfg = self.kind_cfg.clone();
-        kind_cfg.prop = Some(id);
-        let mut kind = Kind::new(kind_cfg, self.ts.clone());
-        for i in invariants.iter() {
-            kind.add_local_constraint(&!i);
-        }
+        let mut kind = CIllKind::new(id, self.ts.clone(), invariants, None);
         assert!(kind.check().is_unknown());
         let wit = kind.witness().into_bl().unwrap();
         Ok(wit)

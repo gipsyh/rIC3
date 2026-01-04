@@ -88,6 +88,17 @@ impl Transys {
         }
     }
 
+    pub fn has_gate_init(&self) -> bool {
+        for l in self.input().chain(self.latch()) {
+            if let Some(i) = self.init.get(&l) {
+                if !(i.var().is_constant()) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn remove_gate_init(&mut self, rst: &mut Restore) {
         let mut init = GHashMap::new();
         let mut eq = Vec::new();

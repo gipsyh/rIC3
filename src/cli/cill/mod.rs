@@ -1,11 +1,11 @@
 mod ind;
+mod kind;
 mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use crate::logger_init;
 use anyhow::Ok;
 use btor::Btor;
-use cadical::CaDiCaL;
 use clap::Subcommand;
 use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
@@ -13,13 +13,12 @@ use giputils::{
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::{fol::Term, satif::Satif};
+use logicrs::fol::Term;
 use rIC3::{
     Engine, McResult,
     bmc::{BMC, BMCConfig},
     frontend::{Frontend, btor::BtorFrontend},
-    kind::KindConfig,
-    transys::{Transys, certify::Restore, unroll::TransysUnroll},
+    transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use ratatui::crossterm::style::Stylize;
@@ -84,10 +83,7 @@ pub struct CIll {
     bb_map: BitblastMap,
     ts_rst: Restore,
     btorfe: BtorFrontend,
-    slv: CaDiCaL,
-    uts: TransysUnroll<Transys>,
     res: Vec<bool>,
-    kind_cfg: KindConfig,
 }
 
 impl CIll {
@@ -96,41 +92,21 @@ impl CIll {
         let (wts, wsym) = btorfe.wts();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
-        let mut slv = CaDiCaL::new();
         let mut ts_rst = Restore::new(&ts);
         ts.simplify(&mut ts_rst);
         ts.remove_gate_init(&mut ts_rst);
         assert!(ts_rst.init_var().is_none());
-        let mut uts = TransysUnroll::new(&ts);
-        uts.unroll_to(4);
-        for k in 0..=uts.num_unroll {
-            uts.load_trans(&mut slv, k, true);
-        }
-        for k in 0..uts.num_unroll {
-            for b in uts.ts.bad.iter() {
-                slv.add_clause(&[!uts.lit_next(*b, k)]);
-            }
-        }
-        let mut kind_cfg = KindConfig::default();
-        kind_cfg.start = uts.num_unroll;
-        kind_cfg.end = uts.num_unroll;
-        kind_cfg.preproc.preproc = false;
-        kind_cfg.local_proof = true;
-        kind_cfg.skip_bmc = true;
         Ok(Self {
             rcfg,
             rp,
             btorfe,
             wsym,
-            slv,
             wts,
             ots,
             ts,
             ts_rst,
             bb_map,
-            uts,
             res: Vec::new(),
-            kind_cfg,
         })
     }
 
