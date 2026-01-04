@@ -159,16 +159,17 @@ impl CIll {
 
 impl Ric3Proj {
     pub fn refresh_cti(&self, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
-        match self.get_cill_state()? {
+        let prop = match self.get_cill_state()? {
             CIllState::Check => {
                 self.clear_cti()?;
                 return Ok(());
             }
-            CIllState::Block(_) => {
+            CIllState::Block(prop) => {
                 assert!(self.path("cill/cti").exists());
+                prop
             }
             CIllState::Select(_) => unreachable!(),
-        }
+        };
         let btor_old = Btor::from_file(dut_old.join("dut.btor"));
         let btorfe_old = BtorFrontend::new(btor_old.clone());
         let mut cti = btorfe_old
@@ -189,6 +190,7 @@ impl Ric3Proj {
             .iter()
             .position(|s| s.eq(&ywb_old.asserts[cti.bad_id]))
         else {
+            info!("{prop} not found. CTI has been removed. Please rerun `ric3 cill check`.");
             self.clear_cti()?;
             self.set_cill_state(CIllState::Check)?;
             return Ok(());
