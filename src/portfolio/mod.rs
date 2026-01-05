@@ -113,14 +113,7 @@ impl Portfolio {
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
-        let config = cfg.config.as_deref().unwrap_or(match model.extension() {
-            Some(ext) if (ext == "aig") | (ext == "aag") => "bl_default",
-            Some(ext) if (ext == "btor") | (ext == "btor2") => "wl_default",
-            _ => {
-                error!("Error: unsupported file format");
-                panic!();
-            }
-        });
+        let config = cfg.config.as_deref().unwrap_or("bl_default");
         for (name, args) in portfolio_config[config].iter() {
             new_engine(name.clone(), args);
         }
