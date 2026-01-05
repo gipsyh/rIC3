@@ -7,9 +7,18 @@ use std::{
     fs,
     io::{BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
 };
 use vcd::IdCode;
+
+fn format_output_for_error(output: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    format!(
+        "status: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status, stdout, stderr
+    )
+}
 
 #[derive(Default)]
 pub struct Yosys {
@@ -33,9 +42,11 @@ impl Yosys {
         }
         let output = cmd.arg("-p").arg(&cmds).output()?;
         if !output.status.success() {
-            info!("{}", String::from_utf8_lossy(&output.stdout));
-            info!("{}", String::from_utf8_lossy(&output.stderr));
-            anyhow::bail!("Yosys execution failed")
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            info!("{}", stdout);
+            info!("{}", stderr);
+            anyhow::bail!("Yosys execution failed.\n{}\n{}", stdout, stderr)
         }
         Ok(())
     }
@@ -109,7 +120,10 @@ impl Yosys {
         if !output.status.success() {
             info!("{}", String::from_utf8_lossy(&output.stdout));
             info!("{}", String::from_utf8_lossy(&output.stderr));
-            anyhow::bail!("Yosys execution failed")
+            anyhow::bail!(
+                "btorvcd/btorsim execution failed.\n{}",
+                format_output_for_error(&output)
+            )
         }
         let vcd_file = fs::File::open(&vcd)?;
         let mut filtered = Vec::new();
