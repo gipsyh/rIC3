@@ -119,10 +119,14 @@ impl Engine for BMC {
     fn check(&mut self) -> McResult {
         let start = Instant::now();
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
-            if let Some(limit) = self.cfg.time_limit
-                && start.elapsed().as_secs() > limit
-            {
-                return McResult::Unknown(k.checked_sub(1));
+            let mut time_limit = self.cfg.step_time_limit;
+            if let Some(limit) = self.cfg.time_limit {
+                let time = start.elapsed().as_secs();
+                if start.elapsed().as_secs() >= limit {
+                    return McResult::Unknown(k.checked_sub(1));
+                }
+                let remain = limit - time;
+                time_limit = Some(time_limit.map_or(remain, |tl| tl.min(remain)));
             }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
@@ -133,12 +137,11 @@ impl Engine for BMC {
                 }
                 assump.clear();
             }
-            let r = if let Some(limit) = self.cfg.step_time_limit {
+            let r = if let Some(limit) = time_limit {
                 let Some(r) =
                     self.solver
                         .solve_with_limit(&assump, vec![], Duration::from_secs(limit))
                 else {
-                    info!("bmc solve timeout in depth {k}");
                     continue;
                 };
                 r
