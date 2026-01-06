@@ -16,10 +16,18 @@ def _require_file(path: str) -> None:
         raise ValueError(f"Not a file: {path}")
 
 
+def _strip_end_prefix(name: str) -> str:
+    """Remove '$end.' prefix from signal name if present."""
+    if name.startswith("$end."):
+        return name[5:]
+    return name
+
+
 def _load_vcd_signals(vcd_path: str) -> List[str]:
     _require_file(vcd_path)
     vcd = VCDVCD(vcd_path, only_sigs=True)
-    return sorted(getattr(vcd, "signals", []))
+    signals = [_strip_end_prefix(s) for s in getattr(vcd, "signals", [])]
+    return sorted(signals)
 
 
 def _resolve_signal_name(available: Sequence[str], name: str) -> str:
@@ -159,7 +167,9 @@ def _steps_json(
         raise ValueError("signals must be a non-empty list")
 
     vcd = VCDVCD(vcd_path, only_sigs=False)
-    available = sorted(getattr(vcd, "signals", []))
+    raw_signals = getattr(vcd, "signals", [])
+    stripped_to_raw: Dict[str, str] = {_strip_end_prefix(s): s for s in raw_signals}
+    available = sorted(stripped_to_raw.keys())
     signal_names = _expand_signal_names(available, signals)
     step_times = _sample_times(vcd_path)
 
@@ -168,7 +178,8 @@ def _steps_json(
 
     sig_indexes: Dict[str, Tuple[List[int], List[str]]] = {}
     for s in signal_names:
-        tv = getattr(vcd[s], "tv", None)
+        raw_name = stripped_to_raw[s]
+        tv = getattr(vcd[raw_name], "tv", None)
         if tv is None:
             raise ValueError(f"No data for signal: {s}")
         sig_indexes[s] = _build_tv_index(tv)
