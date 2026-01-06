@@ -1,5 +1,5 @@
 use super::{IC3, proofoblig::ProofObligation};
-use crate::transys::TransysCtx;
+use crate::{gipsat::TransysSolver, transys::TransysCtx};
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
@@ -119,18 +119,6 @@ impl Frames {
         }
         self.tmp_lit_set.clear();
         None
-    }
-
-    pub fn invariant(&self) -> Vec<LitVec> {
-        let mut invariants: Vec<_> = self.inf.iter().map(|c| c.as_litvec()).cloned().collect();
-        if let Some(invariant) = self.iter().position(|frame| frame.is_empty()) {
-            for i in invariant..self.len() {
-                for cube in self[i].iter() {
-                    invariants.push(cube.as_litvec().clone());
-                }
-            }
-        }
-        invariants
     }
 
     pub fn parent_lemma(&self, lemma: &[Lit], frame: usize) -> Option<LitOrdVec> {
@@ -312,6 +300,52 @@ impl IC3 {
         let clause = !lemma.as_litvec();
         self.inf_solver.add_clause(&clause);
         self.frame.inf.push(FrameLemma::new(lemma, None, None));
+    }
+
+    pub fn inner_invariant(&self) -> Vec<LitVec> {
+        let mut invariants: Vec<_> = self
+            .frame
+            .inf
+            .iter()
+            .map(|c| c.as_litvec().clone())
+            .collect();
+        if let Some(invariant) = self.frame.iter().position(|frame| frame.is_empty()) {
+            for i in invariant..self.frame.len() {
+                for cube in self.frame[i].iter() {
+                    invariants.push(cube.as_litvec().clone());
+                }
+            }
+        } else {
+            let mut cand: Vec<_> = self
+                .frame
+                .last()
+                .unwrap()
+                .iter()
+                .map(|l| l.as_litvec().clone())
+                .collect();
+            loop {
+                let mut slv = TransysSolver::new(&self.tsctx);
+                for i in invariants.iter() {
+                    slv.add_clause(&!i);
+                }
+                for c in cand.iter() {
+                    slv.add_clause(&!c);
+                }
+                let mut new_cand = Vec::new();
+                for c in cand.iter() {
+                    if slv.inductive(c, false) {
+                        new_cand.push(c.clone());
+                    }
+                }
+                if new_cand.len() == cand.len() {
+                    invariants.extend(new_cand);
+                    break;
+                } else {
+                    cand = new_cand;
+                }
+            }
+        }
+        invariants
     }
 
     // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {

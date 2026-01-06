@@ -262,8 +262,7 @@ impl IC3 {
     }
 
     pub fn invariant(&self) -> Vec<LitVec> {
-        self.frame
-            .invariant()
+        self.inner_invariant()
             .iter()
             .map(|l| l.map_var(|l| self.rst.restore_var(l)))
             .collect()
@@ -340,7 +339,7 @@ impl Engine for IC3 {
             let piv = proof.add_init_var();
             self.rst.add_restore(iv, piv);
         }
-        let mut invariants = self.frame.invariant();
+        let mut invariants = self.inner_invariant();
         for c in self.ts.constraint.clone() {
             proof
                 .rel
