@@ -87,6 +87,7 @@ impl Ric3Config {
 
 #[derive(Deserialize, Debug)]
 pub struct Dut {
+    pub reset: Option<String>,
     pub top: String,
     pub files: Vec<PathBuf>,
     pub include_files: Option<Vec<PathBuf>>,

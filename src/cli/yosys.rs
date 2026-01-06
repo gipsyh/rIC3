@@ -37,6 +37,7 @@ impl Yosys {
     pub fn execute(&mut self, cwd: Option<&Path>) -> anyhow::Result<()> {
         let cmds = self.commands.join(" ; ");
         let mut cmd = Command::new("yosys");
+        cmd.args(["-m", "slang"]);
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
         }
@@ -68,13 +69,18 @@ impl Yosys {
             fs::copy(f, &dest)?;
         }
         let mut yosys = Self::new();
+        let mut read = "read_slang -D FORMAL -D YOSYS_SLANG".to_string();
         for file in files.iter() {
-            yosys.add_command(&format!("read_verilog -formal -sv {}", file.display()));
+            read.push_str(&format!(" {}", file.display()));
         }
+        yosys.add_command(&read);
         yosys.add_command(&format!("prep -flatten -top {}", cfg.dut.top));
         yosys.add_command("hierarchy -smtcheck -nokeep_prints");
         yosys.add_command("scc -select; simplemap; select -clear");
         yosys.add_command("memory_nordff");
+        if let Some(reset) = &cfg.dut.reset {
+            yosys.add_command(&format!("fminit -seq {} 1,0", reset));
+        }
         yosys.add_command("chformal -cover -remove");
         yosys.add_command("chformal -early");
         yosys.add_command("async2sync");
