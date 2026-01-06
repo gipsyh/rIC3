@@ -67,13 +67,14 @@ pub fn cli_main() -> anyhow::Result<()> {
 
 #[derive(Deserialize, Debug)]
 pub struct Ric3Config {
-    pub dut: Dut,
-    pub trace: Option<VcdConfig>,
+    dut: Dut,
+    trace: Option<VcdConfig>,
+    modeling: Modeling,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct VcdConfig {
-    pub top: Option<String>,
+    top: Option<String>,
 }
 
 impl Ric3Config {
@@ -86,11 +87,23 @@ impl Ric3Config {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Dut {
-    pub reset: Option<String>,
-    pub top: String,
-    pub files: Vec<PathBuf>,
-    pub include_files: Option<Vec<PathBuf>>,
+struct Dut {
+    reset: Option<String>,
+    top: String,
+    files: Vec<PathBuf>,
+    include_files: Option<Vec<PathBuf>>,
+}
+
+#[derive(Deserialize, Debug)]
+struct Modeling {
+    parser: Parse,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_camel_case_types)]
+enum Parse {
+    yosys,
+    yosys_slang,
 }
 
 impl Dut {

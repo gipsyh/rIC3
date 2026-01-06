@@ -1,5 +1,5 @@
 use super::Ric3Config;
-use crate::cli::VcdConfig;
+use crate::cli::{Modeling, Parse, VcdConfig};
 use giputils::file::recreate_dir;
 use giputils::hash::GHashMap;
 use log::info;
@@ -34,10 +34,16 @@ impl Yosys {
         self.commands.push(cmd.to_string());
     }
 
-    pub fn execute(&mut self, cwd: Option<&Path>) -> anyhow::Result<()> {
+    pub fn execute(
+        &mut self,
+        cwd: Option<&Path>,
+        plugin: impl IntoIterator<Item = String>,
+    ) -> anyhow::Result<()> {
         let cmds = self.commands.join(" ; ");
         let mut cmd = Command::new("yosys");
-        cmd.args(["-m", "slang"]);
+        for p in plugin {
+            cmd.args(["-m", &p]);
+        }
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
         }
@@ -54,6 +60,12 @@ impl Yosys {
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
         info!("Yosys: parsing the DUT and generating BTOR.");
+        let slang = matches!(
+            cfg.modeling,
+            Modeling {
+                parser: Parse::yosys_slang,
+            }
+        );
         recreate_dir(p.as_ref())?;
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
@@ -69,7 +81,12 @@ impl Yosys {
             fs::copy(f, &dest)?;
         }
         let mut yosys = Self::new();
-        let mut read = "read_slang -D FORMAL -D YOSYS_SLANG".to_string();
+        let mut read = if slang {
+            "read_slang -D FORMAL -D YOSYS_SLANG"
+        } else {
+            "read_verilog -formal -sv"
+        }
+        .to_string();
         for file in files.iter() {
             read.push_str(&format!(" {}", file.display()));
         }
@@ -106,7 +123,12 @@ impl Yosys {
             dp.join("dut.info").display(),
             dp.join("dut.btor").display(),
         ));
-        yosys.execute(Some(&src_dir))
+        let plugin = if slang {
+            vec!["slang".to_string()]
+        } else {
+            vec![]
+        };
+        yosys.execute(Some(&src_dir), plugin)
     }
 
     pub fn btor_wit_to_vcd(
