@@ -20,7 +20,7 @@ impl IC3 {
                     if self.blocked_with_ordered(frame_idx + 1, &lemma, false) {
                         let core = self.solvers[frame_idx]
                             .inductive_core()
-                            .unwrap_or(lemma.cube().clone());
+                            .unwrap_or(lemma.as_litvec().clone());
                         if let Some(po) = &mut lemma.po
                             && po.frame < frame_idx + 2
                             && self.obligations.remove(po)
@@ -69,10 +69,10 @@ impl IC3 {
                 if let Some(po) = &mut lemma.po {
                     self.obligations.remove(po);
                 }
-                self.add_inf_lemma(lemma.cube().clone());
+                self.add_inf_lemma(lemma.as_litvec().clone());
                 return true;
             } else {
-                let target = self.tsctx.lits_next(lemma.cube());
+                let target = self.tsctx.lits_next(lemma.as_litvec());
                 let (ctp, _) = self.lift.lift(
                     &mut self.inf_solver,
                     target.iter().chain(self.tsctx.constraint.iter()),
@@ -95,10 +95,10 @@ impl IC3 {
                     if let Some(po) = &mut lemma.po {
                         self.obligations.remove(po);
                     }
-                    self.add_inf_lemma(lemma.cube().clone());
+                    self.add_inf_lemma(lemma.as_litvec().clone());
                     break;
                 } else {
-                    let target = self.tsctx.lits_next(lemma.cube());
+                    let target = self.tsctx.lits_next(lemma.as_litvec());
                     let (ctp, _) = self.lift.lift(
                         &mut self.inf_solver,
                         target.iter().chain(self.tsctx.constraint.iter()),

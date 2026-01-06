@@ -106,7 +106,7 @@ impl Rlive {
         loop {
             debug!("rlive block at level {}", self.level());
             let s = self.trace.last().unwrap().clone();
-            match self.check_reach(s.cube().clone()) {
+            match self.check_reach(s.as_litvec().clone()) {
                 Ok(inv) => {
                     self.add_shoal(inv);
                     self.pop_trace();

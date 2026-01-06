@@ -177,7 +177,7 @@ impl IC3 {
         let nl = self.solvers.len();
         debug!("extending IC3 to level {nl}");
         if let Some(predprop) = self.predprop.as_mut() {
-            predprop.extend(self.frame.inf.iter().map(|l| l.cube()));
+            predprop.extend(self.frame.inf.iter().map(|l| l.as_litvec()));
         }
         let solver = self.inf_solver.clone();
         self.solvers.push(solver);
@@ -371,7 +371,7 @@ impl Engine for IC3 {
             assert!(b.frame == 0);
             let mut b = Some(b);
             while let Some(bad) = b {
-                res.state.push(bad.state.cube().clone());
+                res.state.push(bad.state.as_litvec().clone());
                 res.input.push(bad.input[0].clone());
                 for i in &bad.input[1..] {
                     res.input.push(i.clone());

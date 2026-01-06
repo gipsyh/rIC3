@@ -34,7 +34,7 @@ impl IC3 {
         let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
             po.frame += 1;
             self.add_obligation(po.clone());
-            return self.add_lemma(po.frame - 1, po.state.cube().clone(), false, Some(po));
+            return self.add_lemma(po.frame - 1, po.state.as_litvec().clone(), false, Some(po));
         };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
@@ -104,7 +104,7 @@ impl IC3 {
                         continue;
                     }
                 } else if po.frame > 0 {
-                    let lemma = po.state.cube();
+                    let lemma = po.state.as_litvec();
                     debug_assert!(!self.solvers[0].solve(lemma));
                 } else {
                     self.add_obligation(po.clone());
