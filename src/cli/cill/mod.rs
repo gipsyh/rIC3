@@ -93,7 +93,7 @@ impl CIll {
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
         let mut ts_rst = Restore::new(&ts);
-        ts.simplify(&mut ts_rst);
+        with_log_level(LevelFilter::Warn, || ts.simplify(&mut ts_rst));
         ts.remove_gate_init(&mut ts_rst);
         assert!(ts_rst.init_var().is_none());
         Ok(Self {
@@ -115,7 +115,7 @@ impl CIll {
     }
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
-        info!("Starting checking safety for all properties.");
+        info!("BMC: Checking correctness for all properties.");
         let mut cfg = BMCConfig::default();
         cfg.time_limit = Some(10);
         cfg.preproc.scorr = false;
@@ -141,16 +141,15 @@ impl CIll {
                 println!(
                     "{}",
                     format!(
-                        "A real counterexample violating {name} was found. VCD generated at {}. Please adjust {name} based on the VCD.",
+                        "A CEX violating {name} was found. VCD generated at {}.",
                         cex_vcd.display()
                     )
                     .red()
                 );
             }
-            McResult::Unknown(_) => {
-                info!(
-                    "The portfolio engine failed to obtain a result and will continue with the CIll engine."
-                );
+            McResult::Unknown(d) => {
+                let d = d.unwrap_or_default();
+                info!("BMC found no CEX in {d} steps.");
             }
         };
         Ok(res)
@@ -221,7 +220,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
 
     info!("Checking inductiveness of all properties.");
     if cill.check_inductive()? {
-        info!(
+        println!(
             "{}",
             "All properties are inductive. Proof succeeded.".green()
         );
@@ -263,7 +262,7 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
         .unwrap_or("Unknown".to_string());
     cill.save_witness(&witness, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
     println!(
-        "CTI VCD generated in {}. Please analyze it, generate an assertion to block it, and run 'cill check' to confirm the CTI is blocked.",
+        "CTI VCD generated in {}.",
         rp.path("cill/cti.vcd").display()
     );
     rp.set_cill_state(CIllState::Block(name))
