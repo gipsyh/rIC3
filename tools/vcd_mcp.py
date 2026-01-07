@@ -7,19 +7,6 @@ from mcp.server.fastmcp import FastMCP
 from vcdvcd import VCDVCD
 
 
-def _require_file(path: str) -> str:
-    """Validate and return the absolute path to the VCD file."""
-    if not path:
-        raise ValueError("vcd_path is required")
-    # Convert relative path to absolute path
-    abs_path = os.path.abspath(os.path.expanduser(path))
-    if not os.path.exists(abs_path):
-        raise FileNotFoundError(f"VCD not found: {abs_path}")
-    if not os.path.isfile(abs_path):
-        raise ValueError(f"Not a file: {abs_path}")
-    return abs_path
-
-
 def _strip_end_prefix(name: str) -> str:
     """Remove '$end.' prefix from signal name if present."""
     if name.startswith("$end."):
@@ -28,7 +15,6 @@ def _strip_end_prefix(name: str) -> str:
 
 
 def _load_vcd_signals(vcd_path: str) -> List[str]:
-    vcd_path = _require_file(vcd_path)
     vcd = VCDVCD(vcd_path, only_sigs=True)
     signals = [_strip_end_prefix(s) for s in getattr(vcd, "signals", [])]
     return sorted(signals)
@@ -86,7 +72,6 @@ def _expand_signal_names(
 
 def _extract_time_markers(vcd_path: str) -> List[int]:
     """Return all VCD time markers (#<time>) in file order, after $enddefinitions."""
-    vcd_path = _require_file(vcd_path)
     times: List[int] = []
     start_parsing = False
     with open(vcd_path, "r", encoding="utf-8", errors="replace") as f:
@@ -166,7 +151,6 @@ def _steps_json(
     vcd_path: str,
     signals: Sequence[str],
 ) -> Dict[str, List[str]]:
-    vcd_path = _require_file(vcd_path)
     if not signals:
         raise ValueError("signals must be a non-empty list")
 
@@ -202,7 +186,7 @@ mcp = FastMCP("vcd-tools")
 
 @mcp.tool(
     name="list_signals",
-    description="List all signals in a VCD file.",
+    description="List all signals in a VCD file. The vcd_path must be an absolute path.",
 )
 def list_signals(vcd_path: str) -> List[str]:
     return _load_vcd_signals(vcd_path)
@@ -211,7 +195,9 @@ def list_signals(vcd_path: str) -> List[str]:
 @mcp.tool(
     name="signal_values",
     description=(
-        "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step."
+        "Returns the values of selected signals as a JSON object. Keys are signal names, "
+        "and values are arrays representing the signal state at each step. "
+        "The vcd_path must be an absolute path."
     ),
 )
 def signal_values(
