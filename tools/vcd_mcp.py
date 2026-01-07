@@ -7,13 +7,17 @@ from mcp.server.fastmcp import FastMCP
 from vcdvcd import VCDVCD
 
 
-def _require_file(path: str) -> None:
+def _require_file(path: str) -> str:
+    """Validate and return the absolute path to the VCD file."""
     if not path:
         raise ValueError("vcd_path is required")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"VCD not found: {path}")
-    if not os.path.isfile(path):
-        raise ValueError(f"Not a file: {path}")
+    # Convert relative path to absolute path
+    abs_path = os.path.abspath(os.path.expanduser(path))
+    if not os.path.exists(abs_path):
+        raise FileNotFoundError(f"VCD not found: {abs_path}")
+    if not os.path.isfile(abs_path):
+        raise ValueError(f"Not a file: {abs_path}")
+    return abs_path
 
 
 def _strip_end_prefix(name: str) -> str:
@@ -24,7 +28,7 @@ def _strip_end_prefix(name: str) -> str:
 
 
 def _load_vcd_signals(vcd_path: str) -> List[str]:
-    _require_file(vcd_path)
+    vcd_path = _require_file(vcd_path)
     vcd = VCDVCD(vcd_path, only_sigs=True)
     signals = [_strip_end_prefix(s) for s in getattr(vcd, "signals", [])]
     return sorted(signals)
@@ -82,7 +86,7 @@ def _expand_signal_names(
 
 def _extract_time_markers(vcd_path: str) -> List[int]:
     """Return all VCD time markers (#<time>) in file order, after $enddefinitions."""
-    _require_file(vcd_path)
+    vcd_path = _require_file(vcd_path)
     times: List[int] = []
     start_parsing = False
     with open(vcd_path, "r", encoding="utf-8", errors="replace") as f:
@@ -162,7 +166,7 @@ def _steps_json(
     vcd_path: str,
     signals: Sequence[str],
 ) -> Dict[str, List[str]]:
-    _require_file(vcd_path)
+    vcd_path = _require_file(vcd_path)
     if not signals:
         raise ValueError("signals must be a non-empty list")
 
