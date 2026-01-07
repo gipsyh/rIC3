@@ -34,7 +34,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, EnumAsInner)]
 pub enum McResult {
     /// Safe
     Safe,
@@ -47,20 +47,6 @@ pub enum McResult {
 impl Default for McResult {
     fn default() -> Self {
         McResult::Unknown(None)
-    }
-}
-
-impl McResult {
-    pub fn is_safe(&self) -> bool {
-        matches!(self, McResult::Safe)
-    }
-
-    pub fn is_unsafe(&self) -> bool {
-        matches!(self, McResult::Unsafe(_))
-    }
-
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, McResult::Unknown(_))
     }
 }
 

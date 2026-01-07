@@ -22,6 +22,7 @@ use rIC3::{
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use ratatui::crossterm::style::Stylize;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{env, fs};
 use strum::AsRefStr;
@@ -115,24 +116,35 @@ impl CIll {
     }
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
-        info!("BMC: Checking correctness for all properties.");
-        let mut cfg = BMCConfig::default();
-        cfg.time_limit = Some(10);
-        cfg.preproc.scorr = false;
-        cfg.preproc.frts = false;
-        let mut bmc = with_log_level(LevelFilter::Warn, || BMC::new(cfg, self.ts.clone()));
-        let res = with_log_level(LevelFilter::Warn, || bmc.check());
+        info!("BMC: Checking correctness of all properties.");
+        let steps = [1, 3, 5, 10, 15];
+        let mut results: Vec<(McResult, BMC)> = with_log_level(LevelFilter::Warn, || {
+            steps
+                .into_par_iter()
+                .map(|step| {
+                    let mut cfg = BMCConfig::default();
+                    cfg.time_limit = Some(10);
+                    cfg.step = step;
+                    cfg.preproc.scorr = false;
+                    cfg.preproc.frts = false;
+                    let mut bmc = BMC::new(cfg, self.ts.clone());
+                    let res = bmc.check();
+                    (res, bmc)
+                })
+                .collect()
+        });
+        results.retain(|(r, _)| r.is_unsafe());
+        let min_res = results
+            .into_iter()
+            .min_by_key(|(r, _)| r.into_unsafe().unwrap());
 
         let cex = self.rp.path("cill/cex");
         let cex_vcd = self.rp.path("cill/cex.vcd");
         remove_if_exists(&cex)?;
         remove_if_exists(&cex_vcd)?;
 
-        match res {
-            McResult::Safe => {
-                info!("{}", "All properties are SAFE.".green());
-            }
-            McResult::Unsafe(_) => {
+        match min_res {
+            Some((r, mut bmc)) => {
                 let witness = bmc.witness().into_bl().unwrap();
                 let name = self
                     .get_prop_name(witness.bad_id)
@@ -146,13 +158,13 @@ impl CIll {
                     )
                     .red()
                 );
+                Ok(r)
             }
-            McResult::Unknown(d) => {
-                let d = d.unwrap_or_default();
-                info!("BMC found no CEX in {d} steps.");
+            None => {
+                info!("BMC found no CEX in limited steps.");
+                Ok(McResult::Unknown(None))
             }
-        };
-        Ok(res)
+        }
     }
 }
 
