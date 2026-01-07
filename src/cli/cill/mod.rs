@@ -247,7 +247,9 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
 
 fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     let CIllState::Select(res) = state else {
-        println!("No need to select a non-inductive assertion for CTI generation.");
+        println!(
+            "Unable to select: `cill check` has not been run, or another assertion has already been selected. Please rerun `cill check`."
+        );
         return Ok(());
     };
     let rcfg = Ric3Config::from_file("ric3.toml")?;
