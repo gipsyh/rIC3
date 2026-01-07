@@ -120,7 +120,7 @@ impl CIll {
         cfg.time_limit = Some(10);
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
-        let mut bmc = BMC::new(cfg, self.ts.clone());
+        let mut bmc = with_log_level(LevelFilter::Warn, || BMC::new(cfg, self.ts.clone()));
         let res = with_log_level(LevelFilter::Warn, || bmc.check());
 
         let cex = self.rp.path("cill/cex");
