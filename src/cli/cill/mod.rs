@@ -29,9 +29,6 @@ use strum::AsRefStr;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum CIllCommands {
-    /// Query CIll State
-    State,
-
     /// Check all the properties
     Check,
 
@@ -177,7 +174,6 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let rp = Ric3Proj::new()?;
     let cill_state = rp.get_cill_state()?;
     match cmd {
-        CIllCommands::State => state(rp, cill_state),
         CIllCommands::Check => check(rp, cill_state),
         CIllCommands::Abort => abort(rp, cill_state),
         CIllCommands::Select { id } => select(rp, cill_state, id),
@@ -290,16 +286,6 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
         rp.path("cill/cti.vcd").display()
     );
     rp.set_cill_state(CIllState::Block(name))
-}
-
-fn state(_rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
-    let s = match state {
-        CIllState::Check => "waiting to check the inductiveness of assertions",
-        CIllState::Block(p) => &format!("waiting for helper assertions to block CTI of {p}"),
-        CIllState::Select(_) => "waiting to select a non-inductive assertion for CTI generation",
-    };
-    println!("CIll state: {s}");
-    Ok(())
 }
 
 fn abort(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
