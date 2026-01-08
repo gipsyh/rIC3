@@ -82,7 +82,7 @@ impl Yosys {
         }
         let mut yosys = Self::new();
         let mut read = if slang {
-            "read_slang -D FORMAL -D YOSYS_SLANG"
+            "read_slang -Wnone -D FORMAL -D YOSYS_SLANG"
         } else {
             "read_verilog -formal -sv"
         }
