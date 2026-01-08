@@ -249,11 +249,18 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
 }
 
 fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
-    let CIllState::Select(res) = state else {
-        println!(
-            "Unable to select: `cill check` has not been run, or another assertion has already been selected. Please rerun `cill check`."
-        );
-        return Ok(());
+    let res = match state {
+        CIllState::Check => {
+            println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
+            return Ok(());
+        }
+        CIllState::Block(p) => {
+            println!(
+                "Unable to select: A CTI for {p} has already been selected. To select a different one, please run `ric3 cill abort` to clear the current, then rerun `cill check`"
+            );
+            return Ok(());
+        }
+        CIllState::Select(items) => items,
     };
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     if !matches!(rp.check_cached_dut(&rcfg.dut.src())?, Some(true)) {
