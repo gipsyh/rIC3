@@ -316,6 +316,7 @@ impl IC3 {
                 }
             }
         } else {
+            let iter_max = 5;
             let mut cand: Vec<_> = self
                 .frame
                 .last()
@@ -323,7 +324,10 @@ impl IC3 {
                 .iter()
                 .map(|l| l.as_litvec().clone())
                 .collect();
-            loop {
+            for k in 0..=iter_max {
+                if k == iter_max {
+                    return Vec::new();
+                }
                 let mut slv = TransysSolver::new(&self.tsctx);
                 for i in invariants.iter() {
                     slv.add_clause(&!i);

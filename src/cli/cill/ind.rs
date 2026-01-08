@@ -46,12 +46,22 @@ impl CIll {
             (0..self.ts.bad.len())
                 .into_par_iter()
                 .map(|i| {
-                    let mut cfg = cfg.clone();
-                    cfg.prop = Some(i);
-                    let mut ic3 = IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
-                    let res = ic3.check();
-                    let inv = ic3.invariant();
-                    (matches!(res, McResult::Safe), inv)
+                    let ic3res: Vec<_> = [false, true]
+                        .into_par_iter()
+                        .map(|inn| {
+                            let mut cfg = cfg.clone();
+                            cfg.inn = inn;
+                            cfg.prop = Some(i);
+                            let mut ic3 =
+                                IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
+                            let res = ic3.check();
+                            let inv = ic3.invariant();
+                            (matches!(res, McResult::Safe), inv)
+                        })
+                        .collect();
+                    let [(sr, mut si), (ir, ii)] = ic3res.try_into().unwrap();
+                    si.extend(ii);
+                    (sr || ir, si)
                 })
                 .collect()
         });
