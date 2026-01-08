@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from bisect import bisect_right
 from typing import Dict, List, Sequence, Tuple
 from mcp.server.fastmcp import FastMCP
@@ -184,11 +185,13 @@ mcp = FastMCP("vcd-tools")
 
 
 @mcp.tool(
-    name="list_signals",
-    description="List all signals in a VCD file. The vcd_path must be an absolute path.",
+    name="search_signals",
+    description="Search signals in a VCD file by regex pattern. Returns matching signal names. The vcd_path must be an absolute path.",
 )
-def list_signals(vcd_path: str) -> List[str]:
-    return _load_vcd_signals(vcd_path)
+def search_signals(vcd_path: str, pattern: str) -> List[str]:
+    signals = _load_vcd_signals(vcd_path)
+    regex = re.compile(pattern)
+    return [s for s in signals if regex.search(s)]
 
 
 @mcp.tool(
