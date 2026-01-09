@@ -170,21 +170,21 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
         unsafe { env::set_var("RUST_LOG", "info") };
     }
     logger_init();
-
+    let rcfg = Ric3Config::from_file("ric3.toml")?;
     let rp = Ric3Proj::new()?;
     let cill_state = rp.get_cill_state()?;
     match cmd {
-        CIllCommands::Check => check(rp, cill_state),
-        CIllCommands::Abort => abort(rp, cill_state),
-        CIllCommands::Select { id } => select(rp, cill_state, id),
+        CIllCommands::Check => check(rcfg, rp, cill_state),
+        CIllCommands::Abort => abort(rcfg, rp, cill_state),
+        CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),
     }
 }
 
-fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
+fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     if matches!(state, CIllState::Select(_)) {
         rp.set_cill_state(CIllState::Check)?;
     }
-    let rcfg = Ric3Config::from_file("ric3.toml")?;
+
     recreate_dir(rp.path("tmp"))?;
     match rp.check_cached_dut(&rcfg.dut.src())? {
         Some(false) => {
@@ -244,7 +244,7 @@ fn check(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     rp.set_cill_state(CIllState::Select(cill.res.clone()))
 }
 
-fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
+fn select(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     let res = match state {
         CIllState::Check => {
             println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
@@ -288,7 +288,7 @@ fn select(rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
     rp.set_cill_state(CIllState::Block(name))
 }
 
-fn abort(rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
+fn abort(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     match state {
         CIllState::Check => {
             println!("Currently in checking state, no abort required.")
