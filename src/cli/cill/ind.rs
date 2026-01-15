@@ -39,18 +39,18 @@ impl CIll {
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
-        cfg.local_proof = true;
         cfg.preproc.preproc = false;
         cfg.time_limit = Some(30);
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..self.ts.bad.len())
                 .into_par_iter()
                 .map(|i| {
-                    let ic3res: Vec<_> = [false, true]
+                    let ic3res: Vec<_> = [true, false]
                         .into_par_iter()
-                        .map(|inn| {
+                        .map(|lp| {
                             let mut cfg = cfg.clone();
-                            cfg.inn = inn;
+                            cfg.local_proof = lp;
+                            cfg.inn = true;
                             cfg.prop = Some(i);
                             let mut ic3 =
                                 IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
