@@ -41,7 +41,7 @@ impl CIll {
         cfg.pred_prop = true;
         cfg.local_proof = true;
         cfg.preproc.preproc = false;
-        cfg.time_limit = Some(15);
+        cfg.time_limit = Some(30);
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..self.ts.bad.len())
                 .into_par_iter()
@@ -144,7 +144,8 @@ impl CIll {
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
         let cti = self.bb_map.bitblast_witness(&cti);
         let cti = self.ts_rst.forward_witness(&cti);
-        let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), LitVvec::new(), Some(cti));
+        let invariants = self.load_invariants()?;
+        let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
         if kind.check().is_safe() {
             return Ok(true);
         }

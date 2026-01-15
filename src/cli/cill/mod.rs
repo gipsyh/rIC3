@@ -212,6 +212,15 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
         return Ok(());
     }
 
+    info!("Checking inductiveness of all properties.");
+    if cill.check_inductive()? {
+        println!(
+            "{}",
+            "All properties are inductive. Proof succeeded.".green()
+        );
+        return Ok(());
+    }
+    cill.print_ind_res()?;
     if let CIllState::Block(prop) = rp.get_cill_state()? {
         if cill.check_cti()? {
             println!("{}", "The CTI has been successfully blocked.".green());
@@ -228,16 +237,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
             return Ok(());
         }
     }
-
-    info!("Checking inductiveness of all properties.");
-    if cill.check_inductive()? {
-        println!(
-            "{}",
-            "All properties are inductive. Proof succeeded.".green()
-        );
-        return Ok(());
-    }
-    cill.print_ind_res()?;
     println!(
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
