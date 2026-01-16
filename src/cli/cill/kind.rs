@@ -226,9 +226,9 @@ impl Engine for CIllKind {
                 LitVec::new()
             }
         };
+        wit.bad_id = self.prop;
         wit.lift(&self.uts, Some(f));
         wit = self.rst.restore_witness(&wit);
-        wit.bad_id = self.prop;
         McWitness::Bl(wit)
     }
 }
