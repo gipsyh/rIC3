@@ -315,6 +315,7 @@ impl IC3 {
                     invariants.push(cube.as_litvec().clone());
                 }
             }
+            invariants
         } else {
             let iter_max = 5;
             let mut cand: Vec<_> = self
@@ -326,7 +327,7 @@ impl IC3 {
                 .collect();
             for k in 0..=iter_max {
                 if k == iter_max {
-                    return Vec::new();
+                    return invariants;
                 }
                 let mut slv = TransysSolver::new(&self.tsctx);
                 for i in invariants.iter() {
@@ -342,14 +343,14 @@ impl IC3 {
                     }
                 }
                 if new_cand.len() == cand.len() {
-                    invariants.extend(new_cand);
                     break;
                 } else {
                     cand = new_cand;
                 }
             }
+            invariants.extend(cand);
+            invariants
         }
-        invariants
     }
 
     // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {
