@@ -169,11 +169,11 @@ impl CIll {
 }
 
 impl Ric3Proj {
-    pub fn refresh_cti(&self, dut_old: &Path, dut_new: &Path) -> anyhow::Result<bool> {
+    pub fn refresh_cti(&self, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
         let prop = match self.get_cill_state()? {
             CIllState::Check => {
                 self.clear_cti()?;
-                return Ok(true);
+                return Ok(());
             }
             CIllState::Block(prop) => {
                 assert!(self.path("cill/cti").exists());
@@ -205,10 +205,10 @@ impl Ric3Proj {
             .iter()
             .position(|s| s.eq(&ywb_old.asserts[cti.bad_id]))
         else {
-            info!("{prop} not found. CTI has been removed. Please rerun `ric3 cill check`.");
+            info!("{prop} not found. CTI has been removed.");
             self.clear_cti()?;
             self.set_cill_state(CIllState::Check)?;
-            return Ok(false);
+            return Ok(());
         };
         cti.bad_id = bad_id;
 
@@ -235,6 +235,6 @@ impl Ric3Proj {
             self.path("cill/cti"),
             format!("{}", btorfe_new.unsafe_certificate(McWitness::Wl(cti))),
         )?;
-        Ok(true)
+        Ok(())
     }
 }

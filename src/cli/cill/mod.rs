@@ -182,10 +182,7 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
     match rp.check_cached_dut(&rcfg.dut.src())? {
         Some(false) => {
             Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
-            if !rp.refresh_cti(&rp.path("dut"), &rp.path("tmp/dut"))? {
-                fs::remove_dir_all(rp.path("tmp/dut"))?;
-                return Ok(());
-            }
+            rp.refresh_cti(&rp.path("dut"), &rp.path("tmp/dut"))?;
             fs::remove_dir_all(rp.path("dut"))?;
             fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
             rp.cache_dut(&rcfg.dut.src())?;
