@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from bisect import bisect_right
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple, Union
 from mcp.server.fastmcp import FastMCP
 from vcdvcd import VCDVCD
 
@@ -37,8 +37,10 @@ def _resolve_signal_name(available: Sequence[str], name: str) -> str:
 
 def _expand_signal_names(
     available: Sequence[str], requested: Sequence[str]
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
+    """Returns (resolved_signals, not_found_signals)."""
     resolved: List[str] = []
+    not_found: List[str] = []
     for name in requested:
         try:
             resolved.append(_resolve_signal_name(available, name))
@@ -54,7 +56,8 @@ def _expand_signal_names(
             if sig.endswith("." + name) or sig.endswith("/" + name)
         ]
         if not suffix_matches:
-            raise ValueError(f"Signal not found: {name}")
+            not_found.append(name)
+            continue
 
         # Deterministic order, while still respecting the user's requested ordering.
         resolved.extend(sorted(suffix_matches))
@@ -67,7 +70,7 @@ def _expand_signal_names(
             continue
         seen.add(s)
         out.append(s)
-    return out
+    return out, not_found
 
 
 def _extract_time_markers(vcd_path: str) -> List[int]:
@@ -150,7 +153,7 @@ def _format_hex(val: str) -> str:
 def _steps_json(
     vcd_path: str,
     signals: Sequence[str],
-) -> Dict[str, List[str]]:
+) -> Dict[str, Union[List[str], str]]:
     if not signals:
         raise ValueError("signals must be a non-empty list")
 
@@ -158,7 +161,7 @@ def _steps_json(
     raw_signals = getattr(vcd, "signals", [])
     stripped_to_raw: Dict[str, str] = {_strip_end_prefix(s): s for s in raw_signals}
     available = sorted(stripped_to_raw.keys())
-    signal_names = _expand_signal_names(available, signals)
+    signal_names, not_found = _expand_signal_names(available, signals)
     step_times = _sample_times(vcd_path)
 
     if not step_times:
@@ -172,11 +175,15 @@ def _steps_json(
             raise ValueError(f"No data for signal: {s}")
         sig_indexes[s] = _build_tv_index(tv)
 
-    result: Dict[str, List[str]] = {}
+    result: Dict[str, Union[List[str], str]] = {}
     for s in signal_names:
         times, values = sig_indexes[s]
         row_vals = [_format_hex(_value_at(times, values, t)) for t in step_times]
         result[s] = row_vals
+
+    # Add placeholder for signals that were not found
+    for s in not_found:
+        result[s] = "<SIGNAL NOT FOUND OR IRRELEVANT>"
 
     return result
 
@@ -205,7 +212,7 @@ def search_signals(vcd_path: str, pattern: str) -> List[str]:
 def signal_values(
     vcd_path: str,
     signals: List[str],
-) -> Dict[str, List[str]]:
+) -> Dict[str, Union[List[str], str]]:
     return _steps_json(
         vcd_path,
         signals,
