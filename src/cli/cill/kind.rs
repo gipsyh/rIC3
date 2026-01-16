@@ -219,6 +219,14 @@ impl Engine for CIllKind {
 
     fn witness(&mut self) -> McWitness {
         let mut wit = self.uts.witness(self.solver.as_ref());
+        let f = |k: usize| {
+            if k < self.uts.num_unroll {
+                !&self.uts.ts.bad
+            } else {
+                LitVec::new()
+            }
+        };
+        wit.lift(&self.uts, Some(f));
         wit = self.rst.restore_witness(&wit);
         wit.bad_id = self.prop;
         McWitness::Bl(wit)
