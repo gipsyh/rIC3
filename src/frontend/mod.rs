@@ -2,11 +2,10 @@ use crate::{
     McProof, McWitness,
     frontend::{aig::certifaiger_check, btor::cerbtora_check},
     transys::Transys,
-    wltransys::WlTransys,
+    wltransys::{WlTransys, symbol::WlTsSymbol},
 };
-use giputils::hash::GHashMap;
 use log::{error, info};
-use logicrs::{VarSymbols, fol::Term};
+use logicrs::VarSymbols;
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
@@ -18,7 +17,7 @@ pub mod btor;
 pub trait Frontend {
     fn ts(&mut self) -> (Transys, VarSymbols);
 
-    fn wts(&mut self) -> (WlTransys, GHashMap<Term, Vec<String>>) {
+    fn wts(&mut self) -> (WlTransys, WlTsSymbol) {
         panic!("frontend unsupported for wltransys")
     }
 

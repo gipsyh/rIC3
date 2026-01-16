@@ -9,17 +9,15 @@ use btor::Btor;
 use clap::Subcommand;
 use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
-    hash::GHashMap,
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
-use logicrs::fol::Term;
 use rIC3::{
     Engine, McResult,
     bmc::{BMC, BMCConfig},
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
-    wltransys::{WlTransys, bitblast::BitblastMap},
+    wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
 use rayon::prelude::*;
@@ -73,8 +71,9 @@ impl Ric3Proj {
 pub struct CIll {
     rcfg: Ric3Config,
     rp: Ric3Proj,
+    #[allow(unused)]
     wts: WlTransys,
-    wsym: GHashMap<Term, Vec<String>>,
+    wsym: WlTsSymbol,
     #[allow(unused)]
     ots: Transys,
     ts: Transys,
@@ -108,10 +107,6 @@ impl CIll {
         })
     }
 
-    fn get_prop_name(&self, id: usize) -> Option<String> {
-        self.wsym.get(&self.wts.bad[id]).map(|l| l[0].clone())
-    }
-
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
         info!("BMC: Checking correctness of all properties.");
         let steps = [1, 3, 5, 10, 15];
@@ -143,10 +138,8 @@ impl CIll {
         match min_res {
             Some((r, mut bmc)) => {
                 let witness = bmc.witness().into_bl().unwrap();
-                let name = self
-                    .get_prop_name(witness.bad_id)
-                    .unwrap_or("Unknown".to_string());
                 self.save_witness(&witness, cex, Some(&cex_vcd))?;
+                let name = &self.wsym.prop[witness.bad_id];
                 println!(
                     "{}",
                     format!(
@@ -271,20 +264,18 @@ fn select(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyho
         cill.print_ind_res()?;
         println!(
             "{} is inductive, please select a non-inductive assertion.",
-            cill.get_prop_name(id).unwrap()
+            cill.wsym.prop[id]
         );
         return Ok(());
     }
     let witness = cill.get_cti(id)?;
-    let name = cill
-        .get_prop_name(witness.bad_id)
-        .unwrap_or("Unknown".to_string());
     cill.save_witness(&witness, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
+    let name = &cill.wsym.prop[witness.bad_id];
     println!(
         "CTI VCD generated in {}.",
         rp.path("cill/cti.vcd").display()
     );
-    rp.set_cill_state(CIllState::Block(name))
+    rp.set_cill_state(CIllState::Block(name.to_string()))
 }
 
 fn abort(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {

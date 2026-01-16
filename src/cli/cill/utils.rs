@@ -61,7 +61,7 @@ impl CIll {
     pub fn print_ind_res(&mut self) -> anyhow::Result<()> {
         let mut results = Vec::new();
         for (i, &res) in self.res.iter().enumerate() {
-            let name = self.get_prop_name(i).unwrap_or("Unknown".to_string());
+            let name = &self.wsym.prop[i];
             let status = if res {
                 "Inductive".green().to_string()
             } else {

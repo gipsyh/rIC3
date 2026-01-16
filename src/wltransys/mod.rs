@@ -2,6 +2,7 @@ pub mod bitblast;
 pub mod certify;
 mod preproc;
 mod simplify;
+pub mod symbol;
 pub mod unroll;
 
 use crate::wltransys::certify::Restore;

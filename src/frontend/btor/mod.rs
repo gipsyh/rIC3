@@ -8,6 +8,7 @@ use crate::{
         WlTransys,
         bitblast::BitblastMap,
         certify::{Restore, WlProof, WlWitness},
+        symbol::WlTsSymbol,
     },
 };
 use btor::Btor;
@@ -20,7 +21,7 @@ use logicrs::{
 use std::{fmt::Display, mem::take, path::Path, process::Command};
 
 impl WlTransys {
-    fn from_btor(btor: &Btor) -> (Self, GHashMap<Term, Vec<String>>) {
+    fn from_btor(btor: &Btor) -> (Self, WlTsSymbol) {
         assert!(
             btor.input
                 .iter()
@@ -36,7 +37,10 @@ impl WlTransys {
                 constraint: btor.constraint.clone(),
                 justice: Default::default(),
             },
-            btor.symbols.clone(),
+            WlTsSymbol {
+                signal: btor.symbols.clone(),
+                prop: btor.prop_label.clone(),
+            },
         )
     }
 }
@@ -51,6 +55,7 @@ impl From<&WlTransys> for Btor {
             bad: wl.bad.clone(),
             constraint: wl.constraint.clone(),
             symbols: Default::default(),
+            prop_label: vec![String::new(); wl.bad.len()],
         }
     }
 }
@@ -59,7 +64,7 @@ impl From<&WlTransys> for Btor {
 pub struct BtorFrontend {
     owts: WlTransys,
     wts: WlTransys,
-    symbols: GHashMap<Term, Vec<String>>,
+    symbols: WlTsSymbol,
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
@@ -170,7 +175,7 @@ impl Frontend for BtorFrontend {
         (ts, VarSymbols::new())
     }
 
-    fn wts(&mut self) -> (WlTransys, GHashMap<Term, Vec<String>>) {
+    fn wts(&mut self) -> (WlTransys, WlTsSymbol) {
         (self.wts.clone(), self.symbols.clone())
     }
 
