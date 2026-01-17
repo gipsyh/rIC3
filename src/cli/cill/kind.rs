@@ -30,7 +30,8 @@ impl CIllKind {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         assert!(!ts.has_gate_init());
-        let uts = TransysUnroll::new(&ts);
+        let mut uts = TransysUnroll::new(&ts);
+        uts.enable_simple_path();
         let solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
         Self {
             prop,
@@ -85,7 +86,7 @@ impl CIllKind {
 
 impl Engine for CIllKind {
     fn check(&mut self) -> McResult {
-        let k = 4;
+        let k = 3;
         self.uts.unroll_to(k);
         self.load_trans_to(k);
         self.load_witness_assume();

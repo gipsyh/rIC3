@@ -210,7 +210,7 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
         }
         if let Some(simple_path) = self.simple_path.as_ref()
-            && !simple_path.is_empty()
+            && u > 0
         {
             for c in simple_path[u - 1].iter() {
                 satif.add_clause(c);
