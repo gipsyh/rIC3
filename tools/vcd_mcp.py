@@ -193,12 +193,17 @@ mcp = FastMCP("vcd-tools")
 
 @mcp.tool(
     name="search_signals",
-    description="Search signals in a VCD file by regex pattern. Returns matching signal names. The vcd_path must be an absolute path.",
+    description="Search signals in a VCD file by regex pattern. Returns matching signal names. The vcd_path must be an absolute path. If more than 50 signals match, only the first 50 are returned.",
 )
 def search_signals(vcd_path: str, pattern: str) -> List[str]:
     signals = _load_vcd_signals(vcd_path)
     regex = re.compile(pattern)
-    return [s for s in signals if regex.search(s)]
+    matched = [s for s in signals if regex.search(s)]
+    if len(matched) > 50:
+        return [
+            f"Too many signals matched ({len(matched)}), only showing first 50."
+        ] + matched[:50]
+    return matched
 
 
 @mcp.tool(
