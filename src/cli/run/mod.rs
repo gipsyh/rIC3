@@ -4,13 +4,12 @@ use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use crate::cli::{VcdConfig, run::tui::RunTask};
 use anyhow::Ok;
 use btor::Btor;
-use giputils::{file::recreate_dir, hash::GHashMap};
-use logicrs::fol::Term;
+use giputils::file::recreate_dir;
 use rIC3::{
     McResult,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
-    wltransys::WlTransys,
+    wltransys::{WlTransys, symbol::WlTsSymbol},
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
@@ -39,17 +38,13 @@ struct PropMcState {
 }
 
 impl PropMcState {
-    fn defalut_from_wts(wts: &WlTransys, symbols: &GHashMap<Term, Vec<String>>) -> Vec<Self> {
+    fn defalut_from_wts(wts: &WlTransys, symbols: &WlTsSymbol) -> Vec<Self> {
         let mut mc = Vec::new();
-        for (id, b) in wts.bad.iter().enumerate() {
+        for id in 0..wts.bad.len() {
             mc.push(PropMcState {
                 prop: PropMcInfo {
                     id,
-                    name: symbols
-                        .get(b)
-                        .cloned()
-                        .map(|l| l[0].clone())
-                        .unwrap_or("anonymous".to_string()),
+                    name: symbols.prop[id].clone(),
                     res: McResult::default(),
                     config: Default::default(),
                 },
