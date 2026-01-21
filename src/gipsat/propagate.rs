@@ -183,7 +183,7 @@ impl DagCnfSolver {
         }
     }
 
-    pub fn flip_to_none(&mut self, var: Var) -> bool {
+    pub(super) fn flip_to_none_inner(&mut self, var: Var) -> bool {
         if self.level[var] == 0 {
             return false;
         }

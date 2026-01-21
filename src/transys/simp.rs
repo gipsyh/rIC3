@@ -1,11 +1,11 @@
 use super::{Transys, TransysIf};
 use crate::{
-    config::PreprocessConfig,
+    config::PreprocConfig,
     transys::{certify::Restore, frts::FrTs, scorr::Scorr},
 };
 use giputils::hash::GHashSet;
 use log::{debug, info};
-use logicrs::{Lit, Var};
+use logicrs::{Lit, Var, VarRange};
 
 impl Transys {
     pub fn coi_refine(&mut self, rst: &mut Restore) {
@@ -62,7 +62,7 @@ impl Transys {
         self.input.retain(|i| mark.contains(i));
         self.latch.retain(|i| mark.contains(i));
         let mut removed = 0;
-        for v in Var::CONST + 1..=self.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST + 1, self.max_var()) {
             if !mark.contains(&v) {
                 removed += self.rel[v].len();
                 self.rel.del_rel(v);
@@ -108,7 +108,7 @@ impl Transys {
         self.bad = self.bad.map(map_lit);
         self.constraint = self.constraint.map(map_lit);
         self.justice = self.justice.map(map_lit);
-        rst.filter_map_var(|v| domain_map.get(&v).copied());
+        rst.filter_map_var(&|v| domain_map.get(&v).copied());
     }
 
     pub fn simplify(&mut self, rst: &mut Restore) {
@@ -124,7 +124,7 @@ impl Transys {
 }
 
 impl Transys {
-    pub fn preproc(&self, cfg: &PreprocessConfig, mut rst: Restore) -> (Self, Restore) {
+    pub fn preproc(&self, cfg: &PreprocConfig, mut rst: Restore) -> (Self, Restore) {
         let mut ts = self.clone();
         if cfg.preproc {
             ts.simplify(&mut rst);

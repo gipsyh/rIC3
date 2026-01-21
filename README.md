@@ -28,45 +28,18 @@ To view the submission for HWMCC'24, please checkout the `HWMCC24` branch or dow
 rIC3 can be compiled on both Linux and macOS.
 
 - Install the Rust compiler https://www.rust-lang.org/
-- Switch to nightly ```rustup default nightly```
 - ```git clone --recurse-submodules https://github.com/gipsyh/rIC3```
 - Install `gmp` and `mpfr` required by Bitwuzla ```apt install libgmp-dev libmpfr-dev``` or ```brew install gmp mpfr```
 - Build ```cd rIC3 && cargo b --release```
-- Run ```cargo r --release -- <AIGER/BTOR>```
+- Run ```cargo r --release -- check <AIGER/BTOR> portfolio```
 - Install ```cargo install --path .```
 
 ### Run
-- 16-threads Portfolio ```rIC3 <AIGER/BTOR>```
-- single-thread IC3 ```rIC3 -e ic3 <AIGER/BTOR>```
+- 16-threads Portfolio ```ric3 check <AIGER/BTOR> portfolio```
+- single-thread IC3 ```ric3 check <AIGER/BTOR> ic3```
 
 ### Docker
 - build image: ```docker build -t ric3 .```
-- run: ```docker run -v <AIGER/BTOR>:/model.<aig/btor> ric3 model.<aig/btor>```
-
-### Citation
-```
-@inproceedings{rIC3,
-  author       = {Yuheng Su and
-                  Qiusong Yang and
-                  Yiwei Ci and
-                  Tianjun Bu and
-                  Ziyu Huang},
-  editor       = {Ruzica Piskac and
-                  Zvonimir Rakamaric},
-  title        = {The rIC3 Hardware Model Checker},
-  booktitle    = {Computer Aided Verification - 37th International Conference, {CAV}
-                  2025, Zagreb, Croatia, July 23-25, 2025, Proceedings, Part {I}},
-  series       = {Lecture Notes in Computer Science},
-  volume       = {15931},
-  pages        = {185--199},
-  publisher    = {Springer},
-  year         = {2025},
-  url          = {https://doi.org/10.1007/978-3-031-98668-0\_9},
-  doi          = {10.1007/978-3-031-98668-0\_9},
-  timestamp    = {Sun, 02 Nov 2025 12:33:32 +0100},
-  biburl       = {https://dblp.org/rec/conf/cav/SuYCBH25.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
-```
+- run: ```docker run -v <AIGER/BTOR>:/model.<aig/btor> ric3 check model.<aig/btor> portfolio```
 
 Copyright (C) 2023 - Present, Yuheng Su (gipsyh.icu@gmail.com). All rights reserved.

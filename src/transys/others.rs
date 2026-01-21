@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitVec, Var, VarLMap};
+use logicrs::{Lit, LitVec, Var, VarLMap, VarRange};
 use std::mem::take;
 
 impl Transys {
@@ -27,41 +27,76 @@ impl Transys {
         frozens
     }
 
-    pub fn merge(&mut self, other: &Self) {
-        let offset = self.max_var();
-        let map = |x: Var| {
-            if x == Var::CONST { x } else { x + offset }
-        };
-        self.new_var_to(map(other.max_var()));
-        let lmap = |x: Lit| Lit::new(map(x.var()), x.polarity());
-        for v in Var(1)..=other.max_var() {
+    pub fn merge(&mut self, other: &Self, mapf: impl Fn(Var) -> Option<Var>) {
+        let begin = self.max_var();
+        let mut vmap = GHashMap::new();
+        assert!(mapf(Var::CONST) == Some(Var::CONST));
+        for v in VarRange::new_inclusive(Var::CONST, other.max_var()) {
+            let m = if let Some(m) = mapf(v) {
+                m
+            } else {
+                self.new_var()
+            };
+            vmap.insert(v, m);
+        }
+        let lmap = |x: Lit| x.map_var(|v| vmap[&v]);
+        for i in other.input.iter() {
+            let m = vmap[i];
+            if m > begin {
+                self.input.push(m);
+            }
+        }
+        for l in other.latch.iter() {
+            let ml = vmap[l];
+            if ml <= begin {
+                continue;
+            }
+            self.latch.push(ml);
+            self.next.insert(ml, lmap(other.next[l]));
+            if let Some(i) = other.init.get(l) {
+                self.init.insert(ml, lmap(*i));
+            }
+        }
+        for v in VarRange::new_inclusive(Var::CONST, other.max_var()) {
+            let mv = vmap[&v];
+            if mv <= begin {
+                continue;
+            }
             let rel: Vec<LitVec> = other.rel[v]
                 .iter()
                 .map(|cls| cls.iter().map(|l| lmap(*l)).collect())
                 .collect();
-            let mv = map(v);
             self.rel.add_rel(mv, &rel);
         }
-        for i in other.input.iter() {
-            self.input.push(map(*i));
-        }
-        for &l in other.latch.iter() {
-            let ml = map(l);
-            self.latch.push(ml);
-            self.next.insert(ml, lmap(other.next[&l]));
-            if let Some(i) = other.init.get(&l) {
-                self.init.insert(ml, lmap(*i));
+        for &l in other.bad.iter() {
+            let lm = lmap(l);
+            if lm.var() > begin {
+                self.bad.push(lm);
             }
         }
-        let mut bad = self.bad.clone();
-        bad.extend(other.bad.map(lmap));
-        self.bad = LitVec::from(self.rel.new_or(bad));
         for &l in other.constraint.iter() {
-            self.constraint.push(lmap(l));
+            let lm = lmap(l);
+            if lm.var() > begin {
+                self.constraint.push(lm);
+            }
         }
         for &l in other.justice.iter() {
-            self.justice.push(lmap(l));
+            let lm = lmap(l);
+            if lm.var() > begin {
+                self.justice.push(lm);
+            }
         }
+    }
+
+    pub fn has_gate_init(&self) -> bool {
+        for l in self.input().chain(self.latch()) {
+            if let Some(i) = self.init.get(&l)
+                && !(i.var().is_constant())
+            {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn remove_gate_init(&mut self, rst: &mut Restore) {
@@ -80,13 +115,11 @@ impl Transys {
             return;
         }
         self.init = init;
-        let iv = self.add_init_var();
-        rst.set_init_var(iv);
+        let iv = rst.get_init_var(self);
         for (v, i) in eq {
             let e = self.rel.new_xnor(v.lit(), i);
             let c = self.rel.new_imply(iv.lit(), e);
             self.constraint.push(c);
-            // rst.add_custom_constraint(c);
         }
     }
 
@@ -105,7 +138,7 @@ impl Transys {
         self.bad = self.bad.map_var(map);
         self.constraint = self.constraint.map_var(map);
         self.justice = self.justice.map_var(map);
-        rst.map_var(map);
+        rst.map_var(&map);
     }
 
     pub fn replace(&mut self, map: &VarLMap, rst: &mut Restore) {
@@ -117,6 +150,8 @@ impl Transys {
                 if let Some(init) = self.init.get_mut(&y.var()) {
                     let c = self.rel.new_xnor(*init, y_init);
                     if !c.is_constant(true) {
+                        let iv = rst.get_init_var(self);
+                        let c = self.rel.new_imply(iv.lit(), c);
                         self.constraint.push(c);
                     }
                 } else {
@@ -152,10 +187,4 @@ impl Transys {
         let m = m.inverse();
         self.map(|v| m[v], rst);
     }
-
-    // pub fn add_init_var(&mut self) -> Var {
-    //     let iv = self.new_var();
-    //     self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
-    //     iv
-    // }
 }

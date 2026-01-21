@@ -1,11 +1,7 @@
-use std::ops::{Deref, DerefMut};
-
 use crate::wltransys::WlTransys;
-use giputils::hash::GHashMap;
-use logicrs::{
-    Var,
-    fol::{BvTermValue, Term, TermValue},
-};
+use giputils::hash::{GHashMap, GHashSet};
+use logicrs::fol::{self, BvTermValue, Term, TermValue};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
 pub struct WlWitness {
@@ -24,6 +20,35 @@ impl WlWitness {
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.state.len()
+    }
+
+    pub fn resize(&mut self, size: usize) {
+        self.input.resize(size, Vec::new());
+        self.state.resize(size, Vec::new());
+    }
+
+    pub fn enrich(&mut self, observe: &GHashSet<Term>) {
+        for k in (0..self.len()).rev() {
+            let mut val = GHashMap::new();
+            let mut has = GHashSet::new();
+            for v in self.input[k].iter() {
+                val.insert(v.t().clone(), fol::Value::Bv(v.v().clone()));
+                has.insert(v.t().clone());
+            }
+            for v in self.state[k].iter() {
+                val.insert(v.t().clone(), v.v().clone());
+                has.insert(v.t().clone());
+            }
+            for t in observe.iter() {
+                if has.contains(t) {
+                    continue;
+                }
+                let val = t.simulate(&mut val);
+                if !val.as_bv().unwrap().all_x() {
+                    self.state[k].push(TermValue::new(t.clone(), val));
+                }
+            }
+        }
     }
 }
 
@@ -50,7 +75,6 @@ impl DerefMut for WlProof {
 
 #[derive(Clone, Default)]
 pub struct Restore {
-    pub bb_rst: GHashMap<Var, (Term, usize)>,
     init_var: Option<Term>,
 }
 

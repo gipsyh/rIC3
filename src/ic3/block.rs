@@ -5,11 +5,12 @@ use crate::ic3::{
 };
 use log::{debug, info};
 use logicrs::{LitOrdVec, LitVec, satif::Satif};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 pub enum BlockResult {
     Success,
-    Failure,
+    Failure(usize),
     Proved,
     BlockLimitExceeded,
     OverallTimeLimitExceeded,
@@ -33,18 +34,13 @@ impl IC3 {
         let Some(mut mic) = self.solvers[po.frame - 1].inductive_core() else {
             po.frame += 1;
             self.add_obligation(po.clone());
-            return self.add_lemma(po.frame - 1, po.state.cube().clone(), false, Some(po));
+            return self.add_lemma(po.frame - 1, po.state.as_litvec().clone(), false, Some(po));
         };
         mic = self.mic(po.frame, mic, &[], mic_type);
         let (frame, mic) = self.push_lemma(po.frame, mic);
         self.statistic.avg_po_cube_len += po.state.len();
         po.push_to(frame);
         self.add_obligation(po.clone());
-        debug!(
-            "generalized lemma {:?} in F{}",
-            self.lits_symbols(mic.clone()),
-            frame - 1
-        );
         if self.add_lemma(frame - 1, mic.clone(), false, Some(po)) {
             return true;
         }
@@ -85,16 +81,19 @@ impl IC3 {
             {
                 return BlockResult::BlockLimitExceeded;
             }
+            if self.stop_ctrl.load(Ordering::Relaxed) {
+                return BlockResult::OverallTimeLimitExceeded;
+            }
             if let Some(limit) = self.cfg.time_limit
                 && self.statistic.time.time().as_secs() > limit
             {
                 return BlockResult::OverallTimeLimitExceeded;
             }
             if self.tsctx.cube_subsume_init(&po.state) {
-                if self.cfg.ic3.abs_cst || self.cfg.ic3.abs_trans {
+                if self.cfg.abs_cst || self.cfg.abs_trans {
                     self.add_obligation(po.clone());
                     if self.check_witness_by_bmc(po.depth) {
-                        return BlockResult::Failure;
+                        return BlockResult::Failure(po.depth);
                     } else {
                         self.obligations.clear();
                         for f in self.frame.iter_mut() {
@@ -105,11 +104,11 @@ impl IC3 {
                         continue;
                     }
                 } else if po.frame > 0 {
-                    let lemma = po.state.cube();
+                    let lemma = po.state.as_litvec();
                     debug_assert!(!self.solvers[0].solve(lemma));
                 } else {
                     self.add_obligation(po.clone());
-                    return BlockResult::Failure;
+                    return BlockResult::Failure(po.depth);
                 }
             }
             if let Some((bf, _)) = self.frame.trivial_contained(Some(po.frame), &po.state) {
@@ -120,21 +119,15 @@ impl IC3 {
                 continue;
             }
             po.bump_act();
-            if self.cfg.ic3.drop_po && po.act > 20.0 {
+            if self.cfg.drop_po && po.act > 20.0 {
                 continue;
             }
             let blocked_start = Instant::now();
             let blocked = self.blocked_with_ordered(po.frame, &po.state, false);
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
-                debug!(
-                    "blocked {:?} in F{} with depth {}",
-                    self.lits_symbols(po.state.clone()),
-                    po.frame,
-                    po.depth
-                );
                 noc += 1;
-                let mic_type = if self.cfg.ic3.dynamic {
+                let mic_type = if self.cfg.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
                         let mut act = n.act;
                         for _ in 0..2 {

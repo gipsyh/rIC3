@@ -1,7 +1,8 @@
-mod bitblast;
+pub mod bitblast;
 pub mod certify;
 mod preproc;
 mod simplify;
+pub mod symbol;
 pub mod unroll;
 
 use crate::wltransys::certify::Restore;
@@ -65,8 +66,7 @@ impl WlTransys {
                         rst.set_init_var(iv);
                     }
                     let iv = rst.init_var().unwrap();
-                    self.constraint
-                        .push(iv.op1(op::Implies, l.op1(op::Eq, &init)));
+                    self.constraint.push(iv.imply(l.teq(&init)));
                 }
                 self.init.remove(&l);
                 no_next.insert(l.clone());

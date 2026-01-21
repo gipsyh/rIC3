@@ -2,10 +2,7 @@ use super::{DagCnfSolver, cdb::CREF_NONE};
 use giputils::{OptionU32, gvec::Gvec};
 use logicrs::{Lbool, Lit, LitVec, Var, VarMap};
 use rand::Rng;
-use std::{
-    hint::unlikely,
-    ops::{Index, MulAssign},
-};
+use std::ops::{Index, MulAssign};
 
 #[derive(Default, Clone)]
 pub struct BinaryHeap {
@@ -318,12 +315,11 @@ impl DagCnfSolver {
     pub fn decide(&mut self) -> bool {
         while let Some(decide) = self.vsids.pop() {
             if self.value.v(decide.lit()).is_none() {
-                let decide =
-                    if unlikely(!self.cfg.phase_saving || self.phase_saving[decide].is_none()) {
-                        Lit::new(decide, self.rng.random_bool(0.5))
-                    } else {
-                        Lit::new(decide, self.phase_saving[decide] != Lbool::FALSE)
-                    };
+                let decide = if !self.cfg.phase_saving || self.phase_saving[decide].is_none() {
+                    Lit::new(decide, self.rng.random_bool(0.5))
+                } else {
+                    Lit::new(decide, self.phase_saving[decide] != Lbool::FALSE)
+                };
                 self.pos_in_trail.push(self.trail.len() as u32);
                 self.assign(decide, CREF_NONE);
                 return true;

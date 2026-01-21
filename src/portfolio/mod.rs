@@ -1,298 +1,339 @@
-use crate::{Config, frontend::certificate_check};
+use crate::config::{EngineConfig, EngineConfigBase};
+use crate::transys::Transys;
+use crate::{Engine, McResult, create_bl_engine, impl_config_deref};
+use clap::{Args, Parser};
+use giputils::logger::with_log_level;
 use log::{error, info};
-use process_control::{ChildExt, Control};
+use logicrs::VarSymbols;
+use nix::errno::Errno;
+use nix::sys::wait::{WaitStatus, waitpid};
+use nix::unistd::Pid;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
+use std::sync::mpsc::Sender;
+use std::thread::{JoinHandle, spawn};
+use std::time::Instant;
 use std::{
     collections::HashMap,
     env::current_exe,
-    fs::File,
-    io::{Read, Write},
+    io::{BufRead, BufReader, Read},
     mem::take,
-    ops::{Deref, DerefMut},
-    process::{Command, Stdio, exit},
-    sync::{Arc, Condvar, Mutex},
-    thread::spawn,
+    path::PathBuf,
+    process::{Command, Stdio},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    thread,
 };
 use tempfile::{NamedTempFile, TempDir};
 
-enum PortfolioState {
-    Checking(usize),
-    Finished(bool, String, Option<NamedTempFile>),
-    Terminate,
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct PortfolioConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    /// worker configuration
+    #[arg(long = "config")]
+    pub config: Option<String>,
+
+    /// woker memory limit in GB
+    #[arg(long = "worker-mem-limit", default_value_t = 16)]
+    pub wmem_limit: usize,
 }
 
-impl PortfolioState {
-    fn new(nt: usize) -> Self {
-        PortfolioState::Checking(nt)
-    }
-}
+impl_config_deref!(PortfolioConfig);
 
-impl PortfolioState {
-    fn is_checking(&self) -> bool {
-        matches!(self, Self::Checking(_))
-    }
-
-    fn result(&mut self) -> (bool, String, Option<NamedTempFile>) {
-        let Self::Finished(res, config, certificate) = self else {
-            panic!()
-        };
-        (*res, config.clone(), take(certificate))
+impl Default for PortfolioConfig {
+    fn default() -> Self {
+        let cfg = EngineConfig::parse_from(["", "portfolio"]);
+        cfg.into_portfolio().unwrap()
     }
 }
 
 pub struct Portfolio {
-    cfg: Config,
-    engines: Vec<Engine>,
+    cert: Option<PathBuf>,
+    cfg: PortfolioConfig,
+    engines: Vec<Worker>,
+    engine_pids: Vec<Pid>,
+    stop_flag: Arc<AtomicBool>,
+    monitor: Option<JoinHandle<()>>,
+    #[allow(unused)]
     temp_dir: TempDir,
-    engine_pids: Vec<i32>,
-    certificate: Option<NamedTempFile>,
-    state: Arc<(Mutex<PortfolioState>, Condvar)>,
 }
 
-struct Engine {
+struct Worker {
     name: String,
     cmd: Command,
+    cert: Option<NamedTempFile>,
+}
+
+fn monitor_run(tx: Sender<Option<WaitStatus>>) {
+    loop {
+        match waitpid(None, None) {
+            Ok(status) => {
+                tx.send(Some(status)).unwrap();
+            }
+            Err(Errno::EINTR) => continue,
+            Err(_) => break,
+        }
+    }
+    tx.send(None).unwrap();
 }
 
 impl Portfolio {
-    pub fn new(cfg: Config) -> Self {
+    pub fn new(model: PathBuf, cert: Option<PathBuf>, cfg: PortfolioConfig) -> Self {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
         let mut id = 0;
         let mut new_engine = |name, args: &str| {
-            let args_split = args.split(" ");
             let mut cmd = Command::new(current_exe().unwrap());
             cmd.env("RIC3_TMP_DIR", temp_dir_path);
             cmd.env("RUST_LOG", "warn");
-            cmd.env("RIC3_WORKER", format!("worker{id}"));
             id += 1;
-            cmd.arg(&cfg.model);
+            cmd.arg("check");
+            cmd.arg(&model);
+            let cert = if cert.is_some() {
+                let certificate = NamedTempFile::new_in(temp_dir.path()).unwrap();
+                let certify_path = certificate.path().as_os_str().to_str().unwrap();
+                cmd.arg("--cert");
+                cmd.arg(certify_path);
+                Some(certificate)
+            } else {
+                None
+            };
+            let args_split = args.split(" ");
             for a in args_split {
                 cmd.arg(a);
             }
-            engines.push(Engine { name, cmd });
+            engines.push(Worker { name, cmd, cert });
         };
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: HashMap<String, HashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
-        let portfolio_config = match cfg.model.extension() {
-            Some(ext) if (ext == "aig") | (ext == "aag") => portfolio_config["bl_default"].clone(),
-            Some(ext) if (ext == "btor") | (ext == "btor2") => {
-                portfolio_config["wl_default"].clone()
-            }
-            _ => {
-                error!("Error: unsupported file format");
-                exit(1);
-            }
-        };
-        for (name, args) in portfolio_config {
-            new_engine(name, &args);
+        let config = cfg.config.as_deref().unwrap_or("bl_default");
+        for (name, args) in portfolio_config[config].iter() {
+            new_engine(name.clone(), args);
         }
-        let ps = PortfolioState::new(engines.len());
         Self {
+            cert,
             cfg,
             engines,
             temp_dir,
-            certificate: None,
             engine_pids: Default::default(),
-            state: Arc::new((Mutex::new(ps), Condvar::new())),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+            monitor: None,
         }
     }
 
-    pub fn terminate(&mut self) {
-        let Ok(mut lock) = self.state.0.try_lock() else {
-            return;
-        };
-        if lock.is_checking() {
-            *lock = PortfolioState::Terminate;
-            let pids: Vec<String> = self.engine_pids.iter().map(|p| format!("{}", *p)).collect();
-            let pid = pids.join(",");
-            let _ = Command::new("pkill")
-                .args(["-9", "--parent", &pid])
-                .output();
-            let mut kill = Command::new("kill");
-            kill.arg("-9");
-            for p in pids {
-                kill.arg(p);
-            }
-            let _ = kill.output().unwrap();
-            self.engine_pids.clear();
-            let _ = Command::new("rm")
-                .arg("-rf")
-                .arg(self.temp_dir.path())
-                .output();
+    fn terminate_inner(&mut self) {
+        for pid in self.engine_pids.iter() {
+            let _ = nix::sys::signal::kill(*pid, nix::sys::signal::Signal::SIGTERM);
         }
-        drop(lock);
+        take(&mut self.monitor).unwrap().join().unwrap();
     }
 
-    fn check_inner(&mut self) -> Option<bool> {
-        #[cfg(target_os = "linux")]
-        let wmem = self.cfg.portfolio.wmem_limit * 1024 * 1024 * 1024;
-        let lock = self.state.0.lock().unwrap();
+    pub fn check(&mut self) -> McResult {
+        let mut running = HashMap::new();
         for mut engine in take(&mut self.engines) {
-            let certificate =
-                if self.cfg.certificate.is_some() || self.cfg.certify || self.cfg.witness {
-                    let certificate =
-                        tempfile::NamedTempFile::new_in(self.temp_dir.path()).unwrap();
-                    let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                    engine.cmd.arg(certify_path);
-                    Some(certificate)
-                } else {
-                    None
-                };
-            let mut child = engine.cmd.stderr(Stdio::piped()).spawn().unwrap();
-            self.engine_pids.push(child.id() as i32);
-            let state = self.state.clone();
-            spawn(move || {
-                let config = engine
-                    .cmd
-                    .get_args()
-                    .skip(1)
-                    .map(|cstr| cstr.to_str().unwrap())
-                    .collect::<Vec<&str>>();
-                let config = config.join(" ");
-                info!("start engine {}: {config}", engine.name);
-                #[cfg(target_os = "linux")]
-                let status = child
-                    .controlled()
-                    .memory_limit(wmem)
-                    .wait()
-                    .unwrap()
-                    .unwrap();
-                #[cfg(target_os = "macos")]
-                let status = child.controlled().wait().unwrap().unwrap();
-                let res = match status.code() {
-                    Some(10) => false,
-                    Some(20) => true,
-                    e => {
-                        let mut ps = state.0.lock().unwrap();
-                        if let PortfolioState::Checking(np) = ps.deref_mut() {
-                            info!("{config} unexpectedly exited, exit code: {e:?}");
-                            let mut stderr = String::new();
-                            child.stderr.unwrap().read_to_string(&mut stderr).unwrap();
-                            info!("{stderr}");
-                            *np -= 1;
-                            if *np == 0 {
-                                state.1.notify_one();
+            let child = engine
+                .cmd
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            info!("start engine {}", engine.name);
+            let pid = Pid::from_raw(child.id() as i32);
+            self.engine_pids.push(pid);
+            running.insert(pid, (child, engine));
+        }
+
+        let (tx, rx) = mpsc::channel();
+
+        self.monitor = Some(thread::spawn(move || monitor_run(tx)));
+
+        let start = Instant::now();
+        loop {
+            if self.stop_flag.load(Ordering::Relaxed) {
+                info!("Interrupted by external signal");
+                self.terminate_inner();
+                return McResult::Unknown(None);
+            }
+
+            if let Some(t) = self.cfg.time_limit
+                && start.elapsed().as_secs() >= t
+            {
+                info!("Terminated by timeout.");
+                self.terminate_inner();
+                return McResult::Unknown(None);
+            }
+
+            match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                Ok(msg) => match msg {
+                    Some(WaitStatus::Exited(pid, code)) => {
+                        if let Some((mut child, engine)) = running.remove(&pid) {
+                            if code == 0 {
+                                let stdout = child.stdout.take().unwrap();
+                                let reader = BufReader::new(stdout);
+                                let mut res = None;
+                                for l in reader.lines().map_while(Result::ok) {
+                                    match l.as_str() {
+                                        "SAT" => res = Some(false),
+                                        "UNSAT" => res = Some(true),
+                                        _ => (),
+                                    }
+                                }
+
+                                if let Some(r) = res {
+                                    let config = engine
+                                        .cmd
+                                        .get_args()
+                                        .skip(1)
+                                        .map(|s| s.to_str().unwrap())
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+                                    info!("best configuration: {config}");
+                                    if let Some(cert) = &self.cert
+                                        && let Some(c) = engine.cert
+                                    {
+                                        let _ = std::fs::copy(c.path(), cert);
+                                    }
+                                    self.terminate_inner();
+                                    return if r {
+                                        McResult::Safe
+                                    } else {
+                                        McResult::Unsafe(0)
+                                    };
+                                }
+                            } else {
+                                let mut stderr = String::new();
+                                if let Some(mut e) = child.stderr.take() {
+                                    let _ = e.read_to_string(&mut stderr);
+                                }
+                                info!("{} exited with code {}: {}", engine.name, code, stderr);
                             }
                         }
-                        return;
                     }
-                };
-                let mut lock = state.0.lock().unwrap();
-                if lock.is_checking() {
-                    *lock = PortfolioState::Finished(res, config, certificate);
-                    state.1.notify_one();
+                    Some(WaitStatus::Signaled(pid, _, _)) => {
+                        running.remove(&pid);
+                    }
+                    None => {
+                        error!("all workers unexpectedly exited :(");
+                        self.terminate_inner();
+                        return McResult::Unknown(None);
+                    }
+                    _ => unreachable!(),
+                },
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    error!("monitor thread disconnected");
+                    unreachable!();
                 }
-            });
+            }
         }
-        let mut result = self.state.1.wait(lock).unwrap();
-        if let PortfolioState::Checking(np) = result.deref() {
-            assert!(*np == 0);
-            error!("all workers unexpectedly exited :(");
-            return None;
-        }
-        let (res, config, certificate) = result.result();
-        drop(result);
-        self.certificate = certificate;
-        info!("best configuration: {config}");
-        let pids: Vec<String> = self.engine_pids.iter().map(|p| format!("{}", *p)).collect();
-        let pid = pids.join(",");
-        let _ = Command::new("pkill")
-            .args(["-9", "--parent", &pid])
-            .output();
-        let mut kill = Command::new("kill");
-        kill.arg("-9");
-        for p in pids {
-            kill.arg(p);
-        }
-        let _ = kill.output().unwrap();
-        self.engine_pids.clear();
-        Some(res)
     }
 
-    pub fn check(&mut self) -> Option<bool> {
-        let ric3 = self as *mut Self as usize;
-        ctrlc::set_handler(move || {
-            let ric3 = unsafe { &mut *(ric3 as *mut Portfolio) };
-            ric3.terminate();
-            exit(124);
+    pub fn get_stop_signal(&self) -> Arc<AtomicBool> {
+        self.stop_flag.clone()
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct LightPortfolioConfig {
+    pub time_limit: Option<usize>,
+}
+
+pub struct LightPortfolio {
+    ts: Transys,
+    sym: VarSymbols,
+    cfg: LightPortfolioConfig,
+    ecfgs: Vec<EngineConfig>,
+    engines: Vec<Box<dyn Engine>>,
+    stop_flag: Arc<AtomicBool>,
+}
+
+impl LightPortfolio {
+    pub fn new(
+        cfg: LightPortfolioConfig,
+        ts: Transys,
+        sym: VarSymbols,
+        ecfgs: Vec<EngineConfig>,
+    ) -> Self {
+        Self {
+            cfg,
+            ecfgs,
+            ts,
+            sym,
+            engines: Vec::new(),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+impl Engine for LightPortfolio {
+    fn check(&mut self) -> McResult {
+        let engines: Vec<_> = self
+            .ecfgs
+            .clone()
+            .into_par_iter()
+            .map(|ecfg| create_bl_engine(ecfg, self.ts.clone(), self.sym.clone()))
+            .collect();
+        let stops: Vec<_> = engines.iter().map(|e| e.get_stop_ctrl()).collect();
+        let (tx, rx) = mpsc::channel();
+        let mut joins = Vec::new();
+        with_log_level(log::LevelFilter::Warn, || {
+            let start = Instant::now();
+            let num_engines = engines.len();
+            for mut e in engines {
+                let tx = tx.clone();
+                let join = spawn(move || {
+                    let res = e.check();
+                    let _ = tx.send(res);
+                    (e, res)
+                });
+                joins.push(join);
+            }
+            let mut res = McResult::Unknown(None);
+            let mut finished = 0;
+            while finished < num_engines {
+                if self.stop_flag.load(Ordering::Relaxed) {
+                    info!("LightPortfolio interrupted by external signal.");
+                    break;
+                }
+                if let Some(t) = self.cfg.time_limit
+                    && start.elapsed().as_secs() >= t as u64
+                {
+                    info!("LightPortfolio terminated by timeout.");
+                    break;
+                }
+                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                    Ok(r) => {
+                        finished += 1;
+                        if !r.is_unknown() {
+                            res = r;
+                            break;
+                        }
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        break;
+                    }
+                }
+            }
+            for s in stops {
+                s.store(true, Ordering::Relaxed);
+            }
+            for j in joins {
+                let (e, _) = j.join().unwrap();
+                self.engines.push(e);
+            }
+            res
         })
-        .unwrap();
-        self.check_inner()
     }
 
-    fn certificate(&mut self, cfg: &Config, res: bool) {
-        if res {
-            if cfg.certificate.is_none() && !cfg.certify {
-                return;
-            }
-            if let Some(certificate_path) = &cfg.certificate {
-                std::fs::copy(self.certificate.as_ref().unwrap(), certificate_path).unwrap();
-            }
-        } else {
-            if cfg.certificate.is_none() && !cfg.certify && !cfg.witness {
-                return;
-            }
-            let mut witness = String::new();
-            File::open(
-                self.certificate
-                    .as_ref()
-                    .unwrap()
-                    .path()
-                    .as_os_str()
-                    .to_str()
-                    .unwrap(),
-            )
-            .unwrap()
-            .read_to_string(&mut witness)
-            .unwrap();
-            if cfg.witness {
-                println!("{witness}");
-            }
-            if let Some(certificate_path) = &cfg.certificate {
-                let mut file: File = File::create(certificate_path).unwrap();
-                file.write_all(witness.as_bytes()).unwrap();
-            }
-        }
-        certificate_check(cfg, self.certificate.as_ref().unwrap().path())
-    }
-}
-
-impl Drop for Portfolio {
-    fn drop(&mut self) {
-        let _ = Command::new("rm")
-            .arg("-rf")
-            .arg(self.temp_dir.path())
-            .output();
-    }
-}
-
-pub fn portfolio_main(cfg: Config) {
-    let mut engine = Portfolio::new(cfg.clone());
-    let res = engine.check();
-    match res {
-        Some(true) => {
-            println!("UNSAT");
-            if cfg.witness {
-                println!("0");
-            }
-            engine.certificate(&cfg, true)
-        }
-        Some(false) => {
-            println!("SAT");
-            engine.certificate(&cfg, false)
-        }
-        _ => {
-            println!("UNKNOWN");
-            if cfg.witness {
-                println!("2");
-            }
-        }
-    }
-    if let Some(res) = res {
-        exit(if res { 20 } else { 10 })
-    } else {
-        exit(30)
+    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
+        self.stop_flag.clone()
     }
 }

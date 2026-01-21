@@ -1,18 +1,13 @@
 use super::Frontend;
 use crate::{
-    Proof, Witness,
-    config::Config,
+    McProof, McWitness,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
 use giputils::hash::GHashMap;
 use log::{debug, error, warn};
 use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols, VarVMap};
-use std::{
-    fmt::Display,
-    path::Path,
-    process::{Command, exit},
-};
+use std::{fmt::Display, path::Path, process::Command};
 
 impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
@@ -136,8 +131,8 @@ pub struct AigFrontend {
 }
 
 impl AigFrontend {
-    pub fn new(cfg: &Config) -> Self {
-        let mut oaig = Aig::from_file(&cfg.model);
+    pub fn new(aig: Aig) -> Self {
+        let mut oaig = aig;
         if !oaig.outputs.is_empty() {
             if oaig.bads.is_empty() {
                 oaig.bads = std::mem::take(&mut oaig.outputs);
@@ -149,6 +144,9 @@ impl AigFrontend {
                 warn!("outputs in aiger are ignored");
                 oaig.outputs.clear();
             }
+        } else if oaig.bads.is_empty() {
+            warn!("empty property in aiger");
+            oaig.bads.push(AigEdge::constant(false));
         }
         let mut aig = oaig.clone();
         if !aig.justice.is_empty() {
@@ -158,24 +156,9 @@ impl AigFrontend {
                 );
                 panic!();
             }
-        } else {
-            if !aig.fairness.is_empty() {
-                warn!("fairness constraints are ignored when solving the safety property");
-                aig.fairness.clear();
-            }
-            if aig.bads.is_empty() {
-                warn!("no property to be checked");
-                if let Some(certificate) = &cfg.certificate {
-                    let mut map = aig.inputs.clone();
-                    map.extend(aig.latchs.iter().map(|l| l.input));
-                    for x in map {
-                        aig.set_symbol(x, &format!("= {}", x * 2));
-                    }
-                    aig.to_file(certificate, true);
-                }
-                println!("UNSAT");
-                exit(20);
-            }
+        } else if !aig.fairness.is_empty() {
+            warn!("fairness constraints are ignored when solving the safety property");
+            aig.fairness.clear();
         }
         let ots = Transys::from_aig(&aig, true);
         let osymbols = aig_symbols(&aig);
@@ -207,7 +190,8 @@ impl Frontend for AigFrontend {
         (self.ts.clone(), self.ts_symbols.clone())
     }
 
-    fn safe_certificate(&mut self, proof: Proof) -> Box<dyn Display> {
+    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
+        let proof = proof.into_bl().unwrap();
         if !self.is_safety() {
             error!("rIC3 does not support certificate generation for safe liveness properties");
             panic!();
@@ -228,7 +212,8 @@ impl Frontend for AigFrontend {
         Box::new(certifaiger)
     }
 
-    fn unsafe_certificate(&mut self, witness: Witness) -> Box<dyn Display> {
+    fn unsafe_certificate(&mut self, witness: McWitness) -> Box<dyn Display> {
+        let witness = witness.into_bl().unwrap();
         let mut wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string()];
         if self.is_safety() {

@@ -1,26 +1,39 @@
 use crate::{
-    Engine, Witness,
-    config::Config,
-    ic3::IC3,
+    BlWitness, Engine, McResult, McWitness,
+    config::{EngineConfig, EngineConfigBase, PreprocConfig},
+    ic3::{IC3, IC3Config},
+    impl_config_deref,
     transys::{Transys, TransysIf, certify::Restore},
 };
-use clap::Parser;
-use log::{debug, error, warn};
+use clap::{Args, Parser};
+use log::{LevelFilter, debug, error, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
+use serde::{Deserialize, Serialize};
 use std::mem::take;
 
 pub struct Rlive {
     #[allow(unused)]
-    cfg: Config,
+    cfg: RliveConfig,
     ts: Transys,
-    rcfg: Config,  // reach check config
-    rts: Transys,  // reach check ts
-    base_var: Var, // base var
+    rcfg: IC3Config, // reach check config
+    rts: Transys,    // reach check ts
+    base_var: Var,   // base var
     trace: Vec<LitOrdVec>,
-    witness: Vec<Witness>,
+    witness: Vec<BlWitness>,
     shoals: Vec<LitVec>,
     rst: Restore,
 }
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct RliveConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+}
+
+impl_config_deref!(RliveConfig);
 
 impl Rlive {
     #[inline]
@@ -30,7 +43,7 @@ impl Rlive {
     }
 
     #[inline]
-    fn add_trace(&mut self, mut w: Witness) -> bool {
+    fn add_trace(&mut self, mut w: BlWitness) -> bool {
         for s in w.state.iter_mut().chain(w.input.iter_mut()) {
             s.retain(|l| l.var() != self.base_var);
         }
@@ -70,17 +83,21 @@ impl Rlive {
         self.witness.pop();
     }
 
-    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, Witness> {
+    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, BlWitness> {
         let mut rts = self.rts.clone();
         for l in s {
             assert!(l.var() != self.base_var);
             rts.init.insert(l.var(), Lit::constant(l.polarity()));
         }
         let mut ic3 = IC3::new(self.rcfg.clone(), rts, VarSymbols::new());
-        if ic3.check().unwrap() {
+        let prev_level = log::max_level();
+        log::set_max_level(LevelFilter::Warn);
+        let res = ic3.check();
+        log::set_max_level(prev_level);
+        if let McResult::Safe = res {
             return Ok(ic3.invariant());
         }
-        let wit = ic3.witness();
+        let wit = ic3.witness().into_bl().unwrap();
         assert!(wit.input.len() > 1);
         Err(wit)
     }
@@ -89,7 +106,7 @@ impl Rlive {
         loop {
             debug!("rlive block at level {}", self.level());
             let s = self.trace.last().unwrap().clone();
-            match self.check_reach(s.cube().clone()) {
+            match self.check_reach(s.as_litvec().clone()) {
                 Ok(inv) => {
                     self.add_shoal(inv);
                     self.pop_trace();
@@ -110,7 +127,7 @@ impl Rlive {
 }
 
 impl Rlive {
-    pub fn new(cfg: Config, mut ts: Transys) -> Self {
+    pub fn new(cfg: RliveConfig, mut ts: Transys) -> Self {
         warn!("rlive is unstable, use with caution");
         if ts.justice.is_empty() {
             error!("rlive requires justice property");
@@ -132,11 +149,12 @@ impl Rlive {
         rts.constraint.push(bvc);
         rts.bad = LitVec::from(rts.rel.new_and([rts.bad[0], base_var.lit()]));
         let rcfg =
-            Config::parse_from("-e ic3 --no-ic3-pred-prop --ic3-full-bad --no-preproc".split(' '));
+            EngineConfig::parse_from("ic3 --no-pred-prop --full-bad --no-preproc".split(' '));
+        let rcfg = rcfg.into_ic3().unwrap();
         Self {
             cfg,
             ts,
-            rcfg,
+            rcfg: rcfg.clone(),
             rts,
             base_var,
             trace: Vec::new(),
@@ -148,25 +166,29 @@ impl Rlive {
 }
 
 impl Engine for Rlive {
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         loop {
             let mut ts = self.ts.clone();
             ts.bad = take(&mut ts.justice);
             let mut ic3 = IC3::new(self.rcfg.clone(), ts, VarSymbols::new());
-            if ic3.check().unwrap() {
-                return Some(true);
+            let prev_level = log::max_level();
+            log::set_max_level(LevelFilter::Warn);
+            let res = ic3.check();
+            log::set_max_level(prev_level);
+            if let McResult::Safe = res {
+                return McResult::Safe;
             }
-            let wit = ic3.witness();
+            let wit = ic3.witness().into_bl().unwrap();
             assert!(self.level() == 0);
             self.add_trace(wit);
             if !self.block() {
-                return Some(false);
+                return McResult::Unsafe(0);
             }
         }
     }
 
-    fn witness(&mut self) -> Witness {
-        let witness = Witness::concat(self.witness.clone());
-        witness.map_var(|v| self.rst.restore_var(v))
+    fn witness(&mut self) -> McWitness {
+        let witness = BlWitness::concat(self.witness.clone());
+        McWitness::Bl(witness.map_var(|v| self.rst.restore_var(v)))
     }
 }

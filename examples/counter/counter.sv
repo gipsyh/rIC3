@@ -5,7 +5,7 @@ module counter #(
     input rst_n
 );
     reg [W-1:0] count;
-    always @(posedge clk or negedge rst_n)
+    always @(posedge clk)
         if (!rst_n) begin
             count <= {W{1'b0}};
         end else if (count == {(W - 1) {1'b1}}) begin
@@ -17,9 +17,10 @@ module counter #(
     always_comb assume (!rst_n == $initstate);
     always @(posedge clk)
         if (rst_n) begin
-            assert (count != {W{1'b1}});
-            assert (count != {(W - 1) {1'b1}});
-            assert (count != {(W - 3) {1'b1}});
-            assert (count != {(W - 2) {1'b1}});
+            p0 : assert (count != {W{1'b1}});
+            p1 : assert (count <= {(W - 1) {1'b1}});
+            p2 : assert (count != {(W - 2) {1'b1}});
+            p3 : assert (count != {(W - 3) {1'b1}});
+            p4 : assert (count != {(W - 4) {1'b1}});
         end
 endmodule

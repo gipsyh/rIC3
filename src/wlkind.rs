@@ -1,27 +1,36 @@
 use crate::{
-    Engine,
-    config::Config,
-    wltransys::{
-        WlTransys,
-        certify::{WlProof, WlWitness},
-        unroll::WlTransysUnroll,
-    },
+    Engine, McProof, McResult, McWitness,
+    config::EngineConfigBase,
+    impl_config_deref,
+    tracer::{Tracer, TracerIf},
+    wltransys::{WlTransys, certify::WlProof, unroll::WlTransysUnroll},
 };
+use clap::Args;
 use giputils::hash::GHashMap;
 use log::{error, info};
 use logicrs::fol::{Sort, Term, op};
+use serde::{Deserialize, Serialize};
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct WlKindConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+}
+
+impl_config_deref!(WlKindConfig);
 
 pub struct WlKind {
     uts: WlTransysUnroll,
-    cfg: Config,
+    cfg: WlKindConfig,
     solver: bitwuzla::Bitwuzla,
     solver_trans_k: usize,
     solver_bad_k: usize,
     owts: WlTransys,
+    tracer: Tracer,
 }
 
 impl WlKind {
-    pub fn new(cfg: Config, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: WlKindConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);
@@ -33,6 +42,7 @@ impl WlKind {
             solver_trans_k: 0,
             solver_bad_k: 0,
             owts,
+            tracer: Tracer::new(),
         }
     }
 
@@ -57,11 +67,7 @@ impl WlKind {
 }
 
 impl Engine for WlKind {
-    fn is_wl(&self) -> bool {
-        true
-    }
-
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         let step = self.cfg.step as usize;
         if step != 1 {
             error!("k-induction step should be 1, got {step}");
@@ -74,13 +80,12 @@ impl Engine for WlKind {
         for k in 0..=self.cfg.end {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
-            info!("kind depth: {k}");
             if k > 0 {
                 self.load_bad_to(k - 1);
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
-                    info!("k-induction proofed in depth {k}");
-                    return Some(true);
+                    self.tracer.trace_res(crate::McResult::Safe);
+                    return McResult::Safe;
                 }
             }
 
@@ -92,15 +97,20 @@ impl Engine for WlKind {
             assump.push(bad_at_k);
 
             if self.solver.solve(&assump) {
-                info!("bmc found counter-example in depth {k}");
-                return Some(false);
+                self.tracer.trace_res(crate::McResult::Unsafe(k));
+                return McResult::Unsafe(k);
             }
+            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
-    fn wl_witness(&mut self) -> WlWitness {
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+
+    fn witness(&mut self) -> McWitness {
         let mut witness = self.uts.witness(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
@@ -117,14 +127,10 @@ impl Engine for WlKind {
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        witness
+        McWitness::Wl(witness)
     }
 
-    fn wl_proof(&mut self) -> WlProof {
-        if self.cfg.kind.simple_path {
-            error!("k-induction with simple path constraint does not support certificate");
-            panic!();
-        }
+    fn proof(&mut self) -> McProof {
         let mut proof = self.uts.ts.clone();
         let mut up = WlTransysUnroll::new(proof.clone());
         up.enable_new_next_latch();
@@ -185,6 +191,6 @@ impl Engine for WlKind {
         }
         bads.push(!&aux_vars[0]);
         proof.bad = vec![Term::new_op_fold(op::Or, bads)];
-        WlProof { proof }
+        McProof::Wl(WlProof { proof })
     }
 }

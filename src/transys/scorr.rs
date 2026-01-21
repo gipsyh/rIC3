@@ -1,5 +1,5 @@
 use crate::{
-    config::PreprocessConfig,
+    config::PreprocConfig,
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf, certify::Restore},
 };
@@ -13,11 +13,11 @@ pub struct Scorr {
     rst: Restore,
     init_slv: DagCnfSolver,
     ind_slv: DagCnfSolver,
-    cfg: PreprocessConfig,
+    cfg: PreprocConfig,
 }
 
 impl Scorr {
-    pub fn new(ts: Transys, cfg: &PreprocessConfig, rst: Restore) -> Self {
+    pub fn new(ts: Transys, cfg: &PreprocConfig, rst: Restore) -> Self {
         let mut ind_slv = DagCnfSolver::new(&ts.rel);
         for c in ts.constraint.iter() {
             ind_slv.add_clause(&[*c]);

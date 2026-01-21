@@ -1,22 +1,35 @@
 use crate::{
-    Engine,
-    config::Config,
-    wltransys::{WlTransys, certify::WlWitness, unroll::WlTransysUnroll},
+    Engine, McResult, McWitness,
+    config::EngineConfigBase,
+    impl_config_deref,
+    tracer::{Tracer, TracerIf},
+    wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
+use clap::Args;
 use giputils::hash::GHashMap;
 use log::info;
+use serde::{Deserialize, Serialize};
+
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct WlBMCConfig {
+    #[command(flatten)]
+    pub base: EngineConfigBase,
+}
+
+impl_config_deref!(WlBMCConfig);
 
 pub struct WlBMC {
-    cfg: Config,
+    cfg: WlBMCConfig,
     #[allow(unused)]
     owts: WlTransys,
     uts: WlTransysUnroll,
     solver: bitwuzla::Bitwuzla,
     solver_k: usize,
+    tracer: Tracer,
 }
 
 impl WlBMC {
-    pub fn new(cfg: Config, mut wts: WlTransys) -> Self {
+    pub fn new(cfg: WlBMCConfig, mut wts: WlTransys) -> Self {
         let owts = wts.clone();
         wts.compress_bads();
         let uts = WlTransysUnroll::new(wts);
@@ -30,6 +43,7 @@ impl WlBMC {
             uts,
             solver,
             solver_k: 0,
+            tracer: Tracer::new(),
         }
     }
 
@@ -44,26 +58,26 @@ impl WlBMC {
 }
 
 impl Engine for WlBMC {
-    fn is_wl(&self) -> bool {
-        true
-    }
-
-    fn check(&mut self) -> Option<bool> {
+    fn check(&mut self) -> McResult {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.cfg.step as usize) {
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
-            info!("bmc depth: {k}");
             if self.solver.solve(&[assump]) {
-                info!("bmc found counter-example in depth {k}");
-                return Some(false);
+                self.tracer.trace_res(crate::McResult::Unsafe(k));
+                return McResult::Unsafe(k);
             }
+            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
-        None
+        McResult::Unknown(Some(self.cfg.end))
     }
 
-    fn wl_witness(&mut self) -> WlWitness {
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+
+    fn witness(&mut self) -> McWitness {
         let mut witness = self.uts.witness(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
@@ -80,6 +94,6 @@ impl Engine for WlBMC {
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        witness
+        McWitness::Wl(witness)
     }
 }

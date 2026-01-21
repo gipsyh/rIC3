@@ -1,224 +1,129 @@
-use clap::{ArgAction, Args, Parser, ValueEnum};
-use log::error;
-use std::path::PathBuf;
+use crate::{
+    bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, mp::MultiPropConfig,
+    portfolio::PortfolioConfig, rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
+};
+use clap::{ArgAction, Args, Parser};
+use enum_as_inner::EnumAsInner;
+use serde::{Deserialize, Serialize};
+use strum::AsRefStr;
 
-/// rIC3 model checker
-#[derive(Parser, Debug, Clone)]
-#[command(
-    version,
-    about,
-    after_help = "Copyright (C) 2023 - Present, Yuheng Su <gipsyh.icu@gmail.com>. All rights reserved."
-)]
-pub struct Config {
-    /// model checking engine
-    #[arg(short, long, value_enum, default_value_t = Engine::Portfolio)]
-    pub engine: Engine,
+/// Macro to implement Deref and DerefMut for config structs that wrap EngineConfigBase
+#[macro_export]
+macro_rules! impl_config_deref {
+    ($config_type:ty) => {
+        impl std::ops::Deref for $config_type {
+            type Target = $crate::config::EngineConfigBase;
 
-    /// model file in aiger format or in btor2 format,
-    /// for aiger model, the file name should be suffixed with .aig or .aag,
-    /// for btor model, the file name should be suffixed with .btor or .btor2.
-    pub model: PathBuf,
+            fn deref(&self) -> &Self::Target {
+                &self.base
+            }
+        }
 
-    /// certificate path
-    pub certificate: Option<PathBuf>,
+        impl std::ops::DerefMut for $config_type {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.base
+            }
+        }
+    };
+}
 
-    /// certify with certifaiger or cerbtora
-    #[arg(long, default_value_t = false)]
-    pub certify: bool,
+#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
+pub struct EngineConfigBase {
+    /// Property ID. If not specified, all properties are checked.
+    #[arg(long = "prop")]
+    pub prop: Option<usize>,
 
-    /// print witness when model is unsafe
-    #[arg(long, default_value_t = false)]
-    pub witness: bool,
-
-    #[command(flatten)]
-    pub ic3: IC3Config,
-
-    #[command(flatten)]
-    pub bmc: BMCConfig,
-
-    #[command(flatten)]
-    pub kind: KindConfig,
-
-    #[command(flatten)]
-    pub portfolio: PortfolioConfig,
-
-    #[command(flatten)]
-    pub preproc: PreprocessConfig,
-
-    /// start bound
+    /// Start bound
     #[arg(long = "start", default_value_t = 0)]
     pub start: usize,
 
-    /// max bound to check
+    /// Max bound to check
     #[arg(long = "end", default_value_t = usize::MAX)]
     pub end: usize,
 
-    /// step length
+    /// Step length
     #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     pub step: u32,
 
-    /// random seed
+    /// Random seed
     #[arg(long, default_value_t = 0)]
     pub rseed: u64,
 
-    /// interrupt statistic
-    #[arg(long, default_value_t = false)]
-    pub interrupt_statistic: bool,
-
-    /// time limit in seconds
+    /// Time limit in seconds
     #[arg(long)]
     pub time_limit: Option<u64>,
 }
 
-impl Config {
-    pub fn validate(&self) {
-        match self.engine {
-            Engine::IC3 => self.ic3.validate(),
-            Engine::BMC => {}
-            Engine::WlBMC => {}
-            Engine::Kind => {}
-            Engine::WlKind => {}
-            Engine::Rlive => {}
-            Engine::Portfolio => {}
+impl Default for EngineConfigBase {
+    fn default() -> Self {
+        Self {
+            prop: None,
+            start: 0,
+            end: usize::MAX,
+            step: 1,
+            rseed: 0,
+            time_limit: None,
         }
     }
 }
 
-#[derive(Copy, Clone, ValueEnum, Debug)]
-pub enum Engine {
+#[derive(Parser, Clone, Debug, Serialize, Deserialize, AsRefStr, EnumAsInner)]
+pub enum EngineConfig {
     /// ic3
-    IC3,
+    IC3(IC3Config),
     /// k-induction
-    Kind,
+    Kind(KindConfig),
     /// bmc
-    BMC,
+    BMC(BMCConfig),
     /// word level bmc
-    WlBMC,
+    WlBMC(WlBMCConfig),
     /// word level k-induction
-    WlKind,
-    /// rlive (https://doi.org/10.1007/978-3-031-65627-9_12)
-    Rlive,
+    WlKind(WlKindConfig),
+    /// rlive (CAV'24 https://doi.org/10.1007/978-3-031-65627-9_12)
+    Rlive(RliveConfig),
+    /// Multi-Property (DATE'18 https://doi.org/10.23919/DATE.2018.8341977)
+    MultiProp(MultiPropConfig),
     /// portfolio
-    Portfolio,
+    Portfolio(PortfolioConfig),
 }
 
-impl Engine {
+impl EngineConfig {
     pub fn is_wl(&self) -> bool {
-        matches!(self, Engine::WlBMC | Engine::WlKind)
+        matches!(self, EngineConfig::WlBMC(_) | EngineConfig::WlKind(_))
     }
 }
 
-#[derive(Args, Clone, Debug)]
-pub struct IC3Config {
-    /// dynamic generalization
-    #[arg(long = "ic3-dynamic", default_value_t = false)]
-    pub dynamic: bool,
-
-    /// ic3 with counterexample to generalization
-    #[arg(long = "ic3-ctg", action = ArgAction::Set, default_value_t = true)]
-    pub ctg: bool,
-
-    /// max number of ctg
-    #[arg(long = "ic3-ctg-max", default_value_t = 3)]
-    pub ctg_max: usize,
-
-    /// ctg limit
-    #[arg(long = "ic3-ctg-limit", default_value_t = 1)]
-    pub ctg_limit: usize,
-
-    /// ic3 counterexample to propagation
-    #[arg(long = "ic3-ctp", default_value_t = false)]
-    pub ctp: bool,
-
-    /// ic3 with internal signals (FMCAD'21)
-    #[arg(long = "ic3-inn", default_value_t = false)]
-    pub inn: bool,
-
-    /// ic3 with abstract constrains
-    #[arg(long = "ic3-abs-cst", default_value_t = false)]
-    pub abs_cst: bool,
-
-    /// ic3 with abstract trans
-    #[arg(long = "ic3-abs-trans", default_value_t = false)]
-    pub abs_trans: bool,
-
-    /// ic3 with dropping proof-obligation
-    #[arg(
-        long = "ic3-drop-po", action = ArgAction::Set, default_value_t = true,
-    )]
-    pub drop_po: bool,
-
-    /// ic3 full assignment of last bad (used in rlive)
-    #[arg(long = "ic3-full-bad", default_value_t = false)]
-    pub full_bad: bool,
-
-    /// ic3 with abstract array
-    #[arg(long = "ic3-abs-array", default_value_t = false)]
-    pub abs_array: bool,
-
-    /// ic3 with finding parent lemma in mic
-    #[arg(long = "ic3-parent-lemma", action = ArgAction::Set, default_value_t = true)]
-    pub parent_lemma: bool,
-}
-
-impl IC3Config {
-    pub fn validate(&self) {
-        if self.dynamic && self.drop_po {
-            error!("cannot enable both ic3-dynamic and ic3-drop-po");
-            panic!();
-        }
-    }
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct BMCConfig {
-    /// Per-step time limit for BMC (applies to each BMC step, not the overall solver run).
-    /// The overall `time_limit` option sets the total time limit for the entire solver run.
-    #[arg(long = "bmc-time-limit")]
-    pub step_time_limit: Option<u64>,
-    /// use kissat solver in bmc, otherwise cadical
-    #[arg(long = "bmc-kissat", default_value_t = false)]
-    pub bmc_kissat: bool,
-    /// bmc dynamic step
-    #[arg(long = "bmc-dyn-step", default_value_t = false)]
-    pub dyn_step: bool,
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct KindConfig {
-    /// simple path constraint
-    #[arg(long = "kind-simple-path", default_value_t = false)]
-    pub simple_path: bool,
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct PreprocessConfig {
+#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+pub struct PreprocConfig {
     /// disable preprocess
     #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
+
     /// function reduced transys
     #[arg(long = "frts", action = ArgAction::Set, default_value_t = true)]
     pub frts: bool,
+
     /// frts time limit in seconds
     #[arg(long = "frts-tl", default_value_t = 1000)]
     pub frts_tl: u64,
+
     /// scorr
     #[arg(long = "scorr", action = ArgAction::Set, default_value_t = true)]
     pub scorr: bool,
+
     /// scorr time limit in seconds
     #[arg(long = "scorr-tl", default_value_t = 200)]
     pub scorr_tl: u64,
 }
 
-#[derive(Args, Clone, Debug)]
-pub struct PortfolioConfig {
-    /// portfolio woker memory limit in GB
-    #[arg(long = "pworker-mem-limit", default_value_t = 16)]
-    pub wmem_limit: usize,
-}
-
-impl Default for Config {
+impl Default for PreprocConfig {
     fn default() -> Self {
-        Config::parse_from([""])
+        Self {
+            preproc: true,
+            frts: true,
+            frts_tl: 1000,
+            scorr: true,
+            scorr_tl: 200,
+        }
     }
 }

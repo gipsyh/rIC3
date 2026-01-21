@@ -1,7 +1,7 @@
 use crate::transys::Transys;
 use giputils::hash::GHashSet;
 use log::info;
-use logicrs::{LitOrdVec, LitVec, LitVvec, Var, VarMap, VarVMap};
+use logicrs::{LitOrdVec, LitVec, LitVvec, Var, VarMap, VarRange, VarVMap};
 
 impl Transys {
     pub fn refactor(&self, rst: &mut VarVMap) -> Self {
@@ -24,7 +24,7 @@ impl Transys {
                     (LitOrdVec::new(c), p)
                 })
                 .collect();
-            'yl: for y in x + 1..=rel.max_var() {
+            'yl: for y in VarRange::new_inclusive(x + 1, rel.max_var()) {
                 if rel.is_leaf(y) || !dep[x].is_subset(&dep[y]) {
                     continue;
                 }

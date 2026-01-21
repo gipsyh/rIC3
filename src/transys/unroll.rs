@@ -1,9 +1,10 @@
 use super::{Transys, TransysIf};
-use crate::transys::certify::Witness;
+use crate::transys::certify::BlWitness;
 use giputils::hash::GHashMap;
-use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, satif::Satif};
+use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, VarRange, satif::Satif};
+use std::ops::Deref;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransysUnroll<T: TransysIf> {
     pub ts: T,
     pub num_unroll: usize,
@@ -15,6 +16,15 @@ pub struct TransysUnroll<T: TransysIf> {
     pub optcst: Option<Vec<LitVvec>>,
 }
 
+impl<T: TransysIf> Deref for TransysUnroll<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.ts
+    }
+}
+
 impl<T: TransysIf> TransysUnroll<T> {
     pub fn new(ts: &T) -> Self
     where
@@ -22,7 +32,7 @@ impl<T: TransysIf> TransysUnroll<T> {
     {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
         next_map.reserve(ts.max_var());
-        for v in Var::CONST..=ts.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, ts.max_var()) {
             let l = v.lit();
             next_map[l].push(l);
             next_map[!l].push(!l);
@@ -98,11 +108,13 @@ impl<T: TransysIf> TransysUnroll<T> {
 
     #[inline]
     #[allow(unused)]
-    pub fn lits_next<R: FromIterator<Lit> + AsRef<[Lit]>>(&self, lits: &R, num: usize) -> R {
-        lits.as_ref()
-            .iter()
-            .map(|l| self.lit_next(*l, num))
-            .collect()
+    pub fn lits_next(
+        &self,
+        lits: impl IntoIterator<Item = impl AsRef<Lit>>,
+        num: usize,
+    ) -> impl Iterator<Item = Lit> {
+        lits.into_iter()
+            .map(move |l| self.lit_next(*l.as_ref(), num))
     }
 
     fn single_simple_path(&mut self, i: usize, j: usize) {
@@ -141,7 +153,7 @@ impl<T: TransysIf> TransysUnroll<T> {
                 self.next_map[!l].push(!next);
             }
         }
-        for v in Var::CONST..=self.ts.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, self.ts.max_var()) {
             let l = v.lit();
             if self.next_map[l].len() == self.num_unroll + 1 {
                 self.max_var += 1;
@@ -198,7 +210,7 @@ impl<T: TransysIf> TransysUnroll<T> {
             }
         }
         if let Some(simple_path) = self.simple_path.as_ref()
-            && !simple_path.is_empty()
+            && u > 0
         {
             for c in simple_path[u - 1].iter() {
                 satif.add_clause(c);
@@ -216,8 +228,8 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
     }
 
-    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> Witness {
-        let mut wit = Witness::default();
+    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> BlWitness {
+        let mut wit = BlWitness::default();
         for k in 0..=self.num_unroll {
             let mut w = LitVec::new();
             for l in self.ts.input() {
@@ -243,6 +255,9 @@ impl<T: TransysIf> TransysUnroll<T> {
 }
 impl TransysUnroll<Transys> {
     pub fn compile(&self) -> Transys {
+        if self.num_unroll == 0 {
+            return self.ts.clone();
+        }
         let mut input = Vec::new();
         let mut constraint = LitVec::new();
         let mut rel = self.ts.rel.clone();
@@ -259,7 +274,7 @@ impl TransysUnroll<Transys> {
                 if v <= rel.max_var() && rel.has_rel(v) {
                     continue;
                 }
-                let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, u)).collect();
+                let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, u).collect()).collect();
                 rel.add_rel(v, &cls);
             }
         }
@@ -270,7 +285,7 @@ impl TransysUnroll<Transys> {
             .map(|(v, n)| (*v, self.lit_next(*n, self.num_unroll)))
             .collect();
         assert!(self.ts.justice.is_empty());
-        let bad = self.lits_next(&self.ts.bad, self.num_unroll);
+        let bad = self.lits_next(&self.ts.bad, self.num_unroll).collect();
         Transys {
             input,
             latch: self.ts.latch.clone(),
@@ -295,12 +310,12 @@ impl TransysUnroll<Transys> {
             if v <= rel.max_var() && rel.has_rel(v) {
                 continue;
             }
-            let cls: Vec<_> = cls.iter().map(|c| self.lits_next(c, 1)).collect();
+            let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, 1).collect()).collect();
             rel.add_rel(v, &cls);
         }
         let mut latch = Vec::new();
         let mut next = GHashMap::new();
-        for v in Var::new(1)..=self.ts.max_var() {
+        for v in VarRange::new_inclusive(Var::new(1), self.ts.max_var()) {
             if !keep.contains(&v) {
                 latch.push(v);
                 next.insert(v, self.lit_next(v.lit(), 1));
@@ -317,6 +332,49 @@ impl TransysUnroll<Transys> {
             init: self.ts.init.clone(),
             bad: self.ts.bad.clone(),
             constraint: self.ts.constraint.clone(),
+            justice: Default::default(),
+            rel,
+        }
+    }
+
+    pub fn internal_signals_with_full_prime(&self) -> Transys {
+        assert!(self.num_unroll == 1);
+        let keep = self.ts.rel.fanouts(self.ts.input());
+        let mut rel = self.ts.rel.clone();
+
+        let mut input = self.ts.input.clone();
+        input.extend(self.ts.input().map(|v| self.var_next(v, 1)));
+        let mut constraint = self.ts.constraint.clone();
+        constraint.extend(self.lits_next(self.ts.constraint(), 1));
+
+        for (v, cls) in self.ts.rel.iter() {
+            let v = self.var_next(v, 1);
+            if v <= rel.max_var() && rel.has_rel(v) {
+                continue;
+            }
+            let cls: Vec<LitVec> = cls.iter().map(|c| self.lits_next(c, 1).collect()).collect();
+            rel.add_rel(v, &cls);
+        }
+
+        let mut latch = Vec::new();
+        let mut next = GHashMap::new();
+        for v in VarRange::new_inclusive(Var::new(1), self.ts.max_var()) {
+            if !keep.contains(&v) {
+                latch.push(v);
+                next.insert(v, self.lit_next(v.lit(), 1));
+            }
+        }
+
+        assert!(self.ts.justice.is_empty());
+
+        let bad = self.lits_next(&self.ts.bad, 1).collect();
+        Transys {
+            input,
+            latch,
+            next,
+            init: self.ts.init.clone(),
+            bad,
+            constraint,
             justice: Default::default(),
             rel,
         }

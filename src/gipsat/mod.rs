@@ -2,7 +2,6 @@ mod analyze;
 mod cdb;
 mod domain;
 mod eq;
-mod lift;
 mod propagate;
 mod search;
 mod simplify;
@@ -18,7 +17,7 @@ use domain::Domain;
 use giputils::bitvec::BitVec;
 use giputils::gvec::Gvec;
 use logicrs::satif::Satif;
-use logicrs::{DagCnf, Lbool, VarAssign};
+use logicrs::{DagCnf, Lbool, VarAssign, VarRange};
 use logicrs::{Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
 use rand::Rng;
@@ -327,7 +326,7 @@ impl DagCnfSolver {
     #[allow(unused)]
     pub fn sat_value_bitvet(&mut self) -> BitVec {
         let mut res = BitVec::new();
-        for v in Var::CONST..=self.max_var() {
+        for v in VarRange::new_inclusive(Var::CONST, self.max_var()) {
             if let Some(v) = self.sat_value(v.lit()) {
                 res.push(v);
             } else {
@@ -341,6 +340,25 @@ impl DagCnfSolver {
     pub fn sat_value_iter(&self) -> impl Iterator<Item = &'_ Lit> {
         let constrain_act = self.constrain_act;
         self.trail.iter().filter(move |l| l.var() != constrain_act)
+    }
+
+    pub fn minimal_premise(
+        &mut self,
+        assump: &[Lit],
+        premise: &[Lit],
+        consequent: &[Lit],
+    ) -> Option<LitVec> {
+        let assump = LitVec::from_iter(assump.iter().chain(premise.iter()).copied());
+        if self.solve_with_constraint(&assump, vec![LitVec::from(consequent)]) {
+            return None;
+        }
+        Some(
+            premise
+                .iter()
+                .filter(|l| self.unsat_has(**l))
+                .copied()
+                .collect(),
+        )
     }
 }
 
@@ -400,5 +418,10 @@ impl Satif for DagCnfSolver {
     #[inline]
     fn unsat_has(&self, lit: Lit) -> bool {
         self.unsat_core.has(lit)
+    }
+
+    #[inline]
+    fn flip_to_none(&mut self, var: Var) -> bool {
+        self.flip_to_none_inner(var)
     }
 }
