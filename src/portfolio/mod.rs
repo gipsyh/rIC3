@@ -2,6 +2,7 @@ use crate::config::{EngineConfig, EngineConfigBase};
 use crate::transys::Transys;
 use crate::{Engine, McResult, create_bl_engine, impl_config_deref};
 use clap::{Args, Parser};
+use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
 use log::{error, info};
 use logicrs::VarSymbols;
@@ -14,7 +15,6 @@ use std::sync::mpsc::Sender;
 use std::thread::{JoinHandle, spawn};
 use std::time::Instant;
 use std::{
-    collections::HashMap,
     env::current_exe,
     io::{BufRead, BufReader, Read},
     mem::take,
@@ -111,7 +111,7 @@ impl Portfolio {
             engines.push(Worker { name, cmd, cert });
         };
         let portfolio_toml = include_str!("portfolio.toml");
-        let portfolio_config: HashMap<String, HashMap<String, String>> =
+        let portfolio_config: GHashMap<String, GHashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
         let config = cfg.config.as_deref().unwrap_or("bl_default");
         for (name, args) in portfolio_config[config].iter() {
@@ -136,7 +136,7 @@ impl Portfolio {
     }
 
     pub fn check(&mut self) -> McResult {
-        let mut running = HashMap::new();
+        let mut running = GHashMap::new();
         for mut engine in take(&mut self.engines) {
             let child = engine
                 .cmd

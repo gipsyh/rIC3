@@ -1,9 +1,8 @@
 use crate::cli::run::PropMcInfo;
-use giputils::file::create_dir_if_not_exists;
+use giputils::{file::create_dir_if_not_exists, hash::GHashMap};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap,
     fs,
     io::Read,
     path::{Path, PathBuf},
@@ -16,7 +15,7 @@ struct FileEntry {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct SourceCache {
-    files: HashMap<PathBuf, FileEntry>,
+    files: GHashMap<PathBuf, FileEntry>,
 }
 
 #[derive(Debug, Clone)]
