@@ -87,7 +87,7 @@ pub struct CIll {
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj, mut btorfe: BtorFrontend) -> anyhow::Result<Self> {
-        create_dir_if_not_exists(&rp.path("cill"))?;
+        create_dir_if_not_exists(rp.path("cill"))?;
         CIllStat::init(&rp)?;
         let (wts, wsym) = btorfe.wts();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
