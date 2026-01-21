@@ -40,32 +40,6 @@ rIC3 can be compiled on both Linux and macOS.
 
 ### Docker
 - build image: ```docker build -t ric3 .```
-- run: ```docker run -v <AIGER/BTOR>:/model.<aig/btor> ric3 model.<aig/btor>```
-
-### Citation
-```
-@inproceedings{rIC3,
-  author       = {Yuheng Su and
-                  Qiusong Yang and
-                  Yiwei Ci and
-                  Tianjun Bu and
-                  Ziyu Huang},
-  editor       = {Ruzica Piskac and
-                  Zvonimir Rakamaric},
-  title        = {The rIC3 Hardware Model Checker},
-  booktitle    = {Computer Aided Verification - 37th International Conference, {CAV}
-                  2025, Zagreb, Croatia, July 23-25, 2025, Proceedings, Part {I}},
-  series       = {Lecture Notes in Computer Science},
-  volume       = {15931},
-  pages        = {185--199},
-  publisher    = {Springer},
-  year         = {2025},
-  url          = {https://doi.org/10.1007/978-3-031-98668-0\_9},
-  doi          = {10.1007/978-3-031-98668-0\_9},
-  timestamp    = {Sun, 02 Nov 2025 12:33:32 +0100},
-  biburl       = {https://dblp.org/rec/conf/cav/SuYCBH25.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
-```
+- run: ```docker run -v <AIGER/BTOR>:/model.<aig/btor> ric3 check model.<aig/btor> portfolio```
 
 Copyright (C) 2023 - Present, Yuheng Su (gipsyh.icu@gmail.com). All rights reserved.
