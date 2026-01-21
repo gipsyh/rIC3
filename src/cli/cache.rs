@@ -1,6 +1,9 @@
 use crate::cli::run::PropMcInfo;
-use giputils::{file::create_dir_if_not_exists, hash::GHashMap};
-use serde::{Deserialize, Serialize};
+use giputils::{
+    file::{create_dir_if_not_exists, remove_if_exists},
+    hash::GHashMap,
+};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -13,8 +16,8 @@ struct FileEntry {
     hash: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
-pub struct SourceCache {
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+pub struct DutHash {
     files: GHashMap<PathBuf, FileEntry>,
 }
 
@@ -32,8 +35,8 @@ fn calculate_hash(path: &Path) -> anyhow::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-impl SourceCache {
-    fn new(sources: &[PathBuf]) -> anyhow::Result<Self> {
+impl DutHash {
+    pub fn new(sources: &[PathBuf]) -> anyhow::Result<Self> {
         let mut cache = Self::default();
         for src in sources {
             let abs_src = fs::canonicalize(src)?;
@@ -60,6 +63,18 @@ impl Ric3Proj {
         self.path.join(join.as_ref())
     }
 
+    pub fn save_serde_obj(&self, s: &impl Serialize, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        remove_if_exists(&path)?;
+        fs::write(self.path(path), ron::to_string(s)?)?;
+        Ok(())
+    }
+
+    pub fn load_serde_obj<D: DeserializeOwned>(&self, path: impl AsRef<Path>) -> anyhow::Result<D> {
+        let s = fs::read_to_string(self.path(path))?;
+        let inv: D = ron::from_str(&s)?;
+        Ok(inv)
+    }
+
     pub fn clear_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<()> {
         for entry in fs::read_dir(p.as_ref())? {
             let entry = entry?;
@@ -79,19 +94,18 @@ impl Ric3Proj {
 
     /// None: not exists
     /// Some(bool): consistency
-    pub fn check_cached_dut(&self, sources: &[PathBuf]) -> anyhow::Result<Option<bool>> {
+    pub fn check_cached_dut(&self, dh: &DutHash) -> anyhow::Result<Option<bool>> {
         let cache_path = self.path("dut/hash.ron");
         if !cache_path.exists() {
             return Ok(None);
         }
         let content = fs::read_to_string(&cache_path)?;
-        let cache: SourceCache = ron::from_str(&content)?;
-        let ncache = SourceCache::new(sources)?;
-        Ok(Some(ncache == cache))
+        let cache: DutHash = ron::from_str(&content)?;
+        Ok(Some(&cache == dh))
     }
 
-    pub fn cache_dut(&self, sources: &[PathBuf]) -> anyhow::Result<()> {
-        let content = ron::to_string(&SourceCache::new(sources)?)?;
+    pub fn cache_dut(&self, dh: &DutHash) -> anyhow::Result<()> {
+        let content = ron::to_string(dh)?;
         fs::write(self.path("dut/hash.ron"), content)?;
         Ok(())
     }
