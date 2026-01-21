@@ -90,10 +90,10 @@ impl Transys {
 
     pub fn has_gate_init(&self) -> bool {
         for l in self.input().chain(self.latch()) {
-            if let Some(i) = self.init.get(&l) {
-                if !(i.var().is_constant()) {
-                    return true;
-                }
+            if let Some(i) = self.init.get(&l)
+                && !(i.var().is_constant())
+            {
+                return true;
             }
         }
         false

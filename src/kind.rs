@@ -73,10 +73,10 @@ impl Kind {
         cfg.validate();
         let ots = ts.clone();
         let mut rst = Restore::new(&ts);
-        if let Some(prop) = cfg.prop {
-            if !cfg.local_proof {
-                ts.bad = LitVec::from(ts.bad[prop]);
-            }
+        if let Some(prop) = cfg.prop
+            && !cfg.local_proof
+        {
+            ts.bad = LitVec::from(ts.bad[prop]);
         }
         (ts, rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
