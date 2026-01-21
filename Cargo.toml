@@ -21,6 +21,7 @@ logicrs = { path = "./deps/logicrs", version = "0.6.1" }
 giputils = { path = "./deps/giputils", version = "0.3.6" }
 btor = { path = "./deps/btor-rs", version = "0.2.2" }
 clap = { version = "4.5.52", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
 rand = "0.9.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
 bitfield-struct = "0.12.1"

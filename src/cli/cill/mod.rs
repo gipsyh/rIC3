@@ -6,6 +6,7 @@ use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use crate::logger_init;
 use anyhow::Ok;
 use btor::Btor;
+use chrono::TimeDelta;
 use clap::Subcommand;
 use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
@@ -22,8 +23,9 @@ use rIC3::{
 use ratatui::crossterm::style::Stylize;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{env, fs};
+use std::{env, fs, time::Instant};
 use strum::AsRefStr;
+use utils::CIllStat;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum CIllCommands {
@@ -85,7 +87,8 @@ pub struct CIll {
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj, mut btorfe: BtorFrontend) -> anyhow::Result<Self> {
-        create_dir_if_not_exists(rp.path("cill"))?;
+        create_dir_if_not_exists(&rp.path("cill"))?;
+        CIllStat::init(&rp)?;
         let (wts, wsym) = btorfe.wts();
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
@@ -109,6 +112,7 @@ impl CIll {
 
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
         info!("BMC: Checking correctness of all properties.");
+        let bmc_start = Instant::now();
         let steps = [1, 3, 5, 10, 15];
         let mut results: Vec<(McResult, BMC)> = with_log_level(LevelFilter::Warn, || {
             steps
@@ -134,6 +138,10 @@ impl CIll {
         let cex_vcd = self.rp.path("cill/cex.vcd");
         remove_if_exists(&cex)?;
         remove_if_exists(&cex_vcd)?;
+
+        let mut stat = CIllStat::load(&self.rp)?;
+        stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
+        stat.save(&self.rp)?;
 
         match min_res {
             Some((r, mut bmc)) => {
@@ -204,6 +212,8 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
 
     info!("Checking inductiveness of all properties.");
     if cill.check_inductive()? {
+        let stat = CIllStat::load(&rp)?;
+        println!("CIll Statistic: {}", stat);
         println!(
             "{}",
             "All properties are inductive. Proof succeeded.".green()

@@ -1,8 +1,9 @@
 use crate::cli::{
     cache::Ric3Proj,
-    cill::{CIll, CIllState, kind::CIllKind},
+    cill::{CIll, CIllState, kind::CIllKind, utils::CIllStat},
 };
 use btor::Btor;
+use chrono::TimeDelta;
 use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{
@@ -20,6 +21,7 @@ use std::{
     fs::{self},
     mem::take,
     path::Path,
+    time::Instant,
 };
 
 impl CIll {
@@ -37,6 +39,7 @@ impl CIll {
     }
 
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
+        let ind_start = Instant::now();
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.preproc.preproc = false;
@@ -105,6 +108,11 @@ impl CIll {
         }
         self.res = results;
         let res = self.res.iter().all(|l| *l);
+
+        let mut stat = CIllStat::load(&self.rp)?;
+        stat.ind_time += TimeDelta::from_std(ind_start.elapsed())?;
+        stat.save(&self.rp)?;
+
         // if res {
         // let mut proof = BlProof::new(self.ts.clone());
         // let inv: LitVec = invariants

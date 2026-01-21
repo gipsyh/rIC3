@@ -1,7 +1,10 @@
-use crate::cli::{VcdConfig, cill::CIll, vcd::wlwitness_vcd};
+use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
+use chrono::{DateTime, Duration, Local};
 use rIC3::{McWitness, frontend::Frontend, transys::certify::BlWitness};
 use ratatui::crossterm::style::Stylize;
+use serde::{Deserialize, Serialize};
 use std::{
+    fmt,
     fs::{self, File},
     io::BufWriter,
     path::Path,
@@ -115,5 +118,55 @@ impl CIll {
         //         }
         //     }
         // }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CIllStat {
+    pub start: DateTime<Local>,
+    pub bmc_time: Duration,
+    pub ind_time: Duration,
+}
+
+impl Default for CIllStat {
+    fn default() -> Self {
+        Self {
+            start: Local::now(),
+            bmc_time: Duration::zero(),
+            ind_time: Duration::zero(),
+        }
+    }
+}
+
+impl CIllStat {
+    pub fn init(rp: &Ric3Proj) -> anyhow::Result<()> {
+        if rp.path("cill/statistic.ron").exists() {
+            return Ok(());
+        }
+        let stat = Self::default();
+        stat.save(rp)
+    }
+
+    pub fn load(rp: &Ric3Proj) -> anyhow::Result<Self> {
+        let content = fs::read_to_string(rp.path("cill/statistic.ron"))?;
+        Ok(ron::from_str(&content)?)
+    }
+
+    pub fn save(&self, rp: &Ric3Proj) -> anyhow::Result<()> {
+        fs::write(rp.path("cill/statistic.ron"), ron::to_string(self)?)?;
+        Ok(())
+    }
+}
+
+impl fmt::Display for CIllStat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let elapsed = Local::now().signed_duration_since(self.start);
+        write!(
+            f,
+            "Total time: {}s, Correctness check: {}s, Inductiveness check: {}s",
+            elapsed.num_seconds(),
+            self.bmc_time.num_seconds(),
+            self.ind_time.num_seconds()
+        )
     }
 }
