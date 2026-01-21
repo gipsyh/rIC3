@@ -8,14 +8,40 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 struct FileEntry {
     hash: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct SourceCache {
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+pub struct SourceCache {
     files: GHashMap<PathBuf, FileEntry>,
+}
+
+fn calculate_hash(path: &Path) -> anyhow::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0; 8192];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+impl SourceCache {
+    fn new(sources: &[PathBuf]) -> anyhow::Result<Self> {
+        let mut cache = Self::default();
+        for src in sources {
+            let abs_src = fs::canonicalize(src)?;
+            let hash = calculate_hash(&abs_src)?;
+            cache.files.insert(abs_src, FileEntry { hash });
+        }
+        Ok(cache)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,20 +77,6 @@ impl Ric3Proj {
         self.clear_entry(self.path.clone())
     }
 
-    fn calculate_hash(path: &Path) -> anyhow::Result<String> {
-        let mut file = fs::File::open(path)?;
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; 8192];
-        loop {
-            let count = file.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            hasher.update(&buffer[..count]);
-        }
-        Ok(format!("{:x}", hasher.finalize()))
-    }
-
     /// None: not exists
     /// Some(bool): consistency
     pub fn check_cached_dut(&self, sources: &[PathBuf]) -> anyhow::Result<Option<bool>> {
@@ -74,33 +86,12 @@ impl Ric3Proj {
         }
         let content = fs::read_to_string(&cache_path)?;
         let cache: SourceCache = ron::from_str(&content)?;
-        if cache.files.len() != sources.len() {
-            return Ok(Some(false));
-        }
-        for src in sources {
-            let src = fs::canonicalize(src)?;
-            if let Some(entry) = cache.files.get(&src) {
-                let current_hash = Self::calculate_hash(&src)?;
-                if entry.hash != current_hash {
-                    return Ok(Some(false));
-                }
-            } else {
-                return Ok(Some(false));
-            }
-        }
-
-        Ok(Some(true))
+        let ncache = SourceCache::new(sources)?;
+        Ok(Some(ncache == cache))
     }
 
     pub fn cache_dut(&self, sources: &[PathBuf]) -> anyhow::Result<()> {
-        let mut cache = SourceCache::default();
-        for src in sources {
-            let abs_src = fs::canonicalize(src)?;
-            let hash = Self::calculate_hash(&abs_src)?;
-
-            cache.files.insert(abs_src, FileEntry { hash });
-        }
-        let content = ron::to_string(&cache)?;
+        let content = ron::to_string(&SourceCache::new(sources)?)?;
         fs::write(self.path("dut/hash.ron"), content)?;
         Ok(())
     }
