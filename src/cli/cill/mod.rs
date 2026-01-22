@@ -118,7 +118,7 @@ impl CIll {
                 .into_par_iter()
                 .map(|step| {
                     let mut cfg = BMCConfig::default();
-                    cfg.time_limit = Some(10);
+                    cfg.time_limit = Some(15);
                     cfg.step = step;
                     cfg.preproc.scorr = false;
                     cfg.preproc.frts = false;
