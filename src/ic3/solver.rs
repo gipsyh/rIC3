@@ -70,6 +70,9 @@ impl IC3 {
         let mut cst = self.ts.constraint.clone();
         cls.retain(|l| self.localabs.refine_has(l.var()));
         cst.retain(|l| self.localabs.refine_has(l.var()));
+        if let Some(prop) = self.predprop.as_ref() {
+            cst.retain(|&l| !prop.has_prop(l));
+        }
         let order = |mut i: usize, cube: &mut [Lit]| -> bool {
             if self.cfg.inn || !self.auxiliary_var.is_empty() {
                 if i == 0 {

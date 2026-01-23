@@ -3,7 +3,7 @@ use crate::{
     ic3::{IC3, proofoblig::ProofObligation},
     transys::{Transys, lift::TsLift, unroll::TransysUnroll},
 };
-use giputils::grc::Grc;
+use giputils::{grc::Grc, hash::GHashSet};
 use log::info;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
 use rand::seq::SliceRandom;
@@ -14,6 +14,7 @@ pub struct PredProp {
     slv: TransysSolver,
     lift: TsLift,
     inn: bool,
+    prop: GHashSet<Lit>,
 }
 
 impl PredProp {
@@ -23,9 +24,14 @@ impl PredProp {
         } else {
             uts.compile()
         };
+        let mut prop = GHashSet::new();
         if let Some(lp) = local_proof {
             bts.bad = LitVec::from([bts.bad[lp]]);
-        }
+            prop.insert(!&uts.ts.bad[lp]);
+        } else {
+            assert!(uts.ts.bad.len() == 1);
+            prop.insert(!&uts.ts.bad[0]);
+        };
         bts.constraint.extend(!&uts.ts.bad);
         let slv = TransysSolver::new(&Grc::new(bts.ctx()));
         let lift = TsLift::new(uts);
@@ -34,7 +40,13 @@ impl PredProp {
             slv,
             lift,
             inn,
+            prop,
         }
+    }
+
+    #[inline]
+    pub fn has_prop(&self, lit: Lit) -> bool {
+        self.prop.contains(&lit)
     }
 
     pub fn add_lemma(&mut self, lemma: &LitVec) {
@@ -110,15 +122,18 @@ impl IC3 {
             };
             true
         };
+        let cst: LitVec = predprop
+            .bts
+            .constraint
+            .iter()
+            .copied()
+            .filter(|l| predprop.has_prop(*l))
+            .collect();
         res.then(|| {
             predprop.lift.complex_lift(
                 &mut predprop.slv,
                 predprop.bts.latch.iter(),
-                predprop
-                    .bts
-                    .bad
-                    .iter()
-                    .chain(predprop.bts.constraint.iter()),
+                predprop.bts.bad.iter().chain(cst.iter()),
                 order,
             )
         })
