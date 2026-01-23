@@ -127,7 +127,7 @@ impl IC3 {
             .constraint
             .iter()
             .copied()
-            .filter(|l| predprop.has_prop(*l))
+            .filter(|l| !predprop.has_prop(*l))
             .collect();
         res.then(|| {
             predprop.lift.complex_lift(
