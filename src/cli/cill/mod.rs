@@ -3,7 +3,7 @@ mod kind;
 mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::logger_init;
+use crate::{cli::cache::DutHash, logger_init};
 use anyhow::Ok;
 use btor::Btor;
 use chrono::TimeDelta;
@@ -43,7 +43,6 @@ pub enum CIllCommands {
 enum CIllState {
     Check,
     Block(String),
-    Select(Vec<bool>),
 }
 
 impl Ric3Proj {
@@ -119,7 +118,7 @@ impl CIll {
                 .into_par_iter()
                 .map(|step| {
                     let mut cfg = BMCConfig::default();
-                    cfg.time_limit = Some(10);
+                    cfg.time_limit = Some(15);
                     cfg.step = step;
                     cfg.preproc.scorr = false;
                     cfg.preproc.frts = false;
@@ -181,23 +180,20 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     }
 }
 
-fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
-    if matches!(state, CIllState::Select(_)) {
-        rp.set_cill_state(CIllState::Check)?;
-    }
-
+fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()> {
     recreate_dir(rp.path("tmp"))?;
-    match rp.check_cached_dut(&rcfg.dut.src())? {
+    let dut_hash = rcfg.dut.src_hash()?;
+    match rp.check_cached_dut(&dut_hash)? {
         Some(false) => {
             Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
             rp.refresh_cti(&rp.path("dut"), &rp.path("tmp/dut"))?;
             fs::remove_dir_all(rp.path("dut"))?;
             fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
-            rp.cache_dut(&rcfg.dut.src())?;
+            rp.cache_dut(&dut_hash)?;
         }
         None => {
             Yosys::generate_btor(&rcfg, rp.path("dut"))?;
-            rp.cache_dut(&rcfg.dut.src())?;
+            rp.cache_dut(&dut_hash)?;
         }
         Some(true) => (),
     }
@@ -220,6 +216,11 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
         );
         return Ok(());
     }
+    let select_info = SelectInfo {
+        res: cill.res.clone(),
+        dh: dut_hash,
+    };
+    cill.rp.save_serde_obj(&select_info, "cill/select.ron")?;
     cill.print_ind_res()?;
     if let CIllState::Block(prop) = rp.get_cill_state()? {
         if cill.check_cti()? {
@@ -240,33 +241,39 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()>
     println!(
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
-    rp.set_cill_state(CIllState::Select(cill.res.clone()))
+    rp.set_cill_state(CIllState::Check)
 }
 
-fn select(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
-    let res = match state {
-        CIllState::Check => {
-            println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
-            return Ok(());
-        }
-        CIllState::Block(p) => {
-            println!(
-                "Unable to select: A CTI for {p} has already been selected. To select a different one, please run `ric3 cill abort` to clear the current, then rerun `cill check`"
-            );
-            return Ok(());
-        }
-        CIllState::Select(items) => items,
-    };
-    let rcfg = Ric3Config::from_file("ric3.toml")?;
-    if !matches!(rp.check_cached_dut(&rcfg.dut.src())?, Some(true)) {
+#[derive(Clone, Deserialize, Serialize)]
+struct SelectInfo {
+    res: Vec<bool>,
+    dh: DutHash,
+}
+
+fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
+    if !rp.path("cill/select.ron").exists() {
+        println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
+    }
+    if let CIllState::Block(p) = state {
+        println!("A CTI for {p} already exists. It has been cleared.");
+        rp.clear_cti()?;
+        rp.set_cill_state(CIllState::Check)?;
+    }
+    let select_info: SelectInfo = rp.load_serde_obj("cill/select.ron")?;
+    if select_info.dh != rcfg.dut.src_hash()? {
         println!("DUT modified, selection cannot proceed. Please re-run the 'check'.");
         rp.set_cill_state(CIllState::Check)?;
         return Ok(());
     }
+    let rcfg = Ric3Config::from_file("ric3.toml")?;
+    assert!(matches!(
+        rp.check_cached_dut(&rcfg.dut.src_hash()?)?,
+        Some(true)
+    ));
     let btor = Btor::from_file(rp.path("dut/dut.btor"));
     let btorfe = BtorFrontend::new(btor);
     let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
-    cill.res = res;
+    cill.res = select_info.res;
     if cill.res[id] {
         cill.print_ind_res()?;
         println!(
@@ -288,17 +295,12 @@ fn select(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyho
 fn abort(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
     match state {
         CIllState::Check => {
-            println!("Currently in checking state, no abort required.")
+            println!("No CTI exists; abort is not required.");
         }
         CIllState::Block(_) => {
             rp.clear_cti()?;
             println!("Successfully aborted the CTI.");
             rp.set_cill_state(CIllState::Check)?;
-        }
-        CIllState::Select(_) => {
-            println!(
-                "Waiting to select a non-inductive assertion for CTI generation, no abort required."
-            )
         }
     }
     Ok(())

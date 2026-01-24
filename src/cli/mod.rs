@@ -7,6 +7,7 @@ mod vcd;
 mod yosys;
 
 use crate::cli::{
+    cache::DutHash,
     check::CheckConfig,
     cill::{CIllCommands, cill},
 };
@@ -115,6 +116,10 @@ impl Dut {
             .cloned()
             .chain(once(PathBuf::from("ric3.toml")))
             .collect()
+    }
+
+    fn src_hash(&self) -> anyhow::Result<DutHash> {
+        DutHash::new(&self.src())
     }
 
     fn validate(&self) -> anyhow::Result<()> {

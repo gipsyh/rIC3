@@ -4,7 +4,7 @@ use crate::cli::{
 };
 use btor::Btor;
 use chrono::TimeDelta;
-use giputils::{file::remove_if_exists, hash::GHashMap, logger::with_log_level};
+use giputils::{hash::GHashMap, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{
     LitVvec, VarSymbols,
@@ -25,25 +25,12 @@ use std::{
 };
 
 impl CIll {
-    fn save_invariants(&mut self, invariants: &LitVvec) -> anyhow::Result<()> {
-        let inv = self.rp.path("cill/inv.ron");
-        remove_if_exists(&inv)?;
-        fs::write(inv, ron::to_string(&invariants).unwrap())?;
-        Ok(())
-    }
-
-    fn load_invariants(&mut self) -> anyhow::Result<LitVvec> {
-        let inv = self.rp.path("cill/inv.ron");
-        let inv: LitVvec = ron::from_str(&fs::read_to_string(&inv)?)?;
-        Ok(inv)
-    }
-
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
         let ind_start = Instant::now();
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.preproc.preproc = false;
-        cfg.time_limit = Some(30);
+        cfg.time_limit = Some(60 + self.ts.bad.len() as u64);
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..self.ts.bad.len())
                 .into_par_iter()
@@ -84,7 +71,7 @@ impl CIll {
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
-        self.save_invariants(&invariants)?;
+        self.rp.save_serde_obj(&invariants, "cill/inv.ron")?;
         let kind_results: Vec<_> = with_log_level(LevelFilter::Error, || {
             results
                 .iter()
@@ -152,7 +139,7 @@ impl CIll {
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
         let cti = self.bb_map.bitblast_witness(&cti);
         let cti = self.ts_rst.forward_witness(&cti);
-        let invariants = self.load_invariants()?;
+        let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
         if kind.check().is_safe() {
             return Ok(true);
@@ -168,7 +155,7 @@ impl CIll {
     }
 
     pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
-        let invariants = self.load_invariants()?;
+        let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(id, self.ts.clone(), invariants, None);
         assert!(kind.check().is_unknown());
         let wit = kind.witness().into_bl().unwrap();
@@ -187,7 +174,6 @@ impl Ric3Proj {
                 assert!(self.path("cill/cti").exists());
                 prop
             }
-            CIllState::Select(_) => unreachable!(),
         };
         let btor_old = Btor::from_file(dut_old.join("dut.btor"));
         let btorfe_old = BtorFrontend::new(btor_old.clone());

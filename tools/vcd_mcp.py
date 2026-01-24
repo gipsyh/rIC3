@@ -1,5 +1,6 @@
-import re
 from __future__ import annotations
+
+import re
 from bisect import bisect_right
 from typing import Dict, List, Sequence, Tuple, Union
 from mcp.server.fastmcp import FastMCP
