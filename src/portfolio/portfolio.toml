@@ -16,7 +16,7 @@ bmc = "bmc --step 1 --rseed 12"
 bmc_kissat_10 = "bmc --kissat --step 10 --rseed 13"
 bmc_kissat_65 = "bmc --kissat --step 65 --rseed 14"
 bmc_kissat_dyn = "bmc --kissat --dyn-step --rseed 15"
-kind = "kind --step 1 --rseed 16"
+kind = "kind --step 1 --simple-path --rseed 16"
 
 [wl_default]
 ic3 = "ic3 --rseed 1"
