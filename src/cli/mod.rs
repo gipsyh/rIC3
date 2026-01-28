@@ -1,3 +1,4 @@
+mod build;
 mod cache;
 mod check;
 mod cill;
@@ -50,6 +51,9 @@ pub enum Commands {
     /// Clean up verification cache (ric3proj)
     Clean,
 
+    /// Build ric3proj with ric3.toml
+    Build,
+
     /// CTI Guided Interactive Lemma Generation
     Cill {
         #[command(subcommand)]
@@ -61,6 +65,7 @@ pub fn cli_main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Run => run::run(),
+        Commands::Build => build::build(),
         Commands::Check { chk, cfg } => check::check(chk, cfg),
         Commands::Clean => clean::clean(),
         Commands::Cill { cmd } => cill(cmd),
