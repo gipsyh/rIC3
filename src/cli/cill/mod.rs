@@ -112,16 +112,20 @@ impl CIll {
     fn check_safety(&mut self) -> anyhow::Result<McResult> {
         info!("BMC: Checking correctness of all properties.");
         let bmc_start = Instant::now();
-        let steps = [1, 3, 5, 10, 15];
+        let steps = [0, 1, 3, 5, 10, 15];
         let mut results: Vec<(McResult, BMC)> = with_log_level(LevelFilter::Warn, || {
             steps
                 .into_par_iter()
                 .map(|step| {
                     let mut cfg = BMCConfig::default();
-                    cfg.time_limit = Some(15);
-                    cfg.step = step;
                     cfg.preproc.scorr = false;
                     cfg.preproc.frts = false;
+                    if step == 0 {
+                        cfg.end = 5;
+                    } else {
+                        cfg.time_limit = Some(15);
+                        cfg.step = step;
+                    }
                     let mut bmc = BMC::new(cfg, self.ts.clone());
                     let res = bmc.check();
                     (res, bmc)
