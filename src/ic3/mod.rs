@@ -25,7 +25,7 @@ use std::{
 use utils::Statistic;
 
 mod activity;
-mod aux;
+mod auxv;
 mod block;
 mod frame;
 mod localabs;
