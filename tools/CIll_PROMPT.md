@@ -63,3 +63,11 @@ always @(posedge clk) begin
   h_*: assert (array[any] > 0);
 end
 ```
+- If you need an anyconst value (a random value that stays stable during each cycle), write it like this:
+```systemverilog
+reg [W-1:0] anyconst_reg;
+always @(posedge clk) begin
+  anyconst_reg <= anyconst_reg;
+end
+```
+
