@@ -222,7 +222,7 @@ impl IC3 {
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         if cfg.inn {
-            ts = uts.interal_signals();
+            ts = uts.internal_signals();
         }
         let predprop = cfg.pred_prop.then(|| {
             PredProp::new(

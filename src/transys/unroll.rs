@@ -298,7 +298,7 @@ impl TransysUnroll<Transys> {
         }
     }
 
-    pub fn interal_signals(&self) -> Transys {
+    pub fn internal_signals(&self) -> Transys {
         assert!(self.num_unroll == 1);
         let keep = self.ts.rel.fanouts(self.ts.input());
         let mut rel = self.ts.rel.clone();
