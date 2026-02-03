@@ -12,12 +12,14 @@ use crate::cli::{
     check::CheckConfig,
     cill::{CIllCommands, cill},
 };
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use giputils::hash::GHashSet;
 use rIC3::config::EngineConfig;
 use serde::Deserialize;
 use std::{
     fs,
+    io::ErrorKind,
     iter::once,
     path::{Path, PathBuf},
 };
@@ -86,7 +88,20 @@ pub struct VcdConfig {
 
 impl Ric3Config {
     fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-        let config_content = fs::read_to_string(p)?;
+        let path = p.as_ref();
+        let config_content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(err) if err.kind() == ErrorKind::NotFound => {
+                anyhow::bail!(
+                    "missing config file: {}. Expected a ric3.toml in the current directory.",
+                    path.display()
+                );
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("failed to read config file: {}", path.display()));
+            }
+        };
         let config: Self = toml::from_str(&config_content)?;
         config.dut.validate()?;
         Ok(config)
