@@ -78,7 +78,7 @@ pub fn cli_main() -> anyhow::Result<()> {
 pub struct Ric3Config {
     dut: Dut,
     trace: Option<VcdConfig>,
-    modeling: Modeling,
+    modeling: Option<Modeling>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -1,5 +1,5 @@
 use super::Ric3Config;
-use crate::cli::{Modeling, Parse, VcdConfig};
+use crate::cli::{Parse, VcdConfig};
 use giputils::file::recreate_dir;
 use giputils::hash::GHashMap;
 use log::info;
@@ -60,12 +60,10 @@ impl Yosys {
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
         info!("Yosys: parsing the DUT and generating BTOR.");
-        let slang = matches!(
-            cfg.modeling,
-            Modeling {
-                parser: Parse::yosys_slang,
-            }
-        );
+        let slang = cfg
+            .modeling
+            .as_ref()
+            .map_or(true, |m| matches!(m.parser, Parse::yosys_slang));
         recreate_dir(p.as_ref())?;
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
