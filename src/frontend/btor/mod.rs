@@ -165,7 +165,6 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
-        wts.coi_refine();
         wts.simplify();
         wts.coi_refine();
         // let btor = Btor::from(&wts);

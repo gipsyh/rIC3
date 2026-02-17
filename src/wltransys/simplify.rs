@@ -55,7 +55,11 @@ impl WlTransys {
     }
 
     pub fn simplify(&mut self) {
+        self.coi_refine();
         let mut map = GHashMap::new();
+        for (_, i) in self.init.iter_mut() {
+            *i = i.simplify(&mut map);
+        }
         for (_, n) in self.next.iter_mut() {
             *n = n.simplify(&mut map);
         }
