@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McProof, McResult, McWitness,
+    Engine, McProof, McResult, McWitness, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -48,7 +48,7 @@ pub struct MultiProp {
     ic3_cfg: IC3Config,
     tracer: Tracer,
     parallel: bool,
-    results: Vec<McResult>,
+    results: MpMcResult,
 }
 
 impl MultiProp {
@@ -67,7 +67,7 @@ impl MultiProp {
         let parallel = cfg.parallel;
         Self {
             ots,
-            results: vec![McResult::default(); ts.bad.len()],
+            results: MpMcResult::new(ts.bad.len()),
             ts,
             rst,
             ic3: Vec::new(),
