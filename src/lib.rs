@@ -32,8 +32,54 @@ use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
 use std::{
     ops::BitOr,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
+
+/// External control handle for engines.
+#[derive(Clone, Debug)]
+pub struct EngineCtrl {
+    terminate: Arc<AtomicBool>,
+    // TODO: implement stop/resume support
+    #[allow(dead_code)]
+    stop: Arc<AtomicBool>,
+    #[allow(dead_code)]
+    resume: Arc<AtomicBool>,
+}
+
+impl Default for EngineCtrl {
+    fn default() -> Self {
+        Self {
+            terminate: Arc::new(AtomicBool::new(false)),
+            stop: Arc::new(AtomicBool::new(false)),
+            resume: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+impl EngineCtrl {
+    pub fn terminate(&self) {
+        self.terminate.store(true, Ordering::Relaxed);
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.terminate.load(Ordering::Relaxed)
+    }
+
+    pub fn stop(&self) {
+        todo!("stop not yet implemented");
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        todo!("is_stopped not yet implemented");
+    }
+
+    pub fn resume(&self) {
+        todo!("resume not yet implemented");
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
@@ -131,8 +177,8 @@ pub trait Engine: Send {
         panic!("unsupport witness");
     }
 
-    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
-        panic!("unsupport getting stop ctrl");
+    fn get_ctrl(&self) -> EngineCtrl {
+        panic!("unsupported: get_external_ctrl");
     }
 }
 

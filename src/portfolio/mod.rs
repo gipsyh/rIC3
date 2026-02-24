@@ -1,6 +1,6 @@
 use crate::config::{EngineConfig, EngineConfigBase};
 use crate::transys::Transys;
-use crate::{Engine, McResult, create_bl_engine, impl_config_deref};
+use crate::{Engine, EngineCtrl, McResult, create_bl_engine, impl_config_deref};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
@@ -251,7 +251,7 @@ pub struct LightPortfolio {
     cfg: LightPortfolioConfig,
     ecfgs: Vec<EngineConfig>,
     engines: Vec<Box<dyn Engine>>,
-    stop_flag: Arc<AtomicBool>,
+    ctrl: EngineCtrl,
 }
 
 impl LightPortfolio {
@@ -267,7 +267,7 @@ impl LightPortfolio {
             ts,
             sym,
             engines: Vec::new(),
-            stop_flag: Arc::new(AtomicBool::new(false)),
+            ctrl: EngineCtrl::default(),
         }
     }
 }
@@ -280,7 +280,7 @@ impl Engine for LightPortfolio {
             .into_par_iter()
             .map(|ecfg| create_bl_engine(ecfg, self.ts.clone(), self.sym.clone()))
             .collect();
-        let stops: Vec<_> = engines.iter().map(|e| e.get_stop_ctrl()).collect();
+        let ctrls: Vec<_> = engines.iter().map(|e| e.get_ctrl()).collect();
         let (tx, rx) = mpsc::channel();
         let mut joins = Vec::new();
         with_log_level(log::LevelFilter::Warn, || {
@@ -298,7 +298,7 @@ impl Engine for LightPortfolio {
             let mut res = McResult::Unknown(None);
             let mut finished = 0;
             while finished < num_engines {
-                if self.stop_flag.load(Ordering::Relaxed) {
+                if self.ctrl.is_terminated() {
                     info!("LightPortfolio interrupted by external signal.");
                     break;
                 }
@@ -322,8 +322,8 @@ impl Engine for LightPortfolio {
                     }
                 }
             }
-            for s in stops {
-                s.store(true, Ordering::Relaxed);
+            for c in ctrls {
+                c.terminate();
             }
             for j in joins {
                 let (e, _) = j.join().unwrap();
@@ -333,7 +333,7 @@ impl Engine for LightPortfolio {
         })
     }
 
-    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
-        self.stop_flag.clone()
+    fn get_ctrl(&self) -> EngineCtrl {
+        self.ctrl.clone()
     }
 }

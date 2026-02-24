@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McProof, McResult, McWitness, MpEngine, MpMcResult,
+    Engine, EngineCtrl, McProof, McResult, McWitness, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -163,7 +163,7 @@ pub struct PolyNexus {
     #[allow(unused)]
     rst: Restore,
     tracer: Tracer,
-    stop_ctrl: Arc<AtomicBool>,
+    ctrl: EngineCtrl,
     results: MpMcResult,
     ic3s: Vec<Option<Box<IC3>>>,
 }
@@ -180,7 +180,7 @@ impl PolyNexus {
             ts,
             rst,
             tracer: Tracer::new(),
-            stop_ctrl: Arc::new(AtomicBool::new(false)),
+            ctrl: crate::EngineCtrl::default(),
             results,
             ic3s: (0..num_props).map(|_| None).collect(),
         }
@@ -247,7 +247,7 @@ impl PolyNexus {
         }
 
         loop {
-            if self.stop_ctrl.load(Ordering::Relaxed) {
+            if self.ctrl.is_terminated() {
                 for p in 0..num_props {
                     sched.prop_stops[p].store(true, Ordering::Relaxed);
                 }
@@ -369,8 +369,8 @@ impl Engine for PolyNexus {
         self.tracer.add_tracer(tracer);
     }
 
-    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
-        self.stop_ctrl.clone()
+    fn get_ctrl(&self) -> EngineCtrl {
+        self.ctrl.clone()
     }
 
     fn proof(&mut self) -> McProof {

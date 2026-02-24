@@ -15,7 +15,6 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Row, Table},
 };
 use std::{
-    sync::atomic::Ordering,
     thread::spawn,
     time::{Duration, Instant},
 };
@@ -88,7 +87,7 @@ impl Run {
 
     pub fn stop_solving(&mut self) {
         if let Some(task) = self.nexus_task.take() {
-            task.stop.store(true, Ordering::Relaxed);
+            task.ctrl.terminate();
             let _ = task.join.join();
         }
         // Mark all solving as paused
@@ -195,7 +194,7 @@ impl Run {
         let (tsx, trx) = channel_tracer();
         engine.add_tracer(Box::new(tsx));
 
-        let stop = engine.get_stop_ctrl();
+        let ctrl = engine.get_ctrl();
 
         // Mark pending props as solving
         for &id in &pending {
@@ -208,7 +207,7 @@ impl Run {
         self.nexus_task = Some(NexusTask {
             join,
             state_tracer: trx,
-            stop,
+            ctrl,
         });
     }
 

@@ -5,7 +5,7 @@ use anyhow::Ok;
 use btor::Btor;
 use giputils::file::recreate_dir;
 use rIC3::{
-    McResult, MpMcResult,
+    EngineCtrl, McResult, MpMcResult,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     tracer::ChannelTracerRx,
@@ -13,11 +13,7 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    sync::{Arc, atomic::AtomicBool},
-    thread::JoinHandle,
-};
+use std::{fs, thread::JoinHandle};
 use strum::AsRefStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -63,7 +59,7 @@ impl PropMcState {
 struct NexusTask {
     join: JoinHandle<MpMcResult>,
     state_tracer: ChannelTracerRx,
-    stop: Arc<AtomicBool>,
+    ctrl: EngineCtrl,
 }
 
 pub(crate) struct Run {

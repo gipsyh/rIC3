@@ -1,5 +1,5 @@
 use crate::{
-    BlProof, BlWitness, Engine, McProof, McResult, McWitness,
+    BlProof, BlWitness, Engine, EngineCtrl, McProof, McResult, McWitness,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -18,10 +18,7 @@ use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::{
-    sync::{Arc, atomic::AtomicBool},
-    time::Instant,
-};
+use std::time::Instant;
 use utils::Statistic;
 
 mod activity;
@@ -164,7 +161,7 @@ pub struct IC3 {
     rng: StdRng,
     filog: IntervalLogger,
     tracer: Tracer,
-    stop_ctrl: Arc<AtomicBool>,
+    ctrl: EngineCtrl,
 }
 
 impl IC3 {
@@ -257,7 +254,7 @@ impl IC3 {
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
-            stop_ctrl: Arc::new(AtomicBool::new(false)),
+            ctrl: EngineCtrl::default(),
         }
     }
 
@@ -406,7 +403,7 @@ impl Engine for IC3 {
         info!("{:#?}", self.statistic);
     }
 
-    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
-        self.stop_ctrl.clone()
+    fn get_ctrl(&self) -> crate::EngineCtrl {
+        self.ctrl.clone()
     }
 }
