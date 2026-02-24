@@ -11,11 +11,7 @@ use log::{LevelFilter, set_max_level};
 use logicrs::VarSymbols;
 use serde::{Deserialize, Serialize};
 use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
+    sync::mpsc,
     thread::{self, JoinHandle},
 };
 
@@ -92,10 +88,7 @@ unsafe impl Send for WorkerMsg {}
 struct Scheduler {
     num_props: usize,
     resolved: Vec<bool>,
-    num_resolved: usize,
-    active_workers: Vec<usize>,
     preset_counter: Vec<usize>,
-    prop_stops: Vec<Arc<AtomicBool>>,
     presets: Vec<IC3Config>,
 }
 
@@ -104,23 +97,18 @@ impl Scheduler {
         Self {
             num_props,
             resolved: vec![false; num_props],
-            num_resolved: 0,
-            active_workers: vec![0; num_props],
             preset_counter: vec![0; num_props],
-            prop_stops: (0..num_props)
-                .map(|_| Arc::new(AtomicBool::new(false)))
-                .collect(),
             presets,
         }
     }
 
-    /// Pick the unresolved property with fewest active workers, return (prop, cfg).
+    /// Pick the unresolved property with smallest preset_counter, return (prop, cfg).
     fn next(&mut self) -> Option<(usize, IC3Config)> {
         let mut best = None;
-        let mut min_active = usize::MAX;
+        let mut min_preset = usize::MAX;
         for p in 0..self.num_props {
-            if !self.resolved[p] && self.active_workers[p] < min_active {
-                min_active = self.active_workers[p];
+            if !self.resolved[p] && self.preset_counter[p] < min_preset {
+                min_preset = self.preset_counter[p];
                 best = Some(p);
             }
         }
@@ -131,28 +119,17 @@ impl Scheduler {
         let mut cfg = self.presets[preset_idx].clone();
         cfg.prop = Some(prop);
         cfg.base.rseed = cfg.base.rseed.wrapping_add(idx as u64);
-        self.active_workers[prop] += 1;
         Some((prop, cfg))
-    }
-
-    fn worker_done(&mut self, prop: usize) {
-        self.active_workers[prop] = self.active_workers[prop].saturating_sub(1);
     }
 
     fn resolve(&mut self, prop: usize) {
         if !self.resolved[prop] {
             self.resolved[prop] = true;
-            self.num_resolved += 1;
-            self.prop_stops[prop].store(true, Ordering::Relaxed);
         }
     }
 
     fn all_resolved(&self) -> bool {
-        self.num_resolved == self.num_props
-    }
-
-    fn prop_stop(&self, prop: usize) -> Arc<AtomicBool> {
-        self.prop_stops[prop].clone()
+        self.resolved.iter().all(|x| *x)
     }
 }
 
@@ -201,27 +178,24 @@ impl PolyNexus {
         cfg: IC3Config,
         ts: Transys,
         tx: mpsc::Sender<WorkerMsg>,
-        p_stop: Arc<AtomicBool>,
-    ) -> JoinHandle<()> {
-        thread::spawn(move || {
+    ) -> (JoinHandle<()>, EngineCtrl) {
+        // Create IC3 on the main thread so we can grab its ctrl.
+        let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
+        let ctrl = ic3.get_ctrl();
+        ic3.add_tracer(Box::new(PropTracerBridge {
+            prop,
+            tx: tx.clone(),
+        }));
+        let handle = thread::spawn(move || {
             set_max_level(LevelFilter::Warn);
-            if p_stop.load(Ordering::Relaxed) {
-                return;
-            }
-            let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
-            // Forward per-frame progress reports from IC3 to the main thread.
-            let tx_progress = tx.clone();
-            ic3.add_tracer(Box::new(PropTracerBridge {
-                prop,
-                tx: tx_progress,
-            }));
             let result = ic3.check();
             let _ = tx.send(WorkerMsg::Done {
                 prop,
                 result,
                 ic3: Box::new(ic3),
             });
-        })
+        });
+        (handle, ctrl)
     }
 
     fn run(&mut self) -> MpMcResult {
@@ -231,6 +205,7 @@ impl PolyNexus {
         let mut sched = Scheduler::new(num_props, presets);
         let (tx, rx) = mpsc::channel::<WorkerMsg>();
         let mut joins: Vec<JoinHandle<()>> = Vec::new();
+        let mut engine_ctrls: Vec<EngineCtrl> = Vec::new();
         // Track per-prop unknown bound seen so far — only emit increasing values.
         let mut unknown_bound: Vec<Option<usize>> = vec![None; num_props];
 
@@ -238,9 +213,9 @@ impl PolyNexus {
         while joins.len() < num_workers {
             match sched.next() {
                 Some((prop, cfg)) => {
-                    let p_stop = sched.prop_stop(prop);
-                    let j = Self::spawn_worker(prop, cfg, self.ts.clone(), tx.clone(), p_stop);
+                    let (j, ctrl) = Self::spawn_worker(prop, cfg, self.ts.clone(), tx.clone());
                     joins.push(j);
+                    engine_ctrls.push(ctrl);
                 }
                 None => break,
             }
@@ -248,8 +223,8 @@ impl PolyNexus {
 
         loop {
             if self.ctrl.is_terminated() {
-                for p in 0..num_props {
-                    sched.prop_stops[p].store(true, Ordering::Relaxed);
+                for c in &engine_ctrls {
+                    c.terminate();
                 }
                 break;
             }
@@ -269,8 +244,6 @@ impl PolyNexus {
                 }
 
                 WorkerMsg::Done { prop, result, ic3 } => {
-                    sched.worker_done(prop);
-
                     if !sched.resolved[prop] {
                         if !result.is_unknown() {
                             // Definitive answer — resolve and record.
@@ -283,15 +256,14 @@ impl PolyNexus {
                             // for that property (keeps workers busy).
                             self.merge_and_trace(prop, result, &mut unknown_bound);
                             if let Some((next_prop, next_cfg)) = sched.next() {
-                                let p_stop = sched.prop_stop(next_prop);
-                                let j = Self::spawn_worker(
+                                let (j, ctrl) = Self::spawn_worker(
                                     next_prop,
                                     next_cfg,
                                     self.ts.clone(),
                                     tx.clone(),
-                                    p_stop,
                                 );
                                 joins.push(j);
+                                engine_ctrls.push(ctrl);
                             }
                         }
                     }
@@ -303,9 +275,8 @@ impl PolyNexus {
             }
         }
 
-        // Stop any still-running workers and wait for them.
-        for p in 0..num_props {
-            sched.prop_stops[p].store(true, Ordering::Relaxed);
+        for c in &engine_ctrls {
+            c.terminate();
         }
         drop(tx); // allow workers to detect disconnection
         for j in joins {
