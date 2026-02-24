@@ -235,11 +235,13 @@ impl PolyNexus {
                 break;
             }
 
-            // Block until a message arrives; tx is still alive in this scope so
-            // Disconnected only happens when all workers have exited.
-            let msg = match rx.recv() {
+            let msg = match rx.try_recv() {
                 Ok(m) => m,
-                Err(_) => break,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    continue;
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
             };
 
             match msg {
