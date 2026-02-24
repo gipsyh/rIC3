@@ -24,9 +24,9 @@ pub struct PolyNexusConfig {
     #[command(flatten)]
     pub preproc: PreprocConfig,
 
-    /// Number of worker threads (0 = auto-detect)
-    #[arg(long = "workers", default_value_t = 0)]
-    pub workers: usize,
+    /// Number of worker threads (None = auto-detect)
+    #[arg(long = "workers")]
+    pub workers: Option<usize>,
 }
 
 impl_config_deref!(PolyNexusConfig);
@@ -165,13 +165,11 @@ impl PolyNexus {
     }
 
     fn num_workers(&self) -> usize {
-        if self.cfg.workers > 0 {
-            self.cfg.workers
-        } else {
+        self.cfg.workers.unwrap_or_else(|| {
             thread::available_parallelism()
                 .map(|n| n.get())
                 .unwrap_or(8)
-        }
+        })
     }
 
     fn spawn_worker(
