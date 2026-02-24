@@ -9,6 +9,7 @@ use crate::{
 use clap::Args;
 use log::{LevelFilter, set_max_level};
 use logicrs::VarSymbols;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     sync::mpsc,
@@ -169,7 +170,7 @@ impl PolyNexus {
         } else {
             thread::available_parallelism()
                 .map(|n| n.get())
-                .unwrap_or(4)
+                .unwrap_or(8)
         }
     }
 
@@ -210,15 +211,22 @@ impl PolyNexus {
         let mut unknown_bound: Vec<Option<usize>> = vec![None; num_props];
 
         // Seed the initial wave of workers (up to num_workers in flight).
-        while joins.len() < num_workers {
+        let mut tasks: Vec<(usize, IC3Config)> = Vec::new();
+        while tasks.len() < num_workers {
             match sched.next() {
-                Some((prop, cfg)) => {
-                    let (j, ctrl) = Self::spawn_worker(prop, cfg, self.ts.clone(), tx.clone());
-                    joins.push(j);
-                    engine_ctrls.push(ctrl);
-                }
+                Some(t) => tasks.push(t),
                 None => break,
             }
+        }
+        let ts_ref = &self.ts;
+        let tx_ref = &tx;
+        let spawned: Vec<_> = tasks
+            .into_par_iter()
+            .map(|(prop, cfg)| Self::spawn_worker(prop, cfg, ts_ref.clone(), tx_ref.clone()))
+            .collect();
+        for (j, ctrl) in spawned {
+            joins.push(j);
+            engine_ctrls.push(ctrl);
         }
 
         loop {
