@@ -1,5 +1,5 @@
 use crate::{
-    BlProof, BlWitness, Engine, McProof, McResult, McWitness,
+    BlProof, BlWitness, Engine, EngineCtrl, McProof, McResult, McWitness,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -18,10 +18,7 @@ use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::{
-    sync::{Arc, atomic::AtomicBool},
-    time::Instant,
-};
+use std::time::Instant;
 use utils::Statistic;
 
 mod activity;
@@ -164,7 +161,7 @@ pub struct IC3 {
     rng: StdRng,
     filog: IntervalLogger,
     tracer: Tracer,
-    stop_ctrl: Arc<AtomicBool>,
+    ctrl: EngineCtrl,
 }
 
 impl IC3 {
@@ -257,7 +254,7 @@ impl IC3 {
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
-            stop_ctrl: Arc::new(AtomicBool::new(false)),
+            ctrl: EngineCtrl::default(),
         }
     }
 
@@ -272,7 +269,7 @@ impl IC3 {
 impl Engine for IC3 {
     fn check(&mut self) -> McResult {
         if !self.prep_prop_base() {
-            self.tracer.trace_res(McResult::Unsafe(0));
+            self.tracer.trace_res(None, McResult::Unsafe(0));
             return McResult::Unsafe(0);
         }
         self.extend();
@@ -283,12 +280,12 @@ impl Engine for IC3 {
                 match self.block(None) {
                     BlockResult::Failure(depth) => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_res(McResult::Unsafe(depth));
+                        self.tracer.trace_res(None, McResult::Unsafe(depth));
                         return McResult::Unsafe(depth);
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_res(McResult::Safe);
+                        self.tracer.trace_res(None, McResult::Safe);
                         return McResult::Safe;
                     }
                     BlockResult::OverallTimeLimitExceeded => {
@@ -316,13 +313,14 @@ impl Engine for IC3 {
             debug!("blocking phase end");
             self.statistic.block.overall_time += start.elapsed();
             self.filog.log(Level::Info, self.frame.statistic(true));
-            self.tracer.trace_res(McResult::Unknown(Some(self.level())));
+            self.tracer
+                .trace_res(None, McResult::Unknown(Some(self.level())));
             self.extend();
             let start = Instant::now();
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
-                self.tracer.trace_res(McResult::Safe);
+                self.tracer.trace_res(None, McResult::Safe);
                 return McResult::Safe;
             }
             self.propagate_to_inf();
@@ -405,7 +403,7 @@ impl Engine for IC3 {
         info!("{:#?}", self.statistic);
     }
 
-    fn get_stop_ctrl(&self) -> Arc<AtomicBool> {
-        self.stop_ctrl.clone()
+    fn get_ctrl(&self) -> crate::EngineCtrl {
+        self.ctrl.clone()
     }
 }

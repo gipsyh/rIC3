@@ -149,10 +149,11 @@ impl Engine for BMC {
                 self.solver.solve(&assump)
             };
             if r {
-                self.tracer.trace_res(crate::McResult::Unsafe(k));
+                self.tracer.trace_res(None, crate::McResult::Unsafe(k));
                 return McResult::Unsafe(k);
             }
-            self.tracer.trace_res(crate::McResult::Unknown(Some(k)));
+            self.tracer
+                .trace_res(None, crate::McResult::Unknown(Some(k)));
             if self.cfg.kissat {
                 self.reset_solver();
             }

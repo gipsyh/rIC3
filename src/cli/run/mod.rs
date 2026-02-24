@@ -1,27 +1,27 @@
 mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::cli::{VcdConfig, run::tui::RunTask};
 use anyhow::Ok;
 use btor::Btor;
 use giputils::file::recreate_dir;
 use rIC3::{
-    McResult,
+    EngineCtrl, McResult, MpMcResult,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
+    tracer::ChannelTracerRx,
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, thread::JoinHandle};
 use strum::AsRefStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PropMcInfo {
-    id: usize,
-    name: String,
-    res: McResult,
-    config: Option<EngineConfig>,
+    pub id: usize,
+    pub name: String,
+    pub res: McResult,
+    pub config: Option<EngineConfig>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, AsRefStr)]
@@ -32,13 +32,13 @@ pub enum McStatus {
 }
 
 #[derive(Debug)]
-struct PropMcState {
-    prop: PropMcInfo,
-    state: McStatus,
+pub(crate) struct PropMcState {
+    pub prop: PropMcInfo,
+    pub state: McStatus,
 }
 
 impl PropMcState {
-    fn defalut_from_wts(wts: &WlTransys, symbols: &WlTsSymbol) -> Vec<Self> {
+    fn default_from_wts(wts: &WlTransys, symbols: &WlTsSymbol) -> Vec<Self> {
         let mut mc = Vec::new();
         for id in 0..wts.bad.len() {
             mc.push(PropMcState {
@@ -55,23 +55,24 @@ impl PropMcState {
     }
 }
 
-struct Run {
+/// PolyNexus task handle
+struct NexusTask {
+    join: JoinHandle<MpMcResult>,
+    state_tracer: ChannelTracerRx,
+    ctrl: EngineCtrl,
+}
+
+pub(crate) struct Run {
     btor: Btor,
     table: TableState,
     ric3_proj: Ric3Proj,
     mc: Vec<PropMcState>,
-    solving: Option<RunTask>,
+    nexus_task: Option<NexusTask>,
     should_quit: bool,
-    vcd: Option<VcdConfig>,
 }
 
 impl Run {
-    fn new(
-        btor: Btor,
-        mc: Vec<PropMcState>,
-        ric3_proj: Ric3Proj,
-        vcd: Option<VcdConfig>,
-    ) -> anyhow::Result<Self> {
+    fn new(btor: Btor, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
         fs::create_dir_all(ric3_proj.path("res"))?;
         recreate_dir(ric3_proj.path("tmp"))?;
         let mut table = TableState::default();
@@ -81,9 +82,8 @@ impl Run {
             table,
             ric3_proj,
             mc,
-            solving: None,
+            nexus_task: None,
             should_quit: false,
-            vcd,
         })
     }
 }
@@ -111,8 +111,8 @@ pub fn run() -> anyhow::Result<()> {
                 })
                 .collect()
         })
-        .unwrap_or(PropMcState::defalut_from_wts(&wts, &symbol));
-    let mut run = Run::new(btor, mc, ric3_proj, ric3_cfg.trace.clone())?;
+        .unwrap_or(PropMcState::default_from_wts(&wts, &symbol));
+    let mut run = Run::new(btor, mc, ric3_proj)?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;

@@ -143,7 +143,7 @@ impl Engine for Kind {
                 let bad = self.get_bad(k);
                 let res = self.solver.solve(&[bad]);
                 if !res {
-                    self.tracer.trace_res(McResult::Safe);
+                    self.tracer.trace_res(None, McResult::Safe);
                     return McResult::Safe;
                 }
             }
@@ -151,11 +151,11 @@ impl Engine for Kind {
                 let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
                 assump.push(self.get_bad(k));
                 if self.solver.solve(&assump) {
-                    self.tracer.trace_res(McResult::Unsafe(k));
+                    self.tracer.trace_res(None, McResult::Unsafe(k));
                     return McResult::Unsafe(k);
                 }
             }
-            self.tracer.trace_res(McResult::Unknown(Some(k)));
+            self.tracer.trace_res(None, McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
         McResult::Unknown(Some(self.cfg.end))

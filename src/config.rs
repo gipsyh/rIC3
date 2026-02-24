@@ -1,6 +1,7 @@
 use crate::{
     bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, mp::MultiPropConfig,
-    portfolio::PortfolioConfig, rlive::RliveConfig, wlbmc::WlBMCConfig, wlkind::WlKindConfig,
+    polynexus::PolyNexusConfig, portfolio::PortfolioConfig, rlive::RliveConfig, wlbmc::WlBMCConfig,
+    wlkind::WlKindConfig,
 };
 use clap::{ArgAction, Args, Parser};
 use enum_as_inner::EnumAsInner;
@@ -85,6 +86,8 @@ pub enum EngineConfig {
     MultiProp(MultiPropConfig),
     /// portfolio
     Portfolio(PortfolioConfig),
+    /// polynexus: multi-property parallel engine
+    Polynexus(PolyNexusConfig),
 }
 
 impl EngineConfig {

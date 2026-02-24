@@ -63,7 +63,7 @@ impl Yosys {
         let slang = cfg
             .modeling
             .as_ref()
-            .map_or(true, |m| matches!(m.parser, Parse::yosys_slang));
+            .is_none_or(|m| matches!(m.parser, Parse::yosys_slang));
         recreate_dir(p.as_ref())?;
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
@@ -129,6 +129,7 @@ impl Yosys {
         yosys.execute(Some(&src_dir), plugin)
     }
 
+    #[allow(unused)]
     pub fn btor_wit_to_vcd(
         dut: impl AsRef<Path>,
         witness: impl AsRef<Path>,
