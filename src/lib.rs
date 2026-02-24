@@ -35,7 +35,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, EnumAsInner)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
     /// Safe
     Safe,
