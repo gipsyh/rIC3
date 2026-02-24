@@ -2,7 +2,7 @@ use super::IC3;
 use crate::transys::TransysIf;
 use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, Var, satif::Satif};
-use rand::{Rng, seq::SliceRandom};
+use rand::{RngExt, seq::SliceRandom};
 use std::time::Instant;
 
 impl IC3 {

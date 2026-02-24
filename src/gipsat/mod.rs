@@ -20,8 +20,8 @@ use logicrs::satif::Satif;
 use logicrs::{DagCnf, Lbool, VarAssign, VarRange};
 use logicrs::{Lit, LitSet, LitVec, Var, VarMap};
 use propagate::Watchers;
-use rand::Rng;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::RngExt;
+use rand::{SeedableRng, rngs::SmallRng};
 use simplify::Simplify;
 pub use statistic::SolverStatistic;
 use std::iter::empty;
@@ -52,7 +52,7 @@ pub struct DagCnfSolver {
     dc: DagCnf,
     trivial_unsat: bool,
     mark: LitSet,
-    rng: StdRng,
+    rng: SmallRng,
     pub cfg: Config,
 
     assump: LitVec,
@@ -99,7 +99,7 @@ impl DagCnfSolver {
             constraint: Default::default(),
             statistic: Default::default(),
             trivial_unsat: false,
-            rng: StdRng::seed_from_u64(0),
+            rng: SmallRng::seed_from_u64(0),
             cfg: Default::default(),
             mark: Default::default(),
         };
@@ -116,7 +116,7 @@ impl DagCnfSolver {
     #[inline]
     #[allow(unused)]
     pub fn set_rseed(&mut self, rseed: u64) {
-        self.rng = StdRng::seed_from_u64(rseed);
+        self.rng = SmallRng::seed_from_u64(rseed);
     }
 
     fn simplify_clause(&mut self, clause: &[Lit]) -> Option<LitVec> {

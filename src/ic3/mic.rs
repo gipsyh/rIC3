@@ -3,7 +3,7 @@ use crate::{ic3::IC3Config, transys::TransysIf};
 use giputils::hash::GHashSet;
 use log::trace;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
-use rand::{Rng, seq::SliceRandom};
+use rand::{RngExt, seq::SliceRandom};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, Default)]

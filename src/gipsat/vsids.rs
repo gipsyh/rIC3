@@ -1,7 +1,7 @@
 use super::{DagCnfSolver, cdb::CREF_NONE};
 use giputils::{OptionU32, gvec::Gvec};
 use logicrs::{Lbool, Lit, LitVec, Var, VarMap};
-use rand::Rng;
+use rand::RngExt;
 use std::ops::{Index, MulAssign};
 
 #[derive(Default, Clone)]

@@ -8,7 +8,7 @@ use crate::{
 use clap::{Args, Parser};
 use log::info;
 use logicrs::{LitVec, satif::Satif};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
