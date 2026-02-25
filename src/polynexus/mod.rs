@@ -138,7 +138,6 @@ pub struct PolyNexus {
     #[allow(unused)]
     cfg: PolyNexusConfig,
     ts: Transys,
-    #[allow(unused)]
     rst: Restore,
     tracer: Tracer,
     ctrl: EngineCtrl,
@@ -251,13 +250,22 @@ impl PolyNexus {
                     }
                 }
 
-                WorkerMsg::Done { prop, result, ic3 } => {
+                WorkerMsg::Done {
+                    prop,
+                    result,
+                    mut ic3,
+                } => {
                     if !sched.resolved[prop] {
                         if !result.is_unknown() {
                             // Definitive answer — resolve and record.
                             sched.resolve(prop);
                             self.results[prop] = result;
-                            self.tracer.trace_res(Some(prop), result);
+                            self.tracer.trace_state(Some(prop), result);
+                            if result.is_unsafe() {
+                                let wit = ic3.witness().into_bl().unwrap();
+                                let wit = self.rst.restore_witness(&wit);
+                                self.tracer.trace_witness(McWitness::Bl(wit));
+                            }
                             self.ic3s[prop] = Some(ic3);
                         } else {
                             // Still unknown — merge bound, then spawn next preset
@@ -313,7 +321,7 @@ impl PolyNexus {
             }
         }
         self.results[prop] = merged;
-        self.tracer.trace_res(Some(prop), merged);
+        self.tracer.trace_state(Some(prop), merged);
     }
 }
 
@@ -327,7 +335,7 @@ struct PropTracerBridge {
 }
 
 impl TracerIf for PropTracerBridge {
-    fn trace_res(&mut self, _prop: Option<usize>, res: McResult) {
+    fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
         let _ = self.tx.send(WorkerMsg::Progress {
             prop: self.prop,
             result: res,

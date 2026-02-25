@@ -162,6 +162,15 @@ pub enum McWitness {
     Wl(WlWitness),
 }
 
+impl McWitness {
+    pub fn prop_id(&self) -> usize {
+        match self {
+            McWitness::Bl(bl_witness) => bl_witness.bad_id,
+            McWitness::Wl(wl_witness) => wl_witness.bad_id,
+        }
+    }
+}
+
 pub trait Engine: Send {
     fn check(&mut self) -> McResult;
 

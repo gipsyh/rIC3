@@ -1,9 +1,12 @@
-use crate::cli::run::{McStatus, NexusTask, PropMcState, Run};
+use crate::cli::{
+    run::{McStatus, NexusTask, PropMcState, Run},
+    yosys::Yosys,
+};
 use rIC3::{
     Engine, McResult, MpEngine, MpMcResult,
-    frontend::{Frontend, btor::BtorFrontend},
+    frontend::Frontend,
     polynexus::{PolyNexus, PolyNexusConfig},
-    tracer::channel_tracer,
+    tracer::{state_channel_tracer, witness_channel_tracer},
 };
 use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -15,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Row, Table},
 };
 use std::{
+    fs,
     thread::spawn,
     time::{Duration, Instant},
 };
@@ -151,21 +155,24 @@ impl Run {
     fn process_updates(&mut self) {
         if let Some(task) = &self.nexus_task {
             // Process real-time updates from PolyNexus
-            while let Ok((prop_id, result)) = task.state_tracer.try_recv() {
+            while let Ok((prop_id, result)) = task.state_trx.try_recv() {
                 let prop_id = prop_id.unwrap();
                 let prop = &mut self.mc[prop_id];
                 prop.prop.res = result;
-                if let McResult::Unsafe(_) = result {
-                    // let witness =
-                    // Yosys::btor_wit_to_vcd(
-                    //     self.ric3_proj.path("dut"),
-                    //     cert_path,
-                    //     self.ric3_proj.path(format!("res/p{prop_id}.vcd")),
-                    //     true,
-                    //     None,
-                    // )
-                    // .unwrap();
-                }
+            }
+            while let Ok(wit) = task.wit_trx.try_recv() {
+                let prop_id = wit.prop_id();
+                let wit = self.btorfe.unsafe_certificate(wit);
+                let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
+                fs::write(&wit_path, format!("{wit}")).unwrap();
+                Yosys::btor_wit_to_vcd(
+                    self.ric3_proj.path("dut"),
+                    wit_path,
+                    self.ric3_proj.path(format!("res/p{prop_id}.vcd")),
+                    true,
+                    None,
+                )
+                .unwrap();
             }
         }
     }
@@ -184,15 +191,16 @@ impl Run {
         }
 
         // Create PolyNexus engine
-        let mut btorfe = BtorFrontend::new(self.btor.clone());
-        let (ts, _) = btorfe.ts();
+        let (ts, _) = self.btorfe.ts();
 
         let cfg = PolyNexusConfig::default();
         let mp_res: MpMcResult = self.mc.iter().map(|m| m.prop.res).collect();
         let mut engine = PolyNexus::new(cfg, ts, mp_res);
 
-        let (tsx, trx) = channel_tracer();
-        engine.add_tracer(Box::new(tsx));
+        let (state_tsx, state_trx) = state_channel_tracer();
+        let (wit_tsx, wit_trx) = witness_channel_tracer();
+        engine.add_tracer(Box::new(state_tsx));
+        engine.add_tracer(Box::new(wit_tsx));
 
         let ctrl = engine.get_ctrl();
 
@@ -202,11 +210,15 @@ impl Run {
         }
 
         // Spawn engine in background thread
-        let join = spawn(move || MpEngine::check(&mut engine));
+        let join = spawn(move || {
+            let res = MpEngine::check(&mut engine);
+            (res, engine)
+        });
 
         self.nexus_task = Some(NexusTask {
             join,
-            state_tracer: trx,
+            state_trx,
+            wit_trx,
             ctrl,
         });
     }

@@ -64,11 +64,11 @@ impl Engine for WlBMC {
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
             if self.solver.solve(&[assump]) {
-                self.tracer.trace_res(None, crate::McResult::Unsafe(k));
+                self.tracer.trace_state(None, crate::McResult::Unsafe(k));
                 return McResult::Unsafe(k);
             }
             self.tracer
-                .trace_res(None, crate::McResult::Unknown(Some(k)));
+                .trace_state(None, crate::McResult::Unknown(Some(k)));
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
         McResult::Unknown(Some(self.cfg.end))

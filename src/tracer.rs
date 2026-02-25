@@ -1,4 +1,4 @@
-use crate::McResult;
+use crate::{McResult, McWitness};
 use log::info;
 use std::{
     ops::Deref,
@@ -7,32 +7,60 @@ use std::{
 
 pub trait TracerIf: Sync + Send {
     /// Trace a result. prop is None for all properties, Some(id) for a specific property.
-    fn trace_res(&mut self, _prop: Option<usize>, _res: McResult) {}
+    fn trace_state(&mut self, _prop: Option<usize>, _res: McResult) {}
+
+    /// Trace witness
+    fn trace_witness(&mut self, _w: McWitness) {}
 }
 
-/// Sender part of channel tracer
-pub struct ChannelTracerSx(Sender<(Option<usize>, McResult)>);
+/// Sender part of state channel tracer
+pub struct StateChannelTracerSx(Sender<(Option<usize>, McResult)>);
 
-impl TracerIf for ChannelTracerSx {
-    fn trace_res(&mut self, prop: Option<usize>, res: McResult) {
+impl TracerIf for StateChannelTracerSx {
+    fn trace_state(&mut self, prop: Option<usize>, res: McResult) {
         let _ = self.0.send((prop, res));
     }
 }
 
-/// Receiver part of channel tracer
-pub struct ChannelTracerRx(Receiver<(Option<usize>, McResult)>);
+/// Receiver part of state channel tracer
+pub struct StateChannelTracerRx(Receiver<(Option<usize>, McResult)>);
 
-impl Deref for ChannelTracerRx {
+impl Deref for StateChannelTracerRx {
     type Target = Receiver<(Option<usize>, McResult)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-/// Create a channel tracer pair (sender, receiver)
-pub fn channel_tracer() -> (ChannelTracerSx, ChannelTracerRx) {
+/// Create a state channel tracer pair (sender, receiver)
+pub fn state_channel_tracer() -> (StateChannelTracerSx, StateChannelTracerRx) {
     let (tx, rx) = mpsc::channel();
-    (ChannelTracerSx(tx), ChannelTracerRx(rx))
+    (StateChannelTracerSx(tx), StateChannelTracerRx(rx))
+}
+
+/// Sender part of witness channel tracer
+pub struct WitnessChannelTracerSx(Sender<McWitness>);
+
+impl TracerIf for WitnessChannelTracerSx {
+    fn trace_witness(&mut self, w: McWitness) {
+        let _ = self.0.send(w);
+    }
+}
+
+/// Receiver part of witness channel tracer
+pub struct WitnessChannelTracerRx(Receiver<McWitness>);
+
+impl Deref for WitnessChannelTracerRx {
+    type Target = Receiver<McWitness>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Create a witness channel tracer pair (sender, receiver)
+pub fn witness_channel_tracer() -> (WitnessChannelTracerSx, WitnessChannelTracerRx) {
+    let (tx, rx) = mpsc::channel();
+    (WitnessChannelTracerSx(tx), WitnessChannelTracerRx(rx))
 }
 
 #[derive(Default)]
@@ -49,9 +77,15 @@ impl Tracer {
         self.tracers.push(tracer);
     }
 
-    pub fn trace_res(&mut self, prop: Option<usize>, res: McResult) {
+    pub fn trace_state(&mut self, prop: Option<usize>, res: McResult) {
         for t in self.tracers.iter_mut() {
-            t.trace_res(prop, res);
+            t.trace_state(prop, res);
+        }
+    }
+
+    pub fn trace_witness(&mut self, w: McWitness) {
+        for t in self.tracers.iter_mut() {
+            t.trace_witness(w.clone());
         }
     }
 }
@@ -85,7 +119,7 @@ impl LogTracer {
 }
 
 impl TracerIf for LogTracer {
-    fn trace_res(&mut self, _prop: Option<usize>, res: McResult) {
+    fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
         match res {
             McResult::Safe => info!("{} proved the property", self.name),
             McResult::Unsafe(d) => info!("{} found a counterexample at depth {d}", self.name),
