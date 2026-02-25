@@ -8,7 +8,8 @@ use rIC3::{
     EngineCtrl, McResult, MpMcResult,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
-    tracer::ChannelTracerRx,
+    polynexus::PolyNexus,
+    tracer::{StateChannelTracerRx, WitnessChannelTracerRx},
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
 use ratatui::widgets::TableState;
@@ -57,13 +58,16 @@ impl PropMcState {
 
 /// PolyNexus task handle
 struct NexusTask {
-    join: JoinHandle<MpMcResult>,
-    state_tracer: ChannelTracerRx,
+    join: JoinHandle<(MpMcResult, PolyNexus)>,
+    state_trx: StateChannelTracerRx,
+    wit_trx: WitnessChannelTracerRx,
     ctrl: EngineCtrl,
 }
 
 pub(crate) struct Run {
+    #[allow(unused)]
     btor: Btor,
+    btorfe: BtorFrontend,
     table: TableState,
     ric3_proj: Ric3Proj,
     mc: Vec<PropMcState>,
@@ -73,12 +77,14 @@ pub(crate) struct Run {
 
 impl Run {
     fn new(btor: Btor, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
+        let btorfe = BtorFrontend::new(btor.clone());
         fs::create_dir_all(ric3_proj.path("res"))?;
         recreate_dir(ric3_proj.path("tmp"))?;
         let mut table = TableState::default();
         table.select(Some(0));
         Ok(Self {
             btor,
+            btorfe,
             table,
             ric3_proj,
             mc,
