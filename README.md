@@ -40,8 +40,23 @@ rIC3 can be compiled on both Linux and macOS.
 - Install ```cargo install --path .```
 
 ### Run
-- 16-threads Portfolio ```ric3 check <AIGER/BTOR> portfolio```
-- single-thread IC3 ```ric3 check <AIGER/BTOR> ic3```
+- Project-based: if your design directory contains a `ric3.toml`, run verification directly from that directory with `ric3 run`.
+
+  ```toml
+  [dut]
+  # Top-level module name
+  top = "counter"
+  # RTL source files used to build the DUT
+  files = ["counter.sv"]
+  # Reset signal name; prefix with "!" for an active-low reset
+  reset = "!rst_n"
+  ```
+
+  For complete runnable examples, see `examples/`.
+
+- Direct AIG/BTOR checking:
+  - 16-threads Portfolio ```ric3 check <AIGER/BTOR> portfolio```
+  - single-thread IC3 ```ric3 check <AIGER/BTOR> ic3```
 
 ### Docker
 - build image: ```docker build -t ric3 .```
