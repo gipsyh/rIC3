@@ -39,8 +39,8 @@ rIC3 can be compiled on both Linux and macOS.
 - Run ```cargo r --release -- check <AIGER/BTOR> portfolio```
 - Install ```cargo install --path .```
 
-### Run
-- Project-based: if your design directory contains a `ric3.toml`, run verification directly from that directory with `ric3 run`.
+### Usage
+- Project-based RTL flow: if your design directory contains a `ric3.toml`, run verification directly from that directory with `ric3 run`.
 
   ```toml
   [dut]
