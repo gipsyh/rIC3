@@ -7,7 +7,7 @@
 
 ### LLM-Assisted Model Checking
 rIC3 supports LLM-accelerated model checking through invariant generation. For details, see the paper [CIll: CTI-Guided Invariant Generation via LLMs for Model Checking](https://arxiv.org/abs/2602.23389).
-The prompt and VCD inspection MCP tools are located under the `tools` directory. Yosys and the [Yosys-Slang](https://github.com/gipsyh/yosys-slang/tree/ric3) parser are also required. For a concrete example, see https://github.com/gipsyh/cill-exp
+The prompt and VCD inspection MCP tools are located under the `tools` directory. For a concrete example, see https://github.com/gipsyh/cill-exp
 
 ### HWMCC
 rIC3 achieved first place in both the bit-level track and the word-level bit-vector track at the 2024 and 2025 Hardware Model Checking Competition ([HWMCC](https://hwmcc.github.io)).
@@ -24,12 +24,13 @@ rIC3 achieved first place in both the bit-level track and the word-level bit-vec
 ### Install From Source
 rIC3 can be compiled on both Linux and macOS.
 
-- Install the Rust compiler https://www.rust-lang.org/
-- ```git clone --recurse-submodules https://github.com/gipsyh/rIC3```
-- Install `gmp` and `mpfr` required by Bitwuzla ```apt install libgmp-dev libmpfr-dev``` or ```brew install gmp mpfr```
-- Build ```cd rIC3 && cargo b --release```
-- Run ```cargo r --release -- check <AIGER/BTOR> portfolio```
-- Install ```cargo install --path .```
+- Install the Rust compiler
+- Clone the repository: `git clone --recurse-submodules https://github.com/gipsyh/rIC3`
+- Install Bitwuzla from `https://github.com/bitwuzla/bitwuzla` (required by `wlbmc`)
+- Install Yosys from `https://github.com/YosysHQ/yosys` and Yosys-Slang from `https://github.com/gipsyh/yosys-slang/tree/ric3` (required by the project-based flow and CIll)
+- Build `cd rIC3 && cargo b --release`
+- Run `cargo r --release -- check <AIGER/BTOR> portfolio`
+- Install `cargo install --path .`
 
 ### Usage
 - Project-based RTL flow: if your design directory contains a `ric3.toml`, run verification directly from that directory with `ric3 run`.
