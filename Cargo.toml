@@ -24,7 +24,7 @@ clap = { version = "4.5.60", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.10.0"
 ctrlc = { version = "3.4.1", features = ["termination"] }
-bitfield-struct = "0.12.1"
+bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
 process_control = "5.0.0"
 nix = { version = "0.31.1", features = ["signal"] }
