@@ -32,10 +32,9 @@ pub struct PortfolioConfig {
     /// worker configuration
     #[arg(long = "config")]
     pub config: Option<String>,
-
-    /// woker memory limit in GB
-    #[arg(long = "worker-mem-limit", default_value_t = 16)]
-    pub wmem_limit: usize,
+    // /// woker memory limit in GB
+    // #[arg(long = "worker-mem-limit", default_value_t = 16)]
+    // pub wmem_limit: usize,
 }
 
 impl_config_deref!(PortfolioConfig);
