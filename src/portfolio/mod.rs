@@ -1,32 +1,27 @@
 use crate::config::{EngineConfig, EngineConfigBase};
+use crate::frontend::Frontend;
+use crate::tracer::{
+    PipeStateTracerRecv, PipeTracerRecv, PipeTracerSend, Tracer, TracerIf, pipe_tracer,
+};
 use crate::transys::Transys;
 use crate::{Engine, EngineCtrl, McResult, create_bl_engine, impl_config_deref};
+use anyhow::{Context, bail};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
-use log::{error, info};
+use log::{LevelFilter, info, set_max_level};
 use logicrs::VarSymbols;
+use mio::unix::SourceFd;
+use mio::{Events, Interest, Poll, Registry, Token};
 use nix::errno::Errno;
-use nix::sys::wait::{WaitStatus, waitpid};
+use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::Sender;
-use std::thread::{JoinHandle, spawn};
-use std::time::Instant;
-use std::{
-    env::current_exe,
-    io::{BufRead, BufReader, Read},
-    mem::take,
-    path::PathBuf,
-    process::{Command, Stdio},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
-    thread,
-};
+use std::iter;
+use std::os::fd::AsRawFd;
+use std::time::{Duration, Instant};
+use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
 use tempfile::{NamedTempFile, TempDir};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -53,190 +48,324 @@ impl Default for PortfolioConfig {
 }
 
 pub struct Portfolio {
+    ts: Transys,
+    sym: VarSymbols,
+    frontend: Box<dyn Frontend>,
     cert: Option<PathBuf>,
     cfg: PortfolioConfig,
     engines: Vec<Worker>,
-    engine_pids: Vec<Pid>,
-    stop_flag: Arc<AtomicBool>,
-    monitor: Option<JoinHandle<()>>,
+    running: GHashMap<Pid, usize>,
+    winner_idx: Option<usize>,
+    ctrl: EngineCtrl,
+    tracer: Tracer,
     #[allow(unused)]
     temp_dir: TempDir,
 }
 
 struct Worker {
     name: String,
-    cmd: Command,
+    cfg: EngineConfig,
+    args: String,
     cert: Option<NamedTempFile>,
+    trace: Option<PipeTracerRecv>,
+    state: McResult,
 }
 
-fn monitor_run(tx: Sender<Option<WaitStatus>>) {
-    loop {
-        match waitpid(None, None) {
-            Ok(status) => {
-                tx.send(Some(status)).unwrap();
-            }
-            Err(Errno::EINTR) => continue,
-            Err(_) => break,
-        }
+impl Worker {
+    fn run(
+        &self,
+        ts: &Transys,
+        sym: &VarSymbols,
+        frontend: &mut dyn Frontend,
+        tracer: PipeTracerSend,
+    ) -> ! {
+        set_max_level(LevelFilter::Warn);
+        // We are already in the forked child, so take ownership of the inherited
+        // in-memory model directly instead of reparsing or serializing it.
+        let ts = unsafe { std::ptr::read(ts) };
+        let sym = unsafe { std::ptr::read(sym) };
+        let mut engine = create_bl_engine(self.cfg.clone(), ts, sym);
+        engine.add_tracer(Box::new(tracer));
+        let res = engine.check();
+        write_certificate(
+            frontend,
+            engine.as_mut(),
+            self.cert.as_ref().map(|c| c.path()),
+            res,
+        );
+        exit(0);
     }
-    tx.send(None).unwrap();
+}
+
+fn write_certificate(
+    frontend: &mut dyn Frontend,
+    engine: &mut dyn Engine,
+    cert: Option<&std::path::Path>,
+    res: McResult,
+) {
+    let Some(cert_path) = cert else {
+        return;
+    };
+    let certificate = match res {
+        McResult::Safe => frontend.safe_certificate(engine.proof()),
+        McResult::Unsafe(_) => frontend.unsafe_certificate(engine.witness()),
+        McResult::Unknown(_) => return,
+    };
+    std::fs::write(cert_path, format!("{certificate}")).unwrap();
 }
 
 impl Portfolio {
-    pub fn new(model: PathBuf, cert: Option<PathBuf>, cfg: PortfolioConfig) -> Self {
+    pub fn new(
+        frontend: Box<dyn Frontend>,
+        ts: Transys,
+        sym: VarSymbols,
+        cert: Option<PathBuf>,
+        cfg: PortfolioConfig,
+    ) -> anyhow::Result<Self> {
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
-        let temp_dir_path = temp_dir.path();
         let mut engines = Vec::new();
-        let mut id = 0;
         let mut new_engine = |name, args: &str| {
-            let mut cmd = Command::new(current_exe().unwrap());
-            cmd.env("RIC3_TMP_DIR", temp_dir_path);
-            cmd.env("RUST_LOG", "warn");
-            id += 1;
-            cmd.arg("check");
-            cmd.arg(&model);
+            let argv: Vec<_> = iter::once("").chain(args.split_whitespace()).collect();
+            let cfg = EngineConfig::try_parse_from(argv)?;
+            assert!(!cfg.is_wl());
             let cert = if cert.is_some() {
                 let certificate = NamedTempFile::new_in(temp_dir.path()).unwrap();
-                let certify_path = certificate.path().as_os_str().to_str().unwrap();
-                cmd.arg("--cert");
-                cmd.arg(certify_path);
                 Some(certificate)
             } else {
                 None
             };
-            let args_split = args.split(" ");
-            for a in args_split {
-                cmd.arg(a);
-            }
-            engines.push(Worker { name, cmd, cert });
+            engines.push(Worker {
+                name,
+                cfg,
+                args: args.to_string(),
+                cert,
+                trace: None,
+                state: McResult::default(),
+            });
+            anyhow::Ok(())
         };
         let portfolio_toml = include_str!("portfolio.toml");
         let portfolio_config: GHashMap<String, GHashMap<String, String>> =
             toml::from_str(portfolio_toml).unwrap();
         let config = cfg.config.as_deref().unwrap_or("bl_default");
-        for (name, args) in portfolio_config[config].iter() {
-            new_engine(name.clone(), args);
+        let Some(worker_cfgs) = portfolio_config.get(config) else {
+            bail!("unknown portfolio config `{config}`");
+        };
+        for (name, args) in worker_cfgs.iter() {
+            new_engine(name.clone(), args)
+                .with_context(|| format!("invalid portfolio worker `{name}`"))?;
         }
-        Self {
+        Ok(Self {
+            ts,
+            sym,
+            frontend,
             cert,
             cfg,
             engines,
+            running: GHashMap::new(),
+            winner_idx: None,
             temp_dir,
-            engine_pids: Default::default(),
-            stop_flag: Arc::new(AtomicBool::new(false)),
-            monitor: None,
+            ctrl: EngineCtrl::new(),
+            tracer: Tracer::new(),
+        })
+    }
+
+    fn terminate_running(&mut self) {
+        for &pid in self.running.keys() {
+            let _ = nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM);
+        }
+        loop {
+            match waitpid(None, None) {
+                Ok(WaitStatus::Exited(pid, code)) => {
+                    let worker_idx = self.running.remove(&pid).unwrap();
+                    if code != 0 {
+                        info!("{} exited with code {code}", self.engines[worker_idx].name);
+                    }
+                }
+                Ok(WaitStatus::Signaled(pid, _, _)) => {
+                    self.running.remove(&pid);
+                }
+                Err(Errno::EINTR) => continue,
+                Err(Errno::ECHILD) => {
+                    assert!(self.running.is_empty());
+                    return;
+                }
+                Err(err) => panic!("portfolio waitpid failed: {err}"),
+                _ => panic!(),
+            }
         }
     }
 
-    fn terminate_inner(&mut self) {
-        for pid in self.engine_pids.iter() {
-            let _ = nix::sys::signal::kill(*pid, nix::sys::signal::Signal::SIGTERM);
+    pub fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+
+    fn on_state_trace(&mut self, worker_idx: usize, prop: Option<usize>, res: McResult) {
+        let worker = &mut self.engines[worker_idx];
+        worker.state = res;
+        self.tracer.trace_state(prop, res);
+        let prop_prefix = prop.map(|p| format!("p{p}: ")).unwrap_or_default();
+        match res {
+            McResult::Safe => info!("{}{} proved the property", worker.name, prop_prefix),
+            McResult::Unsafe(d) => info!(
+                "{}{} found a counterexample at depth {d}",
+                worker.name, prop_prefix
+            ),
+            McResult::Unknown(Some(d)) => {
+                info!(
+                    "{}{} found no counterexample at depth {d}",
+                    worker.name, prop_prefix
+                );
+            }
+            McResult::Unknown(None) => {}
         }
-        take(&mut self.monitor).unwrap().join().unwrap();
+    }
+
+    fn reap_child(&mut self) -> Option<McResult> {
+        loop {
+            match waitpid(None, Some(WaitPidFlag::WNOHANG)) {
+                Ok(WaitStatus::StillAlive) => break,
+                Ok(WaitStatus::Exited(pid, code)) => {
+                    let worker_idx = self.running[&pid];
+                    self.running.remove(&pid);
+                    let worker = &mut self.engines[worker_idx];
+                    if code == 0 {
+                        if self.winner_idx.is_none() {
+                            info!(
+                                "best worker: {}, configuration: {}",
+                                worker.name, worker.args
+                            );
+                            self.winner_idx = Some(worker_idx);
+                            if let Some(cert) = &self.cert {
+                                let _ = std::fs::copy(worker.cert.as_ref().unwrap().path(), cert);
+                            }
+                            while let Some((prop, res)) = self.engines[worker_idx]
+                                .trace
+                                .as_mut()
+                                .map(|t| t.state_recv())
+                                .and_then(PipeStateTracerRecv::try_recv)
+                            {
+                                self.on_state_trace(worker_idx, prop, res);
+                            }
+                            let res = self.engines[worker_idx].state;
+                            assert!(!res.is_unknown());
+                            return Some(res);
+                        }
+                    } else {
+                        info!("{} exited with code {code}", worker.name);
+                    }
+                }
+                Ok(WaitStatus::Signaled(pid, _, _)) => {
+                    self.running.remove(&pid);
+                }
+                Err(Errno::EINTR) => continue,
+                Err(Errno::ECHILD) => break,
+                Err(err) => panic!("portfolio waitpid failed: {err}"),
+                _ => panic!(),
+            }
+        }
+        None
+    }
+
+    fn on_trace_ready(&mut self, registry: &Registry, pid: Pid, event: &mio::event::Event) {
+        let Some(&worker_idx) = self.running.get(&pid) else {
+            return;
+        };
+        while let Some((prop, res)) = {
+            let worker = &mut self.engines[worker_idx];
+            worker
+                .trace
+                .as_mut()
+                .map(|t| t.state_recv())
+                .and_then(PipeStateTracerRecv::try_recv)
+        } {
+            self.on_state_trace(worker_idx, prop, res);
+        }
+
+        if event.is_error() || event.is_read_closed() || event.is_write_closed() {
+            let mut trace = {
+                let worker = &mut self.engines[worker_idx];
+                worker.trace.take()
+            };
+            if let Some(trace) = trace.as_mut() {
+                Self::deregister_trace_pipe(registry, trace);
+            }
+        }
+    }
+
+    fn register_trace_pipe(registry: &Registry, pid: Pid, trace: &mut PipeTracerRecv) {
+        let raw_fd = trace.state_recv().pipe().as_raw_fd();
+        let mut source = SourceFd(&raw_fd);
+        registry
+            .register(
+                &mut source,
+                Token(pid.as_raw() as usize),
+                Interest::READABLE,
+            )
+            .expect("portfolio mio register failed");
+    }
+
+    fn deregister_trace_pipe(registry: &Registry, trace: &mut PipeTracerRecv) {
+        let raw_fd = trace.state_recv().pipe().as_raw_fd();
+        let mut source = SourceFd(&raw_fd);
+        let _ = registry.deregister(&mut source);
     }
 
     pub fn check(&mut self) -> McResult {
-        let mut running = GHashMap::new();
-        for mut engine in take(&mut self.engines) {
-            let child = engine
-                .cmd
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .unwrap();
-            info!("start engine {}", engine.name);
-            let pid = Pid::from_raw(child.id() as i32);
-            self.engine_pids.push(pid);
-            running.insert(pid, (child, engine));
+        let mut poll = Poll::new().unwrap();
+        for worker_idx in 0..self.engines.len() {
+            let (tracer_send, mut tracer_recv) = pipe_tracer(true, false, false);
+            let worker = &mut self.engines[worker_idx];
+            match fork::fork().unwrap() {
+                fork::Fork::Parent(child) => {
+                    drop(tracer_send);
+                    let pid = Pid::from_raw(child);
+                    info!("start engine {}", worker.name);
+                    Self::register_trace_pipe(poll.registry(), pid, &mut tracer_recv);
+                    worker.trace = Some(tracer_recv);
+                    self.running.insert(pid, worker_idx);
+                }
+                fork::Fork::Child => {
+                    drop(tracer_recv);
+                    worker.run(&self.ts, &self.sym, self.frontend.as_mut(), tracer_send);
+                }
+            }
         }
 
-        let (tx, rx) = mpsc::channel();
-
-        self.monitor = Some(thread::spawn(move || monitor_run(tx)));
-
         let start = Instant::now();
+        let mut events = Events::with_capacity(self.engines.len());
         loop {
-            if self.stop_flag.load(Ordering::Relaxed) {
-                info!("Interrupted by external signal");
-                self.terminate_inner();
+            if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
+                self.terminate_running();
                 return McResult::Unknown(None);
             }
 
-            if let Some(t) = self.cfg.time_limit
-                && start.elapsed().as_secs() >= t
-            {
-                info!("Terminated by timeout.");
-                self.terminate_inner();
-                return McResult::Unknown(None);
+            if let Some(res) = self.reap_child() {
+                self.terminate_running();
+                return res;
             }
 
-            match rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                Ok(msg) => match msg {
-                    Some(WaitStatus::Exited(pid, code)) => {
-                        if let Some((mut child, engine)) = running.remove(&pid) {
-                            if code == 0 {
-                                let stdout = child.stdout.take().unwrap();
-                                let reader = BufReader::new(stdout);
-                                let mut res = None;
-                                for l in reader.lines().map_while(Result::ok) {
-                                    match l.as_str() {
-                                        "SAT" => res = Some(false),
-                                        "UNSAT" => res = Some(true),
-                                        _ => (),
-                                    }
-                                }
-
-                                if let Some(r) = res {
-                                    let config = engine
-                                        .cmd
-                                        .get_args()
-                                        .skip(1)
-                                        .map(|s| s.to_str().unwrap())
-                                        .collect::<Vec<_>>()
-                                        .join(" ");
-                                    info!("best configuration: {config}");
-                                    if let Some(cert) = &self.cert
-                                        && let Some(c) = engine.cert
-                                    {
-                                        let _ = std::fs::copy(c.path(), cert);
-                                    }
-                                    self.terminate_inner();
-                                    return if r {
-                                        McResult::Safe
-                                    } else {
-                                        McResult::Unsafe(0)
-                                    };
-                                }
-                            } else {
-                                let mut stderr = String::new();
-                                if let Some(mut e) = child.stderr.take() {
-                                    let _ = e.read_to_string(&mut stderr);
-                                }
-                                info!("{} exited with code {}: {}", engine.name, code, stderr);
-                            }
-                        }
+            match poll.poll(&mut events, Some(Duration::from_millis(100))) {
+                Ok(()) => {
+                    for event in &events {
+                        let pid = Pid::from_raw(event.token().0 as i32);
+                        self.on_trace_ready(poll.registry(), pid, event);
                     }
-                    Some(WaitStatus::Signaled(pid, _, _)) => {
-                        running.remove(&pid);
-                    }
-                    None => {
-                        error!("all workers unexpectedly exited :(");
-                        self.terminate_inner();
-                        return McResult::Unknown(None);
-                    }
-                    _ => unreachable!(),
-                },
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    error!("monitor thread disconnected");
-                    unreachable!();
                 }
+                Err(err) => panic!("portfolio mio poll failed: {err}"),
+            }
+
+            if self.running.is_empty() {
+                return self
+                    .winner_idx
+                    .map(|winner_idx| self.engines[winner_idx].state)
+                    .unwrap_or(McResult::Unknown(None));
             }
         }
     }
 
-    pub fn get_stop_signal(&self) -> Arc<AtomicBool> {
-        self.stop_flag.clone()
+    pub fn get_ctrl(&self) -> EngineCtrl {
+        self.ctrl.clone()
     }
 }
 
@@ -267,7 +396,7 @@ impl LightPortfolio {
             ts,
             sym,
             engines: Vec::new(),
-            ctrl: EngineCtrl::default(),
+            ctrl: EngineCtrl::new(),
         }
     }
 }

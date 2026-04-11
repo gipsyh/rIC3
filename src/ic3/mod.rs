@@ -254,7 +254,7 @@ impl IC3 {
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
-            ctrl: EngineCtrl::default(),
+            ctrl: EngineCtrl::new(),
         }
     }
 

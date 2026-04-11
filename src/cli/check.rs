@@ -1,13 +1,11 @@
 use crate::logger_init;
-use aig::Aig;
-use btor::Btor;
 use clap::Parser;
-use log::{error, info};
+use log::info;
 use rIC3::{
     Engine, McResult,
     config::EngineConfig,
     create_bl_engine, create_wl_engine,
-    frontend::{Frontend, aig::AigFrontend, btor::BtorFrontend, certificate_check},
+    frontend::{Frontend, certificate_check, frontend_from_model},
     portfolio::{Portfolio, PortfolioConfig},
     tracer::LogTracer,
     transys::TransysIf,
@@ -80,20 +78,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         drop(tmp_cert);
         return res;
     }
-    let mut frontend: Box<dyn Frontend> = match chk.model.extension() {
-        Some(ext) if (ext == "aig") | (ext == "aag") => {
-            let aig = Aig::from_file(&chk.model);
-            Box::new(AigFrontend::new(aig))
-        }
-        Some(ext) if (ext == "btor") | (ext == "btor2") => {
-            let btor = Btor::from_file(&chk.model);
-            Box::new(BtorFrontend::new(btor))
-        }
-        _ => {
-            error!("Unsupported file format. Supported extensions are: .aig, .aag, .btor, .btor2.");
-            exit(1);
-        }
-    };
+    let mut frontend = frontend_from_model(&chk.model)?;
     let log_tracer = Box::new(LogTracer::new(cfg.as_ref()));
     let mut engine: Box<dyn Engine> = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
@@ -156,7 +141,10 @@ pub fn certificate(
 }
 
 pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {
-    let mut engine = Portfolio::new(chk.model.clone(), chk.cert.clone(), cfg);
+    let mut frontend = frontend_from_model(&chk.model)?;
+    let (ts, symbols) = frontend.ts();
+    info!("origin ts has {}", ts.statistic());
+    let mut engine = Portfolio::new(frontend, ts, symbols, chk.cert.clone(), cfg)?;
     let res = engine.check();
     report_res(&chk, res);
     if chk.certify {

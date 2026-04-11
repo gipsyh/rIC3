@@ -6,6 +6,7 @@ use crate::{
 use clap::{ArgAction, Args, Parser};
 use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use strum::AsRefStr;
 
 /// Macro to implement Deref and DerefMut for config structs that wrap EngineConfigBase
@@ -53,6 +54,13 @@ pub struct EngineConfigBase {
     /// Time limit in seconds
     #[arg(long)]
     pub time_limit: Option<u64>,
+}
+
+impl EngineConfigBase {
+    pub fn time_limit_hit(&self, start: Instant) -> bool {
+        self.time_limit
+            .is_some_and(|t| start.elapsed().as_secs() >= t)
+    }
 }
 
 impl Default for EngineConfigBase {

@@ -60,6 +60,10 @@ impl Default for EngineCtrl {
 }
 
 impl EngineCtrl {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn terminate(&self) {
         self.terminate.store(true, Ordering::Relaxed);
     }

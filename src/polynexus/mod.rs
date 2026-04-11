@@ -157,7 +157,7 @@ impl PolyNexus {
             ts,
             rst,
             tracer: Tracer::new(),
-            ctrl: crate::EngineCtrl::default(),
+            ctrl: crate::EngineCtrl::new(),
             results,
             ic3s: (0..num_props).map(|_| None).collect(),
         }
@@ -264,7 +264,7 @@ impl PolyNexus {
                             if result.is_unsafe() {
                                 let wit = ic3.witness().into_bl().unwrap();
                                 let wit = self.rst.restore_witness(&wit);
-                                self.tracer.trace_witness(McWitness::Bl(wit));
+                                self.tracer.trace_witness(&McWitness::Bl(wit));
                             }
                             self.ic3s[prop] = Some(ic3);
                         } else {
