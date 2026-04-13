@@ -41,9 +41,9 @@ jobs:
           cargo r -- check ./examples/counter/counter.aig --certify portfolio
           cargo r -- check ./examples/counter/counter.btor --certify portfolio
           cargo r -- check ./examples/counter/counter.aig --certify ic3
-          cargo r -- check ./examples/counter/counter.btor --certify ic3cex
-          cargo r -- check ./examples/counter/counter.aig --certify bmccex
-          cargo r -- check ./examples/counter/counter.btor --certify bmccex
+          cargo r -- check ./examples/counter/counter.btor --certify ic3
+          cargo r -- check ./examples/counter/counter.aig --certify bmc
+          cargo r -- check ./examples/counter/counter.btor --certify bmc
           cargo r -- check ./examples/fifo/fifo.aig --certify portfolio
           cargo r -- check ./examples/fifo/fifo.aig --certify ic3
 
