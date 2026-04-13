@@ -15,8 +15,8 @@ pub trait TracerIf: Sync + Send {
     /// Trace cex
     fn trace_cert(&mut self, _c: &McBlCertificate) {}
 
-    /// Trace an invariant for a specific step (`Some(k)`) or for all steps (`None`).
-    fn trace_invariant(&mut self, _inv: &LitVec, _k: Option<usize>) {}
+    /// Trace a lemma for a specific step (`Some(k)`) or for all steps (`None`).
+    fn trace_lemma(&mut self, _inv: &LitVec, _k: Option<usize>) {}
 }
 
 /// Sender part of state channel tracer
@@ -97,7 +97,7 @@ impl Tracer {
 
     pub fn trace_invariant(&mut self, inv: &LitVec, k: Option<usize>) {
         for t in self.tracers.iter_mut() {
-            t.trace_invariant(inv, k);
+            t.trace_lemma(inv, k);
         }
     }
 }
@@ -150,7 +150,7 @@ impl TracerIf for LogTracer {
 pub struct PipeTracerSend {
     state: Option<PipeWriter>,
     witness: Option<PipeWriter>,
-    invariant: Option<PipeWriter>,
+    lemma: Option<PipeWriter>,
 }
 
 impl TracerIf for PipeTracerSend {
@@ -168,10 +168,10 @@ impl TracerIf for PipeTracerSend {
         }
     }
 
-    fn trace_invariant(&mut self, inv: &LitVec, k: Option<usize>) {
-        if let Some(invariant) = self.invariant.as_mut() {
-            let line = ron::to_string(&(inv, k)).unwrap();
-            let _ = writeln!(invariant, "{line}");
+    fn trace_lemma(&mut self, l: &LitVec, k: Option<usize>) {
+        if let Some(lemma) = self.lemma.as_mut() {
+            let line = ron::to_string(&(l, k)).unwrap();
+            let _ = writeln!(lemma, "{line}");
         }
     }
 }
@@ -242,9 +242,9 @@ impl PipeWitnessTracerRecv {
     }
 }
 
-pub struct PipeInvariantTracerRecv(BufReader<PipeReader>);
+pub struct PipeLemmaTracerRecv(BufReader<PipeReader>);
 
-impl PipeInvariantTracerRecv {
+impl PipeLemmaTracerRecv {
     pub fn recv(&mut self) -> (LitVec, Option<usize>) {
         let line = recv_line(&mut self.0);
         ron::from_str(line.trim_end()).unwrap()
@@ -263,7 +263,7 @@ impl PipeInvariantTracerRecv {
 pub struct PipeTracerRecv {
     state: Option<PipeStateTracerRecv>,
     witness: Option<PipeWitnessTracerRecv>,
-    invariant: Option<PipeInvariantTracerRecv>,
+    lemma: Option<PipeLemmaTracerRecv>,
 }
 
 impl PipeTracerRecv {
@@ -272,9 +272,9 @@ impl PipeTracerRecv {
     ) -> (
         Option<PipeStateTracerRecv>,
         Option<PipeWitnessTracerRecv>,
-        Option<PipeInvariantTracerRecv>,
+        Option<PipeLemmaTracerRecv>,
     ) {
-        (self.state, self.witness, self.invariant)
+        (self.state, self.witness, self.lemma)
     }
 
     pub fn state_recv(&mut self) -> &mut PipeStateTracerRecv {
@@ -285,16 +285,12 @@ impl PipeTracerRecv {
         self.witness.as_mut().unwrap()
     }
 
-    pub fn invariant_recv(&mut self) -> &mut PipeInvariantTracerRecv {
-        self.invariant.as_mut().unwrap()
+    pub fn lemma_recv(&mut self) -> &mut PipeLemmaTracerRecv {
+        self.lemma.as_mut().unwrap()
     }
 }
 
-pub fn pipe_tracer(
-    state: bool,
-    witness: bool,
-    invariant: bool,
-) -> (PipeTracerSend, PipeTracerRecv) {
+pub fn pipe_tracer(state: bool, witness: bool, lemma: bool) -> (PipeTracerSend, PipeTracerRecv) {
     fn make_pipe(enabled: bool) -> (Option<PipeWriter>, Option<PipeReader>) {
         if !enabled {
             return (None, None);
@@ -305,20 +301,18 @@ pub fn pipe_tracer(
 
     let (state_tx, state_rx) = make_pipe(state);
     let (witness_tx, witness_rx) = make_pipe(witness);
-    let (invariant_tx, invariant_rx) = make_pipe(invariant);
+    let (lemma_tx, lemma_rx) = make_pipe(lemma);
 
     (
         PipeTracerSend {
             state: state_tx,
             witness: witness_tx,
-            invariant: invariant_tx,
+            lemma: lemma_tx,
         },
         PipeTracerRecv {
             state: state_rx.map(BufReader::new).map(PipeStateTracerRecv),
             witness: witness_rx.map(BufReader::new).map(PipeWitnessTracerRecv),
-            invariant: invariant_rx
-                .map(BufReader::new)
-                .map(PipeInvariantTracerRecv),
+            lemma: lemma_rx.map(BufReader::new).map(PipeLemmaTracerRecv),
         },
     )
 }
