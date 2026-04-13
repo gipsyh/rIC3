@@ -1,6 +1,6 @@
 use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
-use rIC3::{McCex, frontend::Frontend, transys::certify::BlCex};
+use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,7 +23,9 @@ impl CIll {
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
-        let bwit = self.btorfe.unsafe_certificate(McCex::Wl(cex.clone()));
+        let bwit = self
+            .btorfe
+            .wl_certificate(McWlCertificate::Violated(cex.clone()));
         fs::write(&p, format!("{}", bwit))?;
         let Some(vcd) = vcd else {
             return Ok(());

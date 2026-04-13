@@ -1,6 +1,6 @@
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
-    Engine, McCex, McProof, McResult,
+    BlEngine, Engine, McResult,
     transys::{
         Transys, TransysIf,
         certify::{BlCex, BlProof, Restore},
@@ -93,8 +93,10 @@ impl Engine for CIllKind {
         }
         McResult::Unknown(Some(k))
     }
+}
 
-    fn proof(&mut self) -> McProof {
+impl BlEngine for CIllKind {
+    fn proof(&mut self) -> BlProof {
         let mut ts = self.ots.clone();
         let eqi = self.rst.eq_invariant();
         let mut certifaiger_dnf = vec![];
@@ -210,10 +212,10 @@ impl Engine for CIllKind {
         bads.push(!aux_latchs[0]);
         proof.bad = LitVec::from(proof.rel.new_or(bads));
         assert!(proof.input.len() + proof.latch.len() == sum + k);
-        McProof::Bl(BlProof { proof })
+        BlProof { proof }
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         let mut cex = self.uts.cex(self.solver.as_ref());
         let f = |k: usize| {
             if k < self.uts.num_unroll {
@@ -225,6 +227,6 @@ impl Engine for CIllKind {
         cex.bad_id = self.prop;
         cex.lift(&self.uts, Some(f));
         cex = self.rst.restore_cex(&cex);
-        McCex::Bl(cex)
+        cex
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlProof, Engine, EngineCtrl, McCex, McProof, McResult,
+    BlCex, BlEngine, BlProof, Engine, EngineCtrl, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -331,7 +331,25 @@ impl Engine for IC3 {
         self.tracer.add_tracer(tracer);
     }
 
-    fn proof(&mut self) -> McProof {
+    fn statistic(&mut self) {
+        self.statistic.num_auxiliary_var = self.auxiliary_var.len();
+        info!("obligations: {}", self.obligations.statistic());
+        info!("{}", self.frame.statistic(false));
+        let mut statistic = SolverStatistic::default();
+        for s in self.solvers.iter() {
+            statistic += *s.statistic();
+        }
+        info!("{statistic:#?}");
+        info!("{:#?}", self.statistic);
+    }
+
+    fn get_ctrl(&self) -> crate::EngineCtrl {
+        self.ctrl.clone()
+    }
+}
+
+impl BlEngine for IC3 {
+    fn proof(&mut self) -> BlProof {
         let mut proof = self.ots.clone();
         if let Some(iv) = self.rst.init_var() {
             let piv = proof.add_init_var();
@@ -356,10 +374,10 @@ impl Engine for IC3 {
         let invariants = proof.rel.new_or(certifaiger_dnf);
         let bad = proof.rel.new_or(proof.bad);
         proof.bad = LitVec::from(proof.rel.new_or([invariants, bad]));
-        McProof::Bl(BlProof { proof })
+        BlProof { proof }
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         let mut res = if let Some(res) = self.localabs.cex() {
             res
         } else {
@@ -388,22 +406,6 @@ impl Engine for IC3 {
             *s = self.rst.restore_eq_state(s);
         }
         res.exact_state(&self.ots, true);
-        McCex::Bl(res)
-    }
-
-    fn statistic(&mut self) {
-        self.statistic.num_auxiliary_var = self.auxiliary_var.len();
-        info!("obligations: {}", self.obligations.statistic());
-        info!("{}", self.frame.statistic(false));
-        let mut statistic = SolverStatistic::default();
-        for s in self.solvers.iter() {
-            statistic += *s.statistic();
-        }
-        info!("{statistic:#?}");
-        info!("{:#?}", self.statistic);
-    }
-
-    fn get_ctrl(&self) -> crate::EngineCtrl {
-        self.ctrl.clone()
+        res
     }
 }

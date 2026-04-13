@@ -14,7 +14,7 @@ use giputils::{
 };
 use log::{LevelFilter, info};
 use rIC3::{
-    Engine, McResult,
+    BlEngine, Engine, McResult,
     bmc::{BMC, BMCConfig},
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
@@ -148,7 +148,7 @@ impl CIll {
 
         match min_res {
             Some((r, mut bmc)) => {
-                let witness = bmc.cex().into_bl().unwrap();
+                let witness = bmc.cex();
                 self.save_cex(&witness, cex, Some(&cex_vcd))?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(

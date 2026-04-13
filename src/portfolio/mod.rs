@@ -5,7 +5,9 @@ use crate::tracer::{
 };
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
-use crate::{Engine, EngineCtrl, McCex, McProof, McResult, create_bl_engine, impl_config_deref};
+use crate::{
+    BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
+};
 use anyhow::{Context, bail};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
@@ -94,14 +96,12 @@ impl Worker {
         if let Some(cert_path) = self.cert.as_ref().map(|c| c.path()) {
             let certificate = match res {
                 McResult::Safe => {
-                    let cert = engine.proof();
-                    let cert = rst.restore_proof(cert.into_bl().unwrap(), &ots);
-                    frontend.safe_certificate(McProof::Bl(cert))
+                    let cert = rst.restore_proof(engine.proof(), &ots);
+                    frontend.bl_certificate(McBlCertificate::Satisfied(cert))
                 }
                 McResult::Unsafe(_) => {
-                    let cert = engine.cex();
-                    let cert = rst.restore_cex(&cert.into_bl().unwrap());
-                    frontend.unsafe_certificate(McCex::Bl(cert))
+                    let cert = rst.restore_cex(&engine.cex());
+                    frontend.bl_certificate(McBlCertificate::Violated(cert))
                 }
                 McResult::Unknown(_) => panic!(),
             };
@@ -385,7 +385,7 @@ pub struct LightPortfolio {
     sym: VarSymbols,
     cfg: LightPortfolioConfig,
     ecfgs: Vec<EngineConfig>,
-    engines: Vec<Box<dyn Engine>>,
+    engines: Vec<Box<dyn BlEngine>>,
     ctrl: EngineCtrl,
 }
 

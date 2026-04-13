@@ -1,4 +1,4 @@
-use crate::{McBlCertificate, McCex, McResult, transys::certify::BlCex};
+use crate::{McBlCertificate, McResult};
 use log::info;
 use logicrs::LitVec;
 use std::{
@@ -227,20 +227,18 @@ impl PipeStateTracerRecv {
 pub struct PipeWitnessTracerRecv(BufReader<PipeReader>);
 
 impl PipeWitnessTracerRecv {
-    pub fn recv(&mut self) -> McCex {
+    pub fn recv(&mut self) -> McBlCertificate {
         let line = recv_line(&mut self.0);
-        let witness: BlCex = ron::from_str(line.trim_end()).unwrap();
-        McCex::Bl(witness)
+        ron::from_str(line.trim_end()).unwrap()
     }
 
     pub fn pipe(&self) -> &PipeReader {
         self.0.get_ref()
     }
 
-    pub fn try_recv(&mut self) -> Option<McCex> {
+    pub fn try_recv(&mut self) -> Option<McBlCertificate> {
         let line = try_recv_line(&mut self.0)?;
-        let witness: BlCex = ron::from_str(line.trim_end()).unwrap();
-        Some(McCex::Bl(witness))
+        ron::from_str(line.trim_end()).unwrap()
     }
 }
 

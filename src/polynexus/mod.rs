@@ -1,5 +1,5 @@
 use crate::{
-    Engine, EngineCtrl, McBlCertificate, McCex, McProof, McResult, MpEngine, MpMcResult,
+    BlCex, BlEngine, BlProof, Engine, EngineCtrl, McBlCertificate, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -137,6 +137,7 @@ impl Scheduler {
 pub struct PolyNexus {
     #[allow(unused)]
     cfg: PolyNexusConfig,
+    ots: Transys,
     ts: Transys,
     rst: Restore,
     tracer: Tracer,
@@ -147,6 +148,7 @@ pub struct PolyNexus {
 
 impl PolyNexus {
     pub fn new(cfg: PolyNexusConfig, ts: Transys, results: MpMcResult) -> Self {
+        let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts;
@@ -154,12 +156,42 @@ impl PolyNexus {
         let num_props = ts.bad.len();
         Self {
             cfg,
+            ots,
             ts,
             rst,
             tracer: Tracer::new(),
             ctrl: crate::EngineCtrl::new(),
             results,
             ic3s: (0..num_props).map(|_| None).collect(),
+        }
+    }
+
+    fn overall_result(results: &MpMcResult) -> McResult {
+        let mut unsafe_depth = None;
+        let mut unknown_bound = None;
+        let mut all_safe = true;
+        for result in results.iter() {
+            match result {
+                McResult::Safe => {}
+                McResult::Unsafe(depth) => {
+                    unsafe_depth = Some(unsafe_depth.map_or(*depth, |d: usize| d.max(*depth)));
+                    all_safe = false;
+                }
+                McResult::Unknown(bound) => {
+                    if let Some(bound) = bound {
+                        unknown_bound =
+                            Some(unknown_bound.map_or(*bound, |d: usize| d.max(*bound)));
+                    }
+                    all_safe = false;
+                }
+            }
+        }
+        if let Some(depth) = unsafe_depth {
+            McResult::Unsafe(depth)
+        } else if all_safe {
+            McResult::Safe
+        } else {
+            McResult::Unknown(unknown_bound)
         }
     }
 
@@ -262,7 +294,7 @@ impl PolyNexus {
                             self.results[prop] = result;
                             self.tracer.trace_state(Some(prop), result);
                             if result.is_unsafe() {
-                                let cex = ic3.cex().into_bl().unwrap();
+                                let cex = ic3.cex();
                                 let cex = self.rst.restore_cex(&cex);
                                 self.tracer.trace_cert(&McBlCertificate::Violated(cex));
                             }
@@ -349,7 +381,8 @@ impl TracerIf for PropTracerBridge {
 
 impl Engine for PolyNexus {
     fn check(&mut self) -> McResult {
-        todo!()
+        let results = MpEngine::check(self);
+        Self::overall_result(&results)
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
@@ -359,20 +392,35 @@ impl Engine for PolyNexus {
     fn get_ctrl(&self) -> EngineCtrl {
         self.ctrl.clone()
     }
+}
 
-    fn proof(&mut self) -> McProof {
-        if let Some(ic3) = self.ic3s.iter_mut().flatten().next() {
-            return ic3.proof();
+impl BlEngine for PolyNexus {
+    fn proof(&mut self) -> BlProof {
+        let mut proof = BlProof {
+            proof: self.ts.clone(),
+        };
+        let mut found = false;
+        for (prop, result) in self.results.iter().enumerate() {
+            if result.is_safe() {
+                let subp = self.ic3s[prop]
+                    .as_mut()
+                    .expect("no IC3 for this property")
+                    .proof();
+                proof.merge(&subp, &self.ts);
+                found = true;
+            }
         }
-        panic!("no proof available");
+        assert!(found, "no proof available");
+        self.rst.restore_proof(proof, &self.ots)
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         for (i, r) in self.results.iter().enumerate() {
             if r.is_unsafe()
                 && let Some(ic3) = self.ic3s[i].as_mut()
             {
-                return ic3.cex();
+                let cex = ic3.cex();
+                return self.rst.restore_cex(&cex);
             }
         }
         panic!("no cex available");
@@ -384,17 +432,19 @@ impl MpEngine for PolyNexus {
         self.run()
     }
 
-    fn proof(&mut self, prop: usize) -> McProof {
-        self.ic3s[prop]
+    fn proof(&mut self, prop: usize) -> BlProof {
+        let proof = self.ic3s[prop]
             .as_mut()
             .expect("no IC3 for this property")
-            .proof()
+            .proof();
+        self.rst.restore_proof(proof, &self.ots)
     }
 
-    fn cex(&mut self, prop: usize) -> McCex {
-        self.ic3s[prop]
+    fn cex(&mut self, prop: usize) -> BlCex {
+        let cex = self.ic3s[prop]
             .as_mut()
             .expect("no IC3 for this property")
-            .cex()
+            .cex();
+        self.rst.restore_cex(&cex)
     }
 }

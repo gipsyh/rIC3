@@ -2,7 +2,7 @@ mod array;
 
 use super::Frontend;
 use crate::{
-    McCex, McProof,
+    McBlCertificate, McWlCertificate,
     transys::{self as bl},
     wltransys::{
         WlTransys,
@@ -182,9 +182,9 @@ impl Frontend for BtorFrontend {
         cerbtora_check(model, cert)
     }
 
-    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
-        match proof {
-            McProof::Bl(bl_proof) => {
+    fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
+        match cert {
+            McBlCertificate::Satisfied(bl_proof) => {
                 let wl_proof = self
                     .bb_rst
                     .as_ref()
@@ -192,17 +192,17 @@ impl Frontend for BtorFrontend {
                     .restore_proof(&self.wts, &bl_proof);
                 self.wl_safe_certificate(wl_proof)
             }
-            McProof::Wl(wl_proof) => self.wl_safe_certificate(wl_proof),
-        }
-    }
-
-    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display> {
-        match cex {
-            McCex::Bl(bl_cex) => {
+            McBlCertificate::Violated(bl_cex) => {
                 let wl_cex = self.bb_rst.as_ref().unwrap().restore_cex(&bl_cex);
                 self.wl_unsafe_certificate(wl_cex)
             }
-            McCex::Wl(wl_cex) => self.wl_unsafe_certificate(wl_cex),
+        }
+    }
+
+    fn wl_certificate(&mut self, cert: McWlCertificate) -> Box<dyn Display> {
+        match cert {
+            McWlCertificate::Satisfied(wl_proof) => self.wl_safe_certificate(wl_proof),
+            McWlCertificate::Violated(wl_cex) => self.wl_unsafe_certificate(wl_cex),
         }
     }
 }

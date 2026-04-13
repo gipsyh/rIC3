@@ -1,5 +1,5 @@
 use crate::{
-    BlProof, Engine, McCex, McProof, McResult,
+    BlCex, BlEngine, BlProof, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
@@ -164,8 +164,10 @@ impl Engine for Kind {
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
     }
+}
 
-    fn proof(&mut self) -> McProof {
+impl BlEngine for Kind {
+    fn proof(&mut self) -> BlProof {
         if self.cfg.simple_path {
             //TODO: support certifaiger with simple path constraint
             error!("k-induction with simple path constraint not support certifaiger");
@@ -283,16 +285,16 @@ impl Engine for Kind {
         bads.push(!aux_latchs[0]);
         proof.bad = LitVec::from(proof.rel.new_or(bads));
         assert!(proof.input.len() + proof.latch.len() == sum + k);
-        McProof::Bl(BlProof { proof })
+        BlProof { proof }
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         let mut cex = self.uts.cex(self.solver.as_ref());
         cex = self.rst.restore_cex(&cex);
         cex.exact_state(&self.ots, true);
         if let Some(prop) = self.cfg.prop {
             cex.bad_id = prop;
         }
-        McCex::Bl(cex)
+        cex
     }
 }

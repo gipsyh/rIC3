@@ -11,7 +11,7 @@ use logicrs::{
     fol::{self, BvTermValue, TermValue},
 };
 use rIC3::{
-    Engine, McCex, McResult,
+    BlEngine, Engine, McResult, McWlCertificate,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
     transys::{certify::BlCex, unroll::TransysUnroll},
@@ -145,7 +145,7 @@ impl CIll {
             return Ok(true);
         }
         self.rp.clear_cti()?;
-        let witness = kind.cex().into_bl().unwrap();
+        let witness = kind.cex();
         self.save_cex(
             &witness,
             self.rp.path("cill/cti"),
@@ -158,7 +158,7 @@ impl CIll {
         let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(id, self.ts.clone(), invariants, None);
         assert!(kind.check().is_unknown());
-        let cex = kind.cex().into_bl().unwrap();
+        let cex = kind.cex();
         Ok(cex)
     }
 }
@@ -227,7 +227,10 @@ impl Ric3Proj {
         }
         fs::write(
             self.path("cill/cti"),
-            format!("{}", btorfe_new.unsafe_certificate(McCex::Wl(cti))),
+            format!(
+                "{}",
+                btorfe_new.wl_certificate(McWlCertificate::Violated(cti))
+            ),
         )?;
         Ok(())
     }

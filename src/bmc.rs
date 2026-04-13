@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McCex, McResult,
+    BlCex, BlEngine, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
@@ -165,14 +165,16 @@ impl Engine for BMC {
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
     }
+}
 
-    fn cex(&mut self) -> McCex {
+impl BlEngine for BMC {
+    fn cex(&mut self) -> BlCex {
         let mut cex = self.uts.cex(self.solver.as_ref());
         cex = cex.map(|l| self.rst.restore(l));
         for s in cex.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
         cex.exact_state(&self.ots, true);
-        McCex::Bl(cex)
+        cex
     }
 }

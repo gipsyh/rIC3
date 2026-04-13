@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McCex, McResult,
+    Engine, McResult, WlCex, WlEngine,
     config::EngineConfigBase,
     impl_config_deref,
     tracer::{Tracer, TracerIf},
@@ -77,8 +77,10 @@ impl Engine for WlBMC {
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
     }
+}
 
-    fn cex(&mut self) -> McCex {
+impl WlEngine for WlBMC {
+    fn cex(&mut self) -> WlCex {
         let mut cex = self.uts.cex(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
@@ -95,6 +97,6 @@ impl Engine for WlBMC {
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        McCex::Wl(cex)
+        cex
     }
 }

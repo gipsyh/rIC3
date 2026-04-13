@@ -154,31 +154,16 @@ impl FromIterator<McResult> for MpMcResult {
     }
 }
 
-#[derive(Clone, Debug, EnumAsInner)]
-pub enum McProof {
-    Bl(BlProof),
-    Wl(WlProof),
-}
-
-#[derive(Clone, Debug, EnumAsInner)]
-pub enum McCex {
-    Bl(BlCex),
-    Wl(WlCex),
-}
-
-impl McCex {
-    pub fn prop_id(&self) -> usize {
-        match self {
-            McCex::Bl(bl_cex) => bl_cex.bad_id,
-            McCex::Wl(wl_cex) => wl_cex.bad_id,
-        }
-    }
-}
-
 #[derive(Clone, Debug, EnumAsInner, Serialize, Deserialize)]
 pub enum McBlCertificate {
     Satisfied(BlProof),
     Violated(BlCex),
+}
+
+#[derive(Clone, Debug, EnumAsInner)]
+pub enum McWlCertificate {
+    Satisfied(WlProof),
+    Violated(WlCex),
 }
 
 pub trait Engine: Send {
@@ -188,27 +173,55 @@ pub trait Engine: Send {
 
     fn statistic(&mut self) {}
 
-    fn proof(&mut self) -> McProof {
+    fn get_ctrl(&self) -> EngineCtrl {
+        panic!("unsupport get_ctrl");
+    }
+}
+
+pub trait BlEngine: Engine {
+    fn proof(&mut self) -> BlProof {
         panic!("unsupport proof");
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         panic!("unsupport counterexample");
     }
 
-    fn get_ctrl(&self) -> EngineCtrl {
-        panic!("unsupport get_ctrl");
+    fn certificate(&mut self, res: McResult) -> McBlCertificate {
+        match res {
+            McResult::Safe => McBlCertificate::Satisfied(self.proof()),
+            McResult::Unsafe(_) => McBlCertificate::Violated(self.cex()),
+            McResult::Unknown(_) => panic!(),
+        }
+    }
+}
+
+pub trait WlEngine: Engine {
+    fn proof(&mut self) -> WlProof {
+        panic!("unsupport proof");
+    }
+
+    fn cex(&mut self) -> WlCex {
+        panic!("unsupport counterexample");
+    }
+
+    fn certificate(&mut self, res: McResult) -> McWlCertificate {
+        match res {
+            McResult::Safe => McWlCertificate::Satisfied(self.proof()),
+            McResult::Unsafe(_) => McWlCertificate::Violated(self.cex()),
+            McResult::Unknown(_) => panic!(),
+        }
     }
 }
 
 pub trait MpEngine: Engine {
     fn check(&mut self) -> MpMcResult;
 
-    fn cex(&mut self, _prop: usize) -> McCex {
+    fn cex(&mut self, _prop: usize) -> BlCex {
         panic!("unsupport counterexample");
     }
 
-    fn proof(&mut self, _prop: usize) -> McProof {
+    fn proof(&mut self, _prop: usize) -> BlProof {
         panic!("unsupport proof");
     }
 }
@@ -217,7 +230,7 @@ pub fn create_bl_engine(
     cfg: EngineConfig,
     ts: Transys,
     sym: logicrs::VarSymbols,
-) -> Box<dyn Engine> {
+) -> Box<dyn BlEngine> {
     let num_bad = ts.bad.len();
     match cfg {
         EngineConfig::IC3(cfg) => Box::new(ic3::IC3::new(cfg, ts, sym)),
@@ -232,7 +245,7 @@ pub fn create_bl_engine(
     }
 }
 
-pub fn create_wl_engine(cfg: EngineConfig, ts: WlTransys) -> Box<dyn Engine> {
+pub fn create_wl_engine(cfg: EngineConfig, ts: WlTransys) -> Box<dyn WlEngine> {
     match cfg {
         EngineConfig::WlBMC(cfg) => Box::new(wlbmc::WlBMC::new(cfg, ts)),
         EngineConfig::WlKind(cfg) => Box::new(wlkind::WlKind::new(cfg, ts)),

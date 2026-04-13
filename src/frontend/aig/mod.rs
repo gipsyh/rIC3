@@ -1,6 +1,6 @@
 use super::Frontend;
 use crate::{
-    McCex, McProof,
+    McBlCertificate,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
@@ -190,68 +190,72 @@ impl Frontend for AigFrontend {
         (self.ts.clone(), self.ts_symbols.clone())
     }
 
-    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display> {
-        let proof = proof.into_bl().unwrap();
-        if !self.is_safety() {
-            error!("rIC3 does not support certificate generation for safe liveness properties");
-            panic!();
-        }
-        let mut certifaiger = Aig::from(&proof.proof);
-        certifaiger = certifaiger.reencode();
-        certifaiger.symbols.clear();
-        for (i, v) in proof.proof.input().enumerate() {
-            if let Some(r) = self.rst.get(&v) {
-                certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (**r) * 2));
+    fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
+        match cert {
+            McBlCertificate::Satisfied(proof) => {
+                if !self.is_safety() {
+                    error!(
+                        "rIC3 does not support certificate generation for safe liveness properties"
+                    );
+                    panic!();
+                }
+                let mut certifaiger = Aig::from(&proof.proof);
+                certifaiger = certifaiger.reencode();
+                certifaiger.symbols.clear();
+                for (i, v) in proof.proof.input().enumerate() {
+                    if let Some(r) = self.rst.get(&v) {
+                        certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (**r) * 2));
+                    }
+                }
+                for (i, v) in proof.proof.latch().enumerate() {
+                    if let Some(r) = self.rst.get(&v) {
+                        certifaiger
+                            .set_symbol(certifaiger.latchs[i].input, &format!("= {}", (**r) * 2));
+                    }
+                }
+                Box::new(certifaiger)
             }
-        }
-        for (i, v) in proof.proof.latch().enumerate() {
-            if let Some(r) = self.rst.get(&v) {
-                certifaiger.set_symbol(certifaiger.latchs[i].input, &format!("= {}", (**r) * 2));
-            }
-        }
-        Box::new(certifaiger)
-    }
-
-    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display> {
-        let cex = cex.into_bl().unwrap();
-        let mut wit = cex.filter_map_var(|v: Var| self.rst.get(&v).copied());
-        let mut res = vec!["1".to_string()];
-        if self.is_safety() {
-            res.push(format!("b{}", cex.bad_id));
-        } else {
-            res.push("j0".to_string());
-        }
-        wit.exact_init_state(&self.ots);
-        let mut line = String::new();
-        let mut lbstate = Vec::new();
-        for l in wit.state[0].iter() {
-            lbstate.push(Lbool::from(l.polarity()));
-            line.push(if l.polarity() { '1' } else { '0' })
-        }
-        res.push(line);
-        let mut line = String::new();
-        for i in wit.input[0].iter() {
-            line.push(if i.polarity() { '1' } else { '0' })
-        }
-        res.push(line);
-        for c in wit.input[1..].iter() {
-            let map: GHashMap<Var, bool> =
-                GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
-            let mut line = String::new();
-            let mut input = Vec::new();
-            for l in self.oaig.inputs.iter() {
-                let r = if let Some(r) = map.get(&Var::new(*l)) {
-                    *r
+            McBlCertificate::Violated(bl_cex) => {
+                let mut cex = bl_cex.filter_map_var(|v: Var| self.rst.get(&v).copied());
+                let mut res = vec!["1".to_string()];
+                if self.is_safety() {
+                    res.push(format!("b{}", bl_cex.bad_id));
                 } else {
-                    true
-                };
-                line.push(if r { '1' } else { '0' });
-                input.push(Lbool::from(r));
+                    res.push("j0".to_string());
+                }
+                cex.exact_init_state(&self.ots);
+                let mut line = String::new();
+                let mut lbstate = Vec::new();
+                for l in cex.state[0].iter() {
+                    lbstate.push(Lbool::from(l.polarity()));
+                    line.push(if l.polarity() { '1' } else { '0' })
+                }
+                res.push(line);
+                let mut line = String::new();
+                for i in cex.input[0].iter() {
+                    line.push(if i.polarity() { '1' } else { '0' })
+                }
+                res.push(line);
+                for c in cex.input[1..].iter() {
+                    let map: GHashMap<Var, bool> =
+                        GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
+                    let mut line = String::new();
+                    let mut input = Vec::new();
+                    for l in self.oaig.inputs.iter() {
+                        let r = if let Some(r) = map.get(&Var::new(*l)) {
+                            *r
+                        } else {
+                            true
+                        };
+                        line.push(if r { '1' } else { '0' });
+                        input.push(Lbool::from(r));
+                    }
+                    res.push(line);
+                }
+                res.push(".\n".to_string());
+                Box::new(res.join("\n"))
             }
-            res.push(line);
         }
-        res.push(".\n".to_string());
-        Box::new(res.join("\n"))
     }
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool {

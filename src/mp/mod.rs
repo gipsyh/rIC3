@@ -1,12 +1,12 @@
 use crate::{
-    Engine, McCex, McProof, McResult, MpMcResult,
+    BlEngine, Engine, McResult, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{
         Transys,
-        certify::{BlProof, Restore},
+        certify::{BlCex, BlProof, Restore},
     },
 };
 use clap::{ArgAction, Args};
@@ -120,26 +120,26 @@ impl Engine for MultiProp {
         McResult::Safe
     }
 
-    fn proof(&mut self) -> McProof {
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+}
+
+impl BlEngine for MultiProp {
+    fn proof(&mut self) -> BlProof {
         let mut proof = BlProof {
             proof: self.ts.clone(),
         };
         for ic3 in self.ic3.iter_mut() {
-            let subp = ic3.proof().into_bl().unwrap();
+            let subp = ic3.proof();
             proof.merge(&subp, &self.ts);
         }
-        let proof = self.rst.restore_proof(proof, &self.ots);
-        McProof::Bl(proof)
+        self.rst.restore_proof(proof, &self.ots)
     }
 
-    fn cex(&mut self) -> McCex {
+    fn cex(&mut self) -> BlCex {
         let bid = self.results.iter().position(|r| r.is_unsafe()).unwrap();
-        let cex = self.ic3[bid].cex().into_bl().unwrap();
-        let cex = self.rst.restore_cex(&cex);
-        McCex::Bl(cex)
-    }
-
-    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
-        self.tracer.add_tracer(tracer);
+        let cex = self.ic3[bid].cex();
+        self.rst.restore_cex(&cex)
     }
 }

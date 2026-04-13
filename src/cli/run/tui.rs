@@ -3,7 +3,7 @@ use crate::cli::{
     yosys::Yosys,
 };
 use rIC3::{
-    Engine, McCex, McResult, MpEngine, MpMcResult,
+    Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
     frontend::Frontend,
     polynexus::{PolyNexus, PolyNexusConfig},
     tracer::{state_channel_tracer, witness_channel_tracer},
@@ -163,7 +163,7 @@ impl Run {
             while let Ok(cex) = task.wit_trx.try_recv() {
                 let cex = cex.into_violated().unwrap();
                 let prop_id = cex.bad_id;
-                let cex = self.btorfe.unsafe_certificate(McCex::Bl(cex));
+                let cex = self.btorfe.bl_certificate(McBlCertificate::Violated(cex));
                 let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
                 fs::write(&wit_path, format!("{cex}")).unwrap();
                 Yosys::btor_wit_to_vcd(

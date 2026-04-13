@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, Engine, McCex, McResult,
+    BlCex, BlEngine, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -97,7 +97,7 @@ impl Rlive {
         if let McResult::Safe = res {
             return Ok(ic3.invariant());
         }
-        let cex = ic3.cex().into_bl().unwrap();
+        let cex = ic3.cex();
         assert!(cex.input.len() > 1);
         Err(cex)
     }
@@ -178,7 +178,7 @@ impl Engine for Rlive {
             if let McResult::Safe = res {
                 return McResult::Safe;
             }
-            let cex = ic3.cex().into_bl().unwrap();
+            let cex = ic3.cex();
             assert!(self.level() == 0);
             self.add_trace(cex);
             if !self.block() {
@@ -186,9 +186,10 @@ impl Engine for Rlive {
             }
         }
     }
+}
 
-    fn cex(&mut self) -> McCex {
-        let cex = BlCex::concat(self.cex.clone());
-        McCex::Bl(cex.map_var(|v| self.rst.restore_var(v)))
+impl BlEngine for Rlive {
+    fn cex(&mut self) -> BlCex {
+        BlCex::concat(self.cex.clone()).map_var(|v| self.rst.restore_var(v))
     }
 }

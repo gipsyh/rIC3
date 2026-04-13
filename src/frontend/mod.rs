@@ -1,5 +1,5 @@
 use crate::{
-    McCex, McProof,
+    McBlCertificate, McWlCertificate,
     frontend::{
         aig::{AigFrontend, certifaiger_check},
         btor::{BtorFrontend, cerbtora_check},
@@ -27,9 +27,11 @@ pub trait Frontend {
         panic!("frontend unsupported for wltransys")
     }
 
-    fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display>;
+    fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display>;
 
-    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display>;
+    fn wl_certificate(&mut self, _cert: McWlCertificate) -> Box<dyn Display> {
+        panic!("unsupport wl_certificate")
+    }
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool;
 }
