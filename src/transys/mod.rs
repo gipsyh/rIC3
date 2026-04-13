@@ -15,6 +15,7 @@ pub mod unroll;
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
     mem::take,
@@ -119,7 +120,7 @@ pub trait TransysIf {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Transys {
     pub input: Vec<Var>,
     pub latch: Vec<Var>,

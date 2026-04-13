@@ -148,7 +148,7 @@ impl BlCex {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BlProof {
     pub proof: Transys,
 }

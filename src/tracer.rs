@@ -1,4 +1,4 @@
-use crate::{McCex, McResult, transys::certify::BlCex};
+use crate::{McBlCertificate, McCex, McResult, transys::certify::BlCex};
 use log::info;
 use logicrs::LitVec;
 use std::{
@@ -13,7 +13,7 @@ pub trait TracerIf: Sync + Send {
     fn trace_state(&mut self, _prop: Option<usize>, _res: McResult) {}
 
     /// Trace cex
-    fn trace_cex(&mut self, _w: &McCex) {}
+    fn trace_cert(&mut self, _c: &McBlCertificate) {}
 
     /// Trace an invariant for a specific step (`Some(k)`) or for all steps (`None`).
     fn trace_invariant(&mut self, _inv: &LitVec, _k: Option<usize>) {}
@@ -45,19 +45,19 @@ pub fn state_channel_tracer() -> (StateChannelTracerSx, StateChannelTracerRx) {
 }
 
 /// Sender part of witness channel tracer
-pub struct WitnessChannelTracerSx(Sender<McCex>);
+pub struct WitnessChannelTracerSx(Sender<McBlCertificate>);
 
 impl TracerIf for WitnessChannelTracerSx {
-    fn trace_cex(&mut self, w: &McCex) {
-        let _ = self.0.send(w.clone());
+    fn trace_cert(&mut self, c: &McBlCertificate) {
+        let _ = self.0.send(c.clone());
     }
 }
 
 /// Receiver part of witness channel tracer
-pub struct WitnessChannelTracerRx(Receiver<McCex>);
+pub struct WitnessChannelTracerRx(Receiver<McBlCertificate>);
 
 impl Deref for WitnessChannelTracerRx {
-    type Target = Receiver<McCex>;
+    type Target = Receiver<McBlCertificate>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -89,9 +89,9 @@ impl Tracer {
         }
     }
 
-    pub fn trace_cex(&mut self, w: &McCex) {
+    pub fn trace_cert(&mut self, c: &McBlCertificate) {
         for t in self.tracers.iter_mut() {
-            t.trace_cex(w);
+            t.trace_cert(c);
         }
     }
 
@@ -161,10 +161,9 @@ impl TracerIf for PipeTracerSend {
         }
     }
 
-    fn trace_cex(&mut self, w: &McCex) {
+    fn trace_cert(&mut self, c: &McBlCertificate) {
         if let Some(cex) = self.witness.as_mut() {
-            let w = w.as_bl().unwrap();
-            let line = ron::to_string(w).unwrap();
+            let line = ron::to_string(c).unwrap();
             let _ = writeln!(cex, "{line}");
         }
     }

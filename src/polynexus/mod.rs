@@ -1,5 +1,5 @@
 use crate::{
-    Engine, EngineCtrl, McCex, McProof, McResult, MpEngine, MpMcResult,
+    Engine, EngineCtrl, McBlCertificate, McCex, McProof, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -264,7 +264,7 @@ impl PolyNexus {
                             if result.is_unsafe() {
                                 let cex = ic3.cex().into_bl().unwrap();
                                 let cex = self.rst.restore_cex(&cex);
-                                self.tracer.trace_cex(&McCex::Bl(cex));
+                                self.tracer.trace_cert(&McBlCertificate::Violated(cex));
                             }
                             self.ic3s[prop] = Some(ic3);
                         } else {

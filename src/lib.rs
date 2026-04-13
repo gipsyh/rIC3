@@ -175,6 +175,12 @@ impl McCex {
     }
 }
 
+#[derive(Clone, Debug, EnumAsInner, Serialize, Deserialize)]
+pub enum McBlCertificate {
+    Satisfied(BlProof),
+    Violated(BlCex),
+}
+
 pub trait Engine: Send {
     fn check(&mut self) -> McResult;
 
