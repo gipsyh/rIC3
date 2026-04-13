@@ -27,9 +27,9 @@ pub struct CheckConfig {
     #[arg(long, default_value_t = false)]
     pub certify: bool,
 
-    /// print witness when model is unsafe
+    /// print counterexample when model is unsafe
     #[arg(long, default_value_t = false)]
-    pub witness: bool,
+    pub cex: bool,
 
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
@@ -40,20 +40,20 @@ fn report_res(chk: &CheckConfig, res: McResult) {
     match res {
         McResult::Safe => {
             println!("UNSAT");
-            if chk.witness {
+            if chk.cex {
                 println!("0");
             }
         }
         McResult::Unsafe(_) => {
             println!("SAT");
-            if chk.witness {
-                let witness = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
-                println!("{witness}");
+            if chk.cex {
+                let cex = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
+                println!("{cex}");
             }
         }
         McResult::Unknown(_) => {
             println!("UNKNOWN");
-            if chk.witness {
+            if chk.cex {
                 println!("2");
             }
         }
@@ -68,7 +68,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     chk.model = chk.model.canonicalize()?;
     info!("the model to be checked: {}", chk.model.display());
     let mut tmp_cert = None;
-    if chk.cert.is_none() && (chk.certify || chk.witness) {
+    if chk.cert.is_none() && (chk.certify || chk.cex) {
         let tmp_cert_file = tempfile::NamedTempFile::new().unwrap();
         chk.cert = Some(PathBuf::from(tmp_cert_file.path()));
         tmp_cert = Some(tmp_cert_file);
@@ -134,8 +134,8 @@ pub fn certificate(
     let cert = if res {
         frontend.safe_certificate(engine.proof())
     } else {
-        let witness = engine.witness();
-        frontend.unsafe_certificate(witness)
+        let cex = engine.cex();
+        frontend.unsafe_certificate(cex)
     };
     fs::write(chk.cert.as_ref().unwrap(), format!("{cert}")).unwrap();
 }

@@ -1,6 +1,6 @@
 use super::Frontend;
 use crate::{
-    McProof, McWitness,
+    McCex, McProof,
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
@@ -212,12 +212,12 @@ impl Frontend for AigFrontend {
         Box::new(certifaiger)
     }
 
-    fn unsafe_certificate(&mut self, witness: McWitness) -> Box<dyn Display> {
-        let witness = witness.into_bl().unwrap();
-        let mut wit = witness.filter_map_var(|v: Var| self.rst.get(&v).copied());
+    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display> {
+        let cex = cex.into_bl().unwrap();
+        let mut wit = cex.filter_map_var(|v: Var| self.rst.get(&v).copied());
         let mut res = vec!["1".to_string()];
         if self.is_safety() {
-            res.push(format!("b{}", witness.bad_id));
+            res.push(format!("b{}", cex.bad_id));
         } else {
             res.push("j0".to_string());
         }

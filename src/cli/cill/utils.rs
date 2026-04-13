@@ -1,6 +1,6 @@
 use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
-use rIC3::{McWitness, frontend::Frontend, transys::certify::BlWitness};
+use rIC3::{McCex, frontend::Frontend, transys::certify::BlCex};
 use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,15 +15,15 @@ use tabled::{
 };
 
 impl CIll {
-    pub fn save_witness(
+    pub fn save_cex(
         &mut self,
-        wit: &BlWitness,
+        cex: &BlCex,
         p: impl AsRef<Path>,
         vcd: Option<impl AsRef<Path>>,
     ) -> anyhow::Result<()> {
-        let wit = self.ts_rst.restore_witness(wit);
-        let mut wit = self.bb_map.restore_witness(&wit);
-        let bwit = self.btorfe.unsafe_certificate(McWitness::Wl(wit.clone()));
+        let cex = self.ts_rst.restore_cex(cex);
+        let mut cex = self.bb_map.restore_cex(&cex);
+        let bwit = self.btorfe.unsafe_certificate(McCex::Wl(cex.clone()));
         fs::write(&p, format!("{}", bwit))?;
         let Some(vcd) = vcd else {
             return Ok(());
@@ -37,8 +37,8 @@ impl CIll {
         } else {
             ""
         };
-        wit.enrich(&self.wsym.keys().cloned().collect());
-        wlwitness_vcd(&wit, &self.wsym, vcd_file, filter)?;
+        cex.enrich(&self.wsym.keys().cloned().collect());
+        wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
         // crate::cli::yosys::Yosys::btor_wit_to_vcd(
         //     self.rp.path("dut"),
         //     &cti_file,

@@ -1,4 +1,4 @@
-use crate::wltransys::{WlTransys, certify::WlWitness};
+use crate::wltransys::{WlTransys, certify::WlCex};
 use bitwuzla::Bitwuzla;
 use giputils::hash::GHashMap;
 use logicrs::{
@@ -91,8 +91,8 @@ impl WlTransysUnroll {
         t.apply(|t| self.next_map.get(t).map(|n| n[k].clone()))
     }
 
-    pub fn witness(&self, slv: &mut Bitwuzla) -> WlWitness {
-        let mut witness = WlWitness::new();
+    pub fn cex(&self, slv: &mut Bitwuzla) -> WlCex {
+        let mut cex = WlCex::new();
         for k in 0..=self.num_unroll {
             let mut w = Vec::new();
             for i in self.ts.input.iter() {
@@ -101,7 +101,7 @@ impl WlTransysUnroll {
                     w.push(BvTermValue::new(i.clone(), LboolVec::from(val)));
                 }
             }
-            witness.input.push(w);
+            cex.input.push(w);
             let mut w = Vec::new();
             for l in self.ts.latch.iter() {
                 let nl = self.next(l, k);
@@ -112,8 +112,8 @@ impl WlTransysUnroll {
                     ));
                 }
             }
-            witness.state.push(w);
+            cex.state.push(w);
         }
-        witness
+        cex
     }
 }

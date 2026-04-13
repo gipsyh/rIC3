@@ -1,6 +1,6 @@
 use super::IC3;
 use crate::{
-    BlWitness,
+    BlCex,
     ic3::IC3Config,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
@@ -58,11 +58,11 @@ impl LocalAbs {
         }
     }
 
-    pub fn witness(&self) -> Option<BlWitness> {
+    pub fn cex(&self) -> Option<BlCex> {
         if !self.foundcex {
             return None;
         }
-        Some(self.uts.witness(self.solver.as_ref()))
+        Some(self.uts.cex(self.solver.as_ref()))
     }
 
     #[inline]
@@ -84,8 +84,8 @@ impl LocalAbs {
 }
 
 impl IC3 {
-    pub(super) fn check_witness_by_bmc(&mut self, depth: usize) -> bool {
-        debug!("localabs: checking witness by bmc with depth {depth}");
+    pub(super) fn check_cex_by_bmc(&mut self, depth: usize) -> bool {
+        debug!("localabs: checking cex by bmc with depth {depth}");
         self.localabs.uts.unroll_to(depth);
         for k in self.localabs.kslv + 1..=depth {
             self.localabs
@@ -110,7 +110,7 @@ impl IC3 {
             info!("localabs: refine size: {}", self.localabs.refine.len());
             false
         } else {
-            info!("localabs: witness checking passed");
+            info!("localabs: cex checking passed");
             self.localabs.foundcex = true;
             true
         }

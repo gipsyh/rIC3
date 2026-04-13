@@ -1,5 +1,5 @@
 use crate::{
-    BlProof, Engine, McProof, McResult, McWitness,
+    BlProof, Engine, McCex, McProof, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
@@ -286,13 +286,13 @@ impl Engine for Kind {
         McProof::Bl(BlProof { proof })
     }
 
-    fn witness(&mut self) -> McWitness {
-        let mut wit = self.uts.witness(self.solver.as_ref());
-        wit = self.rst.restore_witness(&wit);
-        wit.exact_state(&self.ots, true);
+    fn cex(&mut self) -> McCex {
+        let mut cex = self.uts.cex(self.solver.as_ref());
+        cex = self.rst.restore_cex(&cex);
+        cex.exact_state(&self.ots, true);
         if let Some(prop) = self.cfg.prop {
-            wit.bad_id = prop;
+            cex.bad_id = prop;
         }
-        McWitness::Bl(wit)
+        McCex::Bl(cex)
     }
 }

@@ -2,9 +2,9 @@ use super::WlTransys;
 use crate::{
     transys::{
         Transys, TransysIf,
-        certify::{BlProof, BlWitness},
+        certify::{BlCex, BlProof},
     },
-    wltransys::certify::{WlProof, WlWitness},
+    wltransys::certify::{WlCex, WlProof},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{
@@ -235,31 +235,31 @@ impl BitblastMap {
         }
     }
 
-    pub fn restore_witness(&self, witness: &BlWitness) -> WlWitness {
-        let mut res = WlWitness::new();
-        res.bad_id = witness.bad_id;
-        for t in 0..witness.len() {
+    pub fn restore_cex(&self, cex: &BlCex) -> WlCex {
+        let mut res = WlCex::new();
+        res.bad_id = cex.bad_id;
+        for t in 0..cex.len() {
             res.input.push(
-                self.restore_lits(&witness.input[t])
+                self.restore_lits(&cex.input[t])
                     .into_iter()
                     .map(|t| t.into_bv())
                     .collect(),
             );
-            res.state.push(self.restore_lits(&witness.state[t]));
+            res.state.push(self.restore_lits(&cex.state[t]));
         }
         res
     }
 
-    pub fn bitblast_witness(&self, witness: &WlWitness) -> BlWitness {
-        let mut res = BlWitness::new();
-        res.bad_id = witness.bad_id;
-        for t in 0..witness.len() {
-            let lv: LitVec = witness.input[t]
+    pub fn bitblast_cex(&self, cex: &WlCex) -> BlCex {
+        let mut res = BlCex::new();
+        res.bad_id = cex.bad_id;
+        for t in 0..cex.len() {
+            let lv: LitVec = cex.input[t]
                 .iter()
                 .flat_map(|t| self.map_termval(t))
                 .collect();
             res.input.push(lv);
-            let lv: LitVec = witness.state[t]
+            let lv: LitVec = cex.state[t]
                 .iter()
                 .flat_map(|t| self.map_termval(&t.into_bv()))
                 .collect();

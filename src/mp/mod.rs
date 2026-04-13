@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McProof, McResult, McWitness, MpMcResult,
+    Engine, McCex, McProof, McResult, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -132,11 +132,11 @@ impl Engine for MultiProp {
         McProof::Bl(proof)
     }
 
-    fn witness(&mut self) -> McWitness {
+    fn cex(&mut self) -> McCex {
         let bid = self.results.iter().position(|r| r.is_unsafe()).unwrap();
-        let wit = self.ic3[bid].witness().into_bl().unwrap();
-        let wit = self.rst.restore_witness(&wit);
-        McWitness::Bl(wit)
+        let cex = self.ic3[bid].cex().into_bl().unwrap();
+        let cex = self.rst.restore_cex(&cex);
+        McCex::Bl(cex)
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

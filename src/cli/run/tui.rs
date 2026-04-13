@@ -160,11 +160,11 @@ impl Run {
                 let prop = &mut self.mc[prop_id];
                 prop.prop.res = result;
             }
-            while let Ok(wit) = task.wit_trx.try_recv() {
-                let prop_id = wit.prop_id();
-                let wit = self.btorfe.unsafe_certificate(wit);
+            while let Ok(cex) = task.wit_trx.try_recv() {
+                let prop_id = cex.prop_id();
+                let cex = self.btorfe.unsafe_certificate(cex);
                 let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
-                fs::write(&wit_path, format!("{wit}")).unwrap();
+                fs::write(&wit_path, format!("{cex}")).unwrap();
                 Yosys::btor_wit_to_vcd(
                     self.ric3_proj.path("dut"),
                     wit_path,

@@ -21,11 +21,11 @@ use crate::{
     tracer::TracerIf,
     transys::{
         Transys,
-        certify::{BlProof, BlWitness},
+        certify::{BlCex, BlProof},
     },
     wltransys::{
         WlTransys,
-        certify::{WlProof, WlWitness},
+        certify::{WlCex, WlProof},
     },
 };
 use enum_as_inner::EnumAsInner;
@@ -161,16 +161,16 @@ pub enum McProof {
 }
 
 #[derive(Clone, Debug, EnumAsInner)]
-pub enum McWitness {
-    Bl(BlWitness),
-    Wl(WlWitness),
+pub enum McCex {
+    Bl(BlCex),
+    Wl(WlCex),
 }
 
-impl McWitness {
+impl McCex {
     pub fn prop_id(&self) -> usize {
         match self {
-            McWitness::Bl(bl_witness) => bl_witness.bad_id,
-            McWitness::Wl(wl_witness) => wl_witness.bad_id,
+            McCex::Bl(bl_cex) => bl_cex.bad_id,
+            McCex::Wl(wl_cex) => wl_cex.bad_id,
         }
     }
 }
@@ -186,20 +186,20 @@ pub trait Engine: Send {
         panic!("unsupport proof");
     }
 
-    fn witness(&mut self) -> McWitness {
-        panic!("unsupport witness");
+    fn cex(&mut self) -> McCex {
+        panic!("unsupport counterexample");
     }
 
     fn get_ctrl(&self) -> EngineCtrl {
-        panic!("unsupported: get_external_ctrl");
+        panic!("unsupport get_ctrl");
     }
 }
 
 pub trait MpEngine: Engine {
     fn check(&mut self) -> MpMcResult;
 
-    fn witness(&mut self, _prop: usize) -> McWitness {
-        panic!("unsupport witness");
+    fn cex(&mut self, _prop: usize) -> McCex {
+        panic!("unsupport counterexample");
     }
 
     fn proof(&mut self, _prop: usize) -> McProof {

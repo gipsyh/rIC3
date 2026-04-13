@@ -1,9 +1,9 @@
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
-    Engine, McProof, McResult, McWitness,
+    Engine, McCex, McProof, McResult,
     transys::{
         Transys, TransysIf,
-        certify::{BlProof, BlWitness, Restore},
+        certify::{BlCex, BlProof, Restore},
         unroll::TransysUnroll,
     },
 };
@@ -15,18 +15,13 @@ pub struct CIllKind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     local_cst: LitVvec,
-    wit_assume: Option<BlWitness>,
+    wit_assume: Option<BlCex>,
     ots: Transys,
     rst: Restore,
 }
 
 impl CIllKind {
-    pub fn new(
-        prop: usize,
-        ts: Transys,
-        local_cst: LitVvec,
-        wit_assume: Option<BlWitness>,
-    ) -> Self {
+    pub fn new(prop: usize, ts: Transys, local_cst: LitVvec, wit_assume: Option<BlCex>) -> Self {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         assert!(!ts.has_gate_init());
@@ -68,15 +63,15 @@ impl CIllKind {
         }
     }
 
-    fn load_witness_assume(&mut self) {
-        let Some(wit) = &self.wit_assume else {
+    fn load_cex_assume(&mut self) {
+        let Some(cex) = &self.wit_assume else {
             return;
         };
-        assert!(wit.len() == self.uts.num_unroll + 1);
+        assert!(cex.len() == self.uts.num_unroll + 1);
         for k in 0..=self.uts.num_unroll {
             for l in self
                 .uts
-                .lits_next(wit.input[k].iter().chain(wit.state[k].iter()), k)
+                .lits_next(cex.input[k].iter().chain(cex.state[k].iter()), k)
             {
                 self.solver.add_clause(&[l]);
             }
@@ -89,7 +84,7 @@ impl Engine for CIllKind {
         let k = 3;
         self.uts.unroll_to(k);
         self.load_trans_to(k);
-        self.load_witness_assume();
+        self.load_cex_assume();
         self.load_bad_to(k - 1);
         let bad = self.uts.lit_next(self.uts.ts.bad[self.prop], k);
         let res = self.solver.solve(&[bad]);
@@ -218,8 +213,8 @@ impl Engine for CIllKind {
         McProof::Bl(BlProof { proof })
     }
 
-    fn witness(&mut self) -> McWitness {
-        let mut wit = self.uts.witness(self.solver.as_ref());
+    fn cex(&mut self) -> McCex {
+        let mut cex = self.uts.cex(self.solver.as_ref());
         let f = |k: usize| {
             if k < self.uts.num_unroll {
                 !&self.uts.ts.bad
@@ -227,9 +222,9 @@ impl Engine for CIllKind {
                 LitVec::new()
             }
         };
-        wit.bad_id = self.prop;
-        wit.lift(&self.uts, Some(f));
-        wit = self.rst.restore_witness(&wit);
-        McWitness::Bl(wit)
+        cex.bad_id = self.prop;
+        cex.lift(&self.uts, Some(f));
+        cex = self.rst.restore_cex(&cex);
+        McCex::Bl(cex)
     }
 }

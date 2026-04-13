@@ -1,5 +1,5 @@
 use crate::{
-    BlProof, BlWitness, Engine, EngineCtrl, McProof, McResult, McWitness,
+    BlCex, BlProof, Engine, EngineCtrl, McCex, McProof, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -359,11 +359,11 @@ impl Engine for IC3 {
         McProof::Bl(BlProof { proof })
     }
 
-    fn witness(&mut self) -> McWitness {
-        let mut res = if let Some(res) = self.localabs.witness() {
+    fn cex(&mut self) -> McCex {
+        let mut res = if let Some(res) = self.localabs.cex() {
             res
         } else {
-            let mut res = BlWitness::default();
+            let mut res = BlCex::default();
             let b = self.obligations.peak().unwrap();
             assert!(b.frame == 0);
             let mut b = Some(b);
@@ -388,7 +388,7 @@ impl Engine for IC3 {
             *s = self.rst.restore_eq_state(s);
         }
         res.exact_state(&self.ots, true);
-        McWitness::Bl(res)
+        McCex::Bl(res)
     }
 
     fn statistic(&mut self) {

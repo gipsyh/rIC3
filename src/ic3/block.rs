@@ -91,7 +91,7 @@ impl IC3 {
             if self.tsctx.cube_subsume_init(&po.state) {
                 if self.cfg.abs_cst || self.cfg.abs_trans {
                     self.add_obligation(po.clone());
-                    if self.check_witness_by_bmc(po.depth) {
+                    if self.check_cex_by_bmc(po.depth) {
                         return BlockResult::Failure(po.depth);
                     } else {
                         self.obligations.clear();

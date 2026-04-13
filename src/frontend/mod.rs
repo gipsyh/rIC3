@@ -1,5 +1,5 @@
 use crate::{
-    McProof, McWitness,
+    McCex, McProof,
     frontend::{
         aig::{AigFrontend, certifaiger_check},
         btor::{BtorFrontend, cerbtora_check},
@@ -29,7 +29,7 @@ pub trait Frontend {
 
     fn safe_certificate(&mut self, proof: McProof) -> Box<dyn Display>;
 
-    fn unsafe_certificate(&mut self, witness: McWitness) -> Box<dyn Display>;
+    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display>;
 
     fn certify(&mut self, model: &Path, cert: &Path) -> bool;
 }

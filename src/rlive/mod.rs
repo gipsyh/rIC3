@@ -1,5 +1,5 @@
 use crate::{
-    BlWitness, Engine, McResult, McWitness,
+    BlCex, Engine, McCex, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -19,7 +19,7 @@ pub struct Rlive {
     rts: Transys,    // reach check ts
     base_var: Var,   // base var
     trace: Vec<LitOrdVec>,
-    witness: Vec<BlWitness>,
+    cex: Vec<BlCex>,
     shoals: Vec<LitVec>,
     rst: Restore,
 }
@@ -38,18 +38,18 @@ impl_config_deref!(RliveConfig);
 impl Rlive {
     #[inline]
     fn level(&self) -> usize {
-        assert!(self.trace.len() == self.witness.len());
+        assert!(self.trace.len() == self.cex.len());
         self.trace.len()
     }
 
     #[inline]
-    fn add_trace(&mut self, mut w: BlWitness) -> bool {
+    fn add_trace(&mut self, mut w: BlCex) -> bool {
         for s in w.state.iter_mut().chain(w.input.iter_mut()) {
             s.retain(|l| l.var() != self.base_var);
         }
         let s = LitOrdVec::new(w.state.pop().unwrap());
         w.input.pop();
-        self.witness.push(w);
+        self.cex.push(w);
         for t in self.trace.iter() {
             if t.subsume(&s) || s.subsume(t) {
                 self.trace.push(s);
@@ -80,10 +80,10 @@ impl Rlive {
     #[inline]
     fn pop_trace(&mut self) {
         self.trace.pop();
-        self.witness.pop();
+        self.cex.pop();
     }
 
-    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, BlWitness> {
+    fn check_reach(&mut self, s: LitVec) -> Result<Vec<LitVec>, BlCex> {
         let mut rts = self.rts.clone();
         for l in s {
             assert!(l.var() != self.base_var);
@@ -97,9 +97,9 @@ impl Rlive {
         if let McResult::Safe = res {
             return Ok(ic3.invariant());
         }
-        let wit = ic3.witness().into_bl().unwrap();
-        assert!(wit.input.len() > 1);
-        Err(wit)
+        let cex = ic3.cex().into_bl().unwrap();
+        assert!(cex.input.len() > 1);
+        Err(cex)
     }
 
     fn block(&mut self) -> bool {
@@ -158,7 +158,7 @@ impl Rlive {
             rts,
             base_var,
             trace: Vec::new(),
-            witness: Vec::new(),
+            cex: Vec::new(),
             shoals: Vec::new(),
             rst,
         }
@@ -178,17 +178,17 @@ impl Engine for Rlive {
             if let McResult::Safe = res {
                 return McResult::Safe;
             }
-            let wit = ic3.witness().into_bl().unwrap();
+            let cex = ic3.cex().into_bl().unwrap();
             assert!(self.level() == 0);
-            self.add_trace(wit);
+            self.add_trace(cex);
             if !self.block() {
                 return McResult::Unsafe(0);
             }
         }
     }
 
-    fn witness(&mut self) -> McWitness {
-        let witness = BlWitness::concat(self.witness.clone());
-        McWitness::Bl(witness.map_var(|v| self.rst.restore_var(v)))
+    fn cex(&mut self) -> McCex {
+        let cex = BlCex::concat(self.cex.clone());
+        McCex::Bl(cex.map_var(|v| self.rst.restore_var(v)))
     }
 }

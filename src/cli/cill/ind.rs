@@ -11,10 +11,10 @@ use logicrs::{
     fol::{self, BvTermValue, TermValue},
 };
 use rIC3::{
-    Engine, McResult, McWitness,
+    Engine, McCex, McResult,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
-    transys::{certify::BlWitness, unroll::TransysUnroll},
+    transys::{certify::BlCex, unroll::TransysUnroll},
 };
 use rayon::prelude::*;
 use std::{
@@ -137,16 +137,16 @@ impl CIll {
         let cti_file = self.rp.path("cill/cti");
         let cti = fs::read_to_string(&cti_file)?;
         let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
-        let cti = self.bb_map.bitblast_witness(&cti);
-        let cti = self.ts_rst.forward_witness(&cti);
+        let cti = self.bb_map.bitblast_cex(&cti);
+        let cti = self.ts_rst.forward_cex(&cti);
         let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
         if kind.check().is_safe() {
             return Ok(true);
         }
         self.rp.clear_cti()?;
-        let witness = kind.witness().into_bl().unwrap();
-        self.save_witness(
+        let witness = kind.cex().into_bl().unwrap();
+        self.save_cex(
             &witness,
             self.rp.path("cill/cti"),
             Some(self.rp.path("cill/cti.vcd")),
@@ -154,12 +154,12 @@ impl CIll {
         Ok(false)
     }
 
-    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlWitness> {
+    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlCex> {
         let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(id, self.ts.clone(), invariants, None);
         assert!(kind.check().is_unknown());
-        let wit = kind.witness().into_bl().unwrap();
-        Ok(wit)
+        let cex = kind.cex().into_bl().unwrap();
+        Ok(cex)
     }
 }
 
@@ -227,7 +227,7 @@ impl Ric3Proj {
         }
         fs::write(
             self.path("cill/cti"),
-            format!("{}", btorfe_new.unsafe_certificate(McWitness::Wl(cti))),
+            format!("{}", btorfe_new.unsafe_certificate(McCex::Wl(cti))),
         )?;
         Ok(())
     }

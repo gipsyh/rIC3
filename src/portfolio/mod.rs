@@ -5,9 +5,7 @@ use crate::tracer::{
 };
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
-use crate::{
-    Engine, EngineCtrl, McProof, McResult, McWitness, create_bl_engine, impl_config_deref,
-};
+use crate::{Engine, EngineCtrl, McCex, McProof, McResult, create_bl_engine, impl_config_deref};
 use anyhow::{Context, bail};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
@@ -101,9 +99,9 @@ impl Worker {
                     frontend.safe_certificate(McProof::Bl(cert))
                 }
                 McResult::Unsafe(_) => {
-                    let cert = engine.witness();
-                    let cert = rst.restore_witness(&cert.into_bl().unwrap());
-                    frontend.unsafe_certificate(McWitness::Bl(cert))
+                    let cert = engine.cex();
+                    let cert = rst.restore_cex(&cert.into_bl().unwrap());
+                    frontend.unsafe_certificate(McCex::Bl(cert))
                 }
                 McResult::Unknown(_) => panic!(),
             };

@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McProof, McResult, McWitness,
+    Engine, McCex, McProof, McResult,
     config::EngineConfigBase,
     impl_config_deref,
     tracer::{Tracer, TracerIf},
@@ -111,8 +111,8 @@ impl Engine for WlKind {
         self.tracer.add_tracer(tracer);
     }
 
-    fn witness(&mut self) -> McWitness {
-        let mut witness = self.uts.witness(&mut self.solver);
+    fn cex(&mut self) -> McCex {
+        let mut cex = self.uts.cex(&mut self.solver);
         let mut cache = GHashMap::new();
         let mut ilmap = GHashMap::new();
         for i in self.owts.input.iter().chain(self.owts.latch.iter()) {
@@ -124,11 +124,11 @@ impl Engine for WlKind {
             .iter()
             .map(|b| b.cached_apply(&|t| ilmap.get(t).cloned(), &mut cache))
             .collect();
-        witness.bad_id = bads
+        cex.bad_id = bads
             .into_iter()
             .position(|b| self.solver.sat_value(&b).is_some_and(|v| v.bool()))
             .unwrap();
-        McWitness::Wl(witness)
+        McCex::Wl(cex)
     }
 
     fn proof(&mut self) -> McProof {

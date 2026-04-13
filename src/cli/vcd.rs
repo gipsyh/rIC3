@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Sort, Term};
-use rIC3::wltransys::certify::WlWitness;
+use rIC3::wltransys::certify::WlCex;
 use std::io::{self, Write};
 use vcd::{TimescaleUnit, Value, VarType};
 
@@ -74,7 +74,7 @@ impl Scope {
 }
 
 pub fn wlwitness_vcd(
-    wit: &WlWitness,
+    cex: &WlCex,
     sym: &GHashMap<Term, Vec<String>>,
     out: impl Write,
     filter: &str,
@@ -83,12 +83,12 @@ pub fn wlwitness_vcd(
     writer.timescale(1, TimescaleUnit::NS)?;
 
     let mut present_terms = GHashSet::default();
-    for frame in &wit.input {
+    for frame in &cex.input {
         for tv in frame {
             present_terms.insert(tv.t().clone());
         }
     }
-    for frame in &wit.state {
+    for frame in &cex.state {
         for tv in frame {
             present_terms.insert(tv.t().clone());
         }
@@ -126,15 +126,15 @@ pub fn wlwitness_vcd(
     root.define_scope(&mut writer, &mut term_ids)?;
     writer.enddefinitions()?;
 
-    for t in 0..wit.len() {
+    for t in 0..cex.len() {
         writer.timestamp(t as u64)?;
 
         let mut frame_values = GHashMap::default();
 
-        for tv in &wit.input[t] {
+        for tv in &cex.input[t] {
             frame_values.insert(tv.t().clone(), tv.v().clone());
         }
-        for tv in &wit.state[t] {
+        for tv in &cex.state[t] {
             if let Sort::Bv(_) = tv.t().sort() {
                 let bv_tv = tv.into_bv();
                 frame_values.insert(bv_tv.t().clone(), bv_tv.v().clone());
@@ -163,7 +163,7 @@ pub fn wlwitness_vcd(
             }
         }
     }
-    writer.timestamp(wit.len() as u64)?;
+    writer.timestamp(cex.len() as u64)?;
 
     Ok(())
 }

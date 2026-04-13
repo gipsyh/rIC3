@@ -4,13 +4,13 @@ use logicrs::fol::{self, BvTermValue, Term, TermValue};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
-pub struct WlWitness {
+pub struct WlCex {
     pub input: Vec<Vec<BvTermValue>>,
     pub state: Vec<Vec<TermValue>>,
     pub bad_id: usize,
 }
 
-impl WlWitness {
+impl WlCex {
     #[inline]
     pub fn new() -> Self {
         Self::default()

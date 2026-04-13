@@ -1,5 +1,5 @@
 use crate::{
-    Engine, EngineCtrl, McProof, McResult, McWitness, MpEngine, MpMcResult,
+    Engine, EngineCtrl, McCex, McProof, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -262,9 +262,9 @@ impl PolyNexus {
                             self.results[prop] = result;
                             self.tracer.trace_state(Some(prop), result);
                             if result.is_unsafe() {
-                                let wit = ic3.witness().into_bl().unwrap();
-                                let wit = self.rst.restore_witness(&wit);
-                                self.tracer.trace_witness(&McWitness::Bl(wit));
+                                let cex = ic3.cex().into_bl().unwrap();
+                                let cex = self.rst.restore_cex(&cex);
+                                self.tracer.trace_cex(&McCex::Bl(cex));
                             }
                             self.ic3s[prop] = Some(ic3);
                         } else {
@@ -367,15 +367,15 @@ impl Engine for PolyNexus {
         panic!("no proof available");
     }
 
-    fn witness(&mut self) -> McWitness {
+    fn cex(&mut self) -> McCex {
         for (i, r) in self.results.iter().enumerate() {
             if r.is_unsafe()
                 && let Some(ic3) = self.ic3s[i].as_mut()
             {
-                return ic3.witness();
+                return ic3.cex();
             }
         }
-        panic!("no witness available");
+        panic!("no cex available");
     }
 }
 
@@ -391,10 +391,10 @@ impl MpEngine for PolyNexus {
             .proof()
     }
 
-    fn witness(&mut self, prop: usize) -> McWitness {
+    fn cex(&mut self, prop: usize) -> McCex {
         self.ic3s[prop]
             .as_mut()
             .expect("no IC3 for this property")
-            .witness()
+            .cex()
     }
 }

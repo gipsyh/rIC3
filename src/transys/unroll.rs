@@ -1,5 +1,5 @@
 use super::{Transys, TransysIf};
-use crate::transys::certify::BlWitness;
+use crate::transys::certify::BlCex;
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use std::ops::Deref;
@@ -228,8 +228,8 @@ impl<T: TransysIf> TransysUnroll<T> {
         }
     }
 
-    pub fn witness<S: Satif + ?Sized>(&self, satif: &S) -> BlWitness {
-        let mut wit = BlWitness::default();
+    pub fn cex<S: Satif + ?Sized>(&self, satif: &S) -> BlCex {
+        let mut cex = BlCex::default();
         for k in 0..=self.num_unroll {
             let mut w = LitVec::new();
             for l in self.ts.input() {
@@ -239,7 +239,7 @@ impl<T: TransysIf> TransysUnroll<T> {
                     w.push(l.not_if(!v));
                 }
             }
-            wit.input.push(w);
+            cex.input.push(w);
             let mut w = LitVec::new();
             for l in self.ts.latch() {
                 let l = l.lit();
@@ -248,9 +248,9 @@ impl<T: TransysIf> TransysUnroll<T> {
                     w.push(l.not_if(!v));
                 }
             }
-            wit.state.push(w);
+            cex.state.push(w);
         }
-        wit
+        cex
     }
 }
 impl TransysUnroll<Transys> {

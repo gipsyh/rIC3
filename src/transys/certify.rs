@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct BlWitness {
+pub struct BlCex {
     pub input: Vec<LitVec>,
     pub state: Vec<LitVec>,
     pub bad_id: usize,
 }
 
-impl BlWitness {
+impl BlCex {
     #[inline]
     pub fn new() -> Self {
         Self::default()
@@ -66,11 +66,11 @@ impl BlWitness {
         }
     }
 
-    pub fn concat(iter: impl IntoIterator<Item = BlWitness>) -> Self {
+    pub fn concat(iter: impl IntoIterator<Item = BlCex>) -> Self {
         let mut res = Self::new();
-        for witness in iter {
-            res.input.extend(witness.input);
-            res.state.extend(witness.state);
+        for cex in iter {
+            res.input.extend(cex.input);
+            res.state.extend(cex.state);
         }
         res
     }
@@ -114,7 +114,7 @@ impl BlWitness {
             }
         }
         assert!(solver.solve(&[]));
-        *self = uts.witness(&solver);
+        *self = uts.cex(&solver);
         self.bad_id = ts
             .bad
             .iter()
@@ -318,13 +318,13 @@ impl Restore {
         res
     }
 
-    pub fn restore_witness(&self, wit: &BlWitness) -> BlWitness {
+    pub fn restore_cex(&self, cex: &BlCex) -> BlCex {
         let iv = self.init_var();
-        let mut wit = wit.filter_map(|l| (iv != Some(l.var())).then(|| self.restore(l)));
-        for s in wit.state.iter_mut() {
+        let mut cex = cex.filter_map(|l| (iv != Some(l.var())).then(|| self.restore(l)));
+        for s in cex.state.iter_mut() {
             *s = self.restore_eq_state(s);
         }
-        wit
+        cex
     }
 
     pub fn restore_proof(&self, mut proof: BlProof, ts: &Transys) -> BlProof {
@@ -338,9 +338,9 @@ impl Restore {
         BlProof { proof: res }
     }
 
-    pub fn forward_witness(&self, wit: &BlWitness) -> BlWitness {
+    pub fn forward_cex(&self, cex: &BlCex) -> BlCex {
         assert!(self.eqmap.is_empty());
-        let mut res = wit.clone();
+        let mut res = cex.clone();
         for k in 0..res.len() {
             res.input[k] = res.input[k]
                 .iter()

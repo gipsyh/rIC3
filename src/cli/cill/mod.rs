@@ -148,8 +148,8 @@ impl CIll {
 
         match min_res {
             Some((r, mut bmc)) => {
-                let witness = bmc.witness().into_bl().unwrap();
-                self.save_witness(&witness, cex, Some(&cex_vcd))?;
+                let witness = bmc.cex().into_bl().unwrap();
+                self.save_cex(&witness, cex, Some(&cex_vcd))?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(
                     "{}",
@@ -286,9 +286,9 @@ fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow
         );
         return Ok(());
     }
-    let witness = cill.get_cti(id)?;
-    cill.save_witness(&witness, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
-    let name = &cill.wsym.prop[witness.bad_id];
+    let cex = cill.get_cti(id)?;
+    cill.save_cex(&cex, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
+    let name = &cill.wsym.prop[cex.bad_id];
     println!(
         "CTI VCD generated in {}.",
         rp.path("cill/cti.vcd").display()

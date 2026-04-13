@@ -2,12 +2,12 @@ mod array;
 
 use super::Frontend;
 use crate::{
-    McProof, McWitness,
+    McCex, McProof,
     transys::{self as bl},
     wltransys::{
         WlTransys,
         bitblast::BitblastMap,
-        certify::{Restore, WlProof, WlWitness},
+        certify::{Restore, WlCex, WlProof},
         symbol::WlTsSymbol,
     },
 };
@@ -101,15 +101,15 @@ impl BtorFrontend {
 }
 
 impl BtorFrontend {
-    pub fn deserialize_wl_unsafe_certificate(&self, content: String) -> WlWitness {
+    pub fn deserialize_wl_unsafe_certificate(&self, content: String) -> WlCex {
         let mut lines = content.lines();
         let first = lines.next().unwrap();
         assert_eq!(first, "sat");
         let second = lines.next().unwrap();
         assert!(second.starts_with('b'));
         let bad_id = second[1..].parse::<usize>().unwrap();
-        let mut witness = WlWitness::new();
-        witness.bad_id = bad_id;
+        let mut cex = WlCex::new();
+        cex.bad_id = bad_id;
         let mut current_frame = 0;
         let mut is_state = false;
 
@@ -119,8 +119,8 @@ impl BtorFrontend {
             }
             if let Some(stripped) = line.strip_prefix('#') {
                 let k = stripped.parse::<usize>().unwrap();
-                if k >= witness.len() {
-                    witness.resize(k + 1);
+                if k >= cex.len() {
+                    cex.resize(k + 1);
                 }
                 current_frame = k;
                 is_state = true;
@@ -128,8 +128,8 @@ impl BtorFrontend {
             }
             if let Some(stripped) = line.strip_prefix('@') {
                 let k = stripped.parse::<usize>().unwrap();
-                if k >= witness.len() {
-                    witness.resize(k + 1);
+                if k >= cex.len() {
+                    cex.resize(k + 1);
                 }
                 current_frame = k;
                 is_state = false;
@@ -142,23 +142,23 @@ impl BtorFrontend {
             if is_state {
                 let term = self.owts.latch[id].clone();
                 let tv = TermValue::new(term, fol::Value::Bv(val));
-                witness.state[current_frame].push(tv);
+                cex.state[current_frame].push(tv);
             } else {
                 let term = self.owts.input[id].clone();
                 let bv = BvTermValue::new(term, val);
-                witness.input[current_frame].push(bv);
+                cex.input[current_frame].push(bv);
             }
         }
-        for k in 0..witness.len() {
-            for s in take(&mut witness.state[k]) {
+        for k in 0..cex.len() {
+            for s in take(&mut cex.state[k]) {
                 if self.no_next.contains(s.t()) {
-                    witness.input[k].push(s.into_bv());
+                    cex.input[k].push(s.into_bv());
                 } else {
-                    witness.state[k].push(s);
+                    cex.state[k].push(s);
                 }
             }
         }
-        witness
+        cex
     }
 }
 
@@ -196,13 +196,13 @@ impl Frontend for BtorFrontend {
         }
     }
 
-    fn unsafe_certificate(&mut self, witness: crate::McWitness) -> Box<dyn Display> {
-        match witness {
-            McWitness::Bl(bl_witness) => {
-                let wl_witness = self.bb_rst.as_ref().unwrap().restore_witness(&bl_witness);
-                self.wl_unsafe_certificate(wl_witness)
+    fn unsafe_certificate(&mut self, cex: McCex) -> Box<dyn Display> {
+        match cex {
+            McCex::Bl(bl_cex) => {
+                let wl_cex = self.bb_rst.as_ref().unwrap().restore_cex(&bl_cex);
+                self.wl_unsafe_certificate(wl_cex)
             }
-            McWitness::Wl(wl_witness) => self.wl_unsafe_certificate(wl_witness),
+            McCex::Wl(wl_cex) => self.wl_unsafe_certificate(wl_cex),
         }
     }
 }
@@ -224,22 +224,22 @@ impl BtorFrontend {
         Box::new(Btor::from(&btor))
     }
 
-    fn wl_unsafe_certificate(&mut self, mut witness: WlWitness) -> Box<dyn Display> {
-        let mut res = vec!["sat".to_string(), format!("b{}", witness.bad_id)];
-        for i in 0..witness.len() {
+    fn wl_unsafe_certificate(&mut self, mut cex: WlCex) -> Box<dyn Display> {
+        let mut res = vec!["sat".to_string(), format!("b{}", cex.bad_id)];
+        for i in 0..cex.len() {
             if let Some(iv) = self.rst.init_var() {
-                witness.state[i].retain(|tv| tv.t() != iv);
+                cex.state[i].retain(|tv| tv.t() != iv);
             }
-            let input = take(&mut witness.input[i]);
+            let input = take(&mut cex.input[i]);
             for lv in input {
                 if self.no_next.contains(lv.t()) {
-                    witness.state[i].push(TermValue::from(lv));
+                    cex.state[i].push(TermValue::from(lv));
                 } else {
-                    witness.input[i].push(lv);
+                    cex.input[i].push(lv);
                 }
             }
         }
-        for (k, (input, state)) in witness.input.iter().zip(witness.state.iter()).enumerate() {
+        for (k, (input, state)) in cex.input.iter().zip(cex.state.iter()).enumerate() {
             res.push(format!("#{k}"));
             let mut idw = Vec::new();
             for tv in state {
