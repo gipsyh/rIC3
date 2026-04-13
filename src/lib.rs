@@ -87,10 +87,10 @@ impl EngineCtrl {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
-    /// Safe
-    Safe,
-    /// Unsafe with Cex Depth
-    Unsafe(usize),
+    /// Property is Satisfied
+    Satisfied,
+    /// Property is Violated with Cex Depth
+    Violated(usize),
     /// Proved in Some(exact depth)
     Unknown(Option<usize>),
 }
@@ -107,12 +107,12 @@ impl BitOr for McResult {
     fn bitor(self, rhs: Self) -> Self::Output {
         use McResult::*;
         match (self, rhs) {
-            (Safe, Unsafe(_)) | (Unsafe(_), Safe) => {
-                panic!("conflicting results: safe and unsafe")
+            (Satisfied, Violated(_)) | (Violated(_), Satisfied) => {
+                panic!("conflicting results: satisfied and violated")
             }
-            (Safe, _) | (_, Safe) => Safe,
-            (Unsafe(a), Unsafe(b)) => Unsafe(a.max(b)),
-            (Unsafe(a), Unknown(_)) | (Unknown(_), Unsafe(a)) => Unsafe(a),
+            (Satisfied, _) | (_, Satisfied) => Satisfied,
+            (Violated(a), Violated(b)) => Violated(a.max(b)),
+            (Violated(a), Unknown(_)) | (Unknown(_), Violated(a)) => Violated(a),
             (Unknown(a), Unknown(b)) => Unknown(match (a, b) {
                 (Some(x), Some(y)) => Some(x.max(y)),
                 (Some(x), None) | (None, Some(x)) => Some(x),
@@ -189,8 +189,8 @@ pub trait BlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McBlCertificate {
         match res {
-            McResult::Safe => McBlCertificate::Satisfied(self.proof()),
-            McResult::Unsafe(_) => McBlCertificate::Violated(self.cex()),
+            McResult::Satisfied => McBlCertificate::Satisfied(self.proof()),
+            McResult::Violated(_) => McBlCertificate::Violated(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
     }
@@ -207,8 +207,8 @@ pub trait WlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McWlCertificate {
         match res {
-            McResult::Safe => McWlCertificate::Satisfied(self.proof()),
-            McResult::Unsafe(_) => McWlCertificate::Violated(self.cex()),
+            McResult::Satisfied => McWlCertificate::Satisfied(self.proof()),
+            McResult::Violated(_) => McWlCertificate::Violated(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
     }

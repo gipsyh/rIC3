@@ -46,7 +46,7 @@ impl CIll {
                                 IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
                             let res = ic3.check();
                             let inv = ic3.invariant();
-                            (matches!(res, McResult::Safe), inv)
+                            (matches!(res, McResult::Satisfied), inv)
                         })
                         .collect();
                     let [(sr, mut si), (ir, ii)] = ic3res.try_into().unwrap();
@@ -82,7 +82,7 @@ impl CIll {
                 .into_par_iter()
                 .map(|b| {
                     let mut kind = CIllKind::new(b, self.ts.clone(), invariants.clone(), None);
-                    let r = kind.check().is_safe();
+                    let r = kind.check().is_satisfied();
                     (b, r, kind)
                 })
                 .collect()
@@ -141,7 +141,7 @@ impl CIll {
         let cti = self.ts_rst.forward_cex(&cti);
         let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
         let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
-        if kind.check().is_safe() {
+        if kind.check().is_satisfied() {
             return Ok(true);
         }
         self.rp.clear_cti()?;

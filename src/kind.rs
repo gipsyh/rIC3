@@ -143,16 +143,16 @@ impl Engine for Kind {
                 let bad = self.get_bad(k);
                 let res = self.solver.solve(&[bad]);
                 if !res {
-                    self.tracer.trace_state(None, McResult::Safe);
-                    return McResult::Safe;
+                    self.tracer.trace_state(None, McResult::Satisfied);
+                    return McResult::Satisfied;
                 }
             }
             if !self.cfg.skip_bmc {
                 let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
                 assump.push(self.get_bad(k));
                 if self.solver.solve(&assump) {
-                    self.tracer.trace_state(None, McResult::Unsafe(k));
-                    return McResult::Unsafe(k);
+                    self.tracer.trace_state(None, McResult::Violated(k));
+                    return McResult::Violated(k);
                 }
             }
             self.tracer.trace_state(None, McResult::Unknown(Some(k)));

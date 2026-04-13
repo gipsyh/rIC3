@@ -149,8 +149,8 @@ impl Engine for BMC {
                 self.solver.solve(&assump)
             };
             if r {
-                self.tracer.trace_state(None, crate::McResult::Unsafe(k));
-                return McResult::Unsafe(k);
+                self.tracer.trace_state(None, crate::McResult::Violated(k));
+                return McResult::Violated(k);
             }
             self.tracer
                 .trace_state(None, crate::McResult::Unknown(Some(k)));

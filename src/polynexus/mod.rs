@@ -172,8 +172,8 @@ impl PolyNexus {
         let mut all_safe = true;
         for result in results.iter() {
             match result {
-                McResult::Safe => {}
-                McResult::Unsafe(depth) => {
+                McResult::Satisfied => {}
+                McResult::Violated(depth) => {
                     unsafe_depth = Some(unsafe_depth.map_or(*depth, |d: usize| d.max(*depth)));
                     all_safe = false;
                 }
@@ -187,9 +187,9 @@ impl PolyNexus {
             }
         }
         if let Some(depth) = unsafe_depth {
-            McResult::Unsafe(depth)
+            McResult::Violated(depth)
         } else if all_safe {
-            McResult::Safe
+            McResult::Satisfied
         } else {
             McResult::Unknown(unknown_bound)
         }
@@ -293,7 +293,7 @@ impl PolyNexus {
                             sched.resolve(prop);
                             self.results[prop] = result;
                             self.tracer.trace_state(Some(prop), result);
-                            if result.is_unsafe() {
+                            if result.is_violated() {
                                 let cex = ic3.cex();
                                 let cex = self.rst.restore_cex(&cex);
                                 self.tracer.trace_cert(&McBlCertificate::Violated(cex));
@@ -401,7 +401,7 @@ impl BlEngine for PolyNexus {
         };
         let mut found = false;
         for (prop, result) in self.results.iter().enumerate() {
-            if result.is_safe() {
+            if result.is_satisfied() {
                 let subp = self.ic3s[prop]
                     .as_mut()
                     .expect("no IC3 for this property")
@@ -416,7 +416,7 @@ impl BlEngine for PolyNexus {
 
     fn cex(&mut self) -> BlCex {
         for (i, r) in self.results.iter().enumerate() {
-            if r.is_unsafe()
+            if r.is_violated()
                 && let Some(ic3) = self.ic3s[i].as_mut()
             {
                 let cex = ic3.cex();

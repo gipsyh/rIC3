@@ -132,10 +132,10 @@ impl CIll {
                 })
                 .collect()
         });
-        results.retain(|(r, _)| r.is_unsafe());
+        results.retain(|(r, _)| r.is_violated());
         let min_res = results
             .into_iter()
-            .min_by_key(|(r, _)| r.into_unsafe().unwrap());
+            .min_by_key(|(r, _)| r.into_violated().unwrap());
 
         let cex = self.rp.path("cill/cex");
         let cex_vcd = self.rp.path("cill/cex.vcd");

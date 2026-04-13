@@ -38,14 +38,14 @@ pub struct CheckConfig {
 
 fn report_res(chk: &CheckConfig, res: McResult) {
     match res {
-        McResult::Safe => {
-            println!("UNSAT");
+        McResult::Satisfied => {
+            println!("Satisfied");
             if chk.cex {
                 println!("0");
             }
         }
-        McResult::Unsafe(_) => {
-            println!("SAT");
+        McResult::Violated(_) => {
+            println!("Violated");
             if chk.cex {
                 let cex = fs::read_to_string(chk.cert.as_ref().unwrap()).unwrap();
                 println!("{cex}");

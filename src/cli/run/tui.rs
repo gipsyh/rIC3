@@ -26,8 +26,8 @@ use std::{
 impl PropMcState {
     fn color(&self) -> Color {
         match self.prop.res {
-            McResult::Safe => Color::Green,
-            McResult::Unsafe(_) => Color::Red,
+            McResult::Satisfied => Color::Green,
+            McResult::Violated(_) => Color::Red,
             McResult::Unknown(_) => match self.state {
                 McStatus::Solving => Color::Yellow,
                 McStatus::Wait => Color::DarkGray,
@@ -38,15 +38,15 @@ impl PropMcState {
 
     fn as_str(&self) -> &str {
         match self.prop.res {
-            McResult::Safe => "Safe",
-            McResult::Unsafe(_) => "Unsafe",
+            McResult::Satisfied => "Satisfied",
+            McResult::Violated(_) => "Violated",
             McResult::Unknown(_) => self.state.as_ref(),
         }
     }
 
     fn cells(&'_ self) -> Vec<Cell<'_>> {
         let bound = match self.prop.res {
-            McResult::Unsafe(b) => format!("{b}"),
+            McResult::Violated(b) => format!("{b}"),
             McResult::Unknown(Some(b)) => format!("{b}"),
             _ => "-".to_string(),
         };

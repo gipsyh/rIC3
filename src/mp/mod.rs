@@ -97,8 +97,8 @@ impl Engine for MultiProp {
                 self.ic3.push(ic3);
                 self.results[bad] = result;
                 match result {
-                    McResult::Safe => (),
-                    McResult::Unsafe(_) => return result,
+                    McResult::Satisfied => (),
+                    McResult::Violated(_) => return result,
                     McResult::Unknown(_) => unreachable!(),
                 }
             }
@@ -111,13 +111,13 @@ impl Engine for MultiProp {
                 self.ic3.push(ic3);
                 self.results[i] = result;
                 match result {
-                    McResult::Safe => (),
-                    McResult::Unsafe(_) => return result,
+                    McResult::Satisfied => (),
+                    McResult::Violated(_) => return result,
                     McResult::Unknown(_) => unreachable!(),
                 }
             }
         }
-        McResult::Safe
+        McResult::Satisfied
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
@@ -138,7 +138,7 @@ impl BlEngine for MultiProp {
     }
 
     fn cex(&mut self) -> BlCex {
-        let bid = self.results.iter().position(|r| r.is_unsafe()).unwrap();
+        let bid = self.results.iter().position(|r| r.is_violated()).unwrap();
         let cex = self.ic3[bid].cex();
         self.rst.restore_cex(&cex)
     }

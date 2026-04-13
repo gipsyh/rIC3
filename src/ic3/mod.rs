@@ -269,8 +269,8 @@ impl IC3 {
 impl Engine for IC3 {
     fn check(&mut self) -> McResult {
         if !self.prep_prop_base() {
-            self.tracer.trace_state(None, McResult::Unsafe(0));
-            return McResult::Unsafe(0);
+            self.tracer.trace_state(None, McResult::Violated(0));
+            return McResult::Violated(0);
         }
         self.extend();
         loop {
@@ -280,13 +280,13 @@ impl Engine for IC3 {
                 match self.block(None) {
                     BlockResult::Failure(depth) => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_state(None, McResult::Unsafe(depth));
-                        return McResult::Unsafe(depth);
+                        self.tracer.trace_state(None, McResult::Violated(depth));
+                        return McResult::Violated(depth);
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_state(None, McResult::Safe);
-                        return McResult::Safe;
+                        self.tracer.trace_state(None, McResult::Satisfied);
+                        return McResult::Satisfied;
                     }
                     BlockResult::OverallTimeLimitExceeded => {
                         self.statistic.block.overall_time += start.elapsed();
@@ -320,8 +320,8 @@ impl Engine for IC3 {
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
-                self.tracer.trace_state(None, McResult::Safe);
-                return McResult::Safe;
+                self.tracer.trace_state(None, McResult::Satisfied);
+                return McResult::Satisfied;
             }
             self.propagate_to_inf();
         }
