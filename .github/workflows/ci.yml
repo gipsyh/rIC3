@@ -38,14 +38,14 @@ jobs:
           docker pull ghcr.io/gipsyh/cerbtora:latest
       - name: Test examples
         run: |
-          cargo r -- check ./examples/counter/counter.aig --certify portfolio || [ $? -eq 10 ]
-          cargo r -- check ./examples/counter/counter.btor --certify portfolio || [ $? -eq 10 ]
-          cargo r -- check ./examples/counter/counter.aig --certify ic3 || [ $? -eq 10 ]
-          cargo r -- check ./examples/counter/counter.btor --certify ic3 || [ $? -eq 10 ]
-          cargo r -- check ./examples/counter/counter.aig --certify bmc || [ $? -eq 10 ]
-          cargo r -- check ./examples/counter/counter.btor --certify bmc || [ $? -eq 10 ]
-          cargo r -- check ./examples/fifo/fifo.aig --certify portfolio || [ $? -eq 20 ]
-          cargo r -- check ./examples/fifo/fifo.aig --certify ic3 || [ $? -eq 20 ]
+          cargo r -- check ./examples/counter/counter.aig --certify portfolio
+          cargo r -- check ./examples/counter/counter.btor --certify portfolio
+          cargo r -- check ./examples/counter/counter.aig --certify ic3
+          cargo r -- check ./examples/counter/counter.btor --certify ic3cex
+          cargo r -- check ./examples/counter/counter.aig --certify bmccex
+          cargo r -- check ./examples/counter/counter.btor --certify bmccex
+          cargo r -- check ./examples/fifo/fifo.aig --certify portfolio
+          cargo r -- check ./examples/fifo/fifo.aig --certify ic3
 
   deploy:
     needs: build-and-test
