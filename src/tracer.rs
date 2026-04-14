@@ -1,10 +1,10 @@
 use crate::{McBlCertificate, McResult};
+use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use log::info;
 use logicrs::LitVec;
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
-    io::{self, BufRead, BufReader, PipeReader, PipeWriter, Write},
     ops::Deref,
-    os::fd::{AsFd, AsRawFd},
     sync::mpsc::{self, Receiver, Sender},
 };
 
@@ -148,121 +148,38 @@ impl TracerIf for LogTracer {
 }
 
 pub struct PipeTracerSend {
-    state: Option<PipeWriter>,
-    witness: Option<PipeWriter>,
-    lemma: Option<PipeWriter>,
+    state: Option<IpcSender<(Option<usize>, McResult)>>,
+    cert: Option<IpcSender<McBlCertificate>>,
+    lemma: Option<IpcSender<(LitVec, Option<usize>)>>,
 }
 
 impl TracerIf for PipeTracerSend {
     fn trace_state(&mut self, prop: Option<usize>, res: McResult) {
         if let Some(state) = self.state.as_mut() {
-            let line = ron::to_string(&(prop, res)).unwrap();
-            let _ = writeln!(state, "{line}");
+            let _ = state.send((prop, res));
         }
     }
 
     fn trace_cert(&mut self, c: &McBlCertificate) {
-        if let Some(cex) = self.witness.as_mut() {
-            let line = ron::to_string(c).unwrap();
-            let _ = writeln!(cex, "{line}");
+        if let Some(cert) = self.cert.as_mut() {
+            let _ = cert.send(c.clone());
         }
     }
 
     fn trace_lemma(&mut self, l: &LitVec, k: Option<usize>) {
         if let Some(lemma) = self.lemma.as_mut() {
-            let line = ron::to_string(&(l, k)).unwrap();
-            let _ = writeln!(lemma, "{line}");
+            let _ = lemma.send((l.clone(), k));
         }
     }
 }
 
-fn pipe_has_data(reader: &BufReader<PipeReader>) -> bool {
-    let fd = reader.get_ref().as_fd().as_raw_fd();
-    let mut pfd = nix::libc::pollfd {
-        fd,
-        events: nix::libc::POLLIN,
-        revents: 0,
-    };
-    let ret = unsafe { nix::libc::poll(&mut pfd, 1, 0) };
-    assert!(
-        ret >= 0,
-        "failed to poll trace pipe: {}",
-        io::Error::last_os_error()
-    );
-    ret > 0 && (pfd.revents & nix::libc::POLLIN) != 0
-}
-
-fn recv_line(reader: &mut BufReader<PipeReader>) -> String {
-    let mut line = String::new();
-    let len = reader.read_line(&mut line).unwrap();
-    assert!(len > 0);
-    line
-}
-
-fn try_recv_line(reader: &mut BufReader<PipeReader>) -> Option<String> {
-    if reader.buffer().is_empty() && !pipe_has_data(reader) {
-        return None;
-    }
-    Some(recv_line(reader))
-}
-
-pub struct PipeStateTracerRecv(BufReader<PipeReader>);
-
-impl PipeStateTracerRecv {
-    pub fn recv(&mut self) -> (Option<usize>, McResult) {
-        let line = recv_line(&mut self.0);
-        ron::from_str(line.trim_end()).unwrap()
-    }
-
-    pub fn pipe(&self) -> &PipeReader {
-        self.0.get_ref()
-    }
-
-    pub fn try_recv(&mut self) -> Option<(Option<usize>, McResult)> {
-        let line = try_recv_line(&mut self.0)?;
-        Some(ron::from_str(line.trim_end()).unwrap())
-    }
-}
-
-pub struct PipeWitnessTracerRecv(BufReader<PipeReader>);
-
-impl PipeWitnessTracerRecv {
-    pub fn recv(&mut self) -> McBlCertificate {
-        let line = recv_line(&mut self.0);
-        ron::from_str(line.trim_end()).unwrap()
-    }
-
-    pub fn pipe(&self) -> &PipeReader {
-        self.0.get_ref()
-    }
-
-    pub fn try_recv(&mut self) -> Option<McBlCertificate> {
-        let line = try_recv_line(&mut self.0)?;
-        ron::from_str(line.trim_end()).unwrap()
-    }
-}
-
-pub struct PipeLemmaTracerRecv(BufReader<PipeReader>);
-
-impl PipeLemmaTracerRecv {
-    pub fn recv(&mut self) -> (LitVec, Option<usize>) {
-        let line = recv_line(&mut self.0);
-        ron::from_str(line.trim_end()).unwrap()
-    }
-
-    pub fn pipe(&self) -> &PipeReader {
-        self.0.get_ref()
-    }
-
-    pub fn try_recv(&mut self) -> Option<(LitVec, Option<usize>)> {
-        let line = try_recv_line(&mut self.0)?;
-        Some(ron::from_str(line.trim_end()).unwrap())
-    }
-}
+pub type PipeStateTracerRecv = IpcReceiver<(Option<usize>, McResult)>;
+pub type PipeCertTracerRecv = IpcReceiver<McBlCertificate>;
+pub type PipeLemmaTracerRecv = IpcReceiver<(LitVec, Option<usize>)>;
 
 pub struct PipeTracerRecv {
     state: Option<PipeStateTracerRecv>,
-    witness: Option<PipeWitnessTracerRecv>,
+    cert: Option<PipeCertTracerRecv>,
     lemma: Option<PipeLemmaTracerRecv>,
 }
 
@@ -271,48 +188,42 @@ impl PipeTracerRecv {
         self,
     ) -> (
         Option<PipeStateTracerRecv>,
-        Option<PipeWitnessTracerRecv>,
+        Option<PipeCertTracerRecv>,
         Option<PipeLemmaTracerRecv>,
     ) {
-        (self.state, self.witness, self.lemma)
-    }
-
-    pub fn state_recv(&mut self) -> &mut PipeStateTracerRecv {
-        self.state.as_mut().unwrap()
-    }
-
-    pub fn witness_recv(&mut self) -> &mut PipeWitnessTracerRecv {
-        self.witness.as_mut().unwrap()
-    }
-
-    pub fn lemma_recv(&mut self) -> &mut PipeLemmaTracerRecv {
-        self.lemma.as_mut().unwrap()
+        (self.state, self.cert, self.lemma)
     }
 }
 
 pub fn pipe_tracer(state: bool, witness: bool, lemma: bool) -> (PipeTracerSend, PipeTracerRecv) {
-    fn make_pipe(enabled: bool) -> (Option<PipeWriter>, Option<PipeReader>) {
+    fn make_channel<T: DeserializeOwned + Serialize>(
+        enabled: bool,
+    ) -> (Option<IpcSender<T>>, Option<IpcReceiver<T>>) {
         if !enabled {
             return (None, None);
         }
-        let (reader, writer) = io::pipe().unwrap();
-        (Some(writer), Some(reader))
+        let (sender, receiver) = ipc::channel().unwrap();
+        (Some(sender), Some(receiver))
     }
 
-    let (state_tx, state_rx) = make_pipe(state);
-    let (witness_tx, witness_rx) = make_pipe(witness);
-    let (lemma_tx, lemma_rx) = make_pipe(lemma);
+    let (state_tx, state_rx) = make_channel(state);
+    let (cert_tx, cert_rx) = make_channel(witness);
+    let (lemma_tx, lemma_rx) = make_channel(lemma);
 
     (
         PipeTracerSend {
             state: state_tx,
-            witness: witness_tx,
+            cert: cert_tx,
             lemma: lemma_tx,
         },
         PipeTracerRecv {
-            state: state_rx.map(BufReader::new).map(PipeStateTracerRecv),
-            witness: witness_rx.map(BufReader::new).map(PipeWitnessTracerRecv),
-            lemma: lemma_rx.map(BufReader::new).map(PipeLemmaTracerRecv),
+            state: state_rx,
+            cert: cert_rx,
+            lemma: lemma_rx,
         },
     )
+}
+
+pub trait ExtractorIf: Send {
+    fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)>;
 }

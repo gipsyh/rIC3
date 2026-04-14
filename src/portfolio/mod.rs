@@ -1,8 +1,6 @@
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig};
 use crate::frontend::Frontend;
-use crate::tracer::{
-    PipeStateTracerRecv, PipeTracerRecv, PipeTracerSend, Tracer, TracerIf, pipe_tracer,
-};
+use crate::tracer::{PipeTracerSend, Tracer, TracerIf, pipe_tracer};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
 use crate::{
@@ -12,17 +10,18 @@ use anyhow::{Context, bail};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
+use ipc_channel::{
+    TrySelectError,
+    ipc::{IpcReceiverSet, IpcSelectionResult},
+};
 use log::{LevelFilter, info, set_max_level};
 use logicrs::VarSymbols;
-use mio::unix::SourceFd;
-use mio::{Events, Interest, Poll, Registry, Token};
 use nix::errno::Errno;
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::iter;
-use std::os::fd::AsRawFd;
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
 use tempfile::{NamedTempFile, TempDir};
@@ -64,6 +63,9 @@ pub struct Portfolio {
     tracer: Tracer,
     #[allow(unused)]
     temp_dir: TempDir,
+    st_recv: IpcReceiverSet,
+    // state tracer id to worker id
+    stid_to_wid: GHashMap<u64, usize>,
 }
 
 struct Worker {
@@ -71,7 +73,6 @@ struct Worker {
     cfg: EngineConfig,
     args: String,
     cert: Option<NamedTempFile>,
-    trace: Option<PipeTracerRecv>,
     state: McResult,
 }
 
@@ -139,7 +140,6 @@ impl Portfolio {
                 cfg,
                 args: args.to_string(),
                 cert,
-                trace: None,
                 state: McResult::default(),
             });
             anyhow::Ok(())
@@ -169,6 +169,8 @@ impl Portfolio {
             temp_dir,
             ctrl: EngineCtrl::new(),
             tracer: Tracer::new(),
+            st_recv: IpcReceiverSet::new().unwrap(),
+            stid_to_wid: GHashMap::new(),
         })
     }
 
@@ -238,14 +240,7 @@ impl Portfolio {
                             if let Some(cert) = &self.cert {
                                 let _ = std::fs::copy(worker.cert.as_ref().unwrap().path(), cert);
                             }
-                            while let Some((prop, res)) = self.engines[worker_idx]
-                                .trace
-                                .as_mut()
-                                .map(|t| t.state_recv())
-                                .and_then(PipeStateTracerRecv::try_recv)
-                            {
-                                self.on_state_trace(worker_idx, prop, res);
-                            }
+                            self.poll_state_traces();
                             let res = self.engines[worker_idx].state;
                             assert!(!res.is_unknown());
                             return Some(res);
@@ -266,63 +261,42 @@ impl Portfolio {
         None
     }
 
-    fn on_trace_ready(&mut self, registry: &Registry, pid: Pid, event: &mio::event::Event) {
-        let Some(&worker_idx) = self.running.get(&pid) else {
-            return;
+    fn poll_state_traces(&mut self) {
+        let events = match self.st_recv.try_select_timeout(Duration::from_millis(100)) {
+            Ok(events) => events,
+            Err(TrySelectError::Empty) => return,
+            Err(err) => panic!("portfolio trace select failed: {err}"),
         };
-        while let Some((prop, res)) = {
-            let worker = &mut self.engines[worker_idx];
-            worker
-                .trace
-                .as_mut()
-                .map(|t| t.state_recv())
-                .and_then(PipeStateTracerRecv::try_recv)
-        } {
-            self.on_state_trace(worker_idx, prop, res);
-        }
-
-        if event.is_error() || event.is_read_closed() || event.is_write_closed() {
-            let mut trace = {
-                let worker = &mut self.engines[worker_idx];
-                worker.trace.take()
-            };
-            if let Some(trace) = trace.as_mut() {
-                Self::deregister_trace_pipe(registry, trace);
+        for event in events {
+            match event {
+                IpcSelectionResult::MessageReceived(id, message) => {
+                    let Some(&worker_idx) = self.stid_to_wid.get(&id) else {
+                        continue;
+                    };
+                    let (prop, res): (Option<usize>, McResult) = message.to().unwrap();
+                    self.on_state_trace(worker_idx, prop, res);
+                }
+                IpcSelectionResult::ChannelClosed(id) => {
+                    self.stid_to_wid.remove(&id);
+                }
             }
         }
     }
 
-    fn register_trace_pipe(registry: &Registry, pid: Pid, trace: &mut PipeTracerRecv) {
-        let raw_fd = trace.state_recv().pipe().as_raw_fd();
-        let mut source = SourceFd(&raw_fd);
-        registry
-            .register(
-                &mut source,
-                Token(pid.as_raw() as usize),
-                Interest::READABLE,
-            )
-            .expect("portfolio mio register failed");
-    }
-
-    fn deregister_trace_pipe(registry: &Registry, trace: &mut PipeTracerRecv) {
-        let raw_fd = trace.state_recv().pipe().as_raw_fd();
-        let mut source = SourceFd(&raw_fd);
-        let _ = registry.deregister(&mut source);
-    }
-
     pub fn check(&mut self) -> McResult {
-        let mut poll = Poll::new().unwrap();
         for worker_idx in 0..self.engines.len() {
-            let (tracer_send, mut tracer_recv) = pipe_tracer(true, false, false);
+            let (tracer_send, tracer_recv) = pipe_tracer(true, false, false);
             let worker = &mut self.engines[worker_idx];
             match fork::fork().unwrap() {
                 fork::Fork::Parent(child) => {
                     drop(tracer_send);
+                    let (state_recv, _, _) = tracer_recv.into_parts();
+                    let state_recv = state_recv.unwrap();
+                    let state_trace_id = self.st_recv.add(state_recv).unwrap();
                     let pid = Pid::from_raw(child);
                     info!("start engine {}", worker.name);
-                    Self::register_trace_pipe(poll.registry(), pid, &mut tracer_recv);
-                    worker.trace = Some(tracer_recv);
                     self.running.insert(pid, worker_idx);
+                    self.stid_to_wid.insert(state_trace_id, worker_idx);
                 }
                 fork::Fork::Child => {
                     drop(tracer_recv);
@@ -339,26 +313,10 @@ impl Portfolio {
         }
 
         let start = Instant::now();
-        let mut events = Events::with_capacity(self.engines.len());
         loop {
             if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
                 self.terminate_running();
                 return McResult::Unknown(None);
-            }
-
-            if let Some(res) = self.reap_child() {
-                self.terminate_running();
-                return res;
-            }
-
-            match poll.poll(&mut events, Some(Duration::from_millis(100))) {
-                Ok(()) => {
-                    for event in &events {
-                        let pid = Pid::from_raw(event.token().0 as i32);
-                        self.on_trace_ready(poll.registry(), pid, event);
-                    }
-                }
-                Err(err) => panic!("portfolio mio poll failed: {err}"),
             }
 
             if self.running.is_empty() {
@@ -366,6 +324,13 @@ impl Portfolio {
                     .winner_idx
                     .map(|winner_idx| self.engines[winner_idx].state)
                     .unwrap_or(McResult::Unknown(None));
+            }
+
+            self.poll_state_traces();
+
+            if let Some(res) = self.reap_child() {
+                self.terminate_running();
+                return res;
             }
         }
     }

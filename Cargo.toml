@@ -26,8 +26,7 @@ rand = "0.10.1"
 ctrlc = { version = "3.4.1", features = ["termination"] }
 bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
-nix = { version = "0.31.1", features = ["event", "signal"] }
-mio = { version = "1.2", features = ["os-poll", "os-ext"] }
+nix = { version = "0.31.1", features = ["signal"] }
 env_logger = "0.11.10"
 log = "0.4.27"
 time = { version = "0.3.46", features = ["formatting", "macros"] }
@@ -43,6 +42,7 @@ vcd = "0.7.0"
 enum-as-inner = "0.7.0"
 rayon = "1.10.0"
 fork = "0.7.0"
+ipc-channel = "0.21.0"
 
 [profile.dev]
 opt-level = 3
