@@ -1,5 +1,8 @@
 use crate::{McBlCertificate, McResult};
-use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
+use ipc_channel::{
+    TryRecvError,
+    ipc::{self, IpcReceiver, IpcSender},
+};
 use log::info;
 use logicrs::LitVec;
 use serde::{Serialize, de::DeserializeOwned};
@@ -150,7 +153,7 @@ impl TracerIf for LogTracer {
 pub struct PipeTracerSend {
     state: Option<IpcSender<(Option<usize>, McResult)>>,
     cert: Option<IpcSender<McBlCertificate>>,
-    lemma: Option<IpcSender<(LitVec, Option<usize>)>>,
+    lemma: Option<IpcSender<(Option<usize>, LitVec)>>,
 }
 
 impl TracerIf for PipeTracerSend {
@@ -168,14 +171,14 @@ impl TracerIf for PipeTracerSend {
 
     fn trace_lemma(&mut self, l: &LitVec, k: Option<usize>) {
         if let Some(lemma) = self.lemma.as_mut() {
-            let _ = lemma.send((l.clone(), k));
+            let _ = lemma.send((k, l.clone()));
         }
     }
 }
 
 pub type PipeStateTracerRecv = IpcReceiver<(Option<usize>, McResult)>;
 pub type PipeCertTracerRecv = IpcReceiver<McBlCertificate>;
-pub type PipeLemmaTracerRecv = IpcReceiver<(LitVec, Option<usize>)>;
+pub type PipeLemmaTracerRecv = IpcReceiver<(Option<usize>, LitVec)>;
 
 pub struct PipeTracerRecv {
     state: Option<PipeStateTracerRecv>,
@@ -226,4 +229,14 @@ pub fn pipe_tracer(state: bool, witness: bool, lemma: bool) -> (PipeTracerSend, 
 
 pub trait ExtractorIf: Send {
     fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)>;
+}
+
+impl ExtractorIf for PipeLemmaTracerRecv {
+    fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)> {
+        match self.try_recv() {
+            Ok(r) => Some(r),
+            Err(TryRecvError::Empty) => None,
+            _ => panic!(),
+        }
+    }
 }
