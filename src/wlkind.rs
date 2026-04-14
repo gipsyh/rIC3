@@ -84,8 +84,8 @@ impl Engine for WlKind {
                 self.load_bad_to(k - 1);
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
-                    self.tracer.trace_state(None, crate::McResult::Satisfied);
-                    return McResult::Satisfied;
+                    self.tracer.trace_state(None, crate::McResult::Proved);
+                    return McResult::Proved;
                 }
             }
 

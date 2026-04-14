@@ -38,8 +38,8 @@ pub struct CheckConfig {
 
 fn report_res(chk: &CheckConfig, res: McResult) {
     match res {
-        McResult::Satisfied => {
-            println!("Satisfied");
+        McResult::Proved => {
+            println!("Proved");
             if chk.cex {
                 println!("0");
             }

@@ -143,8 +143,8 @@ impl Engine for Kind {
                 let bad = self.get_bad(k);
                 let res = self.solver.solve(&[bad]);
                 if !res {
-                    self.tracer.trace_state(None, McResult::Satisfied);
-                    return McResult::Satisfied;
+                    self.tracer.trace_state(None, McResult::Proved);
+                    return McResult::Proved;
                 }
             }
             if !self.cfg.skip_bmc {

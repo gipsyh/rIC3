@@ -285,8 +285,8 @@ impl Engine for IC3 {
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_state(None, McResult::Satisfied);
-                        return McResult::Satisfied;
+                        self.tracer.trace_state(None, McResult::Proved);
+                        return McResult::Proved;
                     }
                     BlockResult::OverallTimeLimitExceeded => {
                         self.statistic.block.overall_time += start.elapsed();
@@ -320,8 +320,8 @@ impl Engine for IC3 {
             let propagate = self.propagate(None);
             self.statistic.overall_propagate_time += start.elapsed();
             if propagate {
-                self.tracer.trace_state(None, McResult::Satisfied);
-                return McResult::Satisfied;
+                self.tracer.trace_state(None, McResult::Proved);
+                return McResult::Proved;
             }
             self.propagate_to_inf();
         }

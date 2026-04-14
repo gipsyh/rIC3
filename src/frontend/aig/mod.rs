@@ -192,7 +192,7 @@ impl Frontend for AigFrontend {
 
     fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
         match cert {
-            McBlCertificate::Satisfied(proof) => {
+            McBlCertificate::Proved(proof) => {
                 if !self.is_safety() {
                     error!(
                         "rIC3 does not support certificate generation for safe liveness properties"

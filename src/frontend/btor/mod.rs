@@ -184,7 +184,7 @@ impl Frontend for BtorFrontend {
 
     fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
         match cert {
-            McBlCertificate::Satisfied(bl_proof) => {
+            McBlCertificate::Proved(bl_proof) => {
                 let wl_proof = self
                     .bb_rst
                     .as_ref()
@@ -201,7 +201,7 @@ impl Frontend for BtorFrontend {
 
     fn wl_certificate(&mut self, cert: McWlCertificate) -> Box<dyn Display> {
         match cert {
-            McWlCertificate::Satisfied(wl_proof) => self.wl_safe_certificate(wl_proof),
+            McWlCertificate::Proved(wl_proof) => self.wl_safe_certificate(wl_proof),
             McWlCertificate::Violated(wl_cex) => self.wl_unsafe_certificate(wl_cex),
         }
     }

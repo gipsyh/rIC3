@@ -97,7 +97,7 @@ impl Engine for MultiProp {
                 self.ic3.push(ic3);
                 self.results[bad] = result;
                 match result {
-                    McResult::Satisfied => (),
+                    McResult::Proved => (),
                     McResult::Violated(_) => return result,
                     McResult::Unknown(_) => unreachable!(),
                 }
@@ -111,13 +111,13 @@ impl Engine for MultiProp {
                 self.ic3.push(ic3);
                 self.results[i] = result;
                 match result {
-                    McResult::Satisfied => (),
+                    McResult::Proved => (),
                     McResult::Violated(_) => return result,
                     McResult::Unknown(_) => unreachable!(),
                 }
             }
         }
-        McResult::Satisfied
+        McResult::Proved
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

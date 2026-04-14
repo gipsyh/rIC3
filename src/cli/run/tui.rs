@@ -26,7 +26,7 @@ use std::{
 impl PropMcState {
     fn color(&self) -> Color {
         match self.prop.res {
-            McResult::Satisfied => Color::Green,
+            McResult::Proved => Color::Green,
             McResult::Violated(_) => Color::Red,
             McResult::Unknown(_) => match self.state {
                 McStatus::Solving => Color::Yellow,
@@ -38,7 +38,7 @@ impl PropMcState {
 
     fn as_str(&self) -> &str {
         match self.prop.res {
-            McResult::Satisfied => "Satisfied",
+            McResult::Proved => "Proved",
             McResult::Violated(_) => "Violated",
             McResult::Unknown(_) => self.state.as_ref(),
         }

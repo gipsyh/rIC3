@@ -94,7 +94,7 @@ impl Rlive {
         log::set_max_level(LevelFilter::Warn);
         let res = ic3.check();
         log::set_max_level(prev_level);
-        if let McResult::Satisfied = res {
+        if let McResult::Proved = res {
             return Ok(ic3.invariant());
         }
         let cex = ic3.cex();
@@ -175,8 +175,8 @@ impl Engine for Rlive {
             log::set_max_level(LevelFilter::Warn);
             let res = ic3.check();
             log::set_max_level(prev_level);
-            if let McResult::Satisfied = res {
-                return McResult::Satisfied;
+            if let McResult::Proved = res {
+                return McResult::Proved;
             }
             let cex = ic3.cex();
             assert!(self.level() == 0);

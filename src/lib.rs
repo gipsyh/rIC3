@@ -87,8 +87,8 @@ impl EngineCtrl {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
-    /// Property is Satisfied
-    Satisfied,
+    /// Property is Proved
+    Proved,
     /// Property is Violated with Cex Depth
     Violated(usize),
     /// Proved in Some(exact depth)
@@ -107,10 +107,10 @@ impl BitOr for McResult {
     fn bitor(self, rhs: Self) -> Self::Output {
         use McResult::*;
         match (self, rhs) {
-            (Satisfied, Violated(_)) | (Violated(_), Satisfied) => {
+            (Proved, Violated(_)) | (Violated(_), Proved) => {
                 panic!("conflicting results: satisfied and violated")
             }
-            (Satisfied, _) | (_, Satisfied) => Satisfied,
+            (Proved, _) | (_, Proved) => Proved,
             (Violated(a), Violated(b)) => Violated(a.max(b)),
             (Violated(a), Unknown(_)) | (Unknown(_), Violated(a)) => Violated(a),
             (Unknown(a), Unknown(b)) => Unknown(match (a, b) {
@@ -156,13 +156,13 @@ impl FromIterator<McResult> for MpMcResult {
 
 #[derive(Clone, Debug, EnumAsInner, Serialize, Deserialize)]
 pub enum McBlCertificate {
-    Satisfied(BlProof),
+    Proved(BlProof),
     Violated(BlCex),
 }
 
 #[derive(Clone, Debug, EnumAsInner)]
 pub enum McWlCertificate {
-    Satisfied(WlProof),
+    Proved(WlProof),
     Violated(WlCex),
 }
 
@@ -189,7 +189,7 @@ pub trait BlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McBlCertificate {
         match res {
-            McResult::Satisfied => McBlCertificate::Satisfied(self.proof()),
+            McResult::Proved => McBlCertificate::Proved(self.proof()),
             McResult::Violated(_) => McBlCertificate::Violated(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
@@ -207,7 +207,7 @@ pub trait WlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McWlCertificate {
         match res {
-            McResult::Satisfied => McWlCertificate::Satisfied(self.proof()),
+            McResult::Proved => McWlCertificate::Proved(self.proof()),
             McResult::Violated(_) => McWlCertificate::Violated(self.cex()),
             McResult::Unknown(_) => panic!(),
         }

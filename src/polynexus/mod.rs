@@ -172,7 +172,7 @@ impl PolyNexus {
         let mut all_safe = true;
         for result in results.iter() {
             match result {
-                McResult::Satisfied => {}
+                McResult::Proved => {}
                 McResult::Violated(depth) => {
                     unsafe_depth = Some(unsafe_depth.map_or(*depth, |d: usize| d.max(*depth)));
                     all_safe = false;
@@ -189,7 +189,7 @@ impl PolyNexus {
         if let Some(depth) = unsafe_depth {
             McResult::Violated(depth)
         } else if all_safe {
-            McResult::Satisfied
+            McResult::Proved
         } else {
             McResult::Unknown(unknown_bound)
         }
@@ -401,7 +401,7 @@ impl BlEngine for PolyNexus {
         };
         let mut found = false;
         for (prop, result) in self.results.iter().enumerate() {
-            if result.is_satisfied() {
+            if result.is_proved() {
                 let subp = self.ic3s[prop]
                     .as_mut()
                     .expect("no IC3 for this property")
