@@ -1,6 +1,9 @@
+mod lemma_mgr;
+
+use self::lemma_mgr::LemmaMgr;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig};
 use crate::frontend::Frontend;
-use crate::tracer::{PipeTracerSend, Tracer, TracerIf, pipe_tracer};
+use crate::tracer::{PipeLemmaRecv, PipeTracerSend, Tracer, TracerIf, pipe_tracer};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
 use crate::{
@@ -10,6 +13,7 @@ use anyhow::{Context, bail};
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
+use ipc_channel::ipc;
 use ipc_channel::{
     TrySelectError,
     ipc::{IpcReceiverSet, IpcSelectionResult},
@@ -34,6 +38,10 @@ pub struct PortfolioConfig {
     /// worker configuration
     #[arg(long = "config")]
     pub config: Option<String>,
+
+    /// share lemma
+    #[arg(long = "share-lemma")]
+    pub share_lemma: bool,
     // /// woker memory limit in GB
     // #[arg(long = "worker-mem-limit", default_value_t = 16)]
     // pub wmem_limit: usize,
@@ -85,6 +93,7 @@ impl Worker {
         sym: &VarSymbols,
         frontend: &mut dyn Frontend,
         tracer: PipeTracerSend,
+        extractor: Option<PipeLemmaRecv>,
     ) -> ! {
         set_max_level(LevelFilter::Warn);
         // We are already in the forked child, so take ownership of the inherited
@@ -93,6 +102,7 @@ impl Worker {
         let sym = unsafe { std::ptr::read(sym) };
         let mut engine = create_bl_engine(self.cfg.clone(), ts, sym);
         engine.add_tracer(Box::new(tracer));
+        extractor.map(|e| engine.set_extractor(Box::new(e)));
         let res = engine.check();
         if let Some(cert_path) = self.cert.as_ref().map(|c| c.path()) {
             let certificate = match res {
@@ -284,22 +294,37 @@ impl Portfolio {
     }
 
     pub fn check(&mut self) -> McResult {
+        let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
         for worker_idx in 0..self.engines.len() {
-            let (tracer_send, tracer_recv) = pipe_tracer(true, false, false);
+            let (tracer_send, tracer_recv) = pipe_tracer(true, false, self.cfg.share_lemma);
+            let (lemma_send, lemma_recv) = if self.cfg.share_lemma {
+                let (lemma_send, lemma_recv) = ipc::channel().unwrap();
+                (Some(lemma_send), Some(lemma_recv))
+            } else {
+                (None, None)
+            };
             let worker = &mut self.engines[worker_idx];
             match fork::fork().unwrap() {
                 fork::Fork::Parent(child) => {
-                    drop(tracer_send);
-                    let (state_recv, _, _) = tracer_recv.into_parts();
-                    let state_recv = state_recv.unwrap();
+                    let (Some(state_recv), _, lemma_recv) = tracer_recv.into_parts() else {
+                        panic!();
+                    };
                     let state_trace_id = self.st_recv.add(state_recv).unwrap();
+                    lemma_mgr.as_mut().map(|lemma_mgr| {
+                        lemma_mgr
+                            .add_worker(
+                                worker.name.clone(),
+                                lemma_recv.unwrap(),
+                                lemma_send.unwrap(),
+                            )
+                            .unwrap()
+                    });
                     let pid = Pid::from_raw(child);
                     info!("start engine {}", worker.name);
                     self.running.insert(pid, worker_idx);
                     self.stid_to_wid.insert(state_trace_id, worker_idx);
                 }
                 fork::Fork::Child => {
-                    drop(tracer_recv);
                     worker.run(
                         &self.ts,
                         &self.ots,
@@ -307,29 +332,35 @@ impl Portfolio {
                         &self.sym,
                         self.frontend.as_mut(),
                         tracer_send,
+                        lemma_recv,
                     );
                 }
             }
         }
+        let lemma_mgr_join = lemma_mgr.map(|lemma_mgr| spawn(move || lemma_mgr.run()));
 
         let start = Instant::now();
         loop {
             if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
                 self.terminate_running();
+                let _ = lemma_mgr_join.map(|j| j.join());
                 return McResult::Unknown(None);
             }
 
             if self.running.is_empty() {
-                return self
+                let res = self
                     .winner_idx
                     .map(|winner_idx| self.engines[winner_idx].state)
                     .unwrap_or(McResult::Unknown(None));
+                let _ = lemma_mgr_join.map(|j| j.join());
+                return res;
             }
 
             self.poll_state_traces();
 
             if let Some(res) = self.reap_child() {
                 self.terminate_running();
+                let _ = lemma_mgr_join.map(|j| j.join());
                 return res;
             }
         }

@@ -96,7 +96,6 @@ impl IC3 {
                         self.obligations.remove(po);
                     }
                     self.add_inf_lemma(lemma.as_litvec().clone());
-                    self.tracer.trace_invariant(lemma.as_litvec(), None);
                     break;
                 } else {
                     let target = self.tsctx.lits_next(lemma.as_litvec());

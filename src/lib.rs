@@ -18,7 +18,7 @@ pub mod wltransys;
 
 use crate::{
     config::EngineConfig,
-    tracer::TracerIf,
+    tracer::{ExtractorIf, TracerIf},
     transys::{
         Transys,
         certify::{BlCex, BlProof},
@@ -169,7 +169,11 @@ pub enum McWlCertificate {
 pub trait Engine: Send {
     fn check(&mut self) -> McResult;
 
-    fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {}
+    fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {
+        panic!("unsupport add tracer");
+    }
+
+    fn set_extractor(&mut self, _extractor: Box<dyn ExtractorIf>) {}
 
     fn statistic(&mut self) {}
 

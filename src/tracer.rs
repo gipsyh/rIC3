@@ -176,29 +176,30 @@ impl TracerIf for PipeTracerSend {
     }
 }
 
-pub type PipeStateTracerRecv = IpcReceiver<(Option<usize>, McResult)>;
-pub type PipeCertTracerRecv = IpcReceiver<McBlCertificate>;
-pub type PipeLemmaTracerRecv = IpcReceiver<(Option<usize>, LitVec)>;
+pub type PipeStateRecv = IpcReceiver<(Option<usize>, McResult)>;
+pub type PipeCertRecv = IpcReceiver<McBlCertificate>;
+pub type PipeLemmaSend = IpcSender<(Option<usize>, LitVec)>;
+pub type PipeLemmaRecv = IpcReceiver<(Option<usize>, LitVec)>;
 
 pub struct PipeTracerRecv {
-    state: Option<PipeStateTracerRecv>,
-    cert: Option<PipeCertTracerRecv>,
-    lemma: Option<PipeLemmaTracerRecv>,
+    state: Option<PipeStateRecv>,
+    cert: Option<PipeCertRecv>,
+    lemma: Option<PipeLemmaRecv>,
 }
 
 impl PipeTracerRecv {
     pub fn into_parts(
         self,
     ) -> (
-        Option<PipeStateTracerRecv>,
-        Option<PipeCertTracerRecv>,
-        Option<PipeLemmaTracerRecv>,
+        Option<PipeStateRecv>,
+        Option<PipeCertRecv>,
+        Option<PipeLemmaRecv>,
     ) {
         (self.state, self.cert, self.lemma)
     }
 }
 
-pub fn pipe_tracer(state: bool, witness: bool, lemma: bool) -> (PipeTracerSend, PipeTracerRecv) {
+pub fn pipe_tracer(state: bool, cert: bool, lemma: bool) -> (PipeTracerSend, PipeTracerRecv) {
     fn make_channel<T: DeserializeOwned + Serialize>(
         enabled: bool,
     ) -> (Option<IpcSender<T>>, Option<IpcReceiver<T>>) {
@@ -210,7 +211,7 @@ pub fn pipe_tracer(state: bool, witness: bool, lemma: bool) -> (PipeTracerSend, 
     }
 
     let (state_tx, state_rx) = make_channel(state);
-    let (cert_tx, cert_rx) = make_channel(witness);
+    let (cert_tx, cert_rx) = make_channel(cert);
     let (lemma_tx, lemma_rx) = make_channel(lemma);
 
     (
@@ -231,7 +232,7 @@ pub trait ExtractorIf: Send {
     fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)>;
 }
 
-impl ExtractorIf for PipeLemmaTracerRecv {
+impl ExtractorIf for PipeLemmaRecv {
     fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)> {
         match self.try_recv() {
             Ok(r) => Some(r),

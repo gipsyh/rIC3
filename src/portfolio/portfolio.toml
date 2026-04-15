@@ -81,3 +81,7 @@ bmc_kissat_10 = "bmc --frts=false --scorr=false --kissat --step 10 --rseed 13"
 kind = "kind --frts=false --scorr=false --rseed 14"
 wlbmc = "wl-bmc --rseed 15"
 wlkind = "wl-kind --step 1 --rseed 16"
+
+[test]
+ic3 = "ic3"
+bmc = "bmc"

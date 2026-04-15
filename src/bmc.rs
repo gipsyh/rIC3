@@ -2,7 +2,7 @@ use crate::{
     BlCex, BlEngine, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     impl_config_deref,
-    tracer::{Tracer, TracerIf},
+    tracer::{ExtractorIf, Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
 };
 use clap::{Args, Parser};
@@ -53,6 +53,8 @@ pub struct BMC {
     step: usize,
     rng: StdRng,
     tracer: Tracer,
+    extractor: Option<Box<dyn ExtractorIf>>,
+    invariant: Vec<LitVec>,
 }
 
 impl BMC {
@@ -90,18 +92,35 @@ impl BMC {
             rst,
             rng,
             tracer: Tracer::new(),
+            extractor: None,
+            invariant: Vec::new(),
         }
     }
 
-    pub fn load_trans_to(&mut self, k: usize) {
+    fn extract_invariant(&mut self) {
+        let Some(extractor) = self.extractor.as_mut() else {
+            return;
+        };
+        while let Some((k, lemma)) = extractor.extract_lemma() {
+            if k.is_none() {
+                self.invariant.push(lemma);
+            }
+        }
+    }
+
+    fn extend_slv_to(&mut self, k: usize) {
         while self.solver_k < k + 1 {
             self.uts
                 .load_trans(self.solver.as_mut(), self.solver_k, true);
+            for inv in self.invariant.iter() {
+                let inv: LitVec = self.uts.lits_next(inv, self.solver_k).collect();
+                self.solver.add_clause(&inv);
+            }
             self.solver_k += 1;
         }
     }
 
-    pub fn reset_solver(&mut self) {
+    fn reset_solver(&mut self) {
         self.solver = if self.cfg.kissat {
             Box::new(kissat::Kissat::new())
         } else {
@@ -128,8 +147,9 @@ impl Engine for BMC {
                 let remain = limit - time;
                 time_limit = Some(time_limit.map_or(remain, |tl| tl.min(remain)));
             }
+            self.extract_invariant();
             self.uts.unroll_to(k);
-            self.load_trans_to(k);
+            self.extend_slv_to(k);
             let mut assump: LitVec = self.uts.lits_next(&self.uts.ts.bad, k).collect();
             if self.cfg.kissat {
                 for b in assump.iter() {
@@ -164,6 +184,10 @@ impl Engine for BMC {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn set_extractor(&mut self, extractor: Box<dyn ExtractorIf>) {
+        self.extractor = Some(extractor);
     }
 }
 
