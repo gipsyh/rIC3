@@ -35,6 +35,9 @@ pub struct PortfolioConfig {
     #[command(flatten)]
     pub base: EngineConfigBase,
 
+    #[command(flatten)]
+    pub preproc: PreprocConfig,
+
     /// worker configuration
     #[arg(long = "config")]
     pub config: Option<String>,
@@ -132,7 +135,7 @@ impl Portfolio {
     ) -> anyhow::Result<Self> {
         let rst = Restore::new(&ts);
         let ots = ts.clone();
-        let (ts, rst) = ts.preproc(&PreprocConfig::default(), rst);
+        let (ts, rst) = ts.preproc(&cfg.preproc, rst);
         let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let mut engines = Vec::new();
         let mut new_engine = |name, args: &str| {
