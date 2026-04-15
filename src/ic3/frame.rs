@@ -291,7 +291,13 @@ impl IC3 {
     }
 
     pub(super) fn add_inf_lemma(&mut self, lemma: LitVec) {
-        self.tracer.trace_invariant(&!&lemma, None);
+        self.tracer.trace_lemma(
+            &lemma
+                .iter()
+                .map(|l| !l.map_var(|v| self.rst.restore_var(v)))
+                .collect(),
+            None,
+        );
         let lemma = LitOrdVec::new(lemma);
         assert!(self.frame.trivial_contained(None, &lemma).is_none());
         let lastf = self.frame.last_mut().unwrap();

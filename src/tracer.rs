@@ -98,7 +98,7 @@ impl Tracer {
         }
     }
 
-    pub fn trace_invariant(&mut self, inv: &LitVec, k: Option<usize>) {
+    pub fn trace_lemma(&mut self, inv: &LitVec, k: Option<usize>) {
         for t in self.tracers.iter_mut() {
             t.trace_lemma(inv, k);
         }
