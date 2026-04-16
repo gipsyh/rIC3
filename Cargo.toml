@@ -32,7 +32,7 @@ log = "0.4.27"
 time = { version = "0.3.46", features = ["formatting", "macros"] }
 toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
-sha2 = "0.10.9"
+sha2 = "0.11"
 ratatui = "0.30.0"
 anyhow = "1.0.101"
 ron = "0.12.0"

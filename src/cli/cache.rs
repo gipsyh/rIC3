@@ -13,7 +13,7 @@ use std::{
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 struct FileEntry {
-    hash: String,
+    hash: Vec<u8>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -21,7 +21,7 @@ pub struct DutHash {
     files: GHashMap<PathBuf, FileEntry>,
 }
 
-fn calculate_hash(path: &Path) -> anyhow::Result<String> {
+fn calculate_hash(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0; 8192];
@@ -32,7 +32,7 @@ fn calculate_hash(path: &Path) -> anyhow::Result<String> {
         }
         hasher.update(&buffer[..count]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hasher.finalize().to_vec())
 }
 
 impl DutHash {
