@@ -11,7 +11,7 @@ use crate::{
 };
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
-use frame::{Frame, Frames};
+use frame::Frames;
 use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, error, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
@@ -178,7 +178,7 @@ impl IC3 {
         }
         let solver = self.inf_solver.clone();
         self.solvers.push(solver);
-        self.frame.push(Frame::new());
+        self.frame.extend();
         if self.level() == 0 {
             for init in self.tsctx.init.clone() {
                 self.add_lemma(0, !init, true, None);
@@ -258,7 +258,7 @@ impl IC3 {
         }
     }
 
-    pub fn invariant(&self) -> Vec<LitVec> {
+    pub fn invariant(&mut self) -> Vec<LitVec> {
         self.inner_invariant()
             .iter()
             .map(|l| l.map_var(|l| self.rst.restore_var(l)))

@@ -12,8 +12,8 @@ impl IC3 {
         let level = self.level();
         let from = from.unwrap_or(self.frame.early).max(1);
         for frame_idx in from..level {
-            self.frame[frame_idx].sort_by_key(|x| x.len());
-            let frame = self.frame[frame_idx].clone();
+            let mut frame = self.frame[frame_idx].clone();
+            frame.sort_by_key(|x| x.len());
             for mut lemma in frame {
                 if self.frame[frame_idx].iter().all(|l| l.ne(&lemma)) {
                     continue;
@@ -89,9 +89,8 @@ impl IC3 {
 
     pub fn propagate_to_inf(&mut self) {
         let start = Instant::now();
-        let level = self.level();
-        self.frame[level].shuffle(&mut self.rng);
-        let mut lastf = self.frame[level].clone();
+        let mut lastf = self.frame.last().clone();
+        lastf.shuffle(&mut self.rng);
         while let Some(mut lemma) = lastf.pop() {
             loop {
                 if self.inf_solver.inductive(&lemma, true) {
@@ -122,7 +121,6 @@ impl IC3 {
         let mut cand: Vec<_> = self
             .frame
             .last()
-            .unwrap()
             .iter()
             .map(|l| l.as_litvec().clone())
             .collect();

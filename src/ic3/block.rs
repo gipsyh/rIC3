@@ -95,11 +95,7 @@ impl IC3 {
                         return BlockResult::Failure(po.depth);
                     } else {
                         self.obligations.clear();
-                        for f in self.frame.iter_mut() {
-                            for l in f.iter_mut() {
-                                l.po = None;
-                            }
-                        }
+                        self.frame.clear_po();
                         continue;
                     }
                 } else if po.frame > 0 {

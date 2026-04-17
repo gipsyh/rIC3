@@ -1,11 +1,12 @@
 use super::{IC3, proofoblig::ProofObligation};
-use crate::{gipsat::TransysSolver, transys::TransysCtx};
+use crate::transys::TransysCtx;
 use giputils::grc::Grc;
 use giputils::hash::GHashSet;
 use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
 use std::{
     fmt::Write,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index},
+    vec,
 };
 
 #[derive(Clone)]
@@ -42,7 +43,7 @@ impl DerefMut for FrameLemma {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Frame {
     lemmas: Vec<FrameLemma>,
 }
@@ -69,11 +70,21 @@ impl DerefMut for Frame {
     }
 }
 
+impl IntoIterator for Frame {
+    type Item = FrameLemma;
+    type IntoIter = vec::IntoIter<FrameLemma>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.lemmas.into_iter()
+    }
+}
+
 pub struct Frames {
     frames: Vec<Frame>,
     pub inf: Frame,
     pub early: usize,
-    pub tmp_lit_set: LitSet,
+    tmp_lit_set: LitSet,
 }
 
 impl Frames {
@@ -88,10 +99,28 @@ impl Frames {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub fn last(&self) -> &Frame {
+        &self.frames.last().unwrap()
+    }
+
+    pub fn extend(&mut self) {
+        self.frames.push(Frame::new());
+    }
+
     pub fn reserve(&mut self, var: Var) {
         self.tmp_lit_set.reserve(var);
     }
 
+    /// Check whether `lemma` is already syntactically subsumed by an existing lemma.
+    ///
+    /// If `frame` is `Some(i)`, search delta frames `i..` and then the infinite frame.
+    /// If `frame` is `None`, search only the infinite frame.
+    /// Returns the matched frame index (`None` for the infinite frame) together
+    /// with a mutable reference to the matched lemma's proof obligation.
     #[inline]
     pub fn trivial_contained<'a>(
         &'a mut self,
@@ -172,6 +201,14 @@ impl Frames {
         res
     }
 
+    pub fn clear_po(&mut self) {
+        for f in self.frames.iter_mut() {
+            for l in f.iter_mut() {
+                l.po = None;
+            }
+        }
+    }
+
     #[inline]
     pub fn statistic(&self, compact: bool) -> String {
         let mut s = String::new();
@@ -191,26 +228,12 @@ impl Frames {
     }
 }
 
-impl Deref for Frames {
-    type Target = Vec<Frame>;
+impl Index<usize> for Frames {
+    type Output = Frame;
 
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.frames
-    }
-}
-
-impl DerefMut for Frames {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.get_mut()
-    }
-}
-
-impl Frames {
-    #[inline]
-    pub fn get_mut(&mut self) -> &mut Vec<Frame> {
-        &mut self.frames
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.frames[index]
     }
 }
 
@@ -232,7 +255,7 @@ impl IC3 {
                 predprop.add_lemma(&lemma);
             }
             self.solvers[0].add_clause(&!lemma.as_litvec());
-            self.frame[0].push(FrameLemma::new(lemma, po, None));
+            self.frame.frames[0].push(FrameLemma::new(lemma, po, None));
             return false;
         }
         if contained_check && self.frame.trivial_contained(Some(frame), &lemma).is_some() {
@@ -246,7 +269,7 @@ impl IC3 {
                 let l = &self.frame[i][j];
                 if begin.is_none() && l.subsume(&lemma) {
                     if l.eq(&lemma) {
-                        self.frame[i].swap_remove(j);
+                        self.frame.frames[i].swap_remove(j);
                         let clause = !lemma.as_litvec();
                         for k in i + 1..=frame {
                             self.solvers[k].add_clause(&clause);
@@ -256,7 +279,7 @@ impl IC3 {
                         {
                             predprop.add_lemma(&lemma);
                         }
-                        self.frame[frame].push(FrameLemma::new(lemma, po, None));
+                        self.frame.frames[frame].push(FrameLemma::new(lemma, po, None));
                         self.frame.early = self.frame.early.min(i + 1);
                         return self.frame[i].is_empty();
                     } else {
@@ -265,7 +288,7 @@ impl IC3 {
                     }
                 }
                 if lemma.subsume(l) {
-                    let _remove = self.frame[i].swap_remove(j);
+                    let _remove = self.frame.frames[i].swap_remove(j);
                     // self.solvers[i].remove_lemma(&remove);
                     continue;
                 }
@@ -285,7 +308,7 @@ impl IC3 {
         {
             predprop.add_lemma(&lemma);
         }
-        self.frame[frame].push(FrameLemma::new(lemma, po, None));
+        self.frame.frames[frame].push(FrameLemma::new(lemma, po, None));
         self.frame.early = self.frame.early.min(begin);
         inv_found
     }
@@ -300,7 +323,7 @@ impl IC3 {
         );
         let lemma = LitOrdVec::new(lemma);
         assert!(self.frame.trivial_contained(None, &lemma).is_none());
-        let lastf = self.frame.last_mut().unwrap();
+        let lastf = self.frame.frames.last_mut().unwrap();
         let olen = lastf.len();
         lastf.retain(|l| !l.eq(&lemma));
         assert!(lastf.len() + 1 == olen);
@@ -309,14 +332,14 @@ impl IC3 {
         self.frame.inf.push(FrameLemma::new(lemma, None, None));
     }
 
-    pub fn inner_invariant(&self) -> Vec<LitVec> {
+    pub fn inner_invariant(&mut self) -> Vec<LitVec> {
         let mut invariants: Vec<_> = self
             .frame
             .inf
             .iter()
             .map(|c| c.as_litvec().clone())
             .collect();
-        if let Some(invariant) = self.frame.iter().position(|frame| frame.is_empty()) {
+        if let Some(invariant) = self.frame.frames.iter().position(|frame| frame.is_empty()) {
             for i in invariant..self.frame.len() {
                 for cube in self.frame[i].iter() {
                     invariants.push(cube.as_litvec().clone());
@@ -324,39 +347,12 @@ impl IC3 {
             }
             invariants
         } else {
-            let iter_max = 5;
-            let mut cand: Vec<_> = self
-                .frame
-                .last()
-                .unwrap()
+            self.propagate_to_inf2();
+            self.frame
+                .inf
                 .iter()
-                .map(|l| l.as_litvec().clone())
-                .collect();
-            for k in 0..=iter_max {
-                if k == iter_max {
-                    return invariants;
-                }
-                let mut slv = TransysSolver::new(&self.tsctx);
-                for i in invariants.iter() {
-                    slv.add_clause(&!i);
-                }
-                for c in cand.iter() {
-                    slv.add_clause(&!c);
-                }
-                let mut new_cand = Vec::new();
-                for c in cand.iter() {
-                    if slv.inductive(c, false) {
-                        new_cand.push(c.clone());
-                    }
-                }
-                if new_cand.len() == cand.len() {
-                    break;
-                } else {
-                    cand = new_cand;
-                }
-            }
-            invariants.extend(cand);
-            invariants
+                .map(|c| c.as_litvec().clone())
+                .collect()
         }
     }
 
