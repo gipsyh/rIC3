@@ -103,6 +103,10 @@ impl BMC {
         };
         while let Some((k, lemma)) = extractor.extract_lemma() {
             if k.is_none() {
+                for k in 0..=self.uts.num_unroll {
+                    let inv: LitVec = self.uts.lits_next(&lemma, k).collect();
+                    self.solver.add_clause(&inv);
+                }
                 self.invariant.push(lemma);
             }
         }

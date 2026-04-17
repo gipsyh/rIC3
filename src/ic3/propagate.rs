@@ -1,9 +1,11 @@
 use crate::{
+    gipsat::TransysSolver,
     ic3::{IC3, frame::FrameLemma, mic::MicType},
     transys::TransysIf,
 };
-use logicrs::{LitOrdVec, LitVec};
+use logicrs::{LitOrdVec, LitVec, satif::Satif};
 use rand::seq::SliceRandom;
+use std::time::Instant;
 
 impl IC3 {
     pub fn propagate(&mut self, from: Option<usize>) -> bool {
@@ -86,6 +88,7 @@ impl IC3 {
     }
 
     pub fn propagate_to_inf(&mut self) {
+        let start = Instant::now();
         let level = self.level();
         self.frame[level].shuffle(&mut self.rng);
         let mut lastf = self.frame[level].clone();
@@ -110,5 +113,49 @@ impl IC3 {
                 }
             }
         }
+        self.statistic.propagate.push_inf_time += start.elapsed();
+    }
+
+    pub fn propagate_to_inf2(&mut self) {
+        let start = Instant::now();
+        let iter_max = 7;
+        let mut cand: Vec<_> = self
+            .frame
+            .last()
+            .unwrap()
+            .iter()
+            .map(|l| l.as_litvec().clone())
+            .collect();
+        if cand.is_empty() {
+            return;
+        }
+        for k in 0..=iter_max {
+            if k == iter_max {
+                self.statistic.propagate.push_inf_time += start.elapsed();
+                return;
+            }
+            let mut slv = TransysSolver::new(&self.tsctx);
+            for i in self.frame.inf.iter() {
+                slv.add_clause(&!i.as_litvec());
+            }
+            for c in cand.iter() {
+                slv.add_clause(&!c);
+            }
+            let mut new_cand = Vec::new();
+            for c in cand.iter() {
+                if slv.inductive(c, false) {
+                    new_cand.push(c.clone());
+                }
+            }
+            if new_cand.len() == cand.len() {
+                break;
+            } else {
+                cand = new_cand;
+            }
+        }
+        for c in cand {
+            self.add_inf_lemma(c);
+        }
+        self.statistic.propagate.push_inf_time += start.elapsed();
     }
 }

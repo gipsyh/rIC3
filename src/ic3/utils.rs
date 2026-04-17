@@ -11,6 +11,12 @@ pub struct Block {
     pub push_time: Duration,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct Propagate {
+    pub overall_time: Duration,
+    pub push_inf_time: Duration,
+}
+
 #[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Statistic {
@@ -27,7 +33,7 @@ pub struct Statistic {
 
     pub block: Block,
 
-    pub overall_propagate_time: Duration,
+    pub propagate: Propagate,
 
     pub xor_gen: SuccessRate,
     pub num_auxiliary_var: usize,

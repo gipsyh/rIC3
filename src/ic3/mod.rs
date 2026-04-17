@@ -318,7 +318,7 @@ impl Engine for IC3 {
             self.extend();
             let start = Instant::now();
             let propagate = self.propagate(None);
-            self.statistic.overall_propagate_time += start.elapsed();
+            self.statistic.propagate.overall_time += start.elapsed();
             if propagate {
                 self.tracer.trace_state(None, McResult::Proved);
                 return McResult::Proved;
