@@ -19,7 +19,7 @@ pub struct PredProp {
 impl PredProp {
     pub fn new(uts: TransysUnroll<Transys>, local_proof: Option<usize>, inn: bool) -> Self {
         let mut bts = if inn {
-            uts.internal_signals_with_full_prime()
+            uts.internal_signals()
         } else {
             uts.compile()
         };
