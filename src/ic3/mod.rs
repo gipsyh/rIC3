@@ -147,7 +147,7 @@ pub struct IC3 {
     tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
-    ts_top_level: VarMap<usize>,
+    ts_top_lv: VarMap<usize>,
     lift: TsLift,
     frame: Frames,
     obligations: ProofObligationQueue,
@@ -219,7 +219,7 @@ impl IC3 {
         ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
-        let ts_top_level = ts.rel.level();
+        let ts_top_lv = ts.rel.level();
         if cfg.inn {
             ts = uts.internal_signals();
         }
@@ -245,7 +245,7 @@ impl IC3 {
             solvers: Vec::new(),
             inf_solver,
             lift,
-            ts_top_level,
+            ts_top_lv,
             statistic,
             obligations: ProofObligationQueue::new(),
             frame,

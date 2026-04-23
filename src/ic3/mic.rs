@@ -76,7 +76,7 @@ impl IC3 {
             self.statistic.num_down_sat += 1;
             if self
                 .blocked(frame, &cube)
-                .with_ordered(false)
+                .with_act_order(false)
                 .with_strengthen()
                 .with_constraint(constraint)
                 .check()
@@ -137,7 +137,7 @@ impl IC3 {
             self.statistic.num_down_sat += 1;
             if self
                 .blocked(frame, &cube)
-                .with_ordered(false)
+                .with_act_order(false)
                 .with_strengthen()
                 .check()
             {

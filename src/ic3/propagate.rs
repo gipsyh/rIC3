@@ -21,7 +21,7 @@ impl IC3 {
                 for ctp in 0..3 {
                     if self
                         .blocked(frame_idx + 1, &lemma)
-                        .with_ordered(false)
+                        .with_act_order(false)
                         .check()
                     {
                         let core = self.solvers[frame_idx]

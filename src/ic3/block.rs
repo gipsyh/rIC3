@@ -120,7 +120,7 @@ impl IC3 {
             let blocked_start = Instant::now();
             let blocked = self
                 .blocked(po.frame, &po.state)
-                .with_ordered(false)
+                .with_act_order(false)
                 .check();
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
@@ -200,7 +200,7 @@ impl IC3 {
         loop {
             if self
                 .blocked(frame, &lemma)
-                .with_ordered(false)
+                .with_act_order(false)
                 .with_strengthen()
                 .with_constraint(constraint)
                 .check()

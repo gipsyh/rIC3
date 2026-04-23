@@ -9,14 +9,31 @@ pub(super) struct Blocked<'a, 'cube> {
     ic3: &'a mut IC3,
     frame: usize,
     cube: &'cube LitVec,
-    ordered: Option<bool>,
+    order: BlockedOrder,
     strengthen: bool,
     constraint: Vec<LitVec>,
 }
 
+#[derive(Default)]
+enum BlockedOrder {
+    Activity {
+        ascending: bool,
+    },
+    #[allow(unused)]
+    Inn,
+    #[default]
+    None,
+}
+
 impl<'a, 'cube> Blocked<'a, 'cube> {
-    pub(super) fn with_ordered(mut self, ascending: bool) -> Self {
-        self.ordered = Some(ascending);
+    pub(super) fn with_act_order(mut self, ascending: bool) -> Self {
+        self.order = BlockedOrder::Activity { ascending };
+        self
+    }
+
+    #[allow(unused)]
+    pub(super) fn with_ts_top_lv_order(mut self) -> Self {
+        self.order = BlockedOrder::Inn;
         self
     }
 
@@ -35,17 +52,28 @@ impl<'a, 'cube> Blocked<'a, 'cube> {
             ic3,
             frame,
             cube,
-            ordered,
+            order,
             strengthen,
             constraint,
         } = self;
 
-        let mut ordered_cube = None;
-        if let Some(ascending) = ordered {
-            let mut cube = cube.clone();
-            ic3.activity.sort_by_activity(&mut cube, ascending);
-            ordered_cube = Some(cube);
-        }
+        let ordered_cube = match order {
+            BlockedOrder::Activity { ascending } => {
+                let mut ordered = cube.clone();
+                ic3.activity.sort_by_activity(&mut ordered, ascending);
+                Some(ordered)
+            }
+            BlockedOrder::Inn => {
+                let mut ordered = cube.clone();
+                ordered.sort_by(|a, b| {
+                    ic3.ts_top_lv[b.var()]
+                        .cmp(&ic3.ts_top_lv[a.var()])
+                        .then_with(|| ic3.activity.cmp(b.var(), a.var()))
+                });
+                Some(ordered)
+            }
+            BlockedOrder::None => None,
+        };
         let cube = ordered_cube
             .as_ref()
             .map(|cube| cube.as_slice())
@@ -91,7 +119,7 @@ impl IC3 {
             ic3: self,
             frame,
             cube,
-            ordered: None,
+            order: BlockedOrder::default(),
             strengthen: false,
             constraint: Vec::new(),
         }
@@ -108,8 +136,8 @@ impl IC3 {
             if self.cfg.inn || !self.auxiliary_var.is_empty() {
                 if i == 0 {
                     cube.sort_by(|a, b| {
-                        self.ts_top_level[b.var()]
-                            .cmp(&self.ts_top_level[a.var()])
+                        self.ts_top_lv[b.var()]
+                            .cmp(&self.ts_top_lv[a.var()])
                             .then_with(|| self.activity.cmp(b.var(), a.var()))
                     });
                     return true;
