@@ -136,8 +136,8 @@ impl LogTracer {
 impl TracerIf for LogTracer {
     fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
         match res {
-            McResult::Proved => info!("{} proved the property", self.name),
-            McResult::Violated(d) => info!("{} found a counterexample at depth {d}", self.name),
+            McResult::UNSAT => info!("{} proved the property", self.name),
+            McResult::SAT(d) => info!("{} found a counterexample at depth {d}", self.name),
             McResult::Unknown(Some(d)) => {
                 if self.update_unknow(d) {
                     info!("{} found no counterexample up to depth {d}", self.name)

@@ -192,7 +192,7 @@ impl Frontend for AigFrontend {
 
     fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
         match cert {
-            McBlCertificate::Proved(proof) => {
+            McBlCertificate::UNSAT(proof) => {
                 if !self.is_safety() {
                     error!(
                         "rIC3 does not support certificate generation for safe liveness properties"
@@ -215,7 +215,7 @@ impl Frontend for AigFrontend {
                 }
                 Box::new(certifaiger)
             }
-            McBlCertificate::Violated(bl_cex) => {
+            McBlCertificate::SAT(bl_cex) => {
                 let mut cex = bl_cex.filter_map_var(|v: Var| self.rst.get(&v).copied());
                 let mut res = vec!["1".to_string()];
                 if self.is_safety() {

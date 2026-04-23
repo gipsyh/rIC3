@@ -84,8 +84,8 @@ impl Engine for WlKind {
                 self.load_bad_to(k - 1);
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
-                    self.tracer.trace_state(None, crate::McResult::Proved);
-                    return McResult::Proved;
+                    self.tracer.trace_state(None, crate::McResult::UNSAT);
+                    return McResult::UNSAT;
                 }
             }
 
@@ -97,8 +97,8 @@ impl Engine for WlKind {
             assump.push(bad_at_k);
 
             if self.solver.solve(&assump) {
-                self.tracer.trace_state(None, crate::McResult::Violated(k));
-                return McResult::Violated(k);
+                self.tracer.trace_state(None, crate::McResult::SAT(k));
+                return McResult::SAT(k);
             }
             self.tracer
                 .trace_state(None, crate::McResult::Unknown(Some(k)));

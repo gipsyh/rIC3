@@ -88,9 +88,9 @@ impl EngineCtrl {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
     /// Property is Proved
-    Proved,
+    UNSAT,
     /// Property is Violated with Cex Depth
-    Violated(usize),
+    SAT(usize),
     /// Proved in Some(exact depth)
     Unknown(Option<usize>),
 }
@@ -107,12 +107,12 @@ impl BitOr for McResult {
     fn bitor(self, rhs: Self) -> Self::Output {
         use McResult::*;
         match (self, rhs) {
-            (Proved, Violated(_)) | (Violated(_), Proved) => {
+            (UNSAT, SAT(_)) | (SAT(_), UNSAT) => {
                 panic!("conflicting results: satisfied and violated")
             }
-            (Proved, _) | (_, Proved) => Proved,
-            (Violated(a), Violated(b)) => Violated(a.max(b)),
-            (Violated(a), Unknown(_)) | (Unknown(_), Violated(a)) => Violated(a),
+            (UNSAT, _) | (_, UNSAT) => UNSAT,
+            (SAT(a), SAT(b)) => SAT(a.max(b)),
+            (SAT(a), Unknown(_)) | (Unknown(_), SAT(a)) => SAT(a),
             (Unknown(a), Unknown(b)) => Unknown(match (a, b) {
                 (Some(x), Some(y)) => Some(x.max(y)),
                 (Some(x), None) | (None, Some(x)) => Some(x),
@@ -156,14 +156,14 @@ impl FromIterator<McResult> for MpMcResult {
 
 #[derive(Clone, Debug, EnumAsInner, Serialize, Deserialize)]
 pub enum McBlCertificate {
-    Proved(BlProof),
-    Violated(BlCex),
+    UNSAT(BlProof),
+    SAT(BlCex),
 }
 
 #[derive(Clone, Debug, EnumAsInner)]
 pub enum McWlCertificate {
-    Proved(WlProof),
-    Violated(WlCex),
+    UNSAT(WlProof),
+    SAT(WlCex),
 }
 
 pub trait Engine: Send {
@@ -193,8 +193,8 @@ pub trait BlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McBlCertificate {
         match res {
-            McResult::Proved => McBlCertificate::Proved(self.proof()),
-            McResult::Violated(_) => McBlCertificate::Violated(self.cex()),
+            McResult::UNSAT => McBlCertificate::UNSAT(self.proof()),
+            McResult::SAT(_) => McBlCertificate::SAT(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
     }
@@ -211,8 +211,8 @@ pub trait WlEngine: Engine {
 
     fn certificate(&mut self, res: McResult) -> McWlCertificate {
         match res {
-            McResult::Proved => McWlCertificate::Proved(self.proof()),
-            McResult::Violated(_) => McWlCertificate::Violated(self.cex()),
+            McResult::UNSAT => McWlCertificate::UNSAT(self.proof()),
+            McResult::SAT(_) => McWlCertificate::SAT(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
     }

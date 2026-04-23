@@ -64,8 +64,8 @@ impl Engine for WlBMC {
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
             if self.solver.solve(&[assump]) {
-                self.tracer.trace_state(None, crate::McResult::Violated(k));
-                return McResult::Violated(k);
+                self.tracer.trace_state(None, crate::McResult::SAT(k));
+                return McResult::SAT(k);
             }
             self.tracer
                 .trace_state(None, crate::McResult::Unknown(Some(k)));

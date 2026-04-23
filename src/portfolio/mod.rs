@@ -109,13 +109,13 @@ impl Worker {
         let res = engine.check();
         if let Some(cert_path) = self.cert.as_ref().map(|c| c.path()) {
             let certificate = match res {
-                McResult::Proved => {
+                McResult::UNSAT => {
                     let cert = rst.restore_proof(engine.proof(), ots);
-                    frontend.bl_certificate(McBlCertificate::Proved(cert))
+                    frontend.bl_certificate(McBlCertificate::UNSAT(cert))
                 }
-                McResult::Violated(_) => {
+                McResult::SAT(_) => {
                     let cert = rst.restore_cex(&engine.cex());
-                    frontend.bl_certificate(McBlCertificate::Violated(cert))
+                    frontend.bl_certificate(McBlCertificate::SAT(cert))
                 }
                 McResult::Unknown(_) => panic!(),
             };
@@ -223,8 +223,8 @@ impl Portfolio {
         self.tracer.trace_state(prop, res);
         let prop_prefix = prop.map(|p| format!("p{p}: ")).unwrap_or_default();
         match res {
-            McResult::Proved => info!("{}{} proved the property", worker.name, prop_prefix),
-            McResult::Violated(d) => info!(
+            McResult::UNSAT => info!("{}{} proved the property", worker.name, prop_prefix),
+            McResult::SAT(d) => info!(
                 "{}{} found a counterexample at depth {d}",
                 worker.name, prop_prefix
             ),

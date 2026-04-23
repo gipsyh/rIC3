@@ -25,7 +25,7 @@ impl CIll {
         let mut cex = self.bb_map.restore_cex(&cex);
         let bwit = self
             .btorfe
-            .wl_certificate(McWlCertificate::Violated(cex.clone()));
+            .wl_certificate(McWlCertificate::SAT(cex.clone()));
         fs::write(&p, format!("{}", bwit))?;
         let Some(vcd) = vcd else {
             return Ok(());

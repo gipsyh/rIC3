@@ -94,7 +94,7 @@ impl Rlive {
         log::set_max_level(LevelFilter::Warn);
         let res = ic3.check();
         log::set_max_level(prev_level);
-        if let McResult::Proved = res {
+        if let McResult::UNSAT = res {
             return Ok(ic3.invariant());
         }
         let cex = ic3.cex();
@@ -175,14 +175,14 @@ impl Engine for Rlive {
             log::set_max_level(LevelFilter::Warn);
             let res = ic3.check();
             log::set_max_level(prev_level);
-            if let McResult::Proved = res {
-                return McResult::Proved;
+            if let McResult::UNSAT = res {
+                return McResult::UNSAT;
             }
             let cex = ic3.cex();
             assert!(self.level() == 0);
             self.add_trace(cex);
             if !self.block() {
-                return McResult::Violated(0);
+                return McResult::SAT(0);
             }
         }
     }

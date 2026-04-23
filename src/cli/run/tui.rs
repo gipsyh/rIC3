@@ -26,8 +26,8 @@ use std::{
 impl PropMcState {
     fn color(&self) -> Color {
         match self.prop.res {
-            McResult::Proved => Color::Green,
-            McResult::Violated(_) => Color::Red,
+            McResult::UNSAT => Color::Green,
+            McResult::SAT(_) => Color::Red,
             McResult::Unknown(_) => match self.state {
                 McStatus::Solving => Color::Yellow,
                 McStatus::Wait => Color::DarkGray,
@@ -38,15 +38,15 @@ impl PropMcState {
 
     fn as_str(&self) -> &str {
         match self.prop.res {
-            McResult::Proved => "Proved",
-            McResult::Violated(_) => "Violated",
+            McResult::UNSAT => "Proved",
+            McResult::SAT(_) => "Violated",
             McResult::Unknown(_) => self.state.as_ref(),
         }
     }
 
     fn cells(&'_ self) -> Vec<Cell<'_>> {
         let bound = match self.prop.res {
-            McResult::Violated(b) => format!("{b}"),
+            McResult::SAT(b) => format!("{b}"),
             McResult::Unknown(Some(b)) => format!("{b}"),
             _ => "-".to_string(),
         };
@@ -161,9 +161,9 @@ impl Run {
                 prop.prop.res = result;
             }
             while let Ok(cex) = task.wit_trx.try_recv() {
-                let cex = cex.into_violated().unwrap();
+                let cex = cex.into_sat().unwrap();
                 let prop_id = cex.bad_id;
-                let cex = self.btorfe.bl_certificate(McBlCertificate::Violated(cex));
+                let cex = self.btorfe.bl_certificate(McBlCertificate::SAT(cex));
                 let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
                 fs::write(&wit_path, format!("{cex}")).unwrap();
                 Yosys::btor_wit_to_vcd(

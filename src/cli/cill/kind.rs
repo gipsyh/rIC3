@@ -89,7 +89,7 @@ impl Engine for CIllKind {
         let bad = self.uts.lit_next(self.uts.ts.bad[self.prop], k);
         let res = self.solver.solve(&[bad]);
         if !res {
-            return McResult::Proved;
+            return McResult::UNSAT;
         }
         McResult::Unknown(Some(k))
     }
