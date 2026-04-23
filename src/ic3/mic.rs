@@ -74,13 +74,13 @@ impl IC3 {
                 return None;
             }
             self.statistic.num_down_sat += 1;
-            if self.blocked_with_ordered_with_constrain(
-                frame,
-                &cube,
-                false,
-                true,
-                constraint.to_vec(),
-            ) {
+            if self
+                .blocked(frame, &cube)
+                .with_ordered(false)
+                .with_strengthen()
+                .with_constraint(constraint)
+                .check()
+            {
                 return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             let mut ret = false;
@@ -135,7 +135,12 @@ impl IC3 {
                 return None;
             }
             self.statistic.num_down_sat += 1;
-            if self.blocked_with_ordered(frame, &cube, true) {
+            if self
+                .blocked(frame, &cube)
+                .with_ordered(false)
+                .with_strengthen()
+                .check()
+            {
                 return Some(self.solvers[frame - 1].inductive_core().unwrap());
             }
             for lit in cube.iter() {
