@@ -110,7 +110,7 @@ impl Worker {
         if let Some(cert_path) = self.cert.as_ref().map(|c| c.path()) {
             let certificate = match res {
                 McResult::Proved => {
-                    let cert = rst.restore_proof(engine.proof(), &ots);
+                    let cert = rst.restore_proof(engine.proof(), ots);
                     frontend.bl_certificate(McBlCertificate::Proved(cert))
                 }
                 McResult::Violated(_) => {

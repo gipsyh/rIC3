@@ -14,7 +14,7 @@ use clap::{ArgAction, Args, Parser};
 use frame::Frames;
 use giputils::{grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, error, info, trace};
-use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarSymbols, satif::Satif};
+use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarMap, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
@@ -147,6 +147,7 @@ pub struct IC3 {
     tsctx: Grc<TransysCtx>,
     solvers: Vec<TransysSolver>,
     inf_solver: TransysSolver,
+    ts_top_level: VarMap<usize>,
     lift: TsLift,
     frame: Frames,
     obligations: ProofObligationQueue,
@@ -218,6 +219,7 @@ impl IC3 {
         ts.remove_gate_init(&mut rst);
         let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
+        let ts_top_level = ts.rel.level();
         if cfg.inn {
             ts = uts.internal_signals();
         }
@@ -243,6 +245,7 @@ impl IC3 {
             solvers: Vec::new(),
             inf_solver,
             lift,
+            ts_top_level,
             statistic,
             obligations: ProofObligationQueue::new(),
             frame,

@@ -73,7 +73,11 @@ impl IC3 {
         let order = |mut i: usize, cube: &mut [Lit]| -> bool {
             if self.cfg.inn || !self.auxiliary_var.is_empty() {
                 if i == 0 {
-                    cube.sort_by(|a, b| b.cmp(a));
+                    cube.sort_by(|a, b| {
+                        self.ts_top_level[b.var()]
+                            .cmp(&self.ts_top_level[a.var()])
+                            .then_with(|| self.activity.cmp(b.var(), a.var()))
+                    });
                     return true;
                 }
                 i -= 1;

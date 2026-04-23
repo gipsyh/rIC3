@@ -104,7 +104,7 @@ impl Frames {
     }
 
     pub fn last(&self) -> &Frame {
-        &self.frames.last().unwrap()
+        self.frames.last().unwrap()
     }
 
     pub fn extend(&mut self) {

@@ -1,6 +1,6 @@
 use crate::transys::TransysCtx;
 use logicrs::{Lit, LitVec, Var, VarMap};
-use std::ops::MulAssign;
+use std::{cmp::Ordering, ops::MulAssign};
 
 pub struct Activity {
     activity: VarMap<f64>,
@@ -52,13 +52,16 @@ impl Activity {
         cube.iter().for_each(|l| self.bump(l.var()));
     }
 
+    #[inline]
+    pub fn cmp(&self, a: Var, b: Var) -> Ordering {
+        self.activity[a].partial_cmp(&self.activity[b]).unwrap()
+    }
+
     pub fn sort_by_activity(&self, cube: &mut [Lit], ascending: bool) {
-        let ascending_func =
-            |a: &Lit, b: &Lit| self.activity[*a].partial_cmp(&self.activity[*b]).unwrap();
         if ascending {
-            cube.sort_by(ascending_func);
+            cube.sort_by(|a, b| self.cmp(a.var(), b.var()));
         } else {
-            cube.sort_by(|a, b| ascending_func(b, a));
+            cube.sort_by(|a, b| self.cmp(b.var(), a.var()));
         }
     }
 
