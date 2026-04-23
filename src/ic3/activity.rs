@@ -53,7 +53,7 @@ impl Activity {
     }
 
     #[inline]
-    pub fn cmp(&self, a: Var, b: Var) -> Ordering {
+    pub fn cmp(&self, a: impl Into<Var>, b: impl Into<Var>) -> Ordering {
         self.activity[a].partial_cmp(&self.activity[b]).unwrap()
     }
 

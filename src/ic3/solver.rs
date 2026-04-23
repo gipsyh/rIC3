@@ -32,7 +32,7 @@ impl<'a, 'cube> Blocked<'a, 'cube> {
     }
 
     #[allow(unused)]
-    pub(super) fn with_ts_top_lv_order(mut self) -> Self {
+    pub(super) fn with_inn_order(mut self) -> Self {
         self.order = BlockedOrder::Inn;
         self
     }
@@ -65,11 +65,7 @@ impl<'a, 'cube> Blocked<'a, 'cube> {
             }
             BlockedOrder::Inn => {
                 let mut ordered = cube.clone();
-                ordered.sort_by(|a, b| {
-                    ic3.ts_top_lv[b.var()]
-                        .cmp(&ic3.ts_top_lv[a.var()])
-                        .then_with(|| ic3.activity.cmp(b.var(), a.var()))
-                });
+                ordered.sort_by(|a, b| ic3.inn_cmp(b, a));
                 Some(ordered)
             }
             BlockedOrder::None => None,
@@ -136,9 +132,9 @@ impl IC3 {
             if self.cfg.inn || !self.auxiliary_var.is_empty() {
                 if i == 0 {
                     cube.sort_by(|a, b| {
-                        self.ts_top_lv[b.var()]
-                            .cmp(&self.ts_top_lv[a.var()])
-                            .then_with(|| self.activity.cmp(b.var(), a.var()))
+                        self.ts_top_lv[b]
+                            .cmp(&self.ts_top_lv[a])
+                            .then_with(|| self.activity.cmp(b, a))
                     });
                     return true;
                 }
