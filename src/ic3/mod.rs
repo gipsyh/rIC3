@@ -121,6 +121,10 @@ impl IC3Config {
                 error!("{pre} (abs_cst or abs_trans)");
                 panic!();
             }
+            if self.pred_prop {
+                error!("{pre} pred-prop");
+                panic!();
+            }
         }
         if self.full_bad {
             error!("full-bad can't be used now");
@@ -223,13 +227,9 @@ impl IC3 {
         if cfg.inn {
             ts = uts.internal_signals();
         }
-        let predprop = cfg.pred_prop.then(|| {
-            PredProp::new(
-                uts.clone(),
-                cfg.local_proof.then(|| cfg.prop.unwrap()),
-                cfg.inn,
-            )
-        });
+        let predprop = cfg
+            .pred_prop
+            .then(|| PredProp::new(uts.clone(), cfg.local_proof.then(|| cfg.prop.unwrap())));
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);

@@ -13,28 +13,18 @@ pub struct PredProp {
     bts: Transys,
     slv: TransysSolver,
     lift: TsLift,
-    inn: bool,
 }
 
 impl PredProp {
-    pub fn new(uts: TransysUnroll<Transys>, local_proof: Option<usize>, inn: bool) -> Self {
-        let mut bts = if inn {
-            uts.internal_signals()
-        } else {
-            uts.compile()
-        };
+    pub fn new(uts: TransysUnroll<Transys>, local_proof: Option<usize>) -> Self {
+        let mut bts = uts.compile();
         if let Some(lp) = local_proof {
             bts.bad = LitVec::from([bts.bad[lp]]);
         }
         bts.constraint.extend(!&uts.ts.bad);
         let slv = TransysSolver::new(&Grc::new(bts.ctx()));
         let lift = TsLift::new(uts);
-        Self {
-            bts,
-            slv,
-            lift,
-            inn,
-        }
+        Self { bts, slv, lift }
     }
 
     pub fn add_lemma(&mut self, lemma: &LitVec) {
@@ -89,14 +79,7 @@ impl IC3 {
         let predprop = self.predprop.as_mut().unwrap();
         let res = predprop.slv.solve(&predprop.bts.bad);
         self.statistic.block.get_bad_time += start.elapsed();
-        let order = |mut i: usize, cube: &mut [Lit]| -> bool {
-            if predprop.inn {
-                if i == 0 {
-                    cube.sort_by(|a, b| b.cmp(a));
-                    return true;
-                }
-                i -= 1;
-            }
+        let order = |i: usize, cube: &mut [Lit]| -> bool {
             match i {
                 0 => {
                     self.activity.sort_by_activity(cube, false);
