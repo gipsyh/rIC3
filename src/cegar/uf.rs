@@ -1,5 +1,8 @@
+use super::CegarAbstractor;
 use crate::wltransys::WlTransys;
+use crate::{McResult, WlProof};
 use giputils::hash::GHashMap;
+use log::info;
 use logicrs::fol::{
     Sort, Term, TermType,
     op::{self, DynOp},
@@ -40,6 +43,96 @@ pub struct UfAbstractor {
     output_subst: GHashMap<Term, Term>,
     apps: Vec<UfApp>,
     stats: UfStats,
+}
+
+pub struct Uf {
+    mode: UfMode,
+    output_subst: GHashMap<Term, Term>,
+    stats: UfStats,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UfMode {
+    Abstract,
+    Exact,
+}
+
+impl Uf {
+    pub fn new() -> Self {
+        Self {
+            mode: UfMode::Abstract,
+            output_subst: GHashMap::new(),
+            stats: UfStats::default(),
+        }
+    }
+
+    fn substitute_outputs(&self, mut proof: WlProof) -> WlProof {
+        proof
+            .input
+            .retain(|input| !self.output_subst.contains_key(input));
+
+        let mut cache = GHashMap::new();
+        for init in proof.init.values_mut() {
+            *init = self.substitute_term(init, &mut cache);
+        }
+        for next in proof.next.values_mut() {
+            *next = self.substitute_term(next, &mut cache);
+        }
+        for bad in proof.bad.iter_mut() {
+            *bad = self.substitute_term(bad, &mut cache);
+        }
+        for constraint in proof.constraint.iter_mut() {
+            *constraint = self.substitute_term(constraint, &mut cache);
+        }
+        for justice in proof.justice.iter_mut() {
+            *justice = self.substitute_term(justice, &mut cache);
+        }
+        proof
+    }
+
+    fn substitute_term(&self, term: &Term, cache: &mut GHashMap<Term, Term>) -> Term {
+        term.cached_apply(&|term| self.output_subst.get(term).cloned(), cache)
+    }
+}
+
+impl CegarAbstractor for Uf {
+    fn name(&self) -> &'static str {
+        "uf"
+    }
+
+    fn abstract_wts(&mut self, origin: &WlTransys) -> WlTransys {
+        self.mode = UfMode::Abstract;
+        let mut abstractor = UfAbstractor::new();
+        let result = abstractor.abstract_transys(origin.clone());
+        info!(
+            "cegar uf abstracted {} applications into {} fresh inputs and {} consistency constraints",
+            result.stats.applications, result.stats.outputs, result.stats.constraints,
+        );
+        self.output_subst = result.output_subst;
+        self.stats = result.stats;
+        result.wts
+    }
+
+    fn refine(&mut self, origin: &WlTransys, res: McResult) -> Option<WlTransys> {
+        let McResult::SAT(depth) = res else {
+            return None;
+        };
+        if self.mode != UfMode::Abstract || self.stats.outputs == 0 {
+            return None;
+        }
+
+        info!(
+            "cegar {} abstraction found SAT at depth {depth}; rebuilding IC3 from original WTS",
+            self.name(),
+        );
+        self.mode = UfMode::Exact;
+        self.output_subst.clear();
+        Some(origin.clone())
+    }
+
+    fn certificate(&self, proof: WlProof) -> WlProof {
+        self.substitute_outputs(proof)
+    }
 }
 
 impl UfAbstractor {

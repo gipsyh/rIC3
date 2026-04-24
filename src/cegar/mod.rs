@@ -1,19 +1,17 @@
 mod uf;
 
+use self::uf::Uf;
 use crate::{
     BlEngine, Engine, EngineCtrl, McResult, WlEngine, WlProof,
     config::EngineConfigBase,
     ic3::{IC3, IC3Config},
     impl_config_deref,
-    tracer::TracerIf,
+    tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use clap::Args;
-use giputils::hash::GHashMap;
-use log::info;
-use logicrs::{VarSymbols, fol::Term};
+use logicrs::VarSymbols;
 use serde::{Deserialize, Serialize};
-use uf::UfAbstractor;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct CegarConfig {
@@ -24,86 +22,82 @@ pub struct CegarConfig {
 impl_config_deref!(CegarConfig);
 
 pub struct Cegar {
+    cfg: CegarConfig,
+    origin_wts: WlTransys,
+    abstraction: Box<dyn CegarAbstractor>,
+    model: ActiveModel,
+    tracer: Tracer,
+}
+
+struct ActiveModel {
     ic3: IC3,
-    abstract_wts: WlTransys,
+    wts: WlTransys,
     bb_map: BitblastMap,
-    output_subst: GHashMap<Term, Term>,
 }
 
 impl Cegar {
     pub fn new(cfg: CegarConfig, wts: WlTransys) -> Self {
-        let mut uf_abstractor = UfAbstractor::new();
-        let uf = uf_abstractor.abstract_transys(wts);
-        let wts = uf.wts;
-        info!(
-            "cegar uf abstracted {} applications into {} fresh inputs and {} consistency constraints",
-            uf.stats.applications, uf.stats.outputs, uf.stats.constraints,
-        );
-        let output_subst = uf.output_subst;
+        let mut abstraction: Box<dyn CegarAbstractor> = Box::new(Uf::new());
+        let abstract_wts = abstraction.abstract_wts(&wts);
+        let model = Self::build_model(&cfg, abstract_wts);
+        Self {
+            cfg,
+            origin_wts: wts,
+            abstraction,
+            model,
+            tracer: Tracer::new(),
+        }
+    }
 
+    fn build_model(cfg: &CegarConfig, wts: WlTransys) -> ActiveModel {
         let (ts, bb_map) = wts.bitblast_to_ts();
         let mut ic3_cfg = IC3Config::default();
-        ic3_cfg.base = cfg.base;
+        ic3_cfg.base = cfg.base.clone();
         let ic3 = IC3::new(ic3_cfg, ts, VarSymbols::new());
-        Self {
-            ic3,
-            abstract_wts: wts,
-            bb_map,
-            output_subst,
-        }
-    }
-
-    fn substitute_outputs(&self, mut proof: WlProof) -> WlProof {
-        proof
-            .input
-            .retain(|input| !self.output_subst.contains_key(input));
-
-        let mut cache = GHashMap::new();
-        for init in proof.init.values_mut() {
-            *init = self.substitute_term(init, &mut cache);
-        }
-        for next in proof.next.values_mut() {
-            *next = self.substitute_term(next, &mut cache);
-        }
-        for bad in proof.bad.iter_mut() {
-            *bad = self.substitute_term(bad, &mut cache);
-        }
-        for constraint in proof.constraint.iter_mut() {
-            *constraint = self.substitute_term(constraint, &mut cache);
-        }
-        for justice in proof.justice.iter_mut() {
-            *justice = self.substitute_term(justice, &mut cache);
-        }
-        proof
-    }
-
-    fn substitute_term(&self, term: &Term, cache: &mut GHashMap<Term, Term>) -> Term {
-        term.cached_apply(&|term| self.output_subst.get(term).cloned(), cache)
+        ActiveModel { ic3, wts, bb_map }
     }
 }
 
 impl Engine for Cegar {
     fn check(&mut self) -> McResult {
-        self.ic3.check()
+        loop {
+            let res = self.model.ic3.check();
+            if let Some(refined_wts) = self.abstraction.refine(&self.origin_wts, res) {
+                self.model = Self::build_model(&self.cfg, refined_wts);
+                continue;
+            }
+            self.tracer.trace_state(None, res);
+            return res;
+        }
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
-        self.ic3.add_tracer(tracer);
+        self.tracer.add_tracer(tracer);
     }
 
     fn statistic(&mut self) {
-        self.ic3.statistic();
+        self.model.ic3.statistic();
     }
 
     fn get_ctrl(&self) -> EngineCtrl {
-        self.ic3.get_ctrl()
+        self.model.ic3.get_ctrl()
     }
 }
 
 impl WlEngine for Cegar {
     fn proof(&mut self) -> WlProof {
-        let proof = self.ic3.proof();
-        let proof = self.bb_map.restore_proof(&self.abstract_wts, &proof);
-        self.substitute_outputs(proof)
+        let proof = self.model.ic3.proof();
+        let proof = self.model.bb_map.restore_proof(&self.model.wts, &proof);
+        self.abstraction.certificate(proof)
     }
+}
+
+pub trait CegarAbstractor: Send {
+    fn name(&self) -> &'static str;
+
+    fn abstract_wts(&mut self, origin: &WlTransys) -> WlTransys;
+
+    fn refine(&mut self, origin: &WlTransys, res: McResult) -> Option<WlTransys>;
+
+    fn certificate(&self, proof: WlProof) -> WlProof;
 }
