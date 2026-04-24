@@ -1,6 +1,6 @@
 use super::CegarAbstractor;
 use crate::wltransys::WlTransys;
-use crate::{McResult, WlProof};
+use crate::{WlCex, WlProof};
 use giputils::hash::GHashMap;
 use log::info;
 use logicrs::fol::{
@@ -46,6 +46,7 @@ pub struct UfAbstractor {
 }
 
 pub struct Uf {
+    origin: WlTransys,
     mode: UfMode,
     output_subst: GHashMap<Term, Term>,
     stats: UfStats,
@@ -58,8 +59,9 @@ enum UfMode {
 }
 
 impl Uf {
-    pub fn new() -> Self {
+    pub fn new(origin: WlTransys) -> Self {
         Self {
+            origin,
             mode: UfMode::Abstract,
             output_subst: GHashMap::new(),
             stats: UfStats::default(),
@@ -100,10 +102,10 @@ impl CegarAbstractor for Uf {
         "uf"
     }
 
-    fn abstract_wts(&mut self, origin: &WlTransys) -> WlTransys {
+    fn abstract_wts(&mut self) -> WlTransys {
         self.mode = UfMode::Abstract;
         let mut abstractor = UfAbstractor::new();
-        let result = abstractor.abstract_transys(origin.clone());
+        let result = abstractor.abstract_transys(self.origin.clone());
         info!(
             "cegar uf abstracted {} applications into {} fresh inputs and {} consistency constraints",
             result.stats.applications, result.stats.outputs, result.stats.constraints,
@@ -113,24 +115,21 @@ impl CegarAbstractor for Uf {
         result.wts
     }
 
-    fn refine(&mut self, origin: &WlTransys, res: McResult) -> Option<WlTransys> {
-        let McResult::SAT(depth) = res else {
-            return None;
-        };
+    fn refine(&mut self, _cex: &WlCex) -> Option<WlTransys> {
         if self.mode != UfMode::Abstract || self.stats.outputs == 0 {
             return None;
         }
 
         info!(
-            "cegar {} abstraction found SAT at depth {depth}; rebuilding IC3 from original WTS",
+            "cegar {} abstraction found cex; rebuilding IC3 from original WTS",
             self.name(),
         );
         self.mode = UfMode::Exact;
         self.output_subst.clear();
-        Some(origin.clone())
+        Some(self.origin.clone())
     }
 
-    fn certificate(&self, proof: WlProof) -> WlProof {
+    fn proof(&self, proof: WlProof) -> WlProof {
         self.substitute_outputs(proof)
     }
 }
