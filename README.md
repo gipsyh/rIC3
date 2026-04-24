@@ -10,7 +10,7 @@ rIC3 supports LLM-accelerated model checking through invariant generation. For d
 The prompt and VCD inspection MCP tools are located under the `tools` directory. For a concrete example, see https://github.com/gipsyh/cill-exp
 
 <p align="center">
-	<img width="500" height="auto" src="./images/CIll.png" style="display:inline-block;">
+	<img width="500" height="auto" src="./images/CIll.svg" style="display:inline-block;">
 </p>
 
 ### HWMCC
@@ -19,7 +19,7 @@ rIC3 achieved first place in both the bit-level track and the word-level bit-vec
 
 ### rIC3 Tool Flow
 <p align="center">
-	<img width="500" height="auto" src="./images/toolflow.jpg" style="display:inline-block;">
+	<img width="500" height="auto" src="./images/toolflow.svg" style="display:inline-block;">
 </p>
 
 ### Install From Crates.io
