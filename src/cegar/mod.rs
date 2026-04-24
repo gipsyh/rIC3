@@ -23,7 +23,7 @@ impl_config_deref!(CegarConfig);
 
 pub struct Cegar {
     cfg: CegarConfig,
-    abstractor: Box<dyn CegarAbstractor>,
+    abstractor: Option<Box<dyn CegarAbstractor>>,
     model: ActiveModel,
     tracer: Tracer,
 }
@@ -41,7 +41,7 @@ impl Cegar {
         let model = Self::build_model(&cfg, abstract_wts);
         Self {
             cfg,
-            abstractor,
+            abstractor: Some(abstractor),
             model,
             tracer: Tracer::new(),
         }
@@ -60,18 +60,17 @@ impl Engine for Cegar {
     fn check(&mut self) -> McResult {
         loop {
             let res = self.model.ic3.check();
-            if !res.is_sat() {
+            if !res.is_sat() || self.abstractor.is_none() {
                 self.tracer.trace_state(None, res);
                 return res;
             }
             let bl_cex = self.model.ic3.cex();
             let cex = self.model.bb_map.restore_cex(&bl_cex);
-            if let Some(refined_wts) = self.abstractor.refine(&cex) {
+            if let Some(refined_wts) = self.abstractor.as_mut().unwrap().refine(&cex) {
                 self.model = Self::build_model(&self.cfg, refined_wts);
-                continue;
+            } else {
+                self.abstractor = None;
             }
-            self.tracer.trace_state(None, res);
-            return res;
         }
     }
 
@@ -92,7 +91,13 @@ impl WlEngine for Cegar {
     fn proof(&mut self) -> WlProof {
         let proof = self.model.ic3.proof();
         let proof = self.model.bb_map.restore_proof(&self.model.wts, &proof);
-        self.abstractor.proof(proof)
+        self.abstractor.as_mut().unwrap().proof(proof)
+    }
+
+    fn cex(&mut self) -> WlCex {
+        debug_assert!(self.abstractor.is_none());
+        let bl_cex = self.model.ic3.cex();
+        self.model.bb_map.restore_cex(&bl_cex)
     }
 }
 

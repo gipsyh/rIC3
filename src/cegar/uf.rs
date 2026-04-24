@@ -47,22 +47,14 @@ pub struct UfAbstractor {
 
 pub struct Uf {
     origin: WlTransys,
-    mode: UfMode,
     output_subst: GHashMap<Term, Term>,
     stats: UfStats,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum UfMode {
-    Abstract,
-    Exact,
 }
 
 impl Uf {
     pub fn new(origin: WlTransys) -> Self {
         Self {
             origin,
-            mode: UfMode::Abstract,
             output_subst: GHashMap::new(),
             stats: UfStats::default(),
         }
@@ -103,7 +95,6 @@ impl CegarAbstractor for Uf {
     }
 
     fn abstract_wts(&mut self) -> WlTransys {
-        self.mode = UfMode::Abstract;
         let mut abstractor = UfAbstractor::new();
         let result = abstractor.abstract_transys(self.origin.clone());
         info!(
@@ -116,17 +107,7 @@ impl CegarAbstractor for Uf {
     }
 
     fn refine(&mut self, _cex: &WlCex) -> Option<WlTransys> {
-        if self.mode != UfMode::Abstract || self.stats.outputs == 0 {
-            return None;
-        }
-
-        info!(
-            "cegar {} abstraction found cex; rebuilding IC3 from original WTS",
-            self.name(),
-        );
-        self.mode = UfMode::Exact;
-        self.output_subst.clear();
-        Some(self.origin.clone())
+        None
     }
 
     fn proof(&self, proof: WlProof) -> WlProof {
