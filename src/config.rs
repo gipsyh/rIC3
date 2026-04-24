@@ -1,5 +1,5 @@
 use crate::{
-    bmc::BMCConfig, ic3::IC3Config, kind::KindConfig, mp::MultiPropConfig,
+    bmc::BMCConfig, cegar::CegarConfig, ic3::IC3Config, kind::KindConfig, mp::MultiPropConfig,
     polynexus::PolyNexusConfig, portfolio::PortfolioConfig, rlive::RliveConfig, wlbmc::WlBMCConfig,
     wlkind::WlKindConfig,
 };
@@ -88,6 +88,8 @@ pub enum EngineConfig {
     WlBMC(WlBMCConfig),
     /// word level k-induction
     WlKind(WlKindConfig),
+    /// word level CEGAR with multiplier UF abstraction
+    Cegar(CegarConfig),
     /// rlive (CAV'24 https://doi.org/10.1007/978-3-031-65627-9_12)
     Rlive(RliveConfig),
     /// Multi-Property (DATE'18 https://doi.org/10.23919/DATE.2018.8341977)
@@ -100,7 +102,10 @@ pub enum EngineConfig {
 
 impl EngineConfig {
     pub fn is_wl(&self) -> bool {
-        matches!(self, EngineConfig::WlBMC(_) | EngineConfig::WlKind(_))
+        matches!(
+            self,
+            EngineConfig::WlBMC(_) | EngineConfig::WlKind(_) | EngineConfig::Cegar(_)
+        )
     }
 }
 

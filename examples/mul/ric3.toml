@@ -1,0 +1,4 @@
+[dut]
+top = "multiplier"
+files = ["mul.sv"]
+reset = "!rst_n"
