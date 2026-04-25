@@ -7,7 +7,7 @@ pub mod unroll;
 
 use crate::wltransys::certify::Restore;
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{Sort, Term, op};
+use logicrs::fol::{FolOp, Sort, Term};
 use std::mem::take;
 
 #[derive(Clone, Debug, Default)]
@@ -91,7 +91,7 @@ impl WlTransys {
             return;
         }
         let bad = take(&mut self.bad);
-        self.bad = vec![Term::new_op_fold(op::Or, bad)];
+        self.bad = vec![Term::new_op_fold(FolOp::Or, bad)];
     }
 
     pub fn compress_constraints(&mut self) {
@@ -99,7 +99,7 @@ impl WlTransys {
             return;
         }
         let constraint = take(&mut self.constraint);
-        self.constraint = vec![Term::new_op_fold(op::And, constraint)];
+        self.constraint = vec![Term::new_op_fold(FolOp::And, constraint)];
     }
 
     pub fn eliminate_constraint(&mut self) {
@@ -107,7 +107,7 @@ impl WlTransys {
         if c.is_empty() {
             return;
         }
-        let c = Term::new_op_fold(op::And, c);
+        let c = Term::new_op_fold(FolOp::And, c);
         let v = Term::new_var(Sort::bool());
         let c = v.clone() & c;
         self.add_latch(v.clone(), Some(Term::bool_const(true)), c.clone());

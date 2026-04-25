@@ -1,6 +1,6 @@
 use crate::wltransys::WlTransys;
 use giputils::hash::GHashMap;
-use logicrs::fol::{Sort, Term, TermType, op};
+use logicrs::fol::{FolOp, Sort, Term, TermType};
 use std::ops::Deref;
 
 impl WlTransys {
@@ -10,7 +10,7 @@ impl WlTransys {
         }
         let res = match term.deref() {
             TermType::Op(op_term) => {
-                if op_term.op == op::Read {
+                if op_term.op == FolOp::Read {
                     let (_, e) = op_term.terms[0].sort().array();
                     let wire = Term::new_var(Sort::Bv(e));
                     self.input.push(wire.clone());

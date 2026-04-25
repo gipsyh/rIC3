@@ -8,7 +8,7 @@ use crate::{
 use clap::Args;
 use giputils::hash::GHashMap;
 use log::{error, info};
-use logicrs::fol::{Sort, Term, op};
+use logicrs::fol::{FolOp, Sort, Term};
 use serde::{Deserialize, Serialize};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -145,7 +145,7 @@ impl WlEngine for WlKind {
             for c in proof.constraint.iter() {
                 ors.push(!up.next(c, k));
             }
-            bads.push(Term::new_op_fold(op::Or, ors));
+            bads.push(Term::new_op_fold(FolOp::Or, ors));
         }
         let mut aux_vars = Vec::new();
         for k in 0..up.num_unroll {
@@ -181,7 +181,7 @@ impl WlEngine for WlKind {
                 let l_ks1 = up.next(l, k - 1);
                 eqs.push(l_next_k.teq(&l_ks1));
             }
-            let p = al.imply(Term::new_op_fold(op::And, eqs));
+            let p = al.imply(Term::new_op_fold(FolOp::And, eqs));
             bads.push(!p);
             let mut init = Vec::new();
             for (l, init_val) in up.ts.init.iter() {
@@ -189,11 +189,11 @@ impl WlEngine for WlKind {
                 let init_val = up.apply_next(init_val, k - 1);
                 init.push(l_ks1.teq(init_val));
             }
-            let init = Term::new_op_fold(op::And, init);
+            let init = Term::new_op_fold(FolOp::And, init);
             bads.push(!((!al & al_next).imply(&init)))
         }
         bads.push(!&aux_vars[0]);
-        proof.bad = vec![Term::new_op_fold(op::Or, bads)];
+        proof.bad = vec![Term::new_op_fold(FolOp::Or, bads)];
         WlProof { proof }
     }
 }
