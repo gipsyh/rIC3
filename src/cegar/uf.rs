@@ -3,10 +3,7 @@ use crate::wltransys::WlTransys;
 use crate::{WlCex, WlProof};
 use giputils::hash::GHashMap;
 use log::info;
-use logicrs::fol::{
-    Sort, Term, TermType,
-    op::{self, DynOp},
-};
+use logicrs::fol::{FolOp, Sort, Term, TermType};
 use std::{mem::take, ops::Deref};
 
 pub struct UfAbstraction {
@@ -24,7 +21,7 @@ pub struct UfStats {
 
 #[derive(Clone)]
 struct UfApp {
-    op: DynOp,
+    op: FolOp,
     args: Vec<Term>,
     result: Term,
     history: Option<UfHistory>,
@@ -39,7 +36,7 @@ struct UfHistory {
 
 pub struct UfAbstractor {
     cache: GHashMap<Term, Term>,
-    outputs: GHashMap<(DynOp, Sort, Vec<Term>), Term>,
+    outputs: GHashMap<(FolOp, Sort, Vec<Term>), Term>,
     output_subst: GHashMap<Term, Term>,
     apps: Vec<UfApp>,
     stats: UfStats,
@@ -170,8 +167,8 @@ impl UfAbstractor {
                     .iter()
                     .map(|term| self.abstract_term(term))
                     .collect();
-                if should_abstract(&op_term.op) {
-                    self.uf_output(&op_term.op, term, args)
+                if should_abstract(op_term.op) {
+                    self.uf_output(op_term.op, term, args)
                 } else {
                     Term::new_op(op_term.op.clone(), args)
                 }
@@ -183,7 +180,7 @@ impl UfAbstractor {
         abstracted
     }
 
-    fn uf_output(&mut self, op: &DynOp, concrete: &Term, args: Vec<Term>) -> Term {
+    fn uf_output(&mut self, op: FolOp, concrete: &Term, args: Vec<Term>) -> Term {
         let sort = concrete.sort();
         let key = (op.clone(), sort, args.clone());
         if let Some(output) = self.outputs.get(&key) {
@@ -269,13 +266,13 @@ impl UfAbstractor {
     }
 }
 
-fn should_abstract(op: &DynOp) -> bool {
-    op == &op::Mul
-        || op == &op::Udiv
-        || op == &op::Urem
-        || op == &op::Sdiv
-        || op == &op::Srem
-        || op == &op::Smod
+fn should_abstract(op: FolOp) -> bool {
+    op == FolOp::Mul
+        || op == FolOp::Udiv
+        || op == FolOp::Urem
+        || op == FolOp::Sdiv
+        || op == FolOp::Srem
+        || op == FolOp::Smod
 }
 
 fn same_signature(lhs: &UfApp, rhs: &UfApp) -> bool {

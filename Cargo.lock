@@ -2029,7 +2029,6 @@ name = "smtif-bitwuzla"
 version = "0.1.0"
 dependencies = [
  "giputils",
- "lazy_static",
  "logicrs",
  "pkg-config",
 ]

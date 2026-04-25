@@ -10,9 +10,8 @@ use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{
     DagCnf, Lbool, LboolVec, Lit, LitVec, Var,
     fol::{
-        BvTermValue, Sort, Term, TermValue, TermVec, Value,
+        BvTermValue, FolOp, Sort, Term, TermValue, TermVec, Value,
         bitblast::{bitblast_terms, cnf_encode_terms},
-        op,
     },
 };
 
@@ -229,7 +228,7 @@ impl BitblastMap {
                 let idx = b / elew;
                 let eidx = b % elew;
                 let read_idx = Term::bv_const(BitVec::from_usize(idxw, idx));
-                let read = Term::new_op(op::Read, [w.clone(), read_idx]);
+                let read = Term::new_op(FolOp::Read, [w.clone(), read_idx]);
                 read.slice(eidx, eidx)
             }
         }
