@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 pub mod bmc;
+pub mod cegar;
 pub mod config;
 pub mod frontend;
 pub mod gipsat;
@@ -253,6 +254,7 @@ pub fn create_wl_engine(cfg: EngineConfig, ts: WlTransys) -> Box<dyn WlEngine> {
     match cfg {
         EngineConfig::WlBMC(cfg) => Box::new(wlbmc::WlBMC::new(cfg, ts)),
         EngineConfig::WlKind(cfg) => Box::new(wlkind::WlKind::new(cfg, ts)),
+        EngineConfig::Cegar(cfg) => Box::new(cegar::Cegar::new(cfg, ts)),
         _ => unreachable!(),
     }
 }
