@@ -42,7 +42,7 @@ vcd = "0.7.0"
 enum-as-inner = "0.7.0"
 rayon = "1.10.0"
 fork = "0.7.0"
-ipc-channel = "0.21.0"
+ipc-channel = "0.22.0"
 
 [profile.dev]
 opt-level = 3
