@@ -3,7 +3,7 @@ use crate::{
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
-    tracer::{Tracer, TracerIf},
+    tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
 };
 use clap::Args;
@@ -343,7 +343,10 @@ struct PropTracerBridge {
     tx: mpsc::Sender<WorkerMsg>,
 }
 
-impl TracerIf for PropTracerBridge {
+impl TracerIf for PropTracerBridge {}
+
+#[intertrait::cast_to]
+impl StateTracerIf for PropTracerBridge {
     fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
         let _ = self.tx.send(WorkerMsg::Progress {
             prop: self.prop,

@@ -1,4 +1,4 @@
-use crate::tracer::{PipeLemmaRecv, PipeLemmaSend};
+use crate::tracer::{LemmaTracerIpcRx, LemmaTracerIpcTx};
 use giputils::hash::GHashMap;
 use ipc_channel::ipc::{IpcReceiverSet, IpcSelectionResult};
 use logicrs::LitVec;
@@ -13,7 +13,7 @@ pub struct LemmaMgr {
 struct LemmaWorker {
     #[allow(unused)]
     name: String,
-    send: PipeLemmaSend,
+    send: LemmaTracerIpcTx,
 }
 
 impl LemmaMgr {
@@ -28,8 +28,8 @@ impl LemmaMgr {
     pub fn add_worker(
         &mut self,
         worker: String,
-        recv: PipeLemmaRecv,
-        send: PipeLemmaSend,
+        recv: LemmaTracerIpcRx,
+        send: LemmaTracerIpcTx,
     ) -> io::Result<()> {
         let recv_id = self.recv.add(recv)?;
         let worker_idx = self.workers.len();

@@ -3,7 +3,7 @@ mod lemma_mgr;
 use self::lemma_mgr::LemmaMgr;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig};
 use crate::frontend::Frontend;
-use crate::tracer::{PipeLemmaRecv, PipeTracerSend, Tracer, TracerIf, pipe_tracer};
+use crate::tracer::{LemmaTracerIpcRx, StateTracerIpcTx, Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
 use crate::{
@@ -95,8 +95,8 @@ impl Worker {
         rst: &Restore,
         sym: &VarSymbols,
         frontend: &mut dyn Frontend,
-        tracer: PipeTracerSend,
-        extractor: Option<PipeLemmaRecv>,
+        tracer: StateTracerIpcTx,
+        extractor: Option<LemmaTracerIpcRx>,
     ) -> ! {
         set_max_level(LevelFilter::Warn);
         // We are already in the forked child, so take ownership of the inherited
@@ -299,7 +299,7 @@ impl Portfolio {
     pub fn check(&mut self) -> McResult {
         let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
         for worker_idx in 0..self.engines.len() {
-            let (tracer_send, tracer_recv) = pipe_tracer(true, false, self.cfg.share_lemma);
+            let (state_tx, state_rx) = ipc::channel().unwrap();
             let (lemma_send, lemma_recv) = if self.cfg.share_lemma {
                 let (lemma_send, lemma_recv) = ipc::channel().unwrap();
                 (Some(lemma_send), Some(lemma_recv))
@@ -309,10 +309,7 @@ impl Portfolio {
             let worker = &mut self.engines[worker_idx];
             match fork::fork().unwrap() {
                 fork::Fork::Parent(child) => {
-                    let (Some(state_recv), _, lemma_recv) = tracer_recv.into_parts() else {
-                        panic!();
-                    };
-                    let state_trace_id = self.st_recv.add(state_recv).unwrap();
+                    let state_trace_id = self.st_recv.add(state_rx).unwrap();
                     lemma_mgr.as_mut().map(|lemma_mgr| {
                         lemma_mgr
                             .add_worker(
@@ -334,7 +331,7 @@ impl Portfolio {
                         &self.rst,
                         &self.sym,
                         self.frontend.as_mut(),
-                        tracer_send,
+                        state_tx,
                         lemma_recv,
                     );
                 }
