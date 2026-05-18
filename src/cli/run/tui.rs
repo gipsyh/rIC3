@@ -1,6 +1,6 @@
 use crate::cli::{
     run::{McStatus, NexusTask, PropMcState, Run},
-    yosys::Yosys,
+    vcd::wlwitness_vcd,
 };
 use rIC3::{
     Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
@@ -18,7 +18,8 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Row, Table},
 };
 use std::{
-    fs,
+    fs::{self, File},
+    io::BufWriter,
     thread::spawn,
     time::{Duration, Instant},
 };
@@ -165,15 +166,14 @@ impl Run {
                 let prop_id = cex.bad_id;
                 let cex = self.btorfe.bl_certificate(McBlCertificate::SAT(cex));
                 let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
-                fs::write(&wit_path, format!("{cex}")).unwrap();
-                Yosys::btor_wit_to_vcd(
-                    self.ric3_proj.path("dut"),
-                    wit_path,
-                    self.ric3_proj.path(format!("res/p{prop_id}.vcd")),
-                    true,
-                    None,
-                )
-                .unwrap();
+                let wit = format!("{cex}");
+                fs::write(&wit_path, &wit).unwrap();
+
+                let mut cex = self.btorfe.deserialize_wl_unsafe_certificate(wit);
+                cex.enrich(&self.wsym.keys().cloned().collect());
+                let vcd_path = self.ric3_proj.path(format!("res/p{prop_id}.vcd"));
+                let vcd_file = BufWriter::new(File::create(vcd_path).unwrap());
+                wlwitness_vcd(&cex, &self.wsym, vcd_file, "").unwrap();
             }
         }
     }

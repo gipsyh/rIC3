@@ -42,30 +42,7 @@ fn ic3_presets() -> Vec<IC3Config> {
     {
         let mut c = base();
         c.inn = true;
-        presets.push(c);
-    }
-    {
-        let mut c = base();
-        c.abs_cst = true;
-        c.ctp = true;
-        presets.push(c);
-    }
-    {
-        let mut c = base();
-        c.dynamic = true;
-        c.drop_po = false;
-        presets.push(c);
-    }
-    {
-        let mut c = base();
-        c.inn = true;
-        c.base.rseed = 42;
-        presets.push(c);
-    }
-    {
-        let mut c = base();
-        c.ctp = true;
-        c.base.rseed = 123;
+        c.pred_prop = false;
         presets.push(c);
     }
     presets

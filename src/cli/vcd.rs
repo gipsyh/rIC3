@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Sort, Term};
-use rIC3::wltransys::certify::WlCex;
+use rIC3::wltransys::{certify::WlCex, symbol::WlTsSymbol};
 use std::io::{self, Write};
 use vcd::{TimescaleUnit, Value, VarType};
 
@@ -75,7 +75,7 @@ impl Scope {
 
 pub fn wlwitness_vcd(
     cex: &WlCex,
-    sym: &GHashMap<Term, Vec<String>>,
+    sym: &WlTsSymbol,
     out: impl Write,
     filter: &str,
 ) -> io::Result<()> {

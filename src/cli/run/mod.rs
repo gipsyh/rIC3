@@ -68,6 +68,7 @@ pub(crate) struct Run {
     #[allow(unused)]
     btor: Btor,
     btorfe: BtorFrontend,
+    wsym: WlTsSymbol,
     table: TableState,
     ric3_proj: Ric3Proj,
     mc: Vec<PropMcState>,
@@ -76,7 +77,12 @@ pub(crate) struct Run {
 }
 
 impl Run {
-    fn new(btor: Btor, mc: Vec<PropMcState>, ric3_proj: Ric3Proj) -> anyhow::Result<Self> {
+    fn new(
+        btor: Btor,
+        mc: Vec<PropMcState>,
+        ric3_proj: Ric3Proj,
+        wsym: WlTsSymbol,
+    ) -> anyhow::Result<Self> {
         let btorfe = BtorFrontend::new(btor.clone());
         fs::create_dir_all(ric3_proj.path("res"))?;
         recreate_dir(ric3_proj.path("tmp"))?;
@@ -85,6 +91,7 @@ impl Run {
         Ok(Self {
             btor,
             btorfe,
+            wsym,
             table,
             ric3_proj,
             mc,
@@ -118,7 +125,7 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::default_from_wts(&wts, &symbol));
-    let mut run = Run::new(btor, mc, ric3_proj)?;
+    let mut run = Run::new(btor, mc, ric3_proj, symbol)?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;
