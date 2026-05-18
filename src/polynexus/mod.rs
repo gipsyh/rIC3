@@ -5,15 +5,29 @@ use crate::{
     impl_config_deref,
     tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
+    utils::StateIpcTx,
 };
 use clap::Args;
-use log::{LevelFilter, set_max_level};
+use giputils::hash::GHashMap;
+use ipc_channel::{
+    TrySelectError,
+    ipc::{self, IpcReceiverSet, IpcSelectionResult, IpcSender},
+};
+use log::{LevelFilter, info, set_max_level};
 use logicrs::VarSymbols;
-use rayon::prelude::*;
+use nix::{
+    errno::Errno,
+    sys::{
+        signal::{Signal, kill},
+        wait::{WaitPidFlag, WaitStatus, waitpid},
+    },
+    unistd::Pid,
+};
 use serde::{Deserialize, Serialize};
 use std::{
-    sync::mpsc,
-    thread::{self, JoinHandle},
+    process::exit,
+    thread,
+    time::{Duration, Instant},
 };
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize, Default)]
@@ -24,7 +38,7 @@ pub struct PolyNexusConfig {
     #[command(flatten)]
     pub preproc: PreprocConfig,
 
-    /// Number of worker threads (None = auto-detect)
+    /// Number of worker processes (None = auto-detect)
     #[arg(long = "workers")]
     pub workers: Option<usize>,
 }
@@ -48,19 +62,18 @@ fn ic3_presets() -> Vec<IC3Config> {
     presets
 }
 
-enum WorkerMsg {
-    Progress {
-        prop: usize,
-        result: McResult,
-    },
-    Done {
-        prop: usize,
-        result: McResult,
-        ic3: Box<IC3>,
-    },
+type WorkerDoneTx = IpcSender<WorkerDone>;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct WorkerDone {
+    prop: usize,
+    result: McResult,
+    cert: Option<McBlCertificate>,
 }
 
-unsafe impl Send for WorkerMsg {}
+struct RunningWorker {
+    prop: usize,
+}
 
 /// Scheduler runs on the main thread — no locks needed.
 struct Scheduler {
@@ -120,7 +133,7 @@ pub struct PolyNexus {
     tracer: Tracer,
     ctrl: EngineCtrl,
     results: MpMcResult,
-    ic3s: Vec<Option<Box<IC3>>>,
+    certs: Vec<Option<McBlCertificate>>,
 }
 
 impl PolyNexus {
@@ -139,7 +152,7 @@ impl PolyNexus {
             tracer: Tracer::new(),
             ctrl: crate::EngineCtrl::new(),
             results,
-            ic3s: (0..num_props).map(|_| None).collect(),
+            certs: (0..num_props).map(|_| None).collect(),
         }
     }
 
@@ -183,26 +196,216 @@ impl PolyNexus {
     fn spawn_worker(
         prop: usize,
         cfg: IC3Config,
-        ts: Transys,
-        tx: mpsc::Sender<WorkerMsg>,
-    ) -> (JoinHandle<()>, EngineCtrl) {
-        // Create IC3 on the main thread so we can grab its ctrl.
+        ts: &Transys,
+        state_recv: &mut IpcReceiverSet,
+        done_recv: &mut IpcReceiverSet,
+        running: &mut GHashMap<Pid, RunningWorker>,
+        state_ids: &mut GHashMap<u64, Pid>,
+        done_ids: &mut GHashMap<u64, Pid>,
+    ) {
+        let (state_tx, state_rx) = ipc::channel().unwrap();
+        let (done_tx, done_rx) = ipc::channel().unwrap();
+        match fork::fork().unwrap() {
+            fork::Fork::Parent(child) => {
+                let pid = Pid::from_raw(child);
+                let state_id = state_recv.add(state_rx).unwrap();
+                let done_id = done_recv.add(done_rx).unwrap();
+                running.insert(pid, RunningWorker { prop });
+                state_ids.insert(state_id, pid);
+                done_ids.insert(done_id, pid);
+                info!("start polynexus worker p{prop}");
+            }
+            fork::Fork::Child => Self::run_worker(prop, cfg, ts, state_tx, done_tx),
+        }
+    }
+
+    fn run_worker(
+        prop: usize,
+        cfg: IC3Config,
+        ts: &Transys,
+        state_tx: StateIpcTx,
+        done_tx: WorkerDoneTx,
+    ) -> ! {
+        set_max_level(LevelFilter::Warn);
+        // We are in the forked child. Take ownership of the inherited model
+        // directly, matching the portfolio worker isolation strategy.
+        let ts = unsafe { std::ptr::read(ts) };
         let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
-        let ctrl = ic3.get_ctrl();
-        ic3.add_tracer(Box::new(PropTracerBridge {
-            prop,
-            tx: tx.clone(),
-        }));
-        let handle = thread::spawn(move || {
-            set_max_level(LevelFilter::Warn);
-            let result = ic3.check();
-            let _ = tx.send(WorkerMsg::Done {
-                prop,
-                result,
-                ic3: Box::new(ic3),
-            });
-        });
-        (handle, ctrl)
+        ic3.add_tracer(Box::new(PropTracerBridge { prop, tx: state_tx }));
+        let result = ic3.check();
+        let cert = match result {
+            McResult::UNSAT => Some(McBlCertificate::UNSAT(ic3.proof())),
+            McResult::SAT(_) => Some(McBlCertificate::SAT(ic3.cex())),
+            McResult::Unknown(_) => None,
+        };
+        let _ = done_tx.send(WorkerDone { prop, result, cert });
+        exit(0);
+    }
+
+    fn terminate_running(running: &mut GHashMap<Pid, RunningWorker>) {
+        let pids: Vec<_> = running.keys().copied().collect();
+        for pid in &pids {
+            let _ = kill(*pid, Signal::SIGTERM);
+        }
+        for pid in pids {
+            loop {
+                match waitpid(pid, None) {
+                    Ok(WaitStatus::Exited(_, _)) | Ok(WaitStatus::Signaled(_, _, _)) => {
+                        running.remove(&pid);
+                        break;
+                    }
+                    Err(Errno::EINTR) => continue,
+                    Err(Errno::ECHILD) => {
+                        running.remove(&pid);
+                        break;
+                    }
+                    Err(err) => panic!("polynexus waitpid failed: {err}"),
+                    _ => panic!(),
+                }
+            }
+        }
+    }
+
+    fn reap_finished(running: &mut GHashMap<Pid, RunningWorker>) {
+        let pids: Vec<_> = running.keys().copied().collect();
+        for pid in pids {
+            loop {
+                match waitpid(pid, Some(WaitPidFlag::WNOHANG)) {
+                    Ok(WaitStatus::StillAlive) => break,
+                    Ok(WaitStatus::Exited(_, code)) => {
+                        if code != 0 {
+                            info!(
+                                "polynexus worker p{} exited with code {code}",
+                                running[&pid].prop
+                            );
+                        }
+                        running.remove(&pid);
+                        break;
+                    }
+                    Ok(WaitStatus::Signaled(_, sig, _)) => {
+                        info!(
+                            "polynexus worker p{} terminated by {sig}",
+                            running[&pid].prop
+                        );
+                        running.remove(&pid);
+                        break;
+                    }
+                    Err(Errno::EINTR) => continue,
+                    Err(Errno::ECHILD) => {
+                        running.remove(&pid);
+                        break;
+                    }
+                    Err(err) => panic!("polynexus waitpid failed: {err}"),
+                    _ => panic!(),
+                }
+            }
+        }
+    }
+
+    fn fill_workers(
+        &mut self,
+        num_workers: usize,
+        sched: &mut Scheduler,
+        state_recv: &mut IpcReceiverSet,
+        done_recv: &mut IpcReceiverSet,
+        running: &mut GHashMap<Pid, RunningWorker>,
+        state_ids: &mut GHashMap<u64, Pid>,
+        done_ids: &mut GHashMap<u64, Pid>,
+    ) {
+        while running.len() < num_workers && !sched.all_resolved() {
+            let Some((prop, cfg)) = sched.next() else {
+                break;
+            };
+            Self::spawn_worker(
+                prop, cfg, &self.ts, state_recv, done_recv, running, state_ids, done_ids,
+            );
+        }
+    }
+
+    fn poll_state_traces(
+        &mut self,
+        sched: &Scheduler,
+        unknown_bound: &mut Vec<Option<usize>>,
+        state_recv: &mut IpcReceiverSet,
+        state_ids: &mut GHashMap<u64, Pid>,
+    ) {
+        let events = match state_recv.try_select() {
+            Ok(events) => events,
+            Err(TrySelectError::Empty) => return,
+            Err(err) => panic!("polynexus trace select failed: {err}"),
+        };
+        for event in events {
+            match event {
+                IpcSelectionResult::MessageReceived(id, message) => {
+                    if !state_ids.contains_key(&id) {
+                        continue;
+                    }
+                    let (prop, result): (Option<usize>, McResult) = message.to().unwrap();
+                    let Some(prop) = prop else {
+                        continue;
+                    };
+                    if prop < sched.num_props && !sched.resolved[prop] {
+                        self.merge_and_trace(prop, result, unknown_bound);
+                    }
+                }
+                IpcSelectionResult::ChannelClosed(id) => {
+                    state_ids.remove(&id);
+                }
+            }
+        }
+    }
+
+    fn poll_done(
+        &mut self,
+        sched: &mut Scheduler,
+        unknown_bound: &mut Vec<Option<usize>>,
+        done_recv: &mut IpcReceiverSet,
+        done_ids: &mut GHashMap<u64, Pid>,
+    ) {
+        let events = match done_recv.try_select_timeout(Duration::from_millis(10)) {
+            Ok(events) => events,
+            Err(TrySelectError::Empty) => return,
+            Err(err) => panic!("polynexus done select failed: {err}"),
+        };
+        for event in events {
+            match event {
+                IpcSelectionResult::MessageReceived(id, message) => {
+                    if done_ids.remove(&id).is_none() {
+                        continue;
+                    }
+                    let done: WorkerDone = message.to().unwrap();
+                    self.on_worker_done(done, sched, unknown_bound);
+                }
+                IpcSelectionResult::ChannelClosed(id) => {
+                    done_ids.remove(&id);
+                }
+            }
+        }
+    }
+
+    fn on_worker_done(
+        &mut self,
+        done: WorkerDone,
+        sched: &mut Scheduler,
+        unknown_bound: &mut Vec<Option<usize>>,
+    ) {
+        let WorkerDone { prop, result, cert } = done;
+        if sched.resolved[prop] {
+            return;
+        }
+        if !result.is_unknown() {
+            sched.resolve(prop);
+            self.results[prop] = result;
+            self.tracer.trace_state(Some(prop), result);
+            let cert = cert.expect("polynexus worker returned a final result without certificate");
+            if let McBlCertificate::SAT(cex) = &cert {
+                let cex = self.rst.restore_cex(cex);
+                self.tracer.trace_cert(&McBlCertificate::SAT(cex));
+            }
+            self.certs[prop] = Some(cert);
+        } else {
+            self.merge_and_trace(prop, result, unknown_bound);
+        }
     }
 
     fn run(&mut self) -> MpMcResult {
@@ -210,102 +413,60 @@ impl PolyNexus {
         let presets = ic3_presets();
         let num_props = self.ts.bad.len();
         let mut sched = Scheduler::new(num_props, presets);
-        let (tx, rx) = mpsc::channel::<WorkerMsg>();
-        let mut joins: Vec<JoinHandle<()>> = Vec::new();
-        let mut engine_ctrls: Vec<EngineCtrl> = Vec::new();
+        let mut state_recv = IpcReceiverSet::new().unwrap();
+        let mut done_recv = IpcReceiverSet::new().unwrap();
+        let mut running = GHashMap::new();
+        let mut state_ids = GHashMap::new();
+        let mut done_ids = GHashMap::new();
         // Track per-prop unknown bound seen so far — only emit increasing values.
         let mut unknown_bound: Vec<Option<usize>> = vec![None; num_props];
-
-        // Seed the initial wave of workers (up to num_workers in flight).
-        let mut tasks: Vec<(usize, IC3Config)> = Vec::new();
-        while tasks.len() < num_workers {
-            match sched.next() {
-                Some(t) => tasks.push(t),
-                None => break,
-            }
-        }
-        let ts_ref = &self.ts;
-        let tx_ref = &tx;
-        let spawned: Vec<_> = tasks
-            .into_par_iter()
-            .map(|(prop, cfg)| Self::spawn_worker(prop, cfg, ts_ref.clone(), tx_ref.clone()))
-            .collect();
-        for (j, ctrl) in spawned {
-            joins.push(j);
-            engine_ctrls.push(ctrl);
-        }
+        let start = Instant::now();
+        self.fill_workers(
+            num_workers,
+            &mut sched,
+            &mut state_recv,
+            &mut done_recv,
+            &mut running,
+            &mut state_ids,
+            &mut done_ids,
+        );
 
         loop {
-            if self.ctrl.is_terminated() {
-                for c in &engine_ctrls {
-                    c.terminate();
-                }
+            if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
+                Self::terminate_running(&mut running);
                 break;
             }
 
-            let msg = match rx.try_recv() {
-                Ok(m) => m,
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    continue;
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
-            };
-
-            match msg {
-                WorkerMsg::Progress { prop, result } => {
-                    if !sched.resolved[prop] {
-                        self.merge_and_trace(prop, result, &mut unknown_bound);
-                    }
-                }
-
-                WorkerMsg::Done {
-                    prop,
-                    result,
-                    mut ic3,
-                } => {
-                    if !sched.resolved[prop] {
-                        if !result.is_unknown() {
-                            // Definitive answer — resolve and record.
-                            sched.resolve(prop);
-                            self.results[prop] = result;
-                            self.tracer.trace_state(Some(prop), result);
-                            if result.is_sat() {
-                                let cex = ic3.cex();
-                                let cex = self.rst.restore_cex(&cex);
-                                self.tracer.trace_cert(&McBlCertificate::SAT(cex));
-                            }
-                            self.ic3s[prop] = Some(ic3);
-                        } else {
-                            // Still unknown — merge bound, then spawn next preset
-                            // for that property (keeps workers busy).
-                            self.merge_and_trace(prop, result, &mut unknown_bound);
-                            if let Some((next_prop, next_cfg)) = sched.next() {
-                                let (j, ctrl) = Self::spawn_worker(
-                                    next_prop,
-                                    next_cfg,
-                                    self.ts.clone(),
-                                    tx.clone(),
-                                );
-                                joins.push(j);
-                                engine_ctrls.push(ctrl);
-                            }
-                        }
-                    }
-
-                    if sched.all_resolved() {
-                        break;
-                    }
-                }
+            self.poll_state_traces(&sched, &mut unknown_bound, &mut state_recv, &mut state_ids);
+            self.poll_done(
+                &mut sched,
+                &mut unknown_bound,
+                &mut done_recv,
+                &mut done_ids,
+            );
+            Self::reap_finished(&mut running);
+            self.poll_done(
+                &mut sched,
+                &mut unknown_bound,
+                &mut done_recv,
+                &mut done_ids,
+            );
+            if sched.all_resolved() {
+                break;
             }
+            self.fill_workers(
+                num_workers,
+                &mut sched,
+                &mut state_recv,
+                &mut done_recv,
+                &mut running,
+                &mut state_ids,
+                &mut done_ids,
+            );
         }
 
-        for c in &engine_ctrls {
-            c.terminate();
-        }
-        drop(tx); // allow workers to detect disconnection
-        for j in joins {
-            let _ = j.join();
+        if !running.is_empty() {
+            Self::terminate_running(&mut running);
         }
         self.results.clone()
     }
@@ -340,7 +501,7 @@ impl PolyNexus {
 
 struct PropTracerBridge {
     prop: usize,
-    tx: mpsc::Sender<WorkerMsg>,
+    tx: StateIpcTx,
 }
 
 impl TracerIf for PropTracerBridge {}
@@ -348,10 +509,7 @@ impl TracerIf for PropTracerBridge {}
 #[intertrait::cast_to]
 impl StateTracerIf for PropTracerBridge {
     fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
-        let _ = self.tx.send(WorkerMsg::Progress {
-            prop: self.prop,
-            result: res,
-        });
+        let _ = self.tx.send((Some(self.prop), res));
     }
 }
 
@@ -382,11 +540,13 @@ impl BlEngine for PolyNexus {
         let mut found = false;
         for (prop, result) in self.results.iter().enumerate() {
             if result.is_unsat() {
-                let subp = self.ic3s[prop]
-                    .as_mut()
-                    .expect("no IC3 for this property")
-                    .proof();
-                proof.merge(&subp, &self.ts);
+                match self.certs[prop].as_ref() {
+                    Some(McBlCertificate::UNSAT(subp)) => proof.merge(subp, &self.ts),
+                    Some(McBlCertificate::SAT(_)) => {
+                        panic!("SAT certificate stored for UNSAT property")
+                    }
+                    None => panic!("no proof available for this property"),
+                }
                 found = true;
             }
         }
@@ -397,10 +557,9 @@ impl BlEngine for PolyNexus {
     fn cex(&mut self) -> BlCex {
         for (i, r) in self.results.iter().enumerate() {
             if r.is_sat()
-                && let Some(ic3) = self.ic3s[i].as_mut()
+                && let Some(McBlCertificate::SAT(cex)) = self.certs[i].as_ref()
             {
-                let cex = ic3.cex();
-                return self.rst.restore_cex(&cex);
+                return self.rst.restore_cex(cex);
             }
         }
         panic!("no cex available");
@@ -413,18 +572,16 @@ impl MpEngine for PolyNexus {
     }
 
     fn proof(&mut self, prop: usize) -> BlProof {
-        let proof = self.ic3s[prop]
-            .as_mut()
-            .expect("no IC3 for this property")
-            .proof();
-        self.rst.restore_proof(proof, &self.ots)
+        let Some(McBlCertificate::UNSAT(proof)) = self.certs[prop].as_ref() else {
+            panic!("no proof available for this property");
+        };
+        self.rst.restore_proof(proof.clone(), &self.ots)
     }
 
     fn cex(&mut self, prop: usize) -> BlCex {
-        let cex = self.ic3s[prop]
-            .as_mut()
-            .expect("no IC3 for this property")
-            .cex();
-        self.rst.restore_cex(&cex)
+        let Some(McBlCertificate::SAT(cex)) = self.certs[prop].as_ref() else {
+            panic!("no cex available for this property");
+        };
+        self.rst.restore_cex(cex)
     }
 }
