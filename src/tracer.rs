@@ -1,9 +1,9 @@
-use crate::{McBlCertificate, McResult};
-use intertrait::{CastFrom, cast::CastBox};
-use ipc_channel::{
-    TryRecvError,
-    ipc::{IpcReceiver, IpcSender},
+use crate::{
+    McBlCertificate, McResult,
+    utils::{LemmaIpcRx, LemmaIpcTx, StateIpcTx},
 };
+use intertrait::{CastFrom, cast::CastBox};
+use ipc_channel::TryRecvError;
 use log::info;
 use logicrs::LitVec;
 use std::{
@@ -176,33 +176,25 @@ impl StateTracerIf for LogTracer {
     }
 }
 
-pub type StateTracerIpcTx = IpcSender<(Option<usize>, McResult)>;
-
-impl TracerIf for StateTracerIpcTx {}
+impl TracerIf for StateIpcTx {}
 
 #[intertrait::cast_to]
-impl StateTracerIf for StateTracerIpcTx {
+impl StateTracerIf for StateIpcTx {
     fn trace_state(&mut self, prop: Option<usize>, res: McResult) {
         let _ = self.send((prop, res));
     }
 }
 
-pub type StateTracerIpcRx = IpcReceiver<(Option<usize>, McResult)>;
-
-pub type LemmaTracerIpcTx = IpcSender<(Option<usize>, LitVec)>;
-
-impl TracerIf for LemmaTracerIpcTx {}
+impl TracerIf for LemmaIpcTx {}
 
 #[intertrait::cast_to]
-impl LemmaTracerIf for LemmaTracerIpcTx {
+impl LemmaTracerIf for LemmaIpcTx {
     fn trace_lemma(&mut self, inv: &LitVec, k: Option<usize>) {
         let _ = self.send((k, inv.clone()));
     }
 }
 
-pub type LemmaTracerIpcRx = IpcReceiver<(Option<usize>, LitVec)>;
-
-impl ExtractorIf for LemmaTracerIpcRx {
+impl ExtractorIf for LemmaIpcRx {
     fn extract_lemma(&mut self) -> Option<(Option<usize>, LitVec)> {
         match self.try_recv() {
             Ok(r) => Some(r),

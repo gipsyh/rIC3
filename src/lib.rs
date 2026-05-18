@@ -13,6 +13,7 @@ pub mod portfolio;
 pub mod rlive;
 pub mod tracer;
 pub mod transys;
+pub mod utils;
 pub mod wlbmc;
 pub mod wlkind;
 pub mod wltransys;

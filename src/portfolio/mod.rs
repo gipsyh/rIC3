@@ -3,9 +3,10 @@ mod lemma_mgr;
 use self::lemma_mgr::LemmaMgr;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig};
 use crate::frontend::Frontend;
-use crate::tracer::{LemmaTracerIpcRx, StateTracerIpcTx, Tracer, TracerIf};
+use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
+use crate::utils::{LemmaIpcRx, StateIpcTx};
 use crate::{
     BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
 };
@@ -95,8 +96,8 @@ impl Worker {
         rst: &Restore,
         sym: &VarSymbols,
         frontend: &mut dyn Frontend,
-        tracer: StateTracerIpcTx,
-        extractor: Option<LemmaTracerIpcRx>,
+        tracer: StateIpcTx,
+        extractor: Option<LemmaIpcRx>,
     ) -> ! {
         set_max_level(LevelFilter::Warn);
         // We are already in the forked child, so take ownership of the inherited
