@@ -34,6 +34,6 @@ module fifo (
     assign full  = (count == 4);
 
     p0 :
-    assert property (@(posedge clk) disable iff (!rst_n) (count & 3) == ((wr_ptr - rd_ptr) & 3));
+    assert property (@(posedge clk) disable iff (rst) (count & 3) == ((wr_ptr - rd_ptr) & 3));
 
 endmodule
