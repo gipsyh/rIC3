@@ -5,8 +5,9 @@ use crate::{
 };
 use clap::{ArgAction, Args, Parser};
 use enum_as_inner::EnumAsInner;
+use giputils::hash::GHashMap;
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
+use std::{iter, time::Instant};
 use strum::AsRefStr;
 
 /// Macro to implement Deref and DerefMut for config structs that wrap EngineConfigBase
@@ -141,5 +142,48 @@ impl Default for PreprocConfig {
             scorr: true,
             scorr_tl: 200,
         }
+    }
+}
+
+#[derive(Default)]
+pub struct WorkerConfigs {
+    configs: GHashMap<String, String>,
+}
+
+impl WorkerConfigs {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_toml(toml: &str, config: &str) -> Self {
+        let mut portfolio_config: GHashMap<String, GHashMap<String, String>> =
+            toml::from_str(toml).unwrap();
+        let Some(configs) = portfolio_config.remove(config) else {
+            panic!("unknown portfolio config `{config}`");
+        };
+        Self { configs }
+    }
+
+    pub fn iter_args(&self, auto_rseed: bool) -> impl Iterator<Item = (String, String)> + '_ {
+        self.configs
+            .iter()
+            .enumerate()
+            .map(move |(idx, (name, args))| {
+                let args = if auto_rseed {
+                    format!("{args} --rseed {}", idx + 1)
+                } else {
+                    args.clone()
+                };
+                (name.clone(), args)
+            })
+    }
+
+    pub fn iter(&self, auto_rseed: bool) -> impl Iterator<Item = (String, EngineConfig)> + '_ {
+        self.iter_args(auto_rseed).map(|(name, args)| {
+            let argv = iter::once("").chain(args.split_whitespace());
+            let cfg = EngineConfig::try_parse_from(argv)
+                .unwrap_or_else(|err| panic!("invalid worker config `{name}`: {err}"));
+            (name, cfg)
+        })
     }
 }

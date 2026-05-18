@@ -1,7 +1,7 @@
 mod lemma_mgr;
 
 use self::lemma_mgr::LemmaMgr;
-use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig};
+use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig, WorkerConfigs};
 use crate::frontend::Frontend;
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
@@ -10,7 +10,7 @@ use crate::utils::{CertIpcRx, CertIpcTx, LemmaIpcRx, StateIpcTx};
 use crate::{
     BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
 };
-use anyhow::{Context, bail};
+use anyhow::Context;
 use clap::{Args, Parser};
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
@@ -159,15 +159,10 @@ impl Portfolio {
             });
             anyhow::Ok(())
         };
-        let portfolio_toml = include_str!("portfolio.toml");
-        let portfolio_config: GHashMap<String, GHashMap<String, String>> =
-            toml::from_str(portfolio_toml).unwrap();
         let config = cfg.config.as_deref().unwrap_or("bl_default");
-        let Some(worker_cfgs) = portfolio_config.get(config) else {
-            bail!("unknown portfolio config `{config}`");
-        };
-        for (name, args) in worker_cfgs.iter() {
-            new_engine(name.clone(), args)
+        let worker_cfgs = WorkerConfigs::from_toml(include_str!("portfolio.toml"), config);
+        for (name, args) in worker_cfgs.iter_args(true) {
+            new_engine(name.clone(), &args)
                 .with_context(|| format!("invalid portfolio worker `{name}`"))?;
         }
         Ok(Self {
