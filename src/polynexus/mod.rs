@@ -1,8 +1,11 @@
+mod schd;
+
 use crate::{
     BlCex, BlEngine, BlProof, Engine, EngineCtrl, McBlCertificate, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     impl_config_deref,
+    polynexus::schd::Scheduler,
     tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
     utils::StateIpcTx,
@@ -75,55 +78,6 @@ struct RunningWorker {
     prop: usize,
 }
 
-/// Scheduler runs on the main thread — no locks needed.
-struct Scheduler {
-    num_props: usize,
-    resolved: Vec<bool>,
-    preset_counter: Vec<usize>,
-    presets: Vec<IC3Config>,
-}
-
-impl Scheduler {
-    fn new(num_props: usize, presets: Vec<IC3Config>) -> Self {
-        Self {
-            num_props,
-            resolved: vec![false; num_props],
-            preset_counter: vec![0; num_props],
-            presets,
-        }
-    }
-
-    /// Pick the unresolved property with smallest preset_counter, return (prop, cfg).
-    fn next(&mut self) -> Option<(usize, IC3Config)> {
-        let mut best = None;
-        let mut min_preset = usize::MAX;
-        for p in 0..self.num_props {
-            if !self.resolved[p] && self.preset_counter[p] < min_preset {
-                min_preset = self.preset_counter[p];
-                best = Some(p);
-            }
-        }
-        let prop = best?;
-        let idx = self.preset_counter[prop];
-        self.preset_counter[prop] += 1;
-        let preset_idx = idx % self.presets.len();
-        let mut cfg = self.presets[preset_idx].clone();
-        cfg.prop = Some(prop);
-        cfg.base.rseed = cfg.base.rseed.wrapping_add(idx as u64);
-        Some((prop, cfg))
-    }
-
-    fn resolve(&mut self, prop: usize) {
-        if !self.resolved[prop] {
-            self.resolved[prop] = true;
-        }
-    }
-
-    fn all_resolved(&self) -> bool {
-        self.resolved.iter().all(|x| *x)
-    }
-}
-
 pub struct PolyNexus {
     #[allow(unused)]
     cfg: PolyNexusConfig,
@@ -153,35 +107,6 @@ impl PolyNexus {
             ctrl: crate::EngineCtrl::new(),
             results,
             certs: (0..num_props).map(|_| None).collect(),
-        }
-    }
-
-    fn overall_result(results: &MpMcResult) -> McResult {
-        let mut unsafe_depth = None;
-        let mut unknown_bound = None;
-        let mut all_safe = true;
-        for result in results.iter() {
-            match result {
-                McResult::UNSAT => {}
-                McResult::SAT(depth) => {
-                    unsafe_depth = Some(unsafe_depth.map_or(*depth, |d: usize| d.max(*depth)));
-                    all_safe = false;
-                }
-                McResult::Unknown(bound) => {
-                    if let Some(bound) = bound {
-                        unknown_bound =
-                            Some(unknown_bound.map_or(*bound, |d: usize| d.max(*bound)));
-                    }
-                    all_safe = false;
-                }
-            }
-        }
-        if let Some(depth) = unsafe_depth {
-            McResult::SAT(depth)
-        } else if all_safe {
-            McResult::UNSAT
-        } else {
-            McResult::Unknown(unknown_bound)
         }
     }
 
@@ -313,7 +238,7 @@ impl PolyNexus {
         done_ids: &mut GHashMap<u64, Pid>,
     ) {
         while running.len() < num_workers && !sched.all_resolved() {
-            let Some((prop, cfg)) = sched.next() else {
+            let Some((prop, cfg)) = sched.pick() else {
                 break;
             };
             Self::spawn_worker(
@@ -513,14 +438,9 @@ impl StateTracerIf for PropTracerBridge {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Engine / MpEngine impls
-// ---------------------------------------------------------------------------
-
 impl Engine for PolyNexus {
     fn check(&mut self) -> McResult {
-        let results = MpEngine::check(self);
-        Self::overall_result(&results)
+        panic!();
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
@@ -529,40 +449,6 @@ impl Engine for PolyNexus {
 
     fn get_ctrl(&self) -> EngineCtrl {
         self.ctrl.clone()
-    }
-}
-
-impl BlEngine for PolyNexus {
-    fn proof(&mut self) -> BlProof {
-        let mut proof = BlProof {
-            proof: self.ts.clone(),
-        };
-        let mut found = false;
-        for (prop, result) in self.results.iter().enumerate() {
-            if result.is_unsat() {
-                match self.certs[prop].as_ref() {
-                    Some(McBlCertificate::UNSAT(subp)) => proof.merge(subp, &self.ts),
-                    Some(McBlCertificate::SAT(_)) => {
-                        panic!("SAT certificate stored for UNSAT property")
-                    }
-                    None => panic!("no proof available for this property"),
-                }
-                found = true;
-            }
-        }
-        assert!(found, "no proof available");
-        self.rst.restore_proof(proof, &self.ots)
-    }
-
-    fn cex(&mut self) -> BlCex {
-        for (i, r) in self.results.iter().enumerate() {
-            if r.is_sat()
-                && let Some(McBlCertificate::SAT(cex)) = self.certs[i].as_ref()
-            {
-                return self.rst.restore_cex(cex);
-            }
-        }
-        panic!("no cex available");
     }
 }
 
