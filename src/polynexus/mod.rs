@@ -2,7 +2,7 @@ mod schd;
 
 use crate::{
     BlCex, BlEngine, BlProof, Engine, EngineCtrl, McBlCertificate, McResult, MpEngine, MpMcResult,
-    config::{EngineConfigBase, PreprocConfig},
+    config::{EngineConfigBase, PreprocConfig, WorkerConfigs},
     ic3::{IC3, IC3Config},
     impl_config_deref,
     polynexus::schd::Scheduler,
@@ -47,23 +47,6 @@ pub struct PolyNexusConfig {
 }
 
 impl_config_deref!(PolyNexusConfig);
-
-fn ic3_presets() -> Vec<IC3Config> {
-    let mut presets = Vec::new();
-    let base = || {
-        let mut c = IC3Config::default();
-        c.pred_prop = true;
-        c
-    };
-    presets.push(base());
-    {
-        let mut c = base();
-        c.inn = true;
-        c.pred_prop = false;
-        presets.push(c);
-    }
-    presets
-}
 
 type WorkerDoneTx = IpcSender<WorkerDone>;
 
@@ -335,7 +318,7 @@ impl PolyNexus {
 
     fn run(&mut self) -> MpMcResult {
         let num_workers = self.num_workers();
-        let presets = ic3_presets();
+        let presets = WorkerConfigs::from_toml(include_str!("config.toml"), "bl_default");
         let num_props = self.ts.bad.len();
         let mut sched = Scheduler::new(num_props, presets);
         let mut state_recv = IpcReceiverSet::new().unwrap();

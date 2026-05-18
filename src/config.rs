@@ -159,9 +159,13 @@ impl WorkerConfigs {
         let mut portfolio_config: GHashMap<String, GHashMap<String, String>> =
             toml::from_str(toml).unwrap();
         let Some(configs) = portfolio_config.remove(config) else {
-            panic!("unknown portfolio config `{config}`");
+            panic!("unknown worker config `{config}`");
         };
         Self { configs }
+    }
+
+    pub fn len(&self) -> usize {
+        self.configs.len()
     }
 
     pub fn iter_args(&self, auto_rseed: bool) -> impl Iterator<Item = (String, String)> + '_ {
