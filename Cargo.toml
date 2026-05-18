@@ -43,6 +43,8 @@ enum-as-inner = "0.7.0"
 rayon = "1.10.0"
 fork = "0.7.0"
 ipc-channel = "0.22.0"
+intertrait = "0.2.2"
+linkme = "0.2.10"
 
 [profile.dev]
 opt-level = 3

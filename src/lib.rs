@@ -13,6 +13,7 @@ pub mod portfolio;
 pub mod rlive;
 pub mod tracer;
 pub mod transys;
+pub mod utils;
 pub mod wlbmc;
 pub mod wlkind;
 pub mod wltransys;
@@ -236,16 +237,12 @@ pub fn create_bl_engine(
     ts: Transys,
     sym: logicrs::VarSymbols,
 ) -> Box<dyn BlEngine> {
-    let num_bad = ts.bad.len();
     match cfg {
         EngineConfig::IC3(cfg) => Box::new(ic3::IC3::new(cfg, ts, sym)),
         EngineConfig::Kind(cfg) => Box::new(kind::Kind::new(cfg, ts)),
         EngineConfig::BMC(cfg) => Box::new(bmc::BMC::new(cfg, ts)),
         EngineConfig::MultiProp(cfg) => Box::new(mp::MultiProp::new(cfg, ts)),
         EngineConfig::Rlive(cfg) => Box::new(rlive::Rlive::new(cfg, ts)),
-        EngineConfig::Polynexus(cfg) => {
-            Box::new(polynexus::PolyNexus::new(cfg, ts, MpMcResult::new(num_bad)))
-        }
         _ => unreachable!(),
     }
 }

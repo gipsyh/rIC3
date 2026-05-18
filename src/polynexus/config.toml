@@ -1,0 +1,14 @@
+# If you modify this file, you need to recompile.
+
+[bl_default]
+ic3 = "ic3"
+ic3_no_preproc = "ic3 --ctg=false --frts=false --scorr=false --drop-po=false"
+ic3_no_parent = "ic3 --drop-po=false --parent-lemma=false"
+ic3_abs_cst = "ic3 --abs-cst"
+ic3_abs_all = "ic3 --abs-cst --abs-trans"
+ic3_predprop = "ic3 --pred-prop"
+ic3_ctg_limit = "ic3 --ctg-max 5 --ctg-limit 15 --drop-po=false"
+ic3_inn = "ic3 --inn"
+ic3_inn_ctp = "ic3 --inn --ctp"
+ic3_inn_noctg = "ic3 --inn --ctg=false"
+ic3_inn_dynamic = "ic3 --inn --dynamic --drop-po=false"
