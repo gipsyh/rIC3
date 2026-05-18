@@ -6,7 +6,7 @@ use crate::frontend::Frontend;
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
-use crate::utils::{LemmaIpcRx, StateIpcTx};
+use crate::utils::{CertIpcRx, CertIpcTx, LemmaIpcRx, StateIpcTx};
 use crate::{
     BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
 };
@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use std::iter;
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::TempDir;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct PortfolioConfig {
@@ -84,7 +84,8 @@ struct Worker {
     name: String,
     cfg: EngineConfig,
     args: String,
-    cert: Option<NamedTempFile>,
+    cert_tx: Option<CertIpcTx>,
+    cert_rx: Option<CertIpcRx>,
     state: McResult,
 }
 
@@ -95,7 +96,6 @@ impl Worker {
         ots: &Transys,
         rst: &Restore,
         sym: &VarSymbols,
-        frontend: &mut dyn Frontend,
         tracer: StateIpcTx,
         extractor: Option<LemmaIpcRx>,
     ) -> ! {
@@ -108,19 +108,19 @@ impl Worker {
         engine.add_tracer(Box::new(tracer));
         extractor.map(|e| engine.set_extractor(Box::new(e)));
         let res = engine.check();
-        if let Some(cert_path) = self.cert.as_ref().map(|c| c.path()) {
+        if let Some(cert_tx) = self.cert_tx.as_ref() {
             let certificate = match res {
                 McResult::UNSAT => {
                     let cert = rst.restore_proof(engine.proof(), ots);
-                    frontend.bl_certificate(McBlCertificate::UNSAT(cert))
+                    McBlCertificate::UNSAT(cert)
                 }
                 McResult::SAT(_) => {
                     let cert = rst.restore_cex(&engine.cex());
-                    frontend.bl_certificate(McBlCertificate::SAT(cert))
+                    McBlCertificate::SAT(cert)
                 }
                 McResult::Unknown(_) => panic!(),
             };
-            std::fs::write(cert_path, format!("{certificate}")).unwrap();
+            let _ = cert_tx.send(certificate);
         };
         exit(0);
     }
@@ -143,17 +143,18 @@ impl Portfolio {
             let argv: Vec<_> = iter::once("").chain(args.split_whitespace()).collect();
             let cfg = EngineConfig::try_parse_from(argv)?;
             assert!(!cfg.is_wl());
-            let cert = if cert.is_some() {
-                let certificate = NamedTempFile::new_in(temp_dir.path()).unwrap();
-                Some(certificate)
+            let (cert_tx, cert_rx) = if cert.is_some() {
+                let (cert_tx, cert_rx) = ipc::channel().unwrap();
+                (Some(cert_tx), Some(cert_rx))
             } else {
-                None
+                (None, None)
             };
             engines.push(Worker {
                 name,
                 cfg,
                 args: args.to_string(),
-                cert,
+                cert_tx,
+                cert_rx,
                 state: McResult::default(),
             });
             anyhow::Ok(())
@@ -174,8 +175,8 @@ impl Portfolio {
             ots,
             sym,
             rst,
-            frontend,
             cert,
+            frontend,
             cfg,
             engines,
             running: GHashMap::new(),
@@ -219,20 +220,45 @@ impl Portfolio {
     }
 
     fn on_state_trace(&mut self, worker_idx: usize, prop: Option<usize>, res: McResult) {
-        let worker = &mut self.engines[worker_idx];
-        worker.state = res;
+        self.engines[worker_idx].state = res;
         self.tracer.trace_state(prop, res);
+        let worker_name = self.engines[worker_idx].name.clone();
         let prop_prefix = prop.map(|p| format!("p{p}: ")).unwrap_or_default();
         match res {
-            McResult::UNSAT => info!("{}{} proved the property", worker.name, prop_prefix),
-            McResult::SAT(d) => info!(
-                "{}{} found a counterexample at depth {d}",
-                worker.name, prop_prefix
-            ),
+            McResult::UNSAT => {
+                info!("{worker_name}{prop_prefix} proved the property");
+                self.accept_winner(worker_idx);
+            }
+            McResult::SAT(d) => {
+                info!("{worker_name}{prop_prefix} found a counterexample at depth {d}");
+                self.accept_winner(worker_idx);
+            }
             McResult::Unknown(Some(d)) => {
-                info!("{}{} proved at depth {d}", worker.name, prop_prefix);
+                info!("{worker_name}{prop_prefix} proved at depth {d}");
             }
             McResult::Unknown(None) => {}
+        }
+    }
+
+    fn accept_winner(&mut self, worker_idx: usize) {
+        if self.winner_idx.is_some() {
+            return;
+        }
+        let worker = &self.engines[worker_idx];
+        info!(
+            "best worker: {}, configuration: {}",
+            worker.name, worker.args
+        );
+        self.winner_idx = Some(worker_idx);
+        if let Some(cert_path) = self.cert.clone() {
+            let cert = self.engines[worker_idx]
+                .cert_rx
+                .as_mut()
+                .unwrap()
+                .recv()
+                .unwrap();
+            let cert = self.frontend.bl_certificate(cert);
+            std::fs::write(cert_path, format!("{cert}")).unwrap();
         }
     }
 
@@ -243,24 +269,17 @@ impl Portfolio {
                 Ok(WaitStatus::Exited(pid, code)) => {
                     let worker_idx = self.running[&pid];
                     self.running.remove(&pid);
-                    let worker = &mut self.engines[worker_idx];
                     if code == 0 {
-                        if self.winner_idx.is_none() {
-                            info!(
-                                "best worker: {}, configuration: {}",
-                                worker.name, worker.args
-                            );
-                            self.winner_idx = Some(worker_idx);
-                            if let Some(cert) = &self.cert {
-                                let _ = std::fs::copy(worker.cert.as_ref().unwrap().path(), cert);
-                            }
+                        while self.winner_idx.is_none() {
                             self.poll_state_traces();
+                        }
+                        if self.winner_idx == Some(worker_idx) {
                             let res = self.engines[worker_idx].state;
                             assert!(!res.is_unknown());
                             return Some(res);
                         }
                     } else {
-                        info!("{} exited with code {code}", worker.name);
+                        info!("{} exited with code {code}", self.engines[worker_idx].name);
                     }
                 }
                 Ok(WaitStatus::Signaled(pid, _, _)) => {
@@ -327,13 +346,7 @@ impl Portfolio {
                 }
                 fork::Fork::Child => {
                     worker.run(
-                        &self.ts,
-                        &self.ots,
-                        &self.rst,
-                        &self.sym,
-                        self.frontend.as_mut(),
-                        state_tx,
-                        lemma_recv,
+                        &self.ts, &self.ots, &self.rst, &self.sym, state_tx, lemma_recv,
                     );
                 }
             }
