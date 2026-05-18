@@ -21,7 +21,7 @@ impl WlTransys {
                         .iter()
                         .map(|t| self._term_abs_array(t, map))
                         .collect();
-                    Term::new_op(op_term.op.clone(), terms.deref())
+                    Term::new_op(op_term.op, terms.deref())
                 }
             }
             _ => term.clone(),

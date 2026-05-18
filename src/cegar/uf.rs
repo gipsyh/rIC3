@@ -170,7 +170,7 @@ impl UfAbstractor {
                 if should_abstract(op_term.op) {
                     self.uf_output(op_term.op, term, args)
                 } else {
-                    Term::new_op(op_term.op.clone(), args)
+                    Term::new_op(op_term.op, args)
                 }
             }
             _ => term.clone(),
@@ -182,7 +182,7 @@ impl UfAbstractor {
 
     fn uf_output(&mut self, op: FolOp, concrete: &Term, args: Vec<Term>) -> Term {
         let sort = concrete.sort();
-        let key = (op.clone(), sort, args.clone());
+        let key = (op, sort, args.clone());
         if let Some(output) = self.outputs.get(&key) {
             return output.clone();
         }
@@ -191,7 +191,7 @@ impl UfAbstractor {
         self.outputs.insert(key, output.clone());
         self.output_subst.insert(output.clone(), concrete.clone());
         self.apps.push(UfApp {
-            op: op.clone(),
+            op,
             args,
             result: output.clone(),
             history: None,
