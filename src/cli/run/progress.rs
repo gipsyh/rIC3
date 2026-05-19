@@ -73,7 +73,7 @@ impl PropMcState {
 fn format_time(duration: Duration) -> String {
     let secs = duration.as_secs();
     if secs == 0 {
-        "-".to_string()
+        "<1s".to_string()
     } else if secs < 60 {
         format!("{}s", secs)
     } else if secs < 3600 {
