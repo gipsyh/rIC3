@@ -7,28 +7,35 @@ use std::{thread::sleep, time::Duration};
 impl PropMcState {
     fn status_text(&self) -> String {
         match self.prop.res {
-            McResult::UNSAT => "Proved".green().bold().to_string(),
-            McResult::SAT(bound) => {
-                format!("Violated at bound {}", bound.to_string().yellow().bold())
-                    .red()
-                    .bold()
-                    .to_string()
-            }
+            McResult::UNSAT => format!("{:<20}", "Proved").green().bold().to_string(),
+            McResult::SAT(bound) => format!("{:<20}", format!("Violated at bound {}", bound))
+                .red()
+                .bold()
+                .to_string(),
             McResult::Unknown(Some(bound)) => match self.state {
-                McStatus::Solving => format!("Solving bound {}", bound.to_string().cyan().bold())
-                    .yellow()
-                    .to_string(),
-                McStatus::Wait => format!("Waiting bound {}", bound.to_string().blue())
-                    .dark_grey()
-                    .to_string(),
-                McStatus::Pause => format!("Paused bound {}", bound.to_string().blue())
-                    .dark_grey()
-                    .to_string(),
+                McStatus::Solving => format!(
+                    "{:<20}",
+                    format!("Solving bound {}", bound.to_string().cyan().bold())
+                )
+                .yellow()
+                .to_string(),
+                McStatus::Wait => format!(
+                    "{:<20}",
+                    format!("Waiting bound {}", bound.to_string().blue())
+                )
+                .dark_grey()
+                .to_string(),
+                McStatus::Pause => format!(
+                    "{:<20}",
+                    format!("Paused bound {}", bound.to_string().blue())
+                )
+                .dark_grey()
+                .to_string(),
             },
             McResult::Unknown(None) => match self.state {
-                McStatus::Solving => "Solving".yellow().to_string(),
-                McStatus::Wait => "Waiting".dark_grey().to_string(),
-                McStatus::Pause => "Paused".dark_grey().to_string(),
+                McStatus::Solving => format!("{:<20}", "Solving").yellow().to_string(),
+                McStatus::Wait => format!("{:<20}", "Waiting").dark_grey().to_string(),
+                McStatus::Pause => format!("{:<20}", "Paused").dark_grey().to_string(),
             },
         }
     }
