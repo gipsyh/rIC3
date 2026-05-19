@@ -194,7 +194,10 @@ impl Run {
         // Create PolyNexus engine
         let (ts, _) = self.btorfe.ts();
 
-        let cfg = PolyNexusConfig::default();
+        let cfg = PolyNexusConfig {
+            workers: self.cfg.workers.map(|workers| workers.get()),
+            ..Default::default()
+        };
         let mp_res: MpMcResult = self.mc.iter().map(|m| m.prop.res).collect();
         let mut engine = PolyNexus::new(cfg, ts, mp_res);
 

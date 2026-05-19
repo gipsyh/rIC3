@@ -39,7 +39,10 @@ pub struct Cli {
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     /// Run verification using 'ric3.toml' (requires the file in the current directory)
-    Run,
+    Run {
+        #[command(flatten)]
+        cfg: run::RunConfig,
+    },
 
     /// Verify properties for AIGER/BTOR files
     Check {
@@ -66,7 +69,7 @@ pub enum Commands {
 pub fn cli_main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Run => run::run(),
+        Commands::Run { cfg } => run::run(cfg),
         Commands::Build => build::build(),
         Commands::Check { chk, cfg } => check::check(chk, cfg),
         Commands::Clean => clean::clean(),

@@ -3,6 +3,7 @@ mod tui;
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Ok;
 use btor::Btor;
+use clap::Args;
 use giputils::file::recreate_dir;
 use rIC3::{
     EngineCtrl, McResult, MpMcResult,
@@ -14,8 +15,15 @@ use rIC3::{
 };
 use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
-use std::{fs, thread::JoinHandle};
+use std::{fs, num::NonZeroUsize, thread::JoinHandle};
 use strum::AsRefStr;
+
+#[derive(Args, Debug, Clone, Default)]
+pub struct RunConfig {
+    /// Number of worker processes (auto-detect if omitted)
+    #[arg(long = "workers")]
+    pub workers: Option<NonZeroUsize>,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PropMcInfo {
@@ -73,6 +81,7 @@ pub(crate) struct Run {
     ric3_proj: Ric3Proj,
     mc: Vec<PropMcState>,
     nexus_task: Option<NexusTask>,
+    cfg: RunConfig,
     should_quit: bool,
 }
 
@@ -82,6 +91,7 @@ impl Run {
         mc: Vec<PropMcState>,
         ric3_proj: Ric3Proj,
         wsym: WlTsSymbol,
+        cfg: RunConfig,
     ) -> anyhow::Result<Self> {
         let btorfe = BtorFrontend::new(btor.clone());
         fs::create_dir_all(ric3_proj.path("res"))?;
@@ -96,12 +106,13 @@ impl Run {
             ric3_proj,
             mc,
             nexus_task: None,
+            cfg,
             should_quit: false,
         })
     }
 }
 
-pub fn run() -> anyhow::Result<()> {
+pub fn run(cfg: RunConfig) -> anyhow::Result<()> {
     let ric3_cfg = Ric3Config::from_file("ric3.toml")?;
     let mut ric3_proj = Ric3Proj::new()?;
     let dut_hash = ric3_cfg.dut.src_hash()?;
@@ -125,7 +136,7 @@ pub fn run() -> anyhow::Result<()> {
                 .collect()
         })
         .unwrap_or(PropMcState::default_from_wts(&wts, &symbol));
-    let mut run = Run::new(btor, mc, ric3_proj, symbol)?;
+    let mut run = Run::new(btor, mc, ric3_proj, symbol, cfg)?;
     run.run()?;
     let res: Vec<_> = run.mc.iter().map(|l| l.prop.clone()).collect();
     run.ric3_proj.cache_res(res)?;
