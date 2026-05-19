@@ -1,13 +1,5 @@
-use crate::cli::{
-    run::{McStatus, NexusTask, PropMcState, Run},
-    vcd::wlwitness_vcd,
-};
-use rIC3::{
-    Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
-    frontend::Frontend,
-    polynexus::{PolyNexus, PolyNexusConfig},
-    tracer::{state_channel_tracer, witness_channel_tracer},
-};
+use crate::cli::run::{McStatus, PropMcState, Run};
+use rIC3::McResult;
 use ratatui::crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -17,12 +9,7 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Cell, Row, Table},
 };
-use std::{
-    fs::{self, File},
-    io::BufWriter,
-    thread::spawn,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 impl PropMcState {
     fn color(&self) -> Color {
@@ -37,15 +24,23 @@ impl PropMcState {
         }
     }
 
-    fn as_str(&self) -> &str {
+    fn as_str(&self, tick_count: usize) -> String {
+        let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         match self.prop.res {
-            McResult::UNSAT => "Proved",
-            McResult::SAT(_) => "Violated",
-            McResult::Unknown(_) => self.state.as_ref(),
+            McResult::UNSAT => "Proved".to_string(),
+            McResult::SAT(_) => "Violated".to_string(),
+            McResult::Unknown(_) => {
+                if self.state == McStatus::Solving {
+                    let spinner = spinners[tick_count % spinners.len()];
+                    format!("{} Solving", spinner)
+                } else {
+                    self.state.as_ref().to_string()
+                }
+            }
         }
     }
 
-    fn cells(&'_ self) -> Vec<Cell<'_>> {
+    fn cells(&'_ self, tick_count: usize) -> Vec<Cell<'_>> {
         let bound = match self.prop.res {
             McResult::SAT(b) => format!("{b}"),
             McResult::Unknown(Some(b)) => format!("{b}"),
@@ -54,7 +49,7 @@ impl PropMcState {
         vec![
             Cell::from(self.prop.id.to_string()),
             Cell::from(self.prop.name.clone()),
-            Cell::from(self.as_str()).fg(self.color()),
+            Cell::from(self.as_str(tick_count)).fg(self.color()),
             Cell::from(bound),
             Cell::from(self.prop.config.as_ref().map(|c| c.as_ref()).unwrap_or("-")),
         ]
@@ -90,20 +85,7 @@ impl Run {
         self.table.select(Some(i));
     }
 
-    pub fn stop_solving(&mut self) {
-        if let Some(task) = self.nexus_task.take() {
-            task.ctrl.terminate();
-            let _ = task.join.join();
-        }
-        // Mark all solving as paused
-        for m in self.mc.iter_mut() {
-            if m.state == McStatus::Solving {
-                m.state = McStatus::Pause;
-            }
-        }
-    }
-
-    pub fn run(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn run_tui(&mut self) -> anyhow::Result<()> {
         enable_raw_mode()?;
         let mut stdout = std::io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
@@ -112,15 +94,16 @@ impl Run {
 
         let tick_rate = Duration::from_millis(100);
         let mut last_tick = Instant::now();
+        let mut tick_count = 0;
 
         loop {
-            terminal.draw(|f| self.ui(f))?;
+            terminal.draw(|f| self.ui(f, tick_count))?;
 
             if self.nexus_task.is_none() {
                 self.launch_nexus();
             }
 
-            self.process_updates();
+            self.process_updates()?;
 
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
@@ -141,6 +124,7 @@ impl Run {
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
+                tick_count += 1;
             }
 
             if self.should_quit {
@@ -153,90 +137,16 @@ impl Run {
         }
     }
 
-    fn process_updates(&mut self) {
-        if let Some(task) = &self.nexus_task {
-            // Process real-time updates from PolyNexus
-            while let Ok((prop_id, result)) = task.state_trx.try_recv() {
-                let prop_id = prop_id.unwrap();
-                let prop = &mut self.mc[prop_id];
-                prop.prop.res = result;
-            }
-            while let Ok(cex) = task.wit_trx.try_recv() {
-                let cex = cex.into_sat().unwrap();
-                let prop_id = cex.bad_id;
-                let cex = self.btorfe.bl_certificate(McBlCertificate::SAT(cex));
-                let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
-                let wit = format!("{cex}");
-                fs::write(&wit_path, &wit).unwrap();
-
-                let mut cex = self.btorfe.deserialize_wl_unsafe_certificate(wit);
-                cex.enrich(&self.wsym.keys().cloned().collect());
-                let vcd_path = self.ric3_proj.path(format!("res/p{prop_id}.vcd"));
-                let vcd_file = BufWriter::new(File::create(vcd_path).unwrap());
-                wlwitness_vcd(&cex, &self.wsym, vcd_file, "").unwrap();
-            }
-        }
-    }
-
-    fn launch_nexus(&mut self) {
-        // Get pending property IDs
-        let pending: Vec<usize> = self
-            .mc
-            .iter()
-            .filter(|m| matches!(m.prop.res, McResult::Unknown(_)) && m.state == McStatus::Wait)
-            .map(|m| m.prop.id)
-            .collect();
-
-        if pending.is_empty() {
-            return;
-        }
-
-        // Create PolyNexus engine
-        let (ts, _) = self.btorfe.ts();
-
-        let cfg = PolyNexusConfig {
-            workers: self.cfg.workers.map(|workers| workers.get()),
-            ..Default::default()
-        };
-        let mp_res: MpMcResult = self.mc.iter().map(|m| m.prop.res).collect();
-        let mut engine = PolyNexus::new(cfg, ts, mp_res);
-
-        let (state_tsx, state_trx) = state_channel_tracer();
-        let (wit_tsx, wit_trx) = witness_channel_tracer();
-        engine.add_tracer(Box::new(state_tsx));
-        engine.add_tracer(Box::new(wit_tsx));
-
-        let ctrl = engine.get_ctrl();
-
-        // Mark pending props as solving
-        for &id in &pending {
-            self.mc[id].state = McStatus::Solving;
-        }
-
-        // Spawn engine in background thread
-        let join = spawn(move || {
-            let res = MpEngine::check(&mut engine);
-            (res, engine)
-        });
-
-        self.nexus_task = Some(NexusTask {
-            join,
-            state_trx,
-            wit_trx,
-            ctrl,
-        });
-    }
-
-    fn ui(&mut self, frame: &mut Frame) {
+    fn ui(&mut self, frame: &mut Frame, tick_count: usize) {
         let rects = Layout::default()
             .constraints([Constraint::Min(0), Constraint::Length(3)])
             .split(frame.area());
 
-        self.render_table(frame, rects[0]);
+        self.render_table(frame, rects[0], tick_count);
         self.render_footer(frame, rects[1]);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_table(&mut self, frame: &mut Frame, area: Rect, tick_count: usize) {
         let header_style = Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD);
@@ -249,7 +159,10 @@ impl Run {
             .style(header_style)
             .height(1);
 
-        let rows = self.mc.iter().map(|item| Row::new(item.cells()).height(1));
+        let rows = self
+            .mc
+            .iter()
+            .map(|item| Row::new(item.cells(tick_count)).height(1));
 
         let t = Table::new(
             rows,

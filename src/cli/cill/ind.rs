@@ -41,6 +41,7 @@ impl CIll {
                             let mut cfg = cfg.clone();
                             cfg.local_proof = lp;
                             cfg.inn = true;
+                            cfg.pred_prop = false;
                             cfg.prop = Some(i);
                             let mut ic3 =
                                 IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());

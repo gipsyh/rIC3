@@ -36,7 +36,6 @@ impl Scheduler {
             .into_ic3()
             .unwrap_or_else(|_| panic!("polynexus worker config `{name}` is not ic3"));
         cfg.prop = Some(prop);
-        cfg.base.rseed = cfg.base.rseed.wrapping_add((idx - idx) as u64);
         Some((prop, cfg))
     }
 
