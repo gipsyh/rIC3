@@ -24,15 +24,23 @@ impl PropMcState {
         }
     }
 
-    fn as_str(&self) -> &str {
+    fn as_str(&self, tick_count: usize) -> String {
+        let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         match self.prop.res {
-            McResult::UNSAT => "Proved",
-            McResult::SAT(_) => "Violated",
-            McResult::Unknown(_) => self.state.as_ref(),
+            McResult::UNSAT => "Proved".to_string(),
+            McResult::SAT(_) => "Violated".to_string(),
+            McResult::Unknown(_) => {
+                if self.state == McStatus::Solving {
+                    let spinner = spinners[tick_count % spinners.len()];
+                    format!("{} Solving", spinner)
+                } else {
+                    self.state.as_ref().to_string()
+                }
+            }
         }
     }
 
-    fn cells(&'_ self) -> Vec<Cell<'_>> {
+    fn cells(&'_ self, tick_count: usize) -> Vec<Cell<'_>> {
         let bound = match self.prop.res {
             McResult::SAT(b) => format!("{b}"),
             McResult::Unknown(Some(b)) => format!("{b}"),
@@ -41,7 +49,7 @@ impl PropMcState {
         vec![
             Cell::from(self.prop.id.to_string()),
             Cell::from(self.prop.name.clone()),
-            Cell::from(self.as_str()).fg(self.color()),
+            Cell::from(self.as_str(tick_count)).fg(self.color()),
             Cell::from(bound),
             Cell::from(self.prop.config.as_ref().map(|c| c.as_ref()).unwrap_or("-")),
         ]
@@ -86,9 +94,10 @@ impl Run {
 
         let tick_rate = Duration::from_millis(100);
         let mut last_tick = Instant::now();
+        let mut tick_count = 0;
 
         loop {
-            terminal.draw(|f| self.ui(f))?;
+            terminal.draw(|f| self.ui(f, tick_count))?;
 
             if self.nexus_task.is_none() {
                 self.launch_nexus();
@@ -115,6 +124,7 @@ impl Run {
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
+                tick_count += 1;
             }
 
             if self.should_quit {
@@ -127,16 +137,16 @@ impl Run {
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame) {
+    fn ui(&mut self, frame: &mut Frame, tick_count: usize) {
         let rects = Layout::default()
             .constraints([Constraint::Min(0), Constraint::Length(3)])
             .split(frame.area());
 
-        self.render_table(frame, rects[0]);
+        self.render_table(frame, rects[0], tick_count);
         self.render_footer(frame, rects[1]);
     }
 
-    fn render_table(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_table(&mut self, frame: &mut Frame, area: Rect, tick_count: usize) {
         let header_style = Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD);
@@ -149,7 +159,10 @@ impl Run {
             .style(header_style)
             .height(1);
 
-        let rows = self.mc.iter().map(|item| Row::new(item.cells()).height(1));
+        let rows = self
+            .mc
+            .iter()
+            .map(|item| Row::new(item.cells(tick_count)).height(1));
 
         let t = Table::new(
             rows,

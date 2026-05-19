@@ -1,40 +1,52 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rIC3::McResult;
+use ratatui::crossterm::style::Stylize;
 use std::{thread::sleep, time::Duration};
 
 impl PropMcState {
     fn status_text(&self) -> String {
         match self.prop.res {
-            McResult::UNSAT => "Proved".to_string(),
-            McResult::SAT(bound) => format!("Violated at bound {bound}"),
+            McResult::UNSAT => "Proved".green().bold().to_string(),
+            McResult::SAT(bound) => {
+                format!("Violated at bound {}", bound.to_string().yellow().bold())
+                    .red()
+                    .bold()
+                    .to_string()
+            }
             McResult::Unknown(Some(bound)) => match self.state {
-                McStatus::Solving => format!("Solving bound {bound}"),
-                McStatus::Wait => format!("Waiting bound {bound}"),
-                McStatus::Pause => format!("Paused bound {bound}"),
+                McStatus::Solving => format!("Solving bound {}", bound.to_string().cyan().bold())
+                    .yellow()
+                    .to_string(),
+                McStatus::Wait => format!("Waiting bound {}", bound.to_string().blue())
+                    .dark_grey()
+                    .to_string(),
+                McStatus::Pause => format!("Paused bound {}", bound.to_string().blue())
+                    .dark_grey()
+                    .to_string(),
             },
             McResult::Unknown(None) => match self.state {
-                McStatus::Solving => "Solving".to_string(),
-                McStatus::Wait => "Waiting".to_string(),
-                McStatus::Pause => "Paused".to_string(),
+                McStatus::Solving => "Solving".yellow().to_string(),
+                McStatus::Wait => "Waiting".dark_grey().to_string(),
+                McStatus::Pause => "Paused".dark_grey().to_string(),
             },
         }
     }
 
     fn progress_message(&self) -> String {
         format!(
-            "p{:<3} {:<32} {}",
-            self.prop.id,
-            truncate(&self.prop.name, 32),
+            "{} {} {}",
+            format!("p{:<3}", self.prop.id).magenta().bold(),
+            truncate(&self.prop.name, 32).white(),
             self.status_text()
         )
     }
 
     fn plain_message(&self) -> String {
         format!(
-            "p{} {}: {}",
-            self.prop.id,
-            self.prop.name,
+            "{} {}: {}",
+            format!("p{}", self.prop.id).magenta().bold(),
+            self.prop.name.clone().white(),
             self.status_text()
         )
     }
@@ -44,8 +56,8 @@ impl Run {
     pub(crate) fn run_progress(&mut self) -> anyhow::Result<()> {
         let mp = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(10));
         mp.set_move_cursor(true);
-        let style = ProgressStyle::with_template("{spinner:.cyan} {wide_msg}")?
-            .tick_strings(&["-", "\\", "|", "/"]);
+        let style = ProgressStyle::with_template("{spinner:.cyan.bold} {wide_msg}")?
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "✔"]);
         let bars: Vec<_> = self
             .mc
             .iter()
@@ -134,10 +146,22 @@ fn finish_bar(bar: &ProgressBar, prop: &PropMcState) {
     }
 
     match prop.prop.res {
-        McResult::UNSAT => bar.finish_with_message(format!("[OK] {}", prop.progress_message())),
-        McResult::SAT(_) => bar.finish_with_message(format!("[FAIL] {}", prop.progress_message())),
+        McResult::UNSAT => {
+            bar.set_style(ProgressStyle::with_template("{prefix:.green.bold} {wide_msg}").unwrap());
+            bar.finish_with_message(prop.progress_message());
+            bar.set_prefix("✔");
+        }
+        McResult::SAT(_) => {
+            bar.set_style(ProgressStyle::with_template("{prefix:.red.bold} {wide_msg}").unwrap());
+            bar.finish_with_message(prop.progress_message());
+            bar.set_prefix("✘");
+        }
         McResult::Unknown(_) if prop.state == McStatus::Pause => {
-            bar.finish_with_message(format!("[STOP] {}", prop.progress_message()))
+            bar.set_style(
+                ProgressStyle::with_template("{prefix:.yellow.bold} {wide_msg}").unwrap(),
+            );
+            bar.finish_with_message(prop.progress_message());
+            bar.set_prefix("⏹");
         }
         _ => {}
     }
