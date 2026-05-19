@@ -22,6 +22,7 @@ use std::{
     io::{BufWriter, IsTerminal},
     num::NonZeroUsize,
     thread::{JoinHandle, spawn},
+    time::{Duration, Instant},
 };
 use strum::AsRefStr;
 
@@ -68,6 +69,8 @@ pub enum McStatus {
 pub(crate) struct PropMcState {
     pub prop: PropMcInfo,
     pub state: McStatus,
+    pub start_time: Option<Instant>,
+    pub time: Duration,
 }
 
 impl PropMcState {
@@ -82,6 +85,8 @@ impl PropMcState {
                     config: Default::default(),
                 },
                 state: McStatus::Wait,
+                start_time: None,
+                time: Duration::ZERO,
             });
         }
         mc
@@ -159,6 +164,9 @@ impl Run {
         for m in self.mc.iter_mut() {
             if m.state == McStatus::Solving {
                 m.state = McStatus::Pause;
+                if let Some(t) = m.start_time.take() {
+                    m.time += t.elapsed();
+                }
             }
         }
     }
@@ -223,6 +231,7 @@ impl Run {
 
         for &id in &pending {
             self.mc[id].state = McStatus::Solving;
+            self.mc[id].start_time = Some(Instant::now());
         }
 
         let join = spawn(move || {
@@ -264,6 +273,11 @@ impl Run {
             if let Some(prop_id) = prop_id {
                 let prop = &mut self.mc[prop_id];
                 prop.prop.res = result;
+                if !matches!(result, McResult::Unknown(_)) {
+                    if let Some(t) = prop.start_time.take() {
+                        prop.time += t.elapsed();
+                    }
+                }
                 updates.state.push(prop_id);
             }
         }
@@ -295,6 +309,14 @@ impl Run {
                 prop.state = McStatus::Pause;
             } else {
                 prop.state = McStatus::Wait;
+            }
+            if old_state == McStatus::Solving && prop.state != McStatus::Solving {
+                if let Some(t) = prop.start_time.take() {
+                    prop.time += t.elapsed();
+                }
+            }
+            if old_state != McStatus::Solving && prop.state == McStatus::Solving {
+                prop.start_time = Some(Instant::now());
             }
             let changed = if matches!(result, McResult::Unknown(_)) {
                 old_result != result || old_state != prop.state
@@ -338,6 +360,8 @@ pub fn run(cfg: RunConfig) -> anyhow::Result<()> {
                 .map(|p| PropMcState {
                     prop: p,
                     state: McStatus::Wait,
+                    start_time: None,
+                    time: Duration::ZERO,
                 })
                 .collect()
         })

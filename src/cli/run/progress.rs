@@ -5,62 +5,94 @@ use ratatui::crossterm::style::Stylize;
 use std::{thread::sleep, time::Duration};
 
 impl PropMcState {
-    fn status_text(&self) -> String {
+    fn status_columns(&self) -> (String, String) {
         match self.prop.res {
-            McResult::UNSAT => format!("{:<20}", "Proved").green().bold().to_string(),
-            McResult::SAT(bound) => format!("{:<20}", format!("Violated at bound {}", bound))
-                .red()
-                .bold()
-                .to_string(),
-            McResult::Unknown(Some(bound)) => match self.state {
-                McStatus::Solving => format!(
-                    "{:<20}",
-                    format!("Solving bound {}", bound.to_string().cyan().bold())
-                )
-                .yellow()
-                .to_string(),
-                McStatus::Wait => format!(
-                    "{:<20}",
-                    format!("Waiting bound {}", bound.to_string().blue())
-                )
-                .dark_grey()
-                .to_string(),
-                McStatus::Pause => format!(
-                    "{:<20}",
-                    format!("Paused bound {}", bound.to_string().blue())
-                )
-                .dark_grey()
-                .to_string(),
+            McResult::UNSAT => (
+                format!("{:<10}", "Proved").green().bold().to_string(),
+                format!("{:<10}", "-").to_string(),
+            ),
+            McResult::SAT(b) => (
+                format!("{:<10}", "Violated").red().bold().to_string(),
+                format!("{:<10}", b).to_string(),
+            ),
+            McResult::Unknown(Some(b)) => match self.state {
+                McStatus::Solving => (
+                    format!("{:<10}", "Solving").yellow().to_string(),
+                    format!("{:<10}", b).cyan().bold().to_string(),
+                ),
+                McStatus::Wait => (
+                    format!("{:<10}", "Waiting").dark_grey().to_string(),
+                    format!("{:<10}", b).blue().to_string(),
+                ),
+                McStatus::Pause => (
+                    format!("{:<10}", "Paused").dark_grey().to_string(),
+                    format!("{:<10}", b).blue().to_string(),
+                ),
             },
             McResult::Unknown(None) => match self.state {
-                McStatus::Solving => format!("{:<20}", "Solving").yellow().to_string(),
-                McStatus::Wait => format!("{:<20}", "Waiting").dark_grey().to_string(),
-                McStatus::Pause => format!("{:<20}", "Paused").dark_grey().to_string(),
+                McStatus::Solving => (
+                    format!("{:<10}", "Solving").yellow().to_string(),
+                    format!("{:<10}", "-").to_string(),
+                ),
+                McStatus::Wait => (
+                    format!("{:<10}", "Waiting").dark_grey().to_string(),
+                    format!("{:<10}", "-").to_string(),
+                ),
+                McStatus::Pause => (
+                    format!("{:<10}", "Paused").dark_grey().to_string(),
+                    format!("{:<10}", "-").to_string(),
+                ),
             },
         }
     }
 
-    fn progress_message(&self) -> String {
+    fn message(&self) -> String {
+        let (state, bound) = self.status_columns();
+        let total_time = self.time + self.start_time.map_or(Duration::ZERO, |t| t.elapsed());
         format!(
-            "{} {} {}",
-            format!("p{:<3}", self.prop.id).magenta().bold(),
-            truncate(&self.prop.name, 32).white(),
-            self.status_text()
+            "{} {} {} {} {}",
+            format!("{:<6}", format!("p{}", self.prop.id))
+                .magenta()
+                .bold(),
+            format!("{:<32}", truncate(&self.prop.name, 32)).white(),
+            state,
+            bound,
+            format!("{:<10}", format_time(total_time))
         )
     }
 
+    fn progress_message(&self) -> String {
+        self.message()
+    }
+
     fn plain_message(&self) -> String {
-        format!(
-            "{} {}: {}",
-            format!("p{}", self.prop.id).magenta().bold(),
-            self.prop.name.clone().white(),
-            self.status_text()
-        )
+        self.message()
+    }
+}
+
+fn format_time(duration: Duration) -> String {
+    let secs = duration.as_secs();
+    if secs == 0 {
+        "-".to_string()
+    } else if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
     }
 }
 
 impl Run {
     pub(crate) fn run_progress(&mut self) -> anyhow::Result<()> {
+        println!(
+            "  {} {} {} {} {}",
+            format!("{:<6}", "ID").bold(),
+            format!("{:<32}", "Property").bold(),
+            format!("{:<10}", "State").bold(),
+            format!("{:<10}", "Bound").bold(),
+            format!("{:<10}", "Time").bold(),
+        );
         let mp = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(10));
         mp.set_move_cursor(true);
         let style = ProgressStyle::with_template("{spinner:.cyan.bold} {wide_msg}")?
@@ -94,13 +126,16 @@ impl Run {
                 update_bar(&bars[id], &self.mc[id]);
             }
 
+            // Always update bars occasionally to keep time moving smoothly if solving
+            for (id, prop) in self.mc.iter().enumerate() {
+                if prop.state == McStatus::Solving {
+                    bar_update_time_only(&bars[id], prop);
+                }
+            }
+
             if self.all_done() || self.is_idle() {
                 for (id, prop) in self.mc.iter().enumerate() {
                     finish_bar(&bars[id], prop);
-                }
-                mp.clear()?;
-                for prop in &self.mc {
-                    println!("{}", prop.plain_message());
                 }
                 return Ok(());
             }
@@ -110,6 +145,14 @@ impl Run {
     }
 
     pub(crate) fn run_plain(&mut self) -> anyhow::Result<()> {
+        println!(
+            "{} {} {} {} {}",
+            format!("{:<6}", "ID").bold(),
+            format!("{:<32}", "Property").bold(),
+            format!("{:<10}", "State").bold(),
+            format!("{:<10}", "Bound").bold(),
+            format!("{:<10}", "Time").bold(),
+        );
         for prop in &self.mc {
             println!("{}", prop.plain_message());
         }
@@ -135,6 +178,12 @@ impl Run {
 
             sleep(Duration::from_millis(100));
         }
+    }
+}
+
+fn bar_update_time_only(bar: &ProgressBar, prop: &PropMcState) {
+    if !bar.is_finished() {
+        bar.set_message(prop.progress_message());
     }
 }
 
