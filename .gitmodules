@@ -19,3 +19,6 @@
 [submodule "deps/bitwuzla-rs"]
 	path = deps/bitwuzla-rs
 	url = https://github.com/gipsyh/bitwuzla-rs
+[submodule "examples/fvbench"]
+	path = examples/fvbench
+	url = https://github.com/gipsyh/fvbench.git

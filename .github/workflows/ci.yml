@@ -38,10 +38,10 @@ jobs:
           docker pull ghcr.io/gipsyh/cerbtora:latest
       - name: Test examples
         run: |
-          cargo r -- check ./examples/counter/counter.btor --certify portfolio
-          cargo r -- check ./examples/counter/counter.btor --certify ic3
-          cargo r -- check ./examples/counter/counter.btor --certify bmc
-          cargo r -- check ./examples/fifo/fifo.btor --certify portfolio
+          cargo r -- check ./examples/fvbench/counter/counter.btor --certify portfolio
+          cargo r -- check ./examples/fvbench/counter/counter.btor --certify ic3
+          cargo r -- check ./examples/fvbench/counter/counter.btor --certify bmc
+          cargo r -- check ./examples/fvbench/fifo/fifo.btor --certify portfolio
 
   deploy:
     needs: build-and-test
