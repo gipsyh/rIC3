@@ -62,7 +62,7 @@ fn report_res(chk: &CheckConfig, res: McResult) {
 
 pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", "info") };
+        unsafe { env::set_var("RUST_LOG", "warn") };
     }
     logger_init();
     chk.model = chk.model.canonicalize()?;

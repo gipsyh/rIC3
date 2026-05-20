@@ -31,6 +31,7 @@ mod predprop;
 mod proofoblig;
 mod propagate;
 mod solver;
+mod ui;
 mod utils;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -167,6 +168,7 @@ pub struct IC3 {
     filog: IntervalLogger,
     tracer: Tracer,
     ctrl: EngineCtrl,
+    progress: Option<ui::IC3Progress>,
 }
 
 impl IC3 {
@@ -258,6 +260,7 @@ impl IC3 {
             filog: Default::default(),
             tracer: Tracer::new(),
             ctrl: EngineCtrl::new(),
+            progress: ui::IC3Progress::new(),
         }
     }
 
@@ -273,9 +276,11 @@ impl Engine for IC3 {
     fn check(&mut self) -> McResult {
         if !self.prep_prop_base() {
             self.tracer.trace_state(None, McResult::SAT(0));
+            self.finish_progress(McResult::SAT(0));
             return McResult::SAT(0);
         }
         self.extend();
+        self.render_progress();
         loop {
             let start = Instant::now();
             debug!("blocking phase begin");
@@ -284,16 +289,20 @@ impl Engine for IC3 {
                     BlockResult::Failure(depth) => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.tracer.trace_state(None, McResult::SAT(depth));
+                        self.finish_progress(McResult::SAT(depth));
                         return McResult::SAT(depth);
                     }
                     BlockResult::Proved => {
                         self.statistic.block.overall_time += start.elapsed();
                         self.tracer.trace_state(None, McResult::UNSAT);
+                        self.finish_progress(McResult::UNSAT);
                         return McResult::UNSAT;
                     }
                     BlockResult::OverallTimeLimitExceeded => {
                         self.statistic.block.overall_time += start.elapsed();
-                        return McResult::Unknown(Some(self.level()));
+                        let result = McResult::Unknown(Some(self.level()));
+                        self.finish_progress(result);
+                        return result;
                     }
                     _ => (),
                 }
@@ -319,14 +328,17 @@ impl Engine for IC3 {
             self.tracer
                 .trace_state(None, McResult::Unknown(Some(self.level())));
             self.extend();
+            self.render_progress();
             let start = Instant::now();
             let propagate = self.propagate(None);
             self.statistic.propagate.overall_time += start.elapsed();
             if propagate {
                 self.tracer.trace_state(None, McResult::UNSAT);
+                self.finish_progress(McResult::UNSAT);
                 return McResult::UNSAT;
             }
             self.propagate_to_inf();
+            self.render_progress();
         }
     }
 

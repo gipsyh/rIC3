@@ -72,6 +72,7 @@ impl IC3 {
     pub fn block(&mut self, limit: Option<f64>) -> BlockResult {
         let mut noc = 0;
         while let Some(mut po) = self.obligations.pop(self.level()) {
+            self.render_progress();
             if po.removed {
                 continue;
             }
