@@ -73,6 +73,9 @@ impl Yosys {
             "read_verilog -formal -sv"
         }
         .to_string();
+        for define in define_args(&cfg.dut.defines) {
+            read.push_str(&format!(" {define}"));
+        }
         for file in files.iter() {
             read.push_str(&format!(" {}", file.display()));
         }
@@ -116,4 +119,19 @@ impl Yosys {
         };
         yosys.execute(Some(&src_dir), plugin)
     }
+}
+
+fn define_args(defines: &giputils::hash::GHashMap<String, String>) -> Vec<String> {
+    let mut defines = defines.iter().collect::<Vec<_>>();
+    defines.sort_by(|(lhs, _), (rhs, _)| lhs.cmp(rhs));
+    defines
+        .into_iter()
+        .map(|(name, value)| {
+            if value.is_empty() {
+                format!("-D {name}")
+            } else {
+                format!("-D {name}={value}")
+            }
+        })
+        .collect()
 }

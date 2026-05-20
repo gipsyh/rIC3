@@ -14,7 +14,7 @@ use crate::cli::{
 };
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use giputils::hash::GHashSet;
+use giputils::hash::{GHashMap, GHashSet};
 use rIC3::config::EngineConfig;
 use serde::Deserialize;
 use std::{
@@ -117,6 +117,7 @@ struct Dut {
     top: String,
     files: Vec<PathBuf>,
     include_files: Option<Vec<PathBuf>>,
+    defines: GHashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug)]
