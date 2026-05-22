@@ -47,7 +47,16 @@ impl Yosys {
     }
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
-        info!("Yosys: parsing the DUT and generating BTOR.");
+        Self::generate_btor_with_files(cfg, &cfg.dut.files, p, "dut")
+    }
+
+    pub fn generate_btor_with_files(
+        cfg: &Ric3Config,
+        input_files: &[PathBuf],
+        p: impl AsRef<Path>,
+        stem: &str,
+    ) -> anyhow::Result<()> {
+        info!("Yosys: parsing SystemVerilog and generating BTOR.");
         let slang = cfg
             .modeling
             .as_ref()
@@ -56,7 +65,7 @@ impl Yosys {
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
         let mut files = Vec::new();
-        for f in cfg.dut.files.iter() {
+        for f in input_files {
             let file_name = f.file_name().unwrap();
             let dest = src_dir.join(file_name);
             fs::copy(f, &dest)?;
@@ -105,12 +114,15 @@ impl Yosys {
         yosys.add_command("rename -witness");
         yosys.add_command("check");
         let dp = PathBuf::from("..");
-        yosys.add_command(&format!("write_rtlil {}", dp.join("dut.il").display()));
+        yosys.add_command(&format!(
+            "write_rtlil {}",
+            dp.join(format!("{stem}.il")).display()
+        ));
         yosys.add_command(&format!(
             "write_btor -ywmap {} -i {} {}",
-            dp.join("dut.ywb").display(),
-            dp.join("dut.info").display(),
-            dp.join("dut.btor").display(),
+            dp.join(format!("{stem}.ywb")).display(),
+            dp.join(format!("{stem}.info")).display(),
+            dp.join(format!("{stem}.btor")).display(),
         ));
         let plugin = if slang {
             vec!["slang".to_string()]

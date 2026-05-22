@@ -1,6 +1,7 @@
 mod dut;
 mod ind;
 mod kind;
+mod link;
 mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
@@ -24,7 +25,7 @@ use rIC3::{
 use ratatui::crossterm::style::Stylize;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{env, fs, time::Instant};
+use std::{env, fs, path::PathBuf, time::Instant};
 use strum::AsRefStr;
 use utils::CIllStat;
 
@@ -32,6 +33,9 @@ use utils::CIllStat;
 pub enum CIllCommands {
     /// Prepare shadow DUT artifacts
     Prepare,
+
+    /// Link helper invariants against the prepared DUT
+    Link { invariants: PathBuf },
 
     /// Check all the properties
     Check,
@@ -183,6 +187,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let cill_state = rp.get_cill_state()?;
     match cmd {
         CIllCommands::Prepare => dut::prepare(rcfg, rp),
+        CIllCommands::Link { invariants } => link::link(rcfg, rp, invariants),
         CIllCommands::Check => check(rcfg, rp, cill_state),
         CIllCommands::Abort => abort(rcfg, rp, cill_state),
         CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),

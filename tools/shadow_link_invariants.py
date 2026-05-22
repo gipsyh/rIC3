@@ -2,19 +2,7 @@
 import argparse
 import json
 import re
-import subprocess
 from pathlib import Path
-
-from shadowlib import (
-    build_btor,
-    load_project_config,
-    print_generated,
-    print_link_notes,
-    print_linked_bads,
-    require_file,
-    resolve_project_path,
-    run,
-)
 
 BTOR_NODE_RE = re.compile(r"^(\d+)\s+(\S+)(?:\s+(.*))?$")
 
@@ -227,78 +215,40 @@ def link_btor(
     return link_notes
 
 
-def link_invariants(
-    project,
-    dut_dir: Path,
-    helpers_dir: Path,
-    check: bool = False,
-) -> tuple[Path, Path, list[str]]:
-    if project.invariants is None:
-        raise RuntimeError("missing invariants file")
+def require_file(path: Path, message: str) -> None:
+    if not path.exists():
+        raise RuntimeError(f"{message}: {path}")
 
-    shadow = dut_dir / "shadow.sv"
-    link_map_path = dut_dir / "link_map.json"
-    core = dut_dir / "dut.btor"
-    require_file(shadow, "missing prepared shadow; run `ric3 cill prepare` first")
-    require_file(link_map_path, "missing link map; run `ric3 cill prepare` first")
-    require_file(core, "missing DUT BTOR; run `ric3 cill prepare` first")
 
-    helpers_dir.mkdir(parents=True, exist_ok=True)
-    monitor = helpers_dir / "monitor.btor"
-    linked = helpers_dir / "linked.btor"
-    build_btor(
-        project.project_dir,
-        project.top,
-        [shadow, project.invariants],
-        project.defines,
-        project.reset,
-        helpers_dir / "monitor.info",
-        monitor,
-    )
-    notes = link_btor(core, monitor, link_map_path, linked)
-    if check:
-        run(["ric3", "check", str(linked), "ic3"], project.project_dir)
-    return monitor, linked, notes
+def print_link_notes(notes: list[str]) -> None:
+    print("\nLinked monitor signals:", flush=True)
+    for note in notes:
+        print(" ", note, flush=True)
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Compile invariants against a prepared shadow DUT and link with core BTOR."
+        description="Link prepared CIll DUT and helper monitor BTOR artifacts."
     )
-    parser.add_argument("--config", type=Path, default=Path("ric3.toml"))
-    parser.add_argument("--invariants", type=Path, required=True)
-    parser.add_argument("--dut-dir", type=Path, default=Path("ric3proj/cill/dut"))
-    parser.add_argument(
-        "--helpers-dir", type=Path, default=Path("ric3proj/cill/helpers")
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="run `ric3 check linked.btor ic3` after linking",
-    )
+    parser.add_argument("--core", type=Path, required=True)
+    parser.add_argument("--monitor", type=Path, required=True)
+    parser.add_argument("--link-map", type=Path, required=True)
+    parser.add_argument("--linked", type=Path, required=True)
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv)
-    project = load_project_config(args.config, invariants=args.invariants)
-    dut_dir = resolve_project_path(project.project_dir, args.dut_dir)
-    helpers_dir = resolve_project_path(project.project_dir, args.helpers_dir)
-    monitor, linked, notes = link_invariants(
-        project, dut_dir, helpers_dir, check=args.check
-    )
-    print_generated(
-        project.project_dir,
-        "Generated invariant artifacts",
-        [helpers_dir / "monitor.info", monitor, linked],
-    )
+    require_file(args.core, "missing core BTOR")
+    require_file(args.monitor, "missing monitor BTOR")
+    require_file(args.link_map, "missing link map")
+    args.linked.parent.mkdir(parents=True, exist_ok=True)
+    notes = link_btor(args.core, args.monitor, args.link_map, args.linked)
+    print("\nGenerated linked helper artifact:", flush=True)
+    print(" ", args.linked, flush=True)
     print_link_notes(notes)
-    print_linked_bads(project.project_dir, linked)
     return 0
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(exc.returncode)
+    raise SystemExit(main())
