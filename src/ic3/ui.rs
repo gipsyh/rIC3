@@ -30,6 +30,11 @@ impl IC3 {
     #[inline]
     pub(super) fn finish_progress(&mut self, result: McResult) {
         self.tracer.trace_state(None, result);
+        if result.is_unknown()
+            && let Some(renderer) = &self.renderer
+        {
+            renderer.finish(result);
+        }
     }
 }
 

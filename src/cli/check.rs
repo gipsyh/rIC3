@@ -2,7 +2,7 @@ use crate::logger_init;
 use clap::Parser;
 use log::info;
 use rIC3::{
-    Engine, McResult,
+    EngineCtrl, McResult,
     config::EngineConfig,
     create_bl_engine, create_wl_engine,
     frontend::{certificate_check, frontend_from_model},
@@ -11,7 +11,25 @@ use rIC3::{
     transys::TransysIf,
     ui::UiRenderer,
 };
-use std::{env, fs, mem::transmute, path::PathBuf, process::exit};
+use std::{
+    env, fs,
+    path::PathBuf,
+    process::exit,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+struct InterruptHandle {
+    interrupted: Arc<AtomicBool>,
+}
+
+impl InterruptHandle {
+    fn is_interrupted(&self) -> bool {
+        self.interrupted.load(Ordering::SeqCst)
+    }
+}
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -75,9 +93,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         tmp_cert = Some(tmp_cert_file);
     }
     if let EngineConfig::Portfolio(cfg) = cfg {
-        let res = portfolio_main(chk, cfg);
+        portfolio_main(chk, cfg)?;
         drop(tmp_cert);
-        return res;
+        return Ok(());
     }
     let mut frontend = frontend_from_model(&chk.model)?;
     let res = if cfg.is_wl() {
@@ -88,9 +106,12 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
         }
-        interrupt_statistic(&chk, engine.as_mut());
+        let interrupt = install_interrupt_handler(engine.get_ctrl());
         let res = engine.check();
         engine.statistic();
+        if interrupt.is_interrupted() {
+            exit(130);
+        }
         if let Some(cert_path) = &chk.cert {
             let cert = engine.certificate(res);
             let cert = frontend.wl_certificate(cert);
@@ -106,9 +127,12 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
         }
-        interrupt_statistic(&chk, engine.as_mut());
+        let interrupt = install_interrupt_handler(engine.get_ctrl());
         let res = engine.check();
         engine.statistic();
+        if interrupt.is_interrupted() {
+            exit(130);
+        }
         if let Some(cert_path) = &chk.cert {
             let cert = engine.certificate(res);
             let cert = frontend.bl_certificate(cert);
@@ -124,16 +148,17 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn interrupt_statistic(chk: &CheckConfig, engine: &mut dyn Engine) {
-    if chk.interrupt_statistic {
-        let e: [usize; 2] = unsafe { transmute(engine as *mut dyn Engine) };
-        let _ = ctrlc::set_handler(move || {
-            let e: *mut dyn Engine = unsafe { transmute(e) };
-            let e = unsafe { &mut *e };
-            e.statistic();
-            exit(124);
-        });
-    }
+fn install_interrupt_handler(ctrl: EngineCtrl) -> InterruptHandle {
+    let interrupted = Arc::new(AtomicBool::new(false));
+    let handler_interrupted = interrupted.clone();
+    let _ = ctrlc::set_handler(move || {
+        if handler_interrupted.swap(true, Ordering::SeqCst) {
+            rIC3::ui::restore_terminal();
+            exit(130);
+        }
+        ctrl.terminate();
+    });
+    InterruptHandle { interrupted }
 }
 
 pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {
@@ -141,7 +166,11 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine = Portfolio::new(frontend, ts, symbols, chk.cert.clone(), cfg)?;
+    let interrupt = install_interrupt_handler(engine.get_ctrl());
     let res = engine.check();
+    if interrupt.is_interrupted() {
+        exit(130);
+    }
     report_res(&chk, res);
     if chk.certify {
         assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));

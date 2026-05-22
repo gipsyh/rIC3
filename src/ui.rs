@@ -7,8 +7,7 @@ use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
         ExecutableCommand, cursor,
-        event::{self, Event, KeyCode, KeyModifiers},
-        terminal::{disable_raw_mode, enable_raw_mode},
+        style::{ResetColor, SetAttribute},
     },
     layout::{Constraint, Direction, Layout},
     style::Stylize,
@@ -16,18 +15,12 @@ use ratatui::{
     widgets::Paragraph,
 };
 use std::io::{IsTerminal, Write};
-use std::sync::{
-    Arc, Mutex, Weak,
-    atomic::{AtomicBool, Ordering},
-};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
-    raw_mode: bool,
     cursor_hidden: bool,
-    interrupt_watcher: Arc<AtomicBool>,
     spinner_tick: usize,
     last_update: Instant,
     start_time: Instant,
@@ -39,15 +32,11 @@ pub struct UiRendererInner {
 
 impl UiRendererInner {
     fn cleanup_terminal(&mut self) {
-        self.interrupt_watcher.store(false, Ordering::Relaxed);
         if self.cursor_hidden {
             let _ = self.terminal.show_cursor();
             self.cursor_hidden = false;
         }
-        if self.raw_mode {
-            let _ = disable_raw_mode();
-            self.raw_mode = false;
-        }
+        restore_terminal_direct();
     }
 
     fn draw(&mut self, finish: bool, result: McResult) {
@@ -113,16 +102,23 @@ impl UiRendererInner {
             let area = f.area();
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Length(1)])
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                ])
                 .split(area);
 
             f.render_widget(Paragraph::new(status_line), chunks[0]);
             f.render_widget(Paragraph::new(frame_line), chunks[1]);
+            f.render_widget(Paragraph::new(""), chunks[2]);
+            if finish {
+                f.set_cursor_position((chunks[2].x, chunks[2].y));
+            }
         });
 
         if finish {
             self.cleanup_terminal();
-            eprintln!();
         }
     }
 }
@@ -144,12 +140,11 @@ impl UiRenderer {
             return None;
         }
 
-        let raw_mode = std::io::stdin().is_terminal() && enable_raw_mode().is_ok();
         let backend = CrosstermBackend::new(std::io::stderr());
         let mut terminal = Terminal::with_options(
             backend,
             TerminalOptions {
-                viewport: Viewport::Inline(2),
+                viewport: Viewport::Inline(3),
             },
         )
         .ok()?;
@@ -157,13 +152,10 @@ impl UiRenderer {
         // Hide cursor initially so it doesn't flicker/show in the inline area
         let cursor_hidden = terminal.hide_cursor().is_ok();
 
-        let interrupt_watcher = Arc::new(AtomicBool::new(raw_mode));
         let renderer = Self {
             inner: Arc::new(Mutex::new(UiRendererInner {
                 terminal,
-                raw_mode,
                 cursor_hidden,
-                interrupt_watcher: interrupt_watcher.clone(),
                 spinner_tick: 0,
                 last_update: Instant::now(),
                 start_time: Instant::now(),
@@ -173,10 +165,6 @@ impl UiRenderer {
                 finished: false,
             })),
         };
-
-        if raw_mode {
-            spawn_interrupt_watcher(interrupt_watcher, Arc::downgrade(&renderer.inner));
-        }
 
         Some(renderer)
     }
@@ -197,6 +185,22 @@ impl UiRenderer {
             Ok(mut inner) => {
                 inner.finished = true;
                 inner.cleanup_terminal();
+            }
+            Err(_) => restore_terminal_direct(),
+        }
+    }
+
+    pub fn finish(&self, result: McResult) {
+        match self.inner.lock() {
+            Ok(mut inner) => {
+                if inner.finished {
+                    return;
+                }
+                if let McResult::Unknown(Some(k)) = result {
+                    inner.level = k;
+                }
+                inner.draw(true, result);
+                inner.finished = true;
             }
             Err(_) => restore_terminal_direct(),
         }
@@ -239,41 +243,14 @@ fn format_duration(d: Duration) -> String {
     }
 }
 
-fn spawn_interrupt_watcher(active: Arc<AtomicBool>, inner: Weak<Mutex<UiRendererInner>>) {
-    thread::spawn(move || {
-        while active.load(Ordering::Relaxed) {
-            match event::poll(Duration::from_millis(100)) {
-                Ok(true) => match event::read() {
-                    Ok(Event::Key(key))
-                        if key.modifiers.contains(KeyModifiers::CONTROL)
-                            && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C')) =>
-                    {
-                        if let Some(inner) = inner.upgrade() {
-                            match inner.lock() {
-                                Ok(mut inner) => {
-                                    inner.cleanup_terminal();
-                                    eprintln!();
-                                }
-                                Err(_) => restore_terminal_direct(),
-                            }
-                        } else {
-                            restore_terminal_direct();
-                        }
-                        std::process::exit(130);
-                    }
-                    Ok(_) => {}
-                    Err(_) => break,
-                },
-                Ok(false) => {}
-                Err(_) => break,
-            }
-        }
-    });
-}
-
 fn restore_terminal_direct() {
     let mut stderr = std::io::stderr();
     let _ = stderr.execute(cursor::Show);
+    let _ = stderr.execute(SetAttribute(ratatui::crossterm::style::Attribute::Reset));
+    let _ = stderr.execute(ResetColor);
     let _ = stderr.flush();
-    let _ = disable_raw_mode();
+}
+
+pub fn restore_terminal() {
+    restore_terminal_direct();
 }
