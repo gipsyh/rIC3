@@ -1,7 +1,13 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rIC3::McResult;
-use ratatui::crossterm::{style::Stylize, terminal};
+use ratatui::{
+    Terminal, TerminalOptions, Viewport,
+    backend::CrosstermBackend,
+    crossterm::{style::Stylize, terminal},
+    layout::Constraint,
+    style::{Color, Style},
+    widgets::{Cell, Row, Table},
+};
 use std::{thread::sleep, time::Duration};
 
 const ID_WIDTH: usize = 6;
@@ -10,9 +16,7 @@ const BOUND_WIDTH: usize = 10;
 const TIME_WIDTH: usize = 10;
 const COLUMN_GAPS: usize = 4;
 const MIN_PROPERTY_WIDTH: usize = 1;
-const DEFAULT_PROGRESS_WIDTH: usize = 78;
 const DEFAULT_PLAIN_WIDTH: usize = 80;
-const PROGRESS_PREFIX_WIDTH: usize = 2;
 
 impl PropMcState {
     fn status_columns(&self) -> (String, String) {
@@ -87,10 +91,6 @@ impl PropMcState {
         )
     }
 
-    fn progress_message(&self, line_width: usize) -> String {
-        self.message(line_width)
-    }
-
     fn plain_message(&self, line_width: usize) -> String {
         self.message(line_width)
     }
@@ -111,65 +111,237 @@ fn format_time(duration: Duration) -> String {
 
 impl Run {
     pub(crate) fn run_progress(&mut self) -> anyhow::Result<()> {
-        let mut line_width = progress_line_width();
-        println!("  {}", header_message(line_width));
-        let mp = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(10));
-        mp.set_move_cursor(true);
-        let style = ProgressStyle::with_template("{spinner:.cyan.bold} {wide_msg}")?
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "✔"]);
-        let bars: Vec<_> = self
-            .mc
-            .iter()
-            .map(|prop| {
-                let bar = mp.add(ProgressBar::new_spinner());
-                bar.set_style(style.clone());
-                bar.set_message(prop.progress_message(line_width));
-                bar.enable_steady_tick(Duration::from_millis(100));
-                bar
-            })
-            .collect();
+        let backend = CrosstermBackend::new(std::io::stdout());
+        let height = self.mc.len() + 1;
+        let mut terminal = Terminal::with_options(
+            backend,
+            TerminalOptions {
+                viewport: Viewport::Inline(height as u16),
+            },
+        )?;
+        terminal.hide_cursor()?;
 
-        for (id, prop) in self.mc.iter().enumerate() {
-            finish_bar(&bars[id], prop, line_width);
-        }
+        let mut tick = 0;
 
         loop {
-            let current_line_width = progress_line_width();
-            if current_line_width != line_width {
-                line_width = current_line_width;
-                for (id, prop) in self.mc.iter().enumerate() {
-                    update_bar(&bars[id], prop, line_width);
-                }
-            }
-
             if self.nexus_task.is_none() {
                 self.launch_nexus();
-                for (id, prop) in self.mc.iter().enumerate() {
-                    update_bar(&bars[id], prop, line_width);
-                }
             }
 
-            let updates = self.process_updates()?;
-            for id in updates.state {
-                update_bar(&bars[id], &self.mc[id], line_width);
-            }
+            let _updates = self.process_updates()?;
 
-            // Always update bars occasionally to keep time moving smoothly if solving
-            for (id, prop) in self.mc.iter().enumerate() {
-                if prop.state == McStatus::Solving {
-                    bar_update_time_only(&bars[id], prop, line_width);
+            terminal.draw(|f| {
+                let size = f.area();
+                let term_width = size.width as usize;
+                let prop_width = term_width.saturating_sub(42).max(1);
+
+                let header = Row::new(vec![
+                    Cell::from(""),
+                    Cell::from("ID"),
+                    Cell::from(truncate("Property", prop_width)),
+                    Cell::from("State"),
+                    Cell::from("Bound"),
+                    Cell::from("Time"),
+                ])
+                .style(Style::default().bold());
+
+                let mut rows = Vec::new();
+                for prop in &self.mc {
+                    let spinner_cell = match prop.prop.res {
+                        McResult::UNSAT => {
+                            Cell::from("✔").style(Style::default().fg(Color::Green).bold())
+                        }
+                        McResult::SAT(_) => {
+                            Cell::from("✘").style(Style::default().fg(Color::Red).bold())
+                        }
+                        McResult::Unknown(_) if prop.state == McStatus::Pause => {
+                            Cell::from("⏹").style(Style::default().fg(Color::Yellow).bold())
+                        }
+                        _ => {
+                            let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                            let spinner = spinners[tick % spinners.len()];
+                            Cell::from(spinner).style(Style::default().fg(Color::Cyan).bold())
+                        }
+                    };
+
+                    let id_cell = Cell::from(format!("p{}", prop.prop.id))
+                        .style(Style::default().fg(Color::Magenta).bold());
+                    let prop_cell = Cell::from(truncate(&prop.prop.name, prop_width))
+                        .style(Style::default().fg(Color::White));
+
+                    let state_cell = match prop.prop.res {
+                        McResult::UNSAT => {
+                            Cell::from("Proved").style(Style::default().fg(Color::Green).bold())
+                        }
+                        McResult::SAT(_) => {
+                            Cell::from("Violated").style(Style::default().fg(Color::Red).bold())
+                        }
+                        McResult::Unknown(_) => match prop.state {
+                            McStatus::Solving => {
+                                Cell::from("Solving").style(Style::default().fg(Color::Yellow))
+                            }
+                            McStatus::Wait => {
+                                Cell::from("Waiting").style(Style::default().fg(Color::DarkGray))
+                            }
+                            McStatus::Pause => {
+                                Cell::from("Paused").style(Style::default().fg(Color::DarkGray))
+                            }
+                        },
+                    };
+
+                    let bound_cell = match prop.prop.res {
+                        McResult::UNSAT => Cell::from("-"),
+                        McResult::SAT(b) => Cell::from(b.to_string()),
+                        McResult::Unknown(Some(b)) => match prop.state {
+                            McStatus::Solving => Cell::from(b.to_string())
+                                .style(Style::default().fg(Color::Cyan).bold()),
+                            McStatus::Wait | McStatus::Pause => {
+                                Cell::from(b.to_string()).style(Style::default().fg(Color::Blue))
+                            }
+                        },
+                        McResult::Unknown(None) => Cell::from("-"),
+                    };
+
+                    let total_time =
+                        prop.time + prop.start_time.map_or(Duration::ZERO, |t| t.elapsed());
+                    let time_cell = Cell::from(format_time(total_time));
+
+                    rows.push(Row::new(vec![
+                        spinner_cell,
+                        id_cell,
+                        prop_cell,
+                        state_cell,
+                        bound_cell,
+                        time_cell,
+                    ]));
                 }
-            }
+
+                let widths = [
+                    Constraint::Length(1),
+                    Constraint::Length(6),
+                    Constraint::Min(1),
+                    Constraint::Length(10),
+                    Constraint::Length(10),
+                    Constraint::Length(10),
+                ];
+
+                let table = Table::new(rows, widths).header(header).column_spacing(1);
+
+                f.render_widget(table, size);
+            })?;
 
             if self.all_done() || self.is_idle() {
-                for (id, prop) in self.mc.iter().enumerate() {
-                    finish_bar(&bars[id], prop, line_width);
-                }
-                return Ok(());
+                break;
             }
 
             sleep(Duration::from_millis(100));
+            tick += 1;
         }
+
+        terminal.draw(|f| {
+            let size = f.area();
+            let term_width = size.width as usize;
+            let prop_width = term_width.saturating_sub(42).max(1);
+
+            let header = Row::new(vec![
+                Cell::from(""),
+                Cell::from("ID"),
+                Cell::from(truncate("Property", prop_width)),
+                Cell::from("State"),
+                Cell::from("Bound"),
+                Cell::from("Time"),
+            ])
+            .style(Style::default().bold());
+
+            let mut rows = Vec::new();
+            for prop in &self.mc {
+                let spinner_cell = match prop.prop.res {
+                    McResult::UNSAT => {
+                        Cell::from("✔").style(Style::default().fg(Color::Green).bold())
+                    }
+                    McResult::SAT(_) => {
+                        Cell::from("✘").style(Style::default().fg(Color::Red).bold())
+                    }
+                    McResult::Unknown(_) if prop.state == McStatus::Pause => {
+                        Cell::from("⏹").style(Style::default().fg(Color::Yellow).bold())
+                    }
+                    _ => {
+                        let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                        let spinner = spinners[tick % spinners.len()];
+                        Cell::from(spinner).style(Style::default().fg(Color::Cyan).bold())
+                    }
+                };
+
+                let id_cell = Cell::from(format!("p{}", prop.prop.id))
+                    .style(Style::default().fg(Color::Magenta).bold());
+                let prop_cell = Cell::from(truncate(&prop.prop.name, prop_width))
+                    .style(Style::default().fg(Color::White));
+
+                let state_cell = match prop.prop.res {
+                    McResult::UNSAT => {
+                        Cell::from("Proved").style(Style::default().fg(Color::Green).bold())
+                    }
+                    McResult::SAT(_) => {
+                        Cell::from("Violated").style(Style::default().fg(Color::Red).bold())
+                    }
+                    McResult::Unknown(_) => match prop.state {
+                        McStatus::Solving => {
+                            Cell::from("Solving").style(Style::default().fg(Color::Yellow))
+                        }
+                        McStatus::Wait => {
+                            Cell::from("Waiting").style(Style::default().fg(Color::DarkGray))
+                        }
+                        McStatus::Pause => {
+                            Cell::from("Paused").style(Style::default().fg(Color::DarkGray))
+                        }
+                    },
+                };
+
+                let bound_cell = match prop.prop.res {
+                    McResult::UNSAT => Cell::from("-"),
+                    McResult::SAT(b) => Cell::from(b.to_string()),
+                    McResult::Unknown(Some(b)) => match prop.state {
+                        McStatus::Solving => {
+                            Cell::from(b.to_string()).style(Style::default().fg(Color::Cyan).bold())
+                        }
+                        McStatus::Wait | McStatus::Pause => {
+                            Cell::from(b.to_string()).style(Style::default().fg(Color::Blue))
+                        }
+                    },
+                    McResult::Unknown(None) => Cell::from("-"),
+                };
+
+                let total_time =
+                    prop.time + prop.start_time.map_or(Duration::ZERO, |t| t.elapsed());
+                let time_cell = Cell::from(format_time(total_time));
+
+                rows.push(Row::new(vec![
+                    spinner_cell,
+                    id_cell,
+                    prop_cell,
+                    state_cell,
+                    bound_cell,
+                    time_cell,
+                ]));
+            }
+
+            let widths = [
+                Constraint::Length(1),
+                Constraint::Length(6),
+                Constraint::Min(1),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
+            ];
+
+            let table = Table::new(rows, widths).header(header).column_spacing(1);
+
+            f.render_widget(table, size);
+        })?;
+
+        terminal.show_cursor()?;
+        println!();
+        Ok(())
     }
 
     pub(crate) fn run_plain(&mut self) -> anyhow::Result<()> {
@@ -203,48 +375,6 @@ impl Run {
     }
 }
 
-fn bar_update_time_only(bar: &ProgressBar, prop: &PropMcState, line_width: usize) {
-    if !bar.is_finished() {
-        bar.set_message(prop.progress_message(line_width));
-    }
-}
-
-fn update_bar(bar: &ProgressBar, prop: &PropMcState, line_width: usize) {
-    bar.set_message(prop.progress_message(line_width));
-    if !matches!(prop.prop.res, McResult::Unknown(_)) || prop.state == McStatus::Pause {
-        finish_bar(bar, prop, line_width);
-    } else {
-        bar.tick();
-    }
-}
-
-fn finish_bar(bar: &ProgressBar, prop: &PropMcState, line_width: usize) {
-    if bar.is_finished() {
-        return;
-    }
-
-    match prop.prop.res {
-        McResult::UNSAT => {
-            bar.set_style(ProgressStyle::with_template("{prefix:.green.bold} {wide_msg}").unwrap());
-            bar.finish_with_message(prop.progress_message(line_width));
-            bar.set_prefix("✔");
-        }
-        McResult::SAT(_) => {
-            bar.set_style(ProgressStyle::with_template("{prefix:.red.bold} {wide_msg}").unwrap());
-            bar.finish_with_message(prop.progress_message(line_width));
-            bar.set_prefix("✘");
-        }
-        McResult::Unknown(_) if prop.state == McStatus::Pause => {
-            bar.set_style(
-                ProgressStyle::with_template("{prefix:.yellow.bold} {wide_msg}").unwrap(),
-            );
-            bar.finish_with_message(prop.progress_message(line_width));
-            bar.set_prefix("⏹");
-        }
-        _ => {}
-    }
-}
-
 fn header_message(line_width: usize) -> String {
     let property_width = property_width(line_width);
     let property = truncate("Property", property_width);
@@ -262,12 +392,6 @@ fn property_width(line_width: usize) -> usize {
     line_width
         .saturating_sub(ID_WIDTH + STATE_WIDTH + BOUND_WIDTH + TIME_WIDTH + COLUMN_GAPS)
         .max(MIN_PROPERTY_WIDTH)
-}
-
-fn progress_line_width() -> usize {
-    terminal::size()
-        .map(|(width, _)| usize::from(width).saturating_sub(PROGRESS_PREFIX_WIDTH))
-        .unwrap_or(DEFAULT_PROGRESS_WIDTH)
 }
 
 fn plain_line_width() -> usize {
