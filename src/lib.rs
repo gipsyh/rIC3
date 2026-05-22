@@ -13,6 +13,7 @@ pub mod portfolio;
 pub mod rlive;
 pub mod tracer;
 pub mod transys;
+pub mod ui;
 pub mod utils;
 pub mod wlbmc;
 pub mod wlkind;
@@ -176,6 +177,8 @@ pub trait Engine: Send {
     }
 
     fn set_extractor(&mut self, _extractor: Box<dyn ExtractorIf>) {}
+
+    fn set_ui(&mut self, _renderer: crate::ui::UiRenderer) {}
 
     fn statistic(&mut self) {}
 

@@ -9,6 +9,7 @@ use rIC3::{
     portfolio::{Portfolio, PortfolioConfig},
     tracer::LogTracer,
     transys::TransysIf,
+    ui::UiRenderer,
 };
 use std::{env, fs, mem::transmute, path::PathBuf, process::exit};
 
@@ -83,6 +84,10 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         let (wts, _symbols) = frontend.wts();
         let mut engine = create_wl_engine(cfg.clone(), wts);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
+        if let Some(tui) = UiRenderer::new(cfg.as_ref()) {
+            engine.add_tracer(Box::new(tui.clone()));
+            engine.set_ui(tui);
+        }
         interrupt_statistic(&chk, engine.as_mut());
         let res = engine.check();
         engine.statistic();
@@ -97,6 +102,10 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         info!("origin ts has {}", ts.statistic());
         let mut engine = create_bl_engine(cfg.clone(), ts, symbols);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
+        if let Some(tui) = rIC3::ui::UiRenderer::new(cfg.as_ref()) {
+            engine.add_tracer(Box::new(tui.clone()));
+            engine.set_ui(tui);
+        }
         interrupt_statistic(&chk, engine.as_mut());
         let res = engine.check();
         engine.statistic();

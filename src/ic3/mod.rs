@@ -8,6 +8,7 @@ use crate::{
     transys::{
         Transys, TransysCtx, TransysIf, certify::Restore, lift::TsLift, unroll::TransysUnroll,
     },
+    ui::UiRenderer,
 };
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
@@ -168,7 +169,7 @@ pub struct IC3 {
     filog: IntervalLogger,
     tracer: Tracer,
     ctrl: EngineCtrl,
-    progress: Option<ui::IC3Progress>,
+    renderer: Option<UiRenderer>,
 }
 
 impl IC3 {
@@ -260,7 +261,7 @@ impl IC3 {
             filog: Default::default(),
             tracer: Tracer::new(),
             ctrl: EngineCtrl::new(),
-            progress: ui::IC3Progress::new(),
+            renderer: None,
         }
     }
 
@@ -344,6 +345,10 @@ impl Engine for IC3 {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn set_ui(&mut self, renderer: UiRenderer) {
+        self.renderer = Some(renderer);
     }
 
     fn statistic(&mut self) {
