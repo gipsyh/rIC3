@@ -1,5 +1,4 @@
 mod progress;
-mod tui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use btor::Btor;
@@ -42,8 +41,6 @@ pub enum RunUi {
     /// Pick a terminal-friendly display automatically
     #[default]
     Auto,
-    /// Full-screen interactive terminal UI
-    Tui,
     /// Docker-pull style live progress lines
     Progress,
     /// Print one line per status update
@@ -149,7 +146,6 @@ impl Run {
 
     pub(crate) fn run(&mut self) -> anyhow::Result<()> {
         match self.cfg.ui.resolve() {
-            RunUi::Tui => self.run_tui(),
             RunUi::Progress => self.run_progress(),
             RunUi::Plain => self.run_plain(),
             RunUi::Auto => unreachable!("RunUi::Auto must be resolved before dispatch"),
