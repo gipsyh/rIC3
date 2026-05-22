@@ -389,19 +389,19 @@ pub fn link(rcfg: Ric3Config, rp: Ric3Proj, invariants: PathBuf) -> anyhow::Resu
         }
     }
 
-    let helpers_dir = rp.path("cill/helpers");
-    recreate_dir(&helpers_dir)?;
-    remove_if_exists(helpers_dir.join("linked.btor"))?;
-    Yosys::generate_btor_with_files(&rcfg, &[shadow, invariants], &helpers_dir, "monitor")?;
+    let candinv_dir = rp.path("cill/candinv");
+    recreate_dir(&candinv_dir)?;
+    remove_if_exists(candinv_dir.join("linked.btor"))?;
+    Yosys::generate_btor_with_files(&rcfg, &[shadow, invariants], &candinv_dir, "monitor")?;
     link_btor(
         &core,
-        &helpers_dir.join("monitor.btor"),
+        &candinv_dir.join("monitor.btor"),
         &link_map,
-        &helpers_dir.join("linked.btor"),
+        &candinv_dir.join("linked.btor"),
     )?;
     println!(
         "CIll helper artifacts generated in {}.",
-        helpers_dir.display()
+        candinv_dir.display()
     );
     Ok(())
 }
