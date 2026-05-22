@@ -5,7 +5,7 @@ use btor::Btor;
 use clap::{Args, ValueEnum};
 use giputils::file::recreate_dir;
 use rIC3::{
-    Engine, EngineCtrl, McBlCertificate, McResult, MpEngine, MpMcResult,
+    Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
     config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     polynexus::{PolyNexus, PolyNexusConfig},
@@ -14,7 +14,6 @@ use rIC3::{
     },
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
-use ratatui::widgets::TableState;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -95,7 +94,6 @@ pub(crate) struct NexusTask {
     join: JoinHandle<(MpMcResult, PolyNexus)>,
     state_trx: StateChannelTracerRx,
     wit_trx: WitnessChannelTracerRx,
-    ctrl: EngineCtrl,
 }
 
 pub(crate) struct Run {
@@ -103,12 +101,10 @@ pub(crate) struct Run {
     btor: Btor,
     btorfe: BtorFrontend,
     wsym: WlTsSymbol,
-    table: TableState,
     ric3_proj: Ric3Proj,
     mc: Vec<PropMcState>,
     nexus_task: Option<NexusTask>,
     cfg: RunConfig,
-    should_quit: bool,
 }
 
 #[derive(Debug, Default)]
@@ -129,18 +125,14 @@ impl Run {
         let btorfe = BtorFrontend::new(btor.clone());
         fs::create_dir_all(ric3_proj.path("res"))?;
         recreate_dir(ric3_proj.path("tmp"))?;
-        let mut table = TableState::default();
-        table.select(Some(0));
         Ok(Self {
             btor,
             btorfe,
             wsym,
-            table,
             ric3_proj,
             mc,
             nexus_task: None,
             cfg,
-            should_quit: false,
         })
     }
 
@@ -149,21 +141,6 @@ impl Run {
             RunUi::Progress => self.run_progress(),
             RunUi::Plain => self.run_plain(),
             RunUi::Auto => unreachable!("RunUi::Auto must be resolved before dispatch"),
-        }
-    }
-
-    pub(crate) fn stop_solving(&mut self) {
-        if let Some(task) = self.nexus_task.take() {
-            task.ctrl.terminate();
-            let _ = task.join.join();
-        }
-        for m in self.mc.iter_mut() {
-            if m.state == McStatus::Solving {
-                m.state = McStatus::Pause;
-                if let Some(t) = m.start_time.take() {
-                    m.time += t.elapsed();
-                }
-            }
         }
     }
 
@@ -223,8 +200,6 @@ impl Run {
         engine.add_tracer(Box::new(state_tsx));
         engine.add_tracer(Box::new(wit_tsx));
 
-        let ctrl = engine.get_ctrl();
-
         for &id in &pending {
             self.mc[id].state = McStatus::Solving;
             self.mc[id].start_time = Some(Instant::now());
@@ -239,7 +214,6 @@ impl Run {
             join,
             state_trx,
             wit_trx,
-            ctrl,
         });
     }
 
