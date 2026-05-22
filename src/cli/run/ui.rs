@@ -110,7 +110,7 @@ fn format_time(duration: Duration) -> String {
 }
 
 impl Run {
-    pub(crate) fn run_progress(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn run_tui(&mut self) -> anyhow::Result<()> {
         let backend = CrosstermBackend::new(std::io::stdout());
         let height = self.mc.len() + 1;
         let mut terminal = Terminal::with_options(
