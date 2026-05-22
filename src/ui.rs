@@ -5,17 +5,29 @@ use crate::{
 use ratatui::{
     Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
+    crossterm::{
+        ExecutableCommand, cursor,
+        event::{self, Event, KeyCode, KeyModifiers},
+        terminal::{disable_raw_mode, enable_raw_mode},
+    },
     layout::{Constraint, Direction, Layout},
     style::Stylize,
     text::{Line, Span},
     widgets::Paragraph,
 };
-use std::io::IsTerminal;
-use std::sync::{Arc, Mutex};
+use std::io::{IsTerminal, Write};
+use std::sync::{
+    Arc, Mutex, Weak,
+    atomic::{AtomicBool, Ordering},
+};
+use std::thread;
 use std::time::{Duration, Instant};
 
 pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
+    raw_mode: bool,
+    cursor_hidden: bool,
+    interrupt_watcher: Arc<AtomicBool>,
     spinner_tick: usize,
     last_update: Instant,
     start_time: Instant,
@@ -26,6 +38,18 @@ pub struct UiRendererInner {
 }
 
 impl UiRendererInner {
+    fn cleanup_terminal(&mut self) {
+        self.interrupt_watcher.store(false, Ordering::Relaxed);
+        if self.cursor_hidden {
+            let _ = self.terminal.show_cursor();
+            self.cursor_hidden = false;
+        }
+        if self.raw_mode {
+            let _ = disable_raw_mode();
+            self.raw_mode = false;
+        }
+    }
+
     fn draw(&mut self, finish: bool, result: McResult) {
         let level = self.level;
         let elapsed = self.start_time.elapsed();
@@ -97,9 +121,15 @@ impl UiRendererInner {
         });
 
         if finish {
-            let _ = self.terminal.show_cursor();
+            self.cleanup_terminal();
             eprintln!();
         }
+    }
+}
+
+impl Drop for UiRendererInner {
+    fn drop(&mut self) {
+        self.cleanup_terminal();
     }
 }
 
@@ -114,6 +144,7 @@ impl UiRenderer {
             return None;
         }
 
+        let raw_mode = std::io::stdin().is_terminal() && enable_raw_mode().is_ok();
         let backend = CrosstermBackend::new(std::io::stderr());
         let mut terminal = Terminal::with_options(
             backend,
@@ -124,11 +155,15 @@ impl UiRenderer {
         .ok()?;
 
         // Hide cursor initially so it doesn't flicker/show in the inline area
-        let _ = terminal.hide_cursor();
+        let cursor_hidden = terminal.hide_cursor().is_ok();
 
-        Some(Self {
+        let interrupt_watcher = Arc::new(AtomicBool::new(raw_mode));
+        let renderer = Self {
             inner: Arc::new(Mutex::new(UiRendererInner {
                 terminal,
+                raw_mode,
+                cursor_hidden,
+                interrupt_watcher: interrupt_watcher.clone(),
                 spinner_tick: 0,
                 last_update: Instant::now(),
                 start_time: Instant::now(),
@@ -137,7 +172,13 @@ impl UiRenderer {
                 custom_line: None,
                 finished: false,
             })),
-        })
+        };
+
+        if raw_mode {
+            spawn_interrupt_watcher(interrupt_watcher, Arc::downgrade(&renderer.inner));
+        }
+
+        Some(renderer)
     }
 
     #[inline]
@@ -149,6 +190,16 @@ impl UiRenderer {
         inner.custom_line = Some(line);
         let level = inner.level;
         inner.draw(false, McResult::Unknown(Some(level)));
+    }
+
+    pub fn shutdown(&self) {
+        match self.inner.lock() {
+            Ok(mut inner) => {
+                inner.finished = true;
+                inner.cleanup_terminal();
+            }
+            Err(_) => restore_terminal_direct(),
+        }
     }
 }
 
@@ -186,4 +237,43 @@ fn format_duration(d: Duration) -> String {
     } else {
         format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
     }
+}
+
+fn spawn_interrupt_watcher(active: Arc<AtomicBool>, inner: Weak<Mutex<UiRendererInner>>) {
+    thread::spawn(move || {
+        while active.load(Ordering::Relaxed) {
+            match event::poll(Duration::from_millis(100)) {
+                Ok(true) => match event::read() {
+                    Ok(Event::Key(key))
+                        if key.modifiers.contains(KeyModifiers::CONTROL)
+                            && matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C')) =>
+                    {
+                        if let Some(inner) = inner.upgrade() {
+                            match inner.lock() {
+                                Ok(mut inner) => {
+                                    inner.cleanup_terminal();
+                                    eprintln!();
+                                }
+                                Err(_) => restore_terminal_direct(),
+                            }
+                        } else {
+                            restore_terminal_direct();
+                        }
+                        std::process::exit(130);
+                    }
+                    Ok(_) => {}
+                    Err(_) => break,
+                },
+                Ok(false) => {}
+                Err(_) => break,
+            }
+        }
+    });
+}
+
+fn restore_terminal_direct() {
+    let mut stderr = std::io::stderr();
+    let _ = stderr.execute(cursor::Show);
+    let _ = stderr.flush();
+    let _ = disable_raw_mode();
 }
