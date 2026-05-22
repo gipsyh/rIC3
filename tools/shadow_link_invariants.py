@@ -11,8 +11,8 @@ from shadowlib import (
     print_generated,
     print_link_notes,
     print_linked_bads,
-    project_out_dir,
     require_file,
+    resolve_project_path,
     run,
 )
 
@@ -229,28 +229,30 @@ def link_btor(
 
 def link_invariants(
     project,
-    out_dir: Path,
+    dut_dir: Path,
+    helpers_dir: Path,
     check: bool = False,
 ) -> tuple[Path, Path, list[str]]:
     if project.invariants is None:
-        raise RuntimeError("cannot detect invariants file; pass --invariants")
+        raise RuntimeError("missing invariants file")
 
-    shadow = out_dir / "shadow.sv"
-    link_map_path = out_dir / "link_map.json"
-    core = out_dir / "core.btor"
-    require_file(shadow, "missing prepared shadow; run shadow_prepare.py first")
-    require_file(link_map_path, "missing link map; run shadow_prepare.py first")
-    require_file(core, "missing core BTOR; run shadow_prepare.py first")
+    shadow = dut_dir / "shadow.sv"
+    link_map_path = dut_dir / "link_map.json"
+    core = dut_dir / "dut.btor"
+    require_file(shadow, "missing prepared shadow; run `ric3 cill prepare` first")
+    require_file(link_map_path, "missing link map; run `ric3 cill prepare` first")
+    require_file(core, "missing DUT BTOR; run `ric3 cill prepare` first")
 
-    monitor = out_dir / "monitor.btor"
-    linked = out_dir / "linked.btor"
+    helpers_dir.mkdir(parents=True, exist_ok=True)
+    monitor = helpers_dir / "monitor.btor"
+    linked = helpers_dir / "linked.btor"
     build_btor(
         project.project_dir,
         project.top,
         [shadow, project.invariants],
         project.defines,
         project.reset,
-        out_dir / "monitor.info",
+        helpers_dir / "monitor.info",
         monitor,
     )
     notes = link_btor(core, monitor, link_map_path, linked)
@@ -264,8 +266,11 @@ def parse_args(argv=None):
         description="Compile invariants against a prepared shadow DUT and link with core BTOR."
     )
     parser.add_argument("--config", type=Path, default=Path("ric3.toml"))
-    parser.add_argument("--invariants", type=Path, default=None)
-    parser.add_argument("--out", type=Path, default=Path("shadow_link"))
+    parser.add_argument("--invariants", type=Path, required=True)
+    parser.add_argument("--dut-dir", type=Path, default=Path("ric3proj/cill/dut"))
+    parser.add_argument(
+        "--helpers-dir", type=Path, default=Path("ric3proj/cill/helpers")
+    )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -276,15 +281,16 @@ def parse_args(argv=None):
 
 def main(argv=None) -> int:
     args = parse_args(argv)
-    project = load_project_config(
-        args.config, invariants_arg=args.invariants, require_invariants=True
+    project = load_project_config(args.config, invariants=args.invariants)
+    dut_dir = resolve_project_path(project.project_dir, args.dut_dir)
+    helpers_dir = resolve_project_path(project.project_dir, args.helpers_dir)
+    monitor, linked, notes = link_invariants(
+        project, dut_dir, helpers_dir, check=args.check
     )
-    out_dir = project_out_dir(project, args.out)
-    monitor, linked, notes = link_invariants(project, out_dir, check=args.check)
     print_generated(
         project.project_dir,
         "Generated invariant artifacts",
-        [out_dir / "monitor.info", monitor, linked],
+        [helpers_dir / "monitor.info", monitor, linked],
     )
     print_link_notes(notes)
     print_linked_bads(project.project_dir, linked)

@@ -93,11 +93,6 @@ def load_config(path: Path) -> dict:
         return tomllib.load(f)
 
 
-def detect_invariants(files: list[Path]) -> Path | None:
-    matches = [path for path in files if path.name == "invariants.sv"]
-    return matches[0] if len(matches) == 1 else None
-
-
 def resolve_project_path(project_dir: Path, path: Path) -> Path:
     return path.resolve() if path.is_absolute() else (project_dir / path).resolve()
 
@@ -111,8 +106,7 @@ def relative_to_project(path: Path, project_dir: Path) -> str:
 
 def load_project_config(
     config: Path,
-    invariants_arg: Path | None = None,
-    require_invariants: bool = True,
+    invariants: Path | None = None,
 ) -> ProjectConfig:
     config_path = config.resolve()
     project_dir = config_path.parent
@@ -123,12 +117,8 @@ def load_project_config(
     defines = dut.get("defines", {})
     all_files = [resolve_project_path(project_dir, Path(path)) for path in dut["files"]]
     invariants = (
-        resolve_project_path(project_dir, invariants_arg)
-        if invariants_arg is not None
-        else detect_invariants(all_files)
+        resolve_project_path(project_dir, invariants) if invariants is not None else None
     )
-    if require_invariants and invariants is None:
-        raise RuntimeError("cannot detect invariants file; pass --invariants")
     dut_files = [path for path in all_files if invariants is None or path != invariants]
     if not dut_files:
         raise RuntimeError("no stable DUT files left after removing invariants")
