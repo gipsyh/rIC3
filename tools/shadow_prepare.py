@@ -5,6 +5,7 @@ import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
+import tomlkit
 
 SIMPLE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
 
@@ -396,18 +397,16 @@ def write_shadow_outputs(
         text.append("")
     shadow.write_text("\n".join(text))
 
-    link_map = {}
+    link_map = {"top": top, "ports": {}}
     for declared in link_signals:
         full_path = ".".join(declared.rel_path)
-        link_map[full_path] = {
+        link_map["ports"][full_path] = {
             "path": full_path,
             "memory": declared.concrete_signal.is_memory,
             "indices": declared.concrete_signal.indices,
         }
-    link_map_path = out_dir / "link_map.json"
-    link_map_path.write_text(
-        json.dumps({"top": top, "ports": link_map}, indent=2) + "\n"
-    )
+    link_map_path = out_dir / "link_map.toml"
+    link_map_path.write_text(tomlkit.dumps(link_map))
     return shadow, link_map_path
 
 
