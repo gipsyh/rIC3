@@ -117,6 +117,7 @@ struct Dut {
     top: String,
     files: Vec<PathBuf>,
     include_files: Option<Vec<PathBuf>>,
+    #[serde(default)]
     defines: GHashMap<String, String>,
 }
 
