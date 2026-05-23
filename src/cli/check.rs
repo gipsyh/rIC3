@@ -182,11 +182,14 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine = Portfolio::new(frontend, ts, symbols, chk.cert.clone(), cfg)?;
-    let interrupt = install_interrupt_handler(engine.get_ctrl());
+    // Do not register the ctrlc interrupt handler here: it spawns a background
+    // thread, and Portfolio::check forks workers afterwards. Forking after
+    // threads have been spawned can deadlock in the child process.
+    // let interrupt = install_interrupt_handler(engine.get_ctrl());
     let res = engine.check();
-    if interrupt.is_interrupted() {
-        exit(130);
-    }
+    // if interrupt.is_interrupted() {
+    //     exit(130);
+    // }
     report_res(&chk, res);
     if chk.certify {
         assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));
