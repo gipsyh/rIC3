@@ -43,14 +43,13 @@ impl UiRendererInner {
         Terminal::with_options(
             backend,
             TerminalOptions {
-                viewport: Viewport::Inline(height.max(2) as u16),
+                viewport: Viewport::Inline(height as u16),
             },
         )
         .ok()
     }
 
     fn resize_height_if_needed(&mut self, height: usize) {
-        let height = height.max(2);
         if height == self.height {
             return;
         }

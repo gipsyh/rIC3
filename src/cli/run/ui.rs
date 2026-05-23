@@ -1,5 +1,8 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
-use rIC3::{McResult, ui::TerminalInputGuard};
+use rIC3::{
+    McResult,
+    ui::{TerminalInputGuard, restore_terminal},
+};
 use ratatui::{
     Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
@@ -8,7 +11,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Cell, Row, Table},
 };
-use std::{io, process::exit, thread::sleep, time::Duration};
+use std::{io, io::Write, process::exit, thread::sleep, time::Duration};
 
 const ID_WIDTH: usize = 6;
 const STATE_WIDTH: usize = 10;
@@ -137,7 +140,7 @@ impl Run {
 
         terminal.discard_input();
         terminal.draw(&self.mc, tick)?;
-        println!();
+        terminal.finish()?;
         Ok(())
     }
 
@@ -184,6 +187,8 @@ type RunBackend = CrosstermBackend<io::Stdout>;
 struct RunTerminal {
     terminal: Terminal<RunBackend>,
     input_mode: TerminalInputGuard,
+    cursor_hidden: bool,
+    finished: bool,
 }
 
 impl RunTerminal {
@@ -196,26 +201,56 @@ impl RunTerminal {
                 viewport: Viewport::Inline(height as u16),
             },
         )?;
-        terminal.hide_cursor()?;
+        let cursor_hidden = terminal.hide_cursor().is_ok();
         Ok(Self {
             terminal,
             input_mode,
+            cursor_hidden,
+            finished: false,
         })
     }
 
     fn draw(&mut self, props: &[PropMcState], tick: usize) -> anyhow::Result<()> {
         self.terminal.draw(|f| draw_run_table(f, props, tick))?;
+        self.position_cursor();
         Ok(())
     }
 
     fn discard_input(&self) {
         self.input_mode.discard_input();
     }
+
+    fn finish(&mut self) -> anyhow::Result<()> {
+        self.position_cursor();
+        self.cleanup_terminal();
+        writeln!(io::stdout())?;
+        io::stdout().flush()?;
+        self.finished = true;
+        Ok(())
+    }
+
+    fn position_cursor(&mut self) {
+        let area = self.terminal.get_frame().area();
+        let bottom = (area.x, area.y + area.height.saturating_sub(1));
+        let _ = self.terminal.set_cursor_position(bottom);
+    }
+
+    fn cleanup_terminal(&mut self) {
+        self.input_mode.discard_input();
+        self.input_mode.restore();
+        if self.cursor_hidden {
+            let _ = self.terminal.show_cursor();
+            self.cursor_hidden = false;
+        }
+        restore_terminal();
+    }
 }
 
 impl Drop for RunTerminal {
     fn drop(&mut self) {
-        let _ = self.terminal.show_cursor();
+        if !self.finished {
+            self.cleanup_terminal();
+        }
     }
 }
 
@@ -250,7 +285,6 @@ fn draw_run_table(f: &mut Frame<'_>, props: &[PropMcState], tick: usize) {
     let table = Table::new(rows, widths).header(header).column_spacing(1);
 
     f.render_widget(table, table_area);
-    f.set_cursor_position((size.x, size.y + size.height.saturating_sub(1)));
 }
 
 fn run_table_row(prop: &PropMcState, prop_width: usize, tick: usize) -> Row<'static> {
