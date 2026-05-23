@@ -60,6 +60,7 @@ impl PortfolioUi {
 
 fn header_line() -> Line<'static> {
     Line::from(vec![
+        Span::raw("  "),
         Span::raw(format!("{:<ID_WIDTH$}", "ID")).bold(),
         Span::raw(" "),
         Span::raw(format!("{:<DEFAULT_WORKER_WIDTH$}", "Worker")).bold(),
@@ -71,8 +72,8 @@ fn header_line() -> Line<'static> {
 fn worker_line(idx: usize, worker: &WorkerUiState) -> Line<'static> {
     let (bound, bound_style) = bound_column(worker.res);
     Line::from(vec![
-        Span::raw(format!("{:<ID_WIDTH$}", idx))
-            .style(Style::default().fg(Color::Magenta).bold()),
+        Span::raw("  "),
+        Span::raw(format!("{:<ID_WIDTH$}", idx)).style(Style::default().fg(Color::Magenta).bold()),
         Span::raw(" "),
         Span::raw(format!("{:<DEFAULT_WORKER_WIDTH$}", truncate(&worker.name)))
             .style(Style::default().fg(Color::White)),
@@ -83,7 +84,10 @@ fn worker_line(idx: usize, worker: &WorkerUiState) -> Line<'static> {
 
 fn bound_column(res: McResult) -> (String, Style) {
     match res {
-        McResult::UNSAT => ("UNSAT".to_string(), Style::default().fg(Color::Green).bold()),
+        McResult::UNSAT => (
+            "UNSAT".to_string(),
+            Style::default().fg(Color::Green).bold(),
+        ),
         McResult::SAT(depth) => (depth.to_string(), Style::default().fg(Color::Red).bold()),
         McResult::Unknown(Some(bound)) => {
             (bound.to_string(), Style::default().fg(Color::Cyan).bold())

@@ -10,14 +10,10 @@ use rIC3::{
     portfolio::{Portfolio, PortfolioConfig},
     tracer::LogTracer,
     transys::TransysIf,
-    utils::install_interrupt_handler,
     ui::UiRenderer,
+    utils::install_interrupt_handler,
 };
-use std::{
-    env, fs,
-    path::PathBuf,
-    process::exit,
-};
+use std::{env, fs, path::PathBuf, process::exit};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -155,7 +151,7 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine = Portfolio::new(ts, symbols, chk.cert.is_some(), cfg)?;
-    if let Some(tui) = UiRenderer::new("portfolio") {
+    if let Some(tui) = UiRenderer::new("Portfolio") {
         engine.set_ui(tui);
     }
     // Do not register the ctrlc interrupt handler here: it spawns a background
