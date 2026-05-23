@@ -1,4 +1,5 @@
 use crate::logger_init;
+use anyhow::{Context, bail};
 use clap::Parser;
 use giputils::TerminateCtrl;
 use log::info;
@@ -85,7 +86,13 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         unsafe { env::set_var("RUST_LOG", "warn") };
     }
     logger_init();
-    chk.model = chk.model.canonicalize()?;
+    if !chk.model.exists() {
+        bail!("{} not found", chk.model.display());
+    }
+    chk.model = chk
+        .model
+        .canonicalize()
+        .with_context(|| format!("failed to resolve model file: {}", chk.model.display()))?;
     info!("the model to be checked: {}", chk.model.display());
     let mut tmp_cert = None;
     if chk.cert.is_none() && (chk.certify || chk.cex) {
