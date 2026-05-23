@@ -93,27 +93,23 @@ impl UiRendererInner {
         }
         let status_line = Line::from(status_spans);
 
-        let frame_line = self
-            .custom_line
-            .clone()
-            .unwrap_or_else(|| Line::from(vec![]));
+        let frame_line = self.custom_line.clone();
 
         let _ = self.terminal.draw(|f| {
             let area = f.area();
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                ])
+                .constraints([Constraint::Length(1); 3])
                 .split(area);
-
             f.render_widget(Paragraph::new(status_line), chunks[0]);
-            f.render_widget(Paragraph::new(frame_line), chunks[1]);
-            f.render_widget(Paragraph::new(""), chunks[2]);
+            let mut output_idx = 1;
+            if let Some(frame_line) = frame_line {
+                output_idx += 1;
+                f.render_widget(Paragraph::new(frame_line), chunks[1]);
+            }
+            f.render_widget(Paragraph::new(""), chunks[output_idx]);
             if finish {
-                f.set_cursor_position((chunks[2].x, chunks[2].y));
+                f.set_cursor_position((chunks[output_idx].x, chunks[output_idx].y));
             }
         });
 
