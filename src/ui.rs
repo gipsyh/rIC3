@@ -58,7 +58,7 @@ impl UiRendererInner {
         let _ = self.terminal.show_cursor();
         let _ = self.terminal.clear();
         let _ = self.terminal.set_cursor_position((old_area.x, old_area.y));
-        restore_terminal_direct();
+        restore_terminal_writers();
         if let Some(mut terminal) = Self::terminal(height) {
             self.cursor_hidden = terminal.hide_cursor().is_ok();
             self.terminal = terminal;
@@ -457,6 +457,7 @@ impl UiRenderer {
         }
 
         let height = 2;
+        let input_mode = TerminalInputGuard::new();
         let mut terminal = UiRendererInner::terminal(height)?;
 
         // Hide cursor initially so it doesn't flicker/show in the inline area
@@ -465,7 +466,7 @@ impl UiRenderer {
         let renderer = Self {
             inner: Arc::new(Mutex::new(UiRendererInner {
                 terminal,
-                input_mode: TerminalInputGuard::new(),
+                input_mode,
                 cursor_hidden,
                 height,
                 spinner_tick: 0,
@@ -557,6 +558,10 @@ fn format_duration(d: Duration) -> String {
 
 fn restore_terminal_direct() {
     restore_terminal_input();
+    restore_terminal_writers();
+}
+
+fn restore_terminal_writers() {
     restore_terminal_writer(std::io::stdout());
     restore_terminal_writer(std::io::stderr());
 }
