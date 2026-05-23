@@ -2,10 +2,9 @@ mod lemma_mgr;
 
 use self::lemma_mgr::LemmaMgr;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig, WorkerConfigs};
-use crate::frontend::Frontend;
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
-use crate::transys::certify::Restore;
+use crate::transys::certify::{BlCex, BlProof, Restore};
 use crate::utils::{CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx};
 use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
 use anyhow::Context;
@@ -28,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::iter;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
+use std::{process::exit, sync::mpsc, thread::spawn};
 use tempfile::TempDir;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -65,8 +64,8 @@ pub struct Portfolio {
     ts: Transys,
     sym: VarSymbols,
     rst: Restore,
-    frontend: Box<dyn Frontend>,
-    cert: Option<PathBuf>,
+    cert: Option<McBlCertificate>,
+    need_cert: bool,
     cfg: PortfolioConfig,
     engines: Vec<Worker>,
     running: GHashMap<Pid, usize>,
@@ -128,10 +127,9 @@ impl Worker {
 
 impl Portfolio {
     pub fn new(
-        frontend: Box<dyn Frontend>,
         ts: Transys,
         sym: VarSymbols,
-        cert: Option<PathBuf>,
+        need_cert: bool,
         cfg: PortfolioConfig,
     ) -> anyhow::Result<Self> {
         let rst = Restore::new(&ts);
@@ -143,7 +141,7 @@ impl Portfolio {
             let argv: Vec<_> = iter::once("").chain(args.split_whitespace()).collect();
             let cfg = EngineConfig::try_parse_from(argv)?;
             assert!(!cfg.is_wl());
-            let (cert_tx, cert_rx) = if cert.is_some() {
+            let (cert_tx, cert_rx) = if need_cert {
                 let (cert_tx, cert_rx) = ipc::channel().unwrap();
                 (Some(cert_tx), Some(cert_rx))
             } else {
@@ -170,8 +168,8 @@ impl Portfolio {
             ots,
             sym,
             rst,
-            cert,
-            frontend,
+            cert: None,
+            need_cert,
             cfg,
             engines,
             running: GHashMap::new(),
@@ -210,10 +208,6 @@ impl Portfolio {
         }
     }
 
-    pub fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
-        self.tracer.add_tracer(tracer);
-    }
-
     fn on_state_trace(&mut self, worker_idx: usize, prop: Option<usize>, res: McResult) {
         self.engines[worker_idx].state = res;
         self.tracer.trace_state(prop, res);
@@ -245,15 +239,15 @@ impl Portfolio {
             worker.name, worker.args
         );
         self.winner_idx = Some(worker_idx);
-        if let Some(cert_path) = self.cert.clone() {
+        if self.need_cert {
             let cert = self.engines[worker_idx]
                 .cert_rx
                 .as_mut()
                 .unwrap()
                 .recv()
                 .unwrap();
-            let cert = self.frontend.bl_certificate(cert);
-            std::fs::write(cert_path, format!("{cert}")).unwrap();
+            self.tracer.trace_cert(&cert);
+            self.cert = Some(cert);
         }
     }
 
@@ -310,8 +304,10 @@ impl Portfolio {
             }
         }
     }
+}
 
-    pub fn check(&mut self) -> McResult {
+impl Engine for Portfolio {
+    fn check(&mut self) -> McResult {
         let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
         for worker_idx in 0..self.engines.len() {
             let (state_tx, state_rx) = ipc::channel().unwrap();
@@ -375,8 +371,28 @@ impl Portfolio {
         }
     }
 
-    pub fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
+    }
+}
+
+impl BlEngine for Portfolio {
+    fn proof(&mut self) -> BlProof {
+        let Some(McBlCertificate::UNSAT(proof)) = self.cert.as_ref() else {
+            panic!("no proof available");
+        };
+        proof.clone()
+    }
+
+    fn cex(&mut self) -> BlCex {
+        let Some(McBlCertificate::SAT(cex)) = self.cert.as_ref() else {
+            panic!("no counterexample available");
+        };
+        cex.clone()
     }
 }
 

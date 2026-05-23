@@ -4,7 +4,7 @@ use clap::Parser;
 use giputils::TerminateCtrl;
 use log::info;
 use rIC3::{
-    McResult,
+    BlEngine, Engine, McResult,
     config::EngineConfig,
     create_bl_engine, create_wl_engine,
     frontend::{certificate_check, frontend_from_model},
@@ -181,7 +181,7 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     let mut frontend = frontend_from_model(&chk.model)?;
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
-    let mut engine = Portfolio::new(frontend, ts, symbols, chk.cert.clone(), cfg)?;
+    let mut engine = Portfolio::new(ts, symbols, chk.cert.is_some(), cfg)?;
     // Do not register the ctrlc interrupt handler here: it spawns a background
     // thread, and Portfolio::check forks workers afterwards. Forking after
     // threads have been spawned can deadlock in the child process.
@@ -190,6 +190,11 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     // if interrupt.is_interrupted() {
     //     exit(130);
     // }
+    if let Some(cert_path) = &chk.cert {
+        let cert = engine.certificate(res);
+        let cert = frontend.bl_certificate(cert);
+        fs::write(cert_path, format!("{cert}")).unwrap();
+    }
     report_res(&chk, res);
     if chk.certify {
         assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));
