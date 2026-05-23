@@ -12,6 +12,7 @@ use rIC3::{
     tracer::{
         StateChannelTracerRx, WitnessChannelTracerRx, state_channel_tracer, witness_channel_tracer,
     },
+    utils::{InterruptHandle, install_interrupt_handler},
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
 use serde::{Deserialize, Serialize};
@@ -94,6 +95,8 @@ pub(crate) struct NexusTask {
     join: JoinHandle<(MpMcResult, PolyNexus)>,
     state_trx: StateChannelTracerRx,
     wit_trx: WitnessChannelTracerRx,
+    #[allow(unused)]
+    ctrl: InterruptHandle,
 }
 
 pub(crate) struct Run {
@@ -200,6 +203,7 @@ impl Run {
         let (wit_tsx, wit_trx) = witness_channel_tracer();
         engine.add_tracer(Box::new(state_tsx));
         engine.add_tracer(Box::new(wit_tsx));
+        let ctrl = engine.get_ctrl();
 
         for &id in &pending {
             self.mc[id].state = McStatus::Solving;
@@ -211,10 +215,13 @@ impl Run {
             (res, engine)
         });
 
+        let ctrl = install_interrupt_handler(ctrl);
+
         self.nexus_task = Some(NexusTask {
             join,
             state_trx,
             wit_trx,
+            ctrl,
         });
     }
 

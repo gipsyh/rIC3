@@ -11,7 +11,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Cell, Row, Table},
 };
-use std::{io, io::Write, process::exit, thread::sleep, time::Duration};
+use std::{io, io::Write, thread::sleep, time::Duration};
 
 const ID_WIDTH: usize = 6;
 const STATE_WIDTH: usize = 10;
@@ -114,7 +114,6 @@ fn format_time(duration: Duration) -> String {
 
 impl Run {
     pub(crate) fn run_tui(&mut self) -> anyhow::Result<()> {
-        install_run_tui_interrupt_handler();
         let height = self.mc.len() + 2;
         let mut terminal = RunTerminal::new(height)?;
 
@@ -160,13 +159,6 @@ impl Run {
             sleep(Duration::from_millis(100));
         }
     }
-}
-
-fn install_run_tui_interrupt_handler() {
-    let _ = ctrlc::set_handler(|| {
-        rIC3::ui::restore_terminal();
-        exit(130);
-    });
 }
 
 type RunBackend = CrosstermBackend<io::Stdout>;
