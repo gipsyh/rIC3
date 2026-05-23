@@ -23,7 +23,7 @@ btor = { path = "./deps/btor-rs", version = "0.2.2" }
 clap = { version = "4.5.60", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.10.1"
-ctrlc = { version = "3.4.1", features = ["termination"] }
+ctrlc = { version = "3.4.1" }
 bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
 nix = { version = "0.31.1", features = ["signal", "term"] }

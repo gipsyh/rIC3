@@ -121,10 +121,6 @@ impl Run {
         let mut tick = 0;
 
         loop {
-            if self.nexus_task.is_none() {
-                self.launch_nexus();
-            }
-
             let _updates = self.process_updates()?;
 
             terminal.discard_input();
@@ -152,15 +148,6 @@ impl Run {
         }
 
         loop {
-            if self.nexus_task.is_none() {
-                self.launch_nexus();
-                for prop in &self.mc {
-                    if prop.state == McStatus::Solving {
-                        println!("{}", prop.plain_message(line_width));
-                    }
-                }
-            }
-
             let updates = self.process_updates()?;
             for id in updates.state {
                 println!("{}", self.mc[id].plain_message(line_width));
