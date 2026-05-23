@@ -20,7 +20,7 @@ use std::{
 pub mod aig;
 pub mod btor;
 
-pub trait Frontend {
+pub trait Frontend: Send {
     fn ts(&mut self) -> (Transys, VarSymbols);
 
     fn wts(&mut self) -> (WlTransys, WlTsSymbol) {

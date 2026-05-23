@@ -2,163 +2,39 @@ use super::IC3;
 use crate::McResult;
 use ratatui::crossterm::terminal;
 use ratatui::{
-    Terminal, TerminalOptions, Viewport,
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
     style::Stylize,
     text::{Line, Span},
-    widgets::Paragraph,
 };
-use std::io::IsTerminal;
-use std::time::{Duration, Instant};
 
 /// Template prefix width for the frame bar ("  ").
 const FRAME_PREFIX_WIDTH: usize = 2;
-
-pub struct IC3Progress {
-    terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
-    spinner_tick: usize,
-    last_update: Instant,
-}
-
-impl IC3Progress {
-    pub fn new() -> Option<Self> {
-        if !std::io::stderr().is_terminal() {
-            return None;
-        }
-
-        let backend = CrosstermBackend::new(std::io::stderr());
-        let mut terminal = Terminal::with_options(
-            backend,
-            TerminalOptions {
-                viewport: Viewport::Inline(2),
-            },
-        )
-        .ok()?;
-
-        // Hide cursor initially so it doesn't flicker/show in the inline area
-        let _ = terminal.hide_cursor();
-
-        Some(Self {
-            terminal,
-            spinner_tick: 0,
-            last_update: Instant::now(),
-        })
-    }
-}
 
 fn term_width() -> usize {
     terminal::size().map(|(w, _)| usize::from(w)).unwrap_or(80)
 }
 
 impl IC3 {
-    /// Render the live progress UI (no-op if terminal is not detected).
-    pub(super) fn render_progress(&mut self) {
-        if self.progress.is_none() {
-            return;
-        }
-        if self.solvers.is_empty() {
-            return;
-        }
-
-        let level = self.level();
-        let time = self.statistic.time.time();
+    #[inline]
+    pub(super) fn format_frame_line(&self) -> Line<'static> {
         let tw = term_width();
-        let frame_line = format_frame_line(self, tw);
-
-        let progress = self.progress.as_mut().unwrap();
-        let now = Instant::now();
-        if now.duration_since(progress.last_update) >= Duration::from_millis(80) {
-            progress.spinner_tick = progress.spinner_tick.wrapping_add(1);
-            progress.last_update = now;
-        }
-        let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let spinner = spinners[progress.spinner_tick % spinners.len()];
-
-        let _ = progress.terminal.draw(|f| {
-            let area = f.area();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Length(1)])
-                .split(area);
-
-            // Row 1: Status line
-            let status_line = Line::from(vec![
-                Span::raw(format!("{} ", spinner)).cyan().bold(),
-                Span::raw("rIC3").magenta().bold(),
-                Span::raw("  ────  ").dark_gray(),
-                Span::raw(format!("Level {}", level)).cyan().bold(),
-                Span::raw("  ────  ").dark_gray(),
-                Span::raw("⏱ ").white(),
-                Span::raw(format_duration(time)).white().bold(),
-            ]);
-            f.render_widget(Paragraph::new(status_line), chunks[0]);
-
-            // Row 2: Frames line
-            f.render_widget(Paragraph::new(frame_line), chunks[1]);
-        });
+        format_frame_line(self, tw)
     }
 
-    /// Finish the progress UI with result-specific styling.
-    pub(super) fn finish_progress(&mut self, result: McResult) {
-        if self.progress.is_none() {
-            return;
+    #[inline]
+    pub(super) fn render_progress(&mut self) {
+        if let Some(ref renderer) = self.renderer {
+            renderer.render(vec![self.format_frame_line()]);
         }
+    }
 
-        let level = if self.solvers.is_empty() {
-            0
-        } else {
-            self.level()
-        };
-        let time = self.statistic.time.time();
-        let tw = term_width();
-        let frame_line = format_frame_line(self, tw);
-
-        let (icon, label_span) = match result {
-            McResult::UNSAT => (
-                Span::raw("✔ ").green().bold(),
-                Span::raw("UNSAT").green().bold(),
-            ),
-            McResult::SAT(d) => (
-                Span::raw("✘ ").red().bold(),
-                Span::raw(format!("SAT({d})")).red().bold(),
-            ),
-            McResult::Unknown(_) => (
-                Span::raw("⚠ ").yellow().bold(),
-                Span::raw("UNKNOWN").yellow().bold(),
-            ),
-        };
-
-        let progress = self.progress.as_mut().unwrap();
-
-        let _ = progress.terminal.draw(|f| {
-            let area = f.area();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Length(1)])
-                .split(area);
-
-            // Row 1: Finished Status
-            let status_line = Line::from(vec![
-                icon,
-                Span::raw("rIC3").magenta().bold(),
-                Span::raw("  ────  ").dark_gray(),
-                Span::raw(format!("Level {}", level)).cyan().bold(),
-                Span::raw("  ────  ").dark_gray(),
-                Span::raw("⏱ ").white(),
-                Span::raw(format_duration(time)).white().bold(),
-                Span::raw("  ────  ").dark_gray(),
-                label_span,
-            ]);
-            f.render_widget(Paragraph::new(status_line), chunks[0]);
-
-            // Row 2: Frames
-            f.render_widget(Paragraph::new(frame_line), chunks[1]);
-        });
-
-        // Restore terminal state: show cursor and print a newline so the shell prompt won't overwrite the final output
-        let _ = progress.terminal.show_cursor();
-        eprintln!();
+    #[inline]
+    pub(super) fn finish_progress(&mut self, result: McResult) {
+        self.tracer.trace_state(None, result);
+        if result.is_unknown()
+            && let Some(renderer) = &self.renderer
+        {
+            renderer.finish(result);
+        }
     }
 }
 
@@ -227,17 +103,4 @@ fn format_frame_line(ic3: &IC3, tw: usize) -> Line<'static> {
     spans.push(Span::raw(inf_count.to_string()).cyan().bold());
 
     Line::from(spans)
-}
-
-fn format_duration(d: Duration) -> String {
-    let secs = d.as_secs();
-    if d.is_zero() {
-        "0s".to_string()
-    } else if secs < 60 {
-        format!("{}.{}s", secs, d.subsec_millis() / 100)
-    } else if secs < 3600 {
-        format!("{}m {}s", secs / 60, secs % 60)
-    } else {
-        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
-    }
 }

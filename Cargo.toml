@@ -23,10 +23,10 @@ btor = { path = "./deps/btor-rs", version = "0.2.2" }
 clap = { version = "4.5.60", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.10.1"
-ctrlc = { version = "3.4.1", features = ["termination"] }
+ctrlc = { version = "3.4.1" }
 bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
-nix = { version = "0.31.1", features = ["signal"] }
+nix = { version = "0.31.1", features = ["signal", "term"] }
 env_logger = "0.11.10"
 log = "0.4.27"
 time = { version = "0.3.46", features = ["formatting", "macros"] }
@@ -34,7 +34,6 @@ toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
 sha2 = "0.11"
 ratatui = "0.30.0"
-indicatif = "0.18.4"
 anyhow = "1.0.101"
 ron = "0.12.0"
 strum = "0.28"

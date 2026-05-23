@@ -1,17 +1,20 @@
 mod lemma_mgr;
+mod ui;
 
 use self::lemma_mgr::LemmaMgr;
+use self::ui::PortfolioUi;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig, WorkerConfigs};
-use crate::frontend::Frontend;
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
-use crate::transys::certify::Restore;
-use crate::utils::{CertIpcRx, CertIpcTx, LemmaIpcRx, StateIpcTx};
-use crate::{
-    BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
+use crate::transys::certify::{BlCex, BlProof, Restore};
+use crate::ui::UiRenderer;
+use crate::utils::{
+    CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx, install_interrupt_handler,
 };
+use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
 use anyhow::Context;
 use clap::{Args, Parser};
+use giputils::TerminateCtrl;
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
 use ipc_channel::ipc;
@@ -27,8 +30,9 @@ use nix::unistd::Pid;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::iter;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
+use std::{process::exit, sync::mpsc, thread::spawn};
 use tempfile::TempDir;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
@@ -65,14 +69,15 @@ pub struct Portfolio {
     ts: Transys,
     sym: VarSymbols,
     rst: Restore,
-    frontend: Box<dyn Frontend>,
-    cert: Option<PathBuf>,
+    cert: Option<McBlCertificate>,
+    need_cert: bool,
     cfg: PortfolioConfig,
     engines: Vec<Worker>,
     running: GHashMap<Pid, usize>,
     winner_idx: Option<usize>,
-    ctrl: EngineCtrl,
+    ctrl: Arc<EngineCtrl>,
     tracer: Tracer,
+    ui: Option<PortfolioUi>,
     #[allow(unused)]
     temp_dir: TempDir,
     st_recv: IpcReceiverSet,
@@ -128,10 +133,9 @@ impl Worker {
 
 impl Portfolio {
     pub fn new(
-        frontend: Box<dyn Frontend>,
         ts: Transys,
         sym: VarSymbols,
-        cert: Option<PathBuf>,
+        need_cert: bool,
         cfg: PortfolioConfig,
     ) -> anyhow::Result<Self> {
         let rst = Restore::new(&ts);
@@ -143,7 +147,7 @@ impl Portfolio {
             let argv: Vec<_> = iter::once("").chain(args.split_whitespace()).collect();
             let cfg = EngineConfig::try_parse_from(argv)?;
             assert!(!cfg.is_wl());
-            let (cert_tx, cert_rx) = if cert.is_some() {
+            let (cert_tx, cert_rx) = if need_cert {
                 let (cert_tx, cert_rx) = ipc::channel().unwrap();
                 (Some(cert_tx), Some(cert_rx))
             } else {
@@ -170,15 +174,16 @@ impl Portfolio {
             ots,
             sym,
             rst,
-            cert,
-            frontend,
+            cert: None,
+            need_cert,
             cfg,
             engines,
             running: GHashMap::new(),
             winner_idx: None,
             temp_dir,
-            ctrl: EngineCtrl::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
             tracer: Tracer::new(),
+            ui: None,
             st_recv: IpcReceiverSet::new().unwrap(),
             stid_to_wid: GHashMap::new(),
         })
@@ -210,13 +215,12 @@ impl Portfolio {
         }
     }
 
-    pub fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
-        self.tracer.add_tracer(tracer);
-    }
-
     fn on_state_trace(&mut self, worker_idx: usize, prop: Option<usize>, res: McResult) {
         self.engines[worker_idx].state = res;
         self.tracer.trace_state(prop, res);
+        if let Some(ui) = self.ui.as_mut() {
+            ui.update(worker_idx, res);
+        }
         let worker_name = self.engines[worker_idx].name.clone();
         let prop_prefix = prop.map(|p| format!("p{p}: ")).unwrap_or_default();
         match res {
@@ -245,15 +249,15 @@ impl Portfolio {
             worker.name, worker.args
         );
         self.winner_idx = Some(worker_idx);
-        if let Some(cert_path) = self.cert.clone() {
+        if self.need_cert {
             let cert = self.engines[worker_idx]
                 .cert_rx
                 .as_mut()
                 .unwrap()
                 .recv()
                 .unwrap();
-            let cert = self.frontend.bl_certificate(cert);
-            std::fs::write(cert_path, format!("{cert}")).unwrap();
+            self.tracer.trace_cert(&cert);
+            self.cert = Some(cert);
         }
     }
 
@@ -310,8 +314,10 @@ impl Portfolio {
             }
         }
     }
+}
 
-    pub fn check(&mut self) -> McResult {
+impl Engine for Portfolio {
+    fn check(&mut self) -> McResult {
         let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
         for worker_idx in 0..self.engines.len() {
             let (state_tx, state_rx) = ipc::channel().unwrap();
@@ -347,12 +353,19 @@ impl Portfolio {
             }
         }
         let lemma_mgr_join = lemma_mgr.map(|lemma_mgr| spawn(move || lemma_mgr.run()));
+        let interrupt = install_interrupt_handler(self.ctrl.clone());
 
         let start = Instant::now();
         loop {
             if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
                 self.terminate_running();
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(McResult::Unknown(None));
+                }
+                if interrupt.is_interrupted() {
+                    exit(130);
+                }
                 return McResult::Unknown(None);
             }
 
@@ -362,6 +375,9 @@ impl Portfolio {
                     .map(|winner_idx| self.engines[winner_idx].state)
                     .unwrap_or(McResult::Unknown(None));
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(res);
+                }
                 return res;
             }
 
@@ -370,13 +386,43 @@ impl Portfolio {
             if let Some(res) = self.reap_child() {
                 self.terminate_running();
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(res);
+                }
                 return res;
             }
         }
     }
 
-    pub fn get_ctrl(&self) -> EngineCtrl {
+    fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
+        self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
+    }
+
+    fn set_ui(&mut self, renderer: UiRenderer) {
+        self.ui = Some(PortfolioUi::new(
+            renderer,
+            self.engines.iter().map(|worker| worker.name.clone()),
+        ));
+    }
+}
+
+impl BlEngine for Portfolio {
+    fn proof(&mut self) -> BlProof {
+        let Some(McBlCertificate::UNSAT(proof)) = self.cert.as_ref() else {
+            panic!("no proof available");
+        };
+        proof.clone()
+    }
+
+    fn cex(&mut self) -> BlCex {
+        let Some(McBlCertificate::SAT(cex)) = self.cert.as_ref() else {
+            panic!("no counterexample available");
+        };
+        cex.clone()
     }
 }
 
@@ -391,7 +437,7 @@ pub struct LightPortfolio {
     cfg: LightPortfolioConfig,
     ecfgs: Vec<EngineConfig>,
     engines: Vec<Box<dyn BlEngine>>,
-    ctrl: EngineCtrl,
+    ctrl: Arc<EngineCtrl>,
 }
 
 impl LightPortfolio {
@@ -407,7 +453,7 @@ impl LightPortfolio {
             ts,
             sym,
             engines: Vec::new(),
-            ctrl: EngineCtrl::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
         }
     }
 }
@@ -473,7 +519,7 @@ impl Engine for LightPortfolio {
         })
     }
 
-    fn get_ctrl(&self) -> EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
     }
 }

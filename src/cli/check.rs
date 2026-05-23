@@ -1,16 +1,19 @@
 use crate::logger_init;
+use anyhow::{Context, bail};
 use clap::Parser;
 use log::info;
 use rIC3::{
-    Engine, McResult,
+    BlEngine, Engine, McResult,
     config::EngineConfig,
     create_bl_engine, create_wl_engine,
     frontend::{certificate_check, frontend_from_model},
     portfolio::{Portfolio, PortfolioConfig},
     tracer::LogTracer,
     transys::TransysIf,
+    ui::UiRenderer,
+    utils::install_interrupt_handler,
 };
-use std::{env, fs, mem::transmute, path::PathBuf, process::exit};
+use std::{env, fs, path::PathBuf, process::exit};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -65,7 +68,13 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         unsafe { env::set_var("RUST_LOG", "warn") };
     }
     logger_init();
-    chk.model = chk.model.canonicalize()?;
+    if !chk.model.exists() {
+        bail!("{} not found", chk.model.display());
+    }
+    chk.model = chk
+        .model
+        .canonicalize()
+        .with_context(|| format!("failed to resolve model file: {}", chk.model.display()))?;
     info!("the model to be checked: {}", chk.model.display());
     let mut tmp_cert = None;
     if chk.cert.is_none() && (chk.certify || chk.cex) {
@@ -74,18 +83,29 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         tmp_cert = Some(tmp_cert_file);
     }
     if let EngineConfig::Portfolio(cfg) = cfg {
-        let res = portfolio_main(chk, cfg);
+        portfolio_main(chk, cfg)?;
         drop(tmp_cert);
-        return res;
+        return Ok(());
     }
     let mut frontend = frontend_from_model(&chk.model)?;
     let res = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
         let mut engine = create_wl_engine(cfg.clone(), wts);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        interrupt_statistic(&chk, engine.as_mut());
+        let tui = UiRenderer::new(cfg.as_ref());
+        if let Some(tui) = tui.clone() {
+            engine.add_tracer(Box::new(tui.clone()));
+            engine.set_ui(tui);
+        }
+        let interrupt = install_interrupt_handler(engine.get_ctrl());
         let res = engine.check();
         engine.statistic();
+        if interrupt.is_interrupted() {
+            if let Some(tui) = tui {
+                tui.finish(McResult::Unknown(None));
+            }
+            exit(130);
+        }
         if let Some(cert_path) = &chk.cert {
             let cert = engine.certificate(res);
             let cert = frontend.wl_certificate(cert);
@@ -97,9 +117,20 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         info!("origin ts has {}", ts.statistic());
         let mut engine = create_bl_engine(cfg.clone(), ts, symbols);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        interrupt_statistic(&chk, engine.as_mut());
+        let tui = rIC3::ui::UiRenderer::new(cfg.as_ref());
+        if let Some(tui) = tui.clone() {
+            engine.add_tracer(Box::new(tui.clone()));
+            engine.set_ui(tui);
+        }
+        let interrupt = install_interrupt_handler(engine.get_ctrl());
         let res = engine.check();
         engine.statistic();
+        if interrupt.is_interrupted() {
+            if let Some(tui) = tui {
+                tui.finish(McResult::Unknown(None));
+            }
+            exit(130);
+        }
         if let Some(cert_path) = &chk.cert {
             let cert = engine.certificate(res);
             let cert = frontend.bl_certificate(cert);
@@ -115,24 +146,27 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn interrupt_statistic(chk: &CheckConfig, engine: &mut dyn Engine) {
-    if chk.interrupt_statistic {
-        let e: [usize; 2] = unsafe { transmute(engine as *mut dyn Engine) };
-        let _ = ctrlc::set_handler(move || {
-            let e: *mut dyn Engine = unsafe { transmute(e) };
-            let e = unsafe { &mut *e };
-            e.statistic();
-            exit(124);
-        });
-    }
-}
-
 pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {
     let mut frontend = frontend_from_model(&chk.model)?;
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
-    let mut engine = Portfolio::new(frontend, ts, symbols, chk.cert.clone(), cfg)?;
+    let mut engine = Portfolio::new(ts, symbols, chk.cert.is_some(), cfg)?;
+    if let Some(tui) = UiRenderer::new("Portfolio") {
+        engine.set_ui(tui);
+    }
+    // Do not register the ctrlc interrupt handler here: it spawns a background
+    // thread, and Portfolio::check forks workers afterwards. Forking after
+    // threads have been spawned can deadlock in the child process.
+    // let interrupt = install_interrupt_handler(engine.get_ctrl());
     let res = engine.check();
+    // if interrupt.is_interrupted() {
+    //     exit(130);
+    // }
+    if let Some(cert_path) = &chk.cert {
+        let cert = engine.certificate(res);
+        let cert = frontend.bl_certificate(cert);
+        fs::write(cert_path, format!("{cert}")).unwrap();
+    }
     report_res(&chk, res);
     if chk.certify {
         assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));

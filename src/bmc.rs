@@ -4,13 +4,18 @@ use crate::{
     impl_config_deref,
     tracer::{ExtractorIf, Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
+    utils::EngineCtrl,
 };
 use clap::{Args, Parser};
+use giputils::TerminateCtrl;
 use log::info;
 use logicrs::{LitVec, satif::Satif};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct BMCConfig {
@@ -55,6 +60,23 @@ pub struct BMC {
     tracer: Tracer,
     extractor: Option<Box<dyn ExtractorIf>>,
     invariant: Vec<LitVec>,
+    ctrl: Arc<BmcCtrl>,
+}
+
+struct BmcCtrl {
+    base: EngineCtrl,
+    solver: Mutex<Box<dyn TerminateCtrl>>,
+}
+
+impl TerminateCtrl for BmcCtrl {
+    fn terminate(&self) {
+        self.base.terminate();
+        self.solver.lock().unwrap().terminate();
+    }
+
+    fn is_terminated(&self) -> bool {
+        self.base.is_terminated()
+    }
 }
 
 impl BMC {
@@ -76,6 +98,7 @@ impl BMC {
             Box::new(cadical::CaDiCaL::new())
         };
         solver.set_seed(rng.random());
+        let solver_ctrl = solver.get_terminate_ctrl();
         ts.load_init(solver.as_mut());
         let step = if cfg.dyn_step {
             (10_000_000 / (*ts.max_var() as usize + ts.rel.clauses().len())).max(1)
@@ -94,6 +117,10 @@ impl BMC {
             tracer: Tracer::new(),
             extractor: None,
             invariant: Vec::new(),
+            ctrl: Arc::new(BmcCtrl {
+                base: EngineCtrl::new(),
+                solver: Mutex::new(solver_ctrl),
+            }),
         }
     }
 
@@ -125,12 +152,14 @@ impl BMC {
     }
 
     fn reset_solver(&mut self) {
+        let mut solver_ctrl = self.ctrl.solver.lock().unwrap();
         self.solver = if self.cfg.kissat {
             Box::new(kissat::Kissat::new())
         } else {
             Box::new(cadical::CaDiCaL::new())
         };
         self.solver.set_seed(self.rng.random());
+        *solver_ctrl = self.solver.get_terminate_ctrl();
         self.uts.ts.load_init(self.solver.as_mut());
         for i in 0..self.solver_k {
             self.uts.load_trans(self.solver.as_mut(), i, true);
@@ -142,6 +171,9 @@ impl Engine for BMC {
     fn check(&mut self) -> McResult {
         let start = Instant::now();
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
+            if self.ctrl.is_terminated() {
+                return McResult::Unknown(k.checked_sub(1));
+            }
             let mut time_limit = self.cfg.step_time_limit;
             if let Some(limit) = self.cfg.time_limit {
                 let time = start.elapsed().as_secs();
@@ -162,15 +194,16 @@ impl Engine for BMC {
                 assump.clear();
             }
             let r = if let Some(limit) = time_limit {
-                let Some(r) =
-                    self.solver
-                        .solve_with_limit(&assump, vec![], Duration::from_secs(limit))
-                else {
-                    continue;
-                };
-                r
+                self.solver
+                    .solve_with_limit(&assump, vec![], Duration::from_secs(limit))
             } else {
-                self.solver.solve(&assump)
+                self.solver.try_solve(&assump, vec![])
+            };
+            let Some(r) = r else {
+                if self.ctrl.is_terminated() {
+                    return McResult::Unknown(k.checked_sub(1));
+                }
+                continue;
             };
             if r {
                 self.tracer.trace_state(None, crate::McResult::SAT(k));
@@ -192,6 +225,10 @@ impl Engine for BMC {
 
     fn set_extractor(&mut self, extractor: Box<dyn ExtractorIf>) {
         self.extractor = Some(extractor);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
+        self.ctrl.clone()
     }
 }
 

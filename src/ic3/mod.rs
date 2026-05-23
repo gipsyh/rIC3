@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlEngine, BlProof, Engine, EngineCtrl, McResult,
+    BlCex, BlEngine, BlProof, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -8,17 +8,19 @@ use crate::{
     transys::{
         Transys, TransysCtx, TransysIf, certify::Restore, lift::TsLift, unroll::TransysUnroll,
     },
+    ui::UiRenderer,
+    utils::EngineCtrl,
 };
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
 use frame::Frames;
-use giputils::{grc::Grc, logger::IntervalLogger};
+use giputils::{TerminateCtrl, grc::Grc, logger::IntervalLogger};
 use log::{Level, debug, error, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarMap, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 use utils::Statistic;
 
 mod activity;
@@ -167,8 +169,8 @@ pub struct IC3 {
     rng: StdRng,
     filog: IntervalLogger,
     tracer: Tracer,
-    ctrl: EngineCtrl,
-    progress: Option<ui::IC3Progress>,
+    ctrl: Arc<EngineCtrl>,
+    renderer: Option<UiRenderer>,
 }
 
 impl IC3 {
@@ -259,8 +261,8 @@ impl IC3 {
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
-            ctrl: EngineCtrl::new(),
-            progress: ui::IC3Progress::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
+            renderer: None,
         }
     }
 
@@ -346,6 +348,10 @@ impl Engine for IC3 {
         self.tracer.add_tracer(tracer);
     }
 
+    fn set_ui(&mut self, renderer: UiRenderer) {
+        self.renderer = Some(renderer);
+    }
+
     fn statistic(&mut self) {
         self.statistic.num_auxiliary_var = self.auxiliary_var.len();
         info!("obligations: {}", self.obligations.statistic());
@@ -358,7 +364,7 @@ impl Engine for IC3 {
         info!("{:#?}", self.statistic);
     }
 
-    fn get_ctrl(&self) -> crate::EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
     }
 }
