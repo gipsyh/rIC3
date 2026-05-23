@@ -547,12 +547,8 @@ fn format_duration(d: Duration) -> String {
     let secs = d.as_secs();
     if d.is_zero() {
         "0s".to_string()
-    } else if secs < 60 {
-        format!("{}.{}s", secs, d.subsec_millis() / 100)
-    } else if secs < 3600 {
-        format!("{}m {}s", secs / 60, secs % 60)
     } else {
-        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+        format!("{}.{}s", secs, d.subsec_millis() / 100)
     }
 }
 
