@@ -103,7 +103,8 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         let (wts, _symbols) = frontend.wts();
         let mut engine = create_wl_engine(cfg.clone(), wts);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        if let Some(tui) = UiRenderer::new(cfg.as_ref()) {
+        let tui = UiRenderer::new(cfg.as_ref());
+        if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
         }
@@ -111,6 +112,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         let res = engine.check();
         engine.statistic();
         if interrupt.is_interrupted() {
+            if let Some(tui) = tui {
+                tui.finish(McResult::Unknown(None));
+            }
             exit(130);
         }
         if let Some(cert_path) = &chk.cert {
@@ -124,7 +128,8 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         info!("origin ts has {}", ts.statistic());
         let mut engine = create_bl_engine(cfg.clone(), ts, symbols);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        if let Some(tui) = rIC3::ui::UiRenderer::new(cfg.as_ref()) {
+        let tui = rIC3::ui::UiRenderer::new(cfg.as_ref());
+        if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
         }
@@ -132,6 +137,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         let res = engine.check();
         engine.statistic();
         if interrupt.is_interrupted() {
+            if let Some(tui) = tui {
+                tui.finish(McResult::Unknown(None));
+            }
             exit(130);
         }
         if let Some(cert_path) = &chk.cert {
