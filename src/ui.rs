@@ -10,9 +10,9 @@ use ratatui::{
         style::{ResetColor, SetAttribute},
     },
     layout::{Constraint, Direction, Layout},
-    style::Stylize,
+    style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Wrap},
 };
 use std::io::{IsTerminal, Write};
 use std::sync::{Arc, Mutex};
@@ -42,27 +42,8 @@ impl UiRendererInner {
     fn draw(&mut self, finish: bool, result: McResult) {
         let level = self.level;
         let elapsed = self.start_time.elapsed();
-
-        let (icon, name_span, suffix) = if finish {
-            let (icon, label_span) = match result {
-                McResult::UNSAT => (
-                    Span::raw("✔ ").green().bold(),
-                    Span::raw("UNSAT").green().bold(),
-                ),
-                McResult::SAT(d) => (
-                    Span::raw("✘ ").red().bold(),
-                    Span::raw(format!("SAT({d})")).red().bold(),
-                ),
-                _ => (
-                    Span::raw("⚠ ").yellow().bold(),
-                    Span::raw("UNKNOWN").yellow().bold(),
-                ),
-            };
-            (
-                icon,
-                Span::raw(&self.name).magenta().bold(),
-                Some(label_span),
-            )
+        let running_icon = if finish {
+            None
         } else {
             let now = Instant::now();
             if now.duration_since(self.last_update) >= Duration::from_millis(80) {
@@ -70,38 +51,30 @@ impl UiRendererInner {
                 self.last_update = now;
             }
             let spinners = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-            let spinner = spinners[self.spinner_tick % spinners.len()];
-            (
-                Span::raw(format!("{} ", spinner)).cyan().bold(),
-                Span::raw(&self.name).magenta().bold(),
-                None,
-            )
+            Some(spinners[self.spinner_tick % spinners.len()])
         };
-
-        let mut status_spans = vec![
-            icon,
-            name_span,
-            Span::raw("  ────  ").dark_gray(),
-            Span::raw(format!("Level {}", level)).cyan().bold(),
-            Span::raw("  ────  ").dark_gray(),
-            Span::raw("⏱ ").white(),
-            Span::raw(format_duration(elapsed)).white().bold(),
-        ];
-        if let Some(suf) = suffix {
-            status_spans.push(Span::raw("  ────  ").dark_gray());
-            status_spans.push(suf);
-        }
-        let status_line = Line::from(status_spans);
 
         let frame_line = self.custom_line.clone();
 
         let _ = self.terminal.draw(|f| {
             let area = f.area();
+            let status_line = format_status_line(
+                &self.name,
+                level,
+                elapsed,
+                finish,
+                result,
+                running_icon,
+                area.width,
+            );
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Length(1); 3])
                 .split(area);
-            f.render_widget(Paragraph::new(status_line), chunks[0]);
+            f.render_widget(
+                Paragraph::new(status_line).wrap(Wrap { trim: true }),
+                chunks[0],
+            );
             let mut output_idx = 1;
             if let Some(frame_line) = frame_line {
                 output_idx += 1;
@@ -116,6 +89,131 @@ impl UiRendererInner {
         if finish {
             self.cleanup_terminal();
         }
+    }
+}
+
+fn format_status_line(
+    name: &str,
+    level: usize,
+    elapsed: Duration,
+    finish: bool,
+    result: McResult,
+    running_icon: Option<&'static str>,
+    width: u16,
+) -> Line<'static> {
+    let result_label = match result {
+        McResult::UNSAT => "UNSAT".to_string(),
+        McResult::SAT(d) => format!("SAT({d})"),
+        McResult::Unknown(_) => "UNKNOWN".to_string(),
+    };
+    let result_color = match result {
+        McResult::UNSAT => Color::Green,
+        McResult::SAT(_) => Color::Red,
+        McResult::Unknown(_) => Color::Yellow,
+    };
+    let icon = if finish {
+        match result {
+            McResult::UNSAT => "✔",
+            McResult::SAT(_) => "✘",
+            McResult::Unknown(_) => "⚠",
+        }
+    } else {
+        running_icon.unwrap_or("•")
+    };
+    let time = format_duration(elapsed);
+
+    let w = usize::from(width);
+    let layout = if w >= 68 {
+        StatusLayout::Full
+    } else if w >= 42 {
+        StatusLayout::Compact
+    } else {
+        StatusLayout::Tiny
+    };
+
+    let spans = match layout {
+        StatusLayout::Full => {
+            let mut spans = vec![
+                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
+                Span::raw(name.to_string()).magenta().bold(),
+                separator(),
+                Span::raw("Level ").dark_gray(),
+                Span::raw(level.to_string()).cyan().bold(),
+                separator(),
+                Span::raw("time ").dark_gray(),
+                Span::raw(time).white().bold(),
+            ];
+            if finish {
+                spans.push(separator());
+                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
+            }
+            spans
+        }
+        StatusLayout::Compact => {
+            let mut spans = vec![
+                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
+                Span::raw(name.to_string()).magenta().bold(),
+                Span::raw("  L").dark_gray(),
+                Span::raw(level.to_string()).cyan().bold(),
+                Span::raw("  ").dark_gray(),
+                Span::raw(time).white().bold(),
+            ];
+            if finish {
+                spans.push(Span::raw("  ").dark_gray());
+                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
+            }
+            spans
+        }
+        StatusLayout::Tiny => {
+            let mut spans = vec![
+                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
+                Span::raw(compact_name(name, w.saturating_sub(18)))
+                    .magenta()
+                    .bold(),
+                Span::raw(" ").dark_gray(),
+                Span::raw(format!("L{level}")).cyan().bold(),
+            ];
+            if finish {
+                spans.push(Span::raw(" ").dark_gray());
+                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
+            }
+            spans
+        }
+    };
+
+    Line::from(spans)
+}
+
+enum StatusLayout {
+    Full,
+    Compact,
+    Tiny,
+}
+
+fn separator() -> Span<'static> {
+    Span::raw("  ·  ").dark_gray()
+}
+
+fn status_icon_style(finish: bool, result_color: Color) -> Style {
+    if finish {
+        Style::default().fg(result_color).bold()
+    } else {
+        Style::default().fg(Color::Cyan).bold()
+    }
+}
+
+fn compact_name(name: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let len = name.chars().count();
+    if len <= max_chars {
+        name.to_string()
+    } else if max_chars <= 1 {
+        "…".to_string()
+    } else {
+        let keep = max_chars - 1;
+        format!("{}…", name.chars().take(keep).collect::<String>())
     }
 }
 
