@@ -173,7 +173,7 @@ fn format_status_line(
     ];
     let level_compact = vec![Span::raw(format!("L{level}")).cyan().bold()];
     let time_full = vec![
-        Span::raw("time ").dark_gray(),
+        Span::raw("Time ").dark_gray(),
         Span::raw(time.clone()).white().bold(),
     ];
     let time_compact = vec![Span::raw(time).white().bold()];

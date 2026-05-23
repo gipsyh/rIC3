@@ -8,7 +8,9 @@ use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::{BlCex, BlProof, Restore};
 use crate::ui::UiRenderer;
-use crate::utils::{CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx};
+use crate::utils::{
+    CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx, install_interrupt_handler,
+};
 use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
 use anyhow::Context;
 use clap::{Args, Parser};
@@ -351,6 +353,7 @@ impl Engine for Portfolio {
             }
         }
         let lemma_mgr_join = lemma_mgr.map(|lemma_mgr| spawn(move || lemma_mgr.run()));
+        let interrupt = install_interrupt_handler(self.ctrl.clone());
 
         let start = Instant::now();
         loop {
@@ -359,6 +362,9 @@ impl Engine for Portfolio {
                 let _ = lemma_mgr_join.map(|j| j.join());
                 if let Some(ui) = self.ui.as_ref() {
                     ui.finish(McResult::Unknown(None));
+                }
+                if interrupt.is_interrupted() {
+                    exit(130);
                 }
                 return McResult::Unknown(None);
             }

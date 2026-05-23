@@ -1,7 +1,6 @@
 use crate::logger_init;
 use anyhow::{Context, bail};
 use clap::Parser;
-use giputils::TerminateCtrl;
 use log::info;
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -11,27 +10,14 @@ use rIC3::{
     portfolio::{Portfolio, PortfolioConfig},
     tracer::LogTracer,
     transys::TransysIf,
+    utils::install_interrupt_handler,
     ui::UiRenderer,
 };
 use std::{
     env, fs,
     path::PathBuf,
     process::exit,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
 };
-
-struct InterruptHandle {
-    interrupted: Arc<AtomicBool>,
-}
-
-impl InterruptHandle {
-    fn is_interrupted(&self) -> bool {
-        self.interrupted.load(Ordering::SeqCst)
-    }
-}
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -162,19 +148,6 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     }
     drop(tmp_cert);
     Ok(())
-}
-
-fn install_interrupt_handler(ctrl: Arc<dyn TerminateCtrl>) -> InterruptHandle {
-    let interrupted = Arc::new(AtomicBool::new(false));
-    let handler_interrupted = interrupted.clone();
-    let _ = ctrlc::set_handler(move || {
-        if handler_interrupted.swap(true, Ordering::SeqCst) {
-            rIC3::ui::restore_terminal();
-            exit(130);
-        }
-        ctrl.terminate();
-    });
-    InterruptHandle { interrupted }
 }
 
 pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<()> {
