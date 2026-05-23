@@ -141,7 +141,7 @@ impl Run {
         match self.cfg.ui.resolve() {
             RunUi::Tui => self.run_tui(),
             RunUi::Plain => self.run_plain(),
-            RunUi::Auto => unreachable!("RunUi::Auto must be resolved before dispatch"),
+            _ => unreachable!(),
         }
     }
 
