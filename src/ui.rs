@@ -54,7 +54,10 @@ impl UiRendererInner {
         if height == self.height {
             return;
         }
+        let old_area = self.terminal.get_frame().area();
         let _ = self.terminal.show_cursor();
+        let _ = self.terminal.clear();
+        let _ = self.terminal.set_cursor_position((old_area.x, old_area.y));
         restore_terminal_direct();
         if let Some(mut terminal) = Self::terminal(height) {
             self.cursor_hidden = terminal.hide_cursor().is_ok();
@@ -90,7 +93,9 @@ impl UiRendererInner {
 
         let custom_lines = self.custom_lines.clone();
         let custom_line_count = custom_lines.len();
-        self.resize_height_if_needed(custom_line_count + 1);
+        let cursor_line = custom_line_count + 1;
+        let height = cursor_line + 1;
+        self.resize_height_if_needed(height);
         self.input_mode.discard_input();
 
         let _ = self.terminal.draw(|f| {
@@ -106,7 +111,7 @@ impl UiRendererInner {
             );
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(vec![Constraint::Length(1); custom_line_count + 1])
+                .constraints(vec![Constraint::Length(1); height])
                 .split(area);
             f.render_widget(
                 Paragraph::new(status_line).wrap(Wrap { trim: true }),
@@ -116,7 +121,6 @@ impl UiRendererInner {
                 f.render_widget(Paragraph::new(line), chunks[idx + 1]);
             }
             if finish {
-                let cursor_line = custom_line_count;
                 let cursor_area = chunks[cursor_line];
                 f.set_cursor_position((cursor_area.x, cursor_area.y));
             }
