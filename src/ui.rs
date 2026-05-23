@@ -27,16 +27,42 @@ pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
     input_mode: TerminalInputGuard,
     cursor_hidden: bool,
+    height: usize,
     spinner_tick: usize,
     last_update: Instant,
     start_time: Instant,
     name: String,
     level: usize,
-    custom_line: Option<Line<'static>>,
+    custom_lines: Vec<Line<'static>>,
     finished: bool,
 }
 
 impl UiRendererInner {
+    fn terminal(height: usize) -> Option<Terminal<CrosstermBackend<std::io::Stderr>>> {
+        let backend = CrosstermBackend::new(std::io::stderr());
+        Terminal::with_options(
+            backend,
+            TerminalOptions {
+                viewport: Viewport::Inline(height.max(2) as u16),
+            },
+        )
+        .ok()
+    }
+
+    fn resize_height_if_needed(&mut self, height: usize) {
+        let height = height.max(2);
+        if height == self.height {
+            return;
+        }
+        let _ = self.terminal.show_cursor();
+        restore_terminal_direct();
+        if let Some(mut terminal) = Self::terminal(height) {
+            self.cursor_hidden = terminal.hide_cursor().is_ok();
+            self.terminal = terminal;
+            self.height = height;
+        }
+    }
+
     fn cleanup_terminal(&mut self) {
         self.input_mode.discard_input();
         self.input_mode.restore();
@@ -62,7 +88,8 @@ impl UiRendererInner {
             Some(spinners[self.spinner_tick % spinners.len()])
         };
 
-        let frame_line = self.custom_line.clone();
+        let custom_lines = self.custom_lines.clone();
+        self.resize_height_if_needed(custom_lines.len() + 2);
         self.input_mode.discard_input();
 
         let _ = self.terminal.draw(|f| {
@@ -78,16 +105,15 @@ impl UiRendererInner {
             );
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1); 3])
+                .constraints(vec![Constraint::Length(1); custom_lines.len() + 2])
                 .split(area);
             f.render_widget(
                 Paragraph::new(status_line).wrap(Wrap { trim: true }),
                 chunks[0],
             );
-            let mut output_idx = 1;
-            if let Some(frame_line) = frame_line {
-                output_idx += 1;
-                f.render_widget(Paragraph::new(frame_line), chunks[1]);
+            let output_idx = custom_lines.len() + 1;
+            for (idx, line) in custom_lines.into_iter().enumerate() {
+                f.render_widget(Paragraph::new(line), chunks[idx + 1]);
             }
             f.render_widget(Paragraph::new(""), chunks[output_idx]);
             if finish {
@@ -424,14 +450,8 @@ impl UiRenderer {
             return None;
         }
 
-        let backend = CrosstermBackend::new(std::io::stderr());
-        let mut terminal = Terminal::with_options(
-            backend,
-            TerminalOptions {
-                viewport: Viewport::Inline(3),
-            },
-        )
-        .ok()?;
+        let height = 2;
+        let mut terminal = UiRendererInner::terminal(height)?;
 
         // Hide cursor initially so it doesn't flicker/show in the inline area
         let cursor_hidden = terminal.hide_cursor().is_ok();
@@ -441,12 +461,13 @@ impl UiRenderer {
                 terminal,
                 input_mode: TerminalInputGuard::new(),
                 cursor_hidden,
+                height,
                 spinner_tick: 0,
                 last_update: Instant::now(),
                 start_time: Instant::now(),
                 name: name.to_string(),
                 level: 0,
-                custom_line: None,
+                custom_lines: Vec::new(),
                 finished: false,
             })),
         };
@@ -455,12 +476,12 @@ impl UiRenderer {
     }
 
     #[inline]
-    pub fn render(&self, line: Line<'static>) {
+    pub fn render(&self, lines: Vec<Line<'static>>) {
         let mut inner = self.inner.lock().unwrap();
         if inner.finished {
             return;
         }
-        inner.custom_line = Some(line);
+        inner.custom_lines = lines;
         let level = inner.level;
         inner.draw(false, McResult::Unknown(Some(level)));
     }

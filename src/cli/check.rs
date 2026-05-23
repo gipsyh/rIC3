@@ -182,6 +182,9 @@ pub fn portfolio_main(chk: CheckConfig, cfg: PortfolioConfig) -> anyhow::Result<
     let (ts, symbols) = frontend.ts();
     info!("origin ts has {}", ts.statistic());
     let mut engine = Portfolio::new(ts, symbols, chk.cert.is_some(), cfg)?;
+    if let Some(tui) = UiRenderer::new("portfolio") {
+        engine.set_ui(tui);
+    }
     // Do not register the ctrlc interrupt handler here: it spawns a background
     // thread, and Portfolio::check forks workers afterwards. Forking after
     // threads have been spawned can deadlock in the child process.

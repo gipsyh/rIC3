@@ -1,10 +1,13 @@
 mod lemma_mgr;
+mod ui;
 
 use self::lemma_mgr::LemmaMgr;
+use self::ui::PortfolioUi;
 use crate::config::{EngineConfig, EngineConfigBase, PreprocConfig, WorkerConfigs};
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::{BlCex, BlProof, Restore};
+use crate::ui::UiRenderer;
 use crate::utils::{CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx};
 use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
 use anyhow::Context;
@@ -72,6 +75,7 @@ pub struct Portfolio {
     winner_idx: Option<usize>,
     ctrl: Arc<EngineCtrl>,
     tracer: Tracer,
+    ui: Option<PortfolioUi>,
     #[allow(unused)]
     temp_dir: TempDir,
     st_recv: IpcReceiverSet,
@@ -177,6 +181,7 @@ impl Portfolio {
             temp_dir,
             ctrl: Arc::new(EngineCtrl::new()),
             tracer: Tracer::new(),
+            ui: None,
             st_recv: IpcReceiverSet::new().unwrap(),
             stid_to_wid: GHashMap::new(),
         })
@@ -211,6 +216,9 @@ impl Portfolio {
     fn on_state_trace(&mut self, worker_idx: usize, prop: Option<usize>, res: McResult) {
         self.engines[worker_idx].state = res;
         self.tracer.trace_state(prop, res);
+        if let Some(ui) = self.ui.as_mut() {
+            ui.update(worker_idx, res);
+        }
         let worker_name = self.engines[worker_idx].name.clone();
         let prop_prefix = prop.map(|p| format!("p{p}: ")).unwrap_or_default();
         match res {
@@ -349,6 +357,9 @@ impl Engine for Portfolio {
             if self.ctrl.is_terminated() || self.cfg.time_limit_hit(start) {
                 self.terminate_running();
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(McResult::Unknown(None));
+                }
                 return McResult::Unknown(None);
             }
 
@@ -358,6 +369,9 @@ impl Engine for Portfolio {
                     .map(|winner_idx| self.engines[winner_idx].state)
                     .unwrap_or(McResult::Unknown(None));
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(res);
+                }
                 return res;
             }
 
@@ -366,6 +380,9 @@ impl Engine for Portfolio {
             if let Some(res) = self.reap_child() {
                 self.terminate_running();
                 let _ = lemma_mgr_join.map(|j| j.join());
+                if let Some(ui) = self.ui.as_ref() {
+                    ui.finish(res);
+                }
                 return res;
             }
         }
@@ -377,6 +394,13 @@ impl Engine for Portfolio {
 
     fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
+    }
+
+    fn set_ui(&mut self, renderer: UiRenderer) {
+        self.ui = Some(PortfolioUi::new(
+            renderer,
+            self.engines.iter().map(|worker| worker.name.clone()),
+        ));
     }
 }
 

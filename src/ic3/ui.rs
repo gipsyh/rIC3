@@ -23,7 +23,7 @@ impl IC3 {
     #[inline]
     pub(super) fn render_progress(&mut self) {
         if let Some(ref renderer) = self.renderer {
-            renderer.render(self.format_frame_line());
+            renderer.render(vec![self.format_frame_line()]);
         }
     }
 
