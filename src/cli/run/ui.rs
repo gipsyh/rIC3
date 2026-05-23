@@ -1,5 +1,5 @@
 use crate::cli::run::{McStatus, PropMcState, Run};
-use rIC3::McResult;
+use rIC3::{McResult, ui::TerminalInputGuard};
 use ratatui::{
     Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
@@ -8,15 +8,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Cell, Row, Table},
 };
-use std::{
-    io::{self, IsTerminal},
-    os::fd::AsFd,
-    thread::sleep,
-    time::Duration,
-};
-
-#[cfg(unix)]
-use nix::sys::termios::{self, FlushArg, LocalFlags, SetArg, Termios};
+use std::{io, process::exit, thread::sleep, time::Duration};
 
 const ID_WIDTH: usize = 6;
 const STATE_WIDTH: usize = 10;
@@ -119,7 +111,8 @@ fn format_time(duration: Duration) -> String {
 
 impl Run {
     pub(crate) fn run_tui(&mut self) -> anyhow::Result<()> {
-        let height = self.mc.len() + 1;
+        install_run_tui_interrupt_handler();
+        let height = self.mc.len() + 2;
         let mut terminal = RunTerminal::new(height)?;
 
         let mut tick = 0;
@@ -179,16 +172,23 @@ impl Run {
     }
 }
 
+fn install_run_tui_interrupt_handler() {
+    let _ = ctrlc::set_handler(|| {
+        rIC3::ui::restore_terminal();
+        exit(130);
+    });
+}
+
 type RunBackend = CrosstermBackend<io::Stdout>;
 
 struct RunTerminal {
     terminal: Terminal<RunBackend>,
-    input_mode: InputModeGuard,
+    input_mode: TerminalInputGuard,
 }
 
 impl RunTerminal {
     fn new(height: usize) -> anyhow::Result<Self> {
-        let input_mode = InputModeGuard::new()?;
+        let input_mode = TerminalInputGuard::new();
         let backend = CrosstermBackend::new(io::stdout());
         let mut terminal = Terminal::with_options(
             backend,
@@ -219,67 +219,12 @@ impl Drop for RunTerminal {
     }
 }
 
-#[cfg(unix)]
-struct InputModeGuard {
-    stdin: io::Stdin,
-    original: Option<Termios>,
-}
-
-#[cfg(unix)]
-impl InputModeGuard {
-    fn new() -> anyhow::Result<Self> {
-        let stdin = io::stdin();
-        if !stdin.is_terminal() {
-            return Ok(Self {
-                stdin,
-                original: None,
-            });
-        }
-
-        let original = termios::tcgetattr(stdin.as_fd())?;
-        let mut next = original.clone();
-        next.local_flags
-            .remove(LocalFlags::ECHO | LocalFlags::ICANON);
-        termios::tcsetattr(stdin.as_fd(), SetArg::TCSANOW, &next)?;
-
-        Ok(Self {
-            stdin,
-            original: Some(original),
-        })
-    }
-
-    fn discard_input(&self) {
-        if self.original.is_some() {
-            let _ = termios::tcflush(self.stdin.as_fd(), FlushArg::TCIFLUSH);
-        }
-    }
-}
-
-#[cfg(unix)]
-impl Drop for InputModeGuard {
-    fn drop(&mut self) {
-        if let Some(original) = &self.original {
-            let _ = termios::tcsetattr(self.stdin.as_fd(), SetArg::TCSANOW, original);
-        }
-    }
-}
-
-#[cfg(not(unix))]
-struct InputModeGuard;
-
-#[cfg(not(unix))]
-impl InputModeGuard {
-    fn new() -> anyhow::Result<Self> {
-        Ok(Self)
-    }
-
-    fn discard_input(&self) {}
-}
-
 fn draw_run_table(f: &mut Frame<'_>, props: &[PropMcState], tick: usize) {
     let size = f.area();
     let term_width = size.width as usize;
     let prop_width = term_width.saturating_sub(42).max(1);
+    let mut table_area = size;
+    table_area.height = table_area.height.saturating_sub(1);
 
     let header = Row::new(vec![
         Cell::from(""),
@@ -304,7 +249,8 @@ fn draw_run_table(f: &mut Frame<'_>, props: &[PropMcState], tick: usize) {
     ];
     let table = Table::new(rows, widths).header(header).column_spacing(1);
 
-    f.render_widget(table, size);
+    f.render_widget(table, table_area);
+    f.set_cursor_position((size.x, size.y + size.height.saturating_sub(1)));
 }
 
 fn run_table_row(prop: &PropMcState, prop_width: usize, tick: usize) -> Row<'static> {

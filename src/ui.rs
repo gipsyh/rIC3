@@ -2,6 +2,7 @@ use crate::{
     McResult,
     tracer::{StateTracerIf, TracerIf},
 };
+use nix::sys::termios::{self, FlushArg, LocalFlags, SetArg, Termios};
 use ratatui::{
     Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
@@ -14,12 +15,17 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
 };
-use std::io::{IsTerminal, Write};
-use std::sync::{Arc, Mutex};
+use std::io::{self, IsTerminal, Write};
+use std::os::fd::AsFd;
+use std::sync::{
+    Arc, LazyLock, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::{Duration, Instant};
 
 pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
+    input_mode: TerminalInputGuard,
     cursor_hidden: bool,
     spinner_tick: usize,
     last_update: Instant,
@@ -32,6 +38,8 @@ pub struct UiRendererInner {
 
 impl UiRendererInner {
     fn cleanup_terminal(&mut self) {
+        self.input_mode.discard_input();
+        self.input_mode.restore();
         if self.cursor_hidden {
             let _ = self.terminal.show_cursor();
             self.cursor_hidden = false;
@@ -55,6 +63,7 @@ impl UiRendererInner {
         };
 
         let frame_line = self.custom_line.clone();
+        self.input_mode.discard_input();
 
         let _ = self.terminal.draw(|f| {
             let area = f.area();
@@ -288,6 +297,116 @@ fn compact_name(name: &str, max_chars: usize) -> String {
     }
 }
 
+#[derive(Default)]
+pub struct TerminalInputGuard {
+    active: bool,
+}
+
+impl TerminalInputGuard {
+    pub fn new() -> Self {
+        Self {
+            active: acquire_input_guard(),
+        }
+    }
+
+    pub fn discard_input(&self) {
+        if self.active {
+            discard_terminal_input();
+        }
+    }
+
+    pub fn restore(&mut self) {
+        if self.active {
+            release_input_guard();
+            self.active = false;
+        }
+    }
+}
+
+impl Drop for TerminalInputGuard {
+    fn drop(&mut self) {
+        self.restore();
+    }
+}
+
+struct TerminalInputState {
+    stdin: io::Stdin,
+    original: Termios,
+}
+
+impl TerminalInputState {
+    fn new() -> Option<Self> {
+        let stdin = io::stdin();
+        let original = termios::tcgetattr(stdin.as_fd()).ok()?;
+        Some(Self { stdin, original })
+    }
+
+    fn apply_quiet_mode(&self) -> bool {
+        let mut next = self.original.clone();
+        next.local_flags
+            .remove(LocalFlags::ECHO | LocalFlags::ICANON);
+        termios::tcsetattr(self.stdin.as_fd(), SetArg::TCSANOW, &next).is_ok()
+    }
+
+    fn discard_input(&self) {
+        let _ = termios::tcflush(self.stdin.as_fd(), FlushArg::TCIFLUSH);
+    }
+
+    fn restore(&self) {
+        let _ = termios::tcsetattr(self.stdin.as_fd(), SetArg::TCSANOW, &self.original);
+    }
+}
+
+static INPUT_GUARD_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+static TERMINAL_INPUT_STATE: LazyLock<Mutex<Option<TerminalInputState>>> = LazyLock::new(|| {
+    let stdin = io::stdin();
+    Mutex::new(stdin.is_terminal().then(TerminalInputState::new).flatten())
+});
+
+fn acquire_input_guard() -> bool {
+    let Ok(state) = TERMINAL_INPUT_STATE.lock() else {
+        return false;
+    };
+    let Some(state) = state.as_ref() else {
+        return false;
+    };
+    if INPUT_GUARD_COUNT.fetch_add(1, Ordering::SeqCst) == 0 && !state.apply_quiet_mode() {
+        INPUT_GUARD_COUNT.fetch_sub(1, Ordering::SeqCst);
+        return false;
+    }
+    true
+}
+
+fn release_input_guard() {
+    if INPUT_GUARD_COUNT.load(Ordering::SeqCst) == 0 {
+        return;
+    }
+    if INPUT_GUARD_COUNT.fetch_sub(1, Ordering::SeqCst) == 1
+        && let Ok(state) = TERMINAL_INPUT_STATE.lock()
+        && let Some(state) = state.as_ref()
+    {
+        state.restore();
+    }
+}
+
+fn discard_terminal_input() {
+    if let Ok(state) = TERMINAL_INPUT_STATE.lock()
+        && let Some(state) = state.as_ref()
+    {
+        state.discard_input();
+    }
+}
+
+fn restore_terminal_input() {
+    INPUT_GUARD_COUNT.store(0, Ordering::SeqCst);
+    if let Ok(state) = TERMINAL_INPUT_STATE.lock()
+        && let Some(state) = state.as_ref()
+    {
+        state.restore();
+    }
+}
+
 impl Drop for UiRendererInner {
     fn drop(&mut self) {
         self.cleanup_terminal();
@@ -320,6 +439,7 @@ impl UiRenderer {
         let renderer = Self {
             inner: Arc::new(Mutex::new(UiRendererInner {
                 terminal,
+                input_mode: TerminalInputGuard::new(),
                 cursor_hidden,
                 spinner_tick: 0,
                 last_update: Instant::now(),
@@ -409,11 +529,16 @@ fn format_duration(d: Duration) -> String {
 }
 
 fn restore_terminal_direct() {
-    let mut stderr = std::io::stderr();
-    let _ = stderr.execute(cursor::Show);
-    let _ = stderr.execute(SetAttribute(ratatui::crossterm::style::Attribute::Reset));
-    let _ = stderr.execute(ResetColor);
-    let _ = stderr.flush();
+    restore_terminal_input();
+    restore_terminal_writer(std::io::stdout());
+    restore_terminal_writer(std::io::stderr());
+}
+
+fn restore_terminal_writer(mut writer: impl Write) {
+    let _ = writer.execute(cursor::Show);
+    let _ = writer.execute(SetAttribute(ratatui::crossterm::style::Attribute::Reset));
+    let _ = writer.execute(ResetColor);
+    let _ = writer.flush();
 }
 
 pub fn restore_terminal() {
