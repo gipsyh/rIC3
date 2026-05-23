@@ -89,7 +89,8 @@ impl UiRendererInner {
         };
 
         let custom_lines = self.custom_lines.clone();
-        self.resize_height_if_needed(custom_lines.len() + 2);
+        let custom_line_count = custom_lines.len();
+        self.resize_height_if_needed(custom_line_count + 1);
         self.input_mode.discard_input();
 
         let _ = self.terminal.draw(|f| {
@@ -105,24 +106,25 @@ impl UiRendererInner {
             );
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(vec![Constraint::Length(1); custom_lines.len() + 2])
+                .constraints(vec![Constraint::Length(1); custom_line_count + 1])
                 .split(area);
             f.render_widget(
                 Paragraph::new(status_line).wrap(Wrap { trim: true }),
                 chunks[0],
             );
-            let output_idx = custom_lines.len() + 1;
             for (idx, line) in custom_lines.into_iter().enumerate() {
                 f.render_widget(Paragraph::new(line), chunks[idx + 1]);
             }
-            f.render_widget(Paragraph::new(""), chunks[output_idx]);
             if finish {
-                f.set_cursor_position((chunks[output_idx].x, chunks[output_idx].y));
+                let cursor_line = custom_line_count;
+                let cursor_area = chunks[cursor_line];
+                f.set_cursor_position((cursor_area.x, cursor_area.y));
             }
         });
 
         if finish {
             self.cleanup_terminal();
+            let _ = writeln!(std::io::stderr());
         }
     }
 }
