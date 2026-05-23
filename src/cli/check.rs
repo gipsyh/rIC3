@@ -1,8 +1,9 @@
 use crate::logger_init;
 use clap::Parser;
+use giputils::TerminateCtrl;
 use log::info;
 use rIC3::{
-    EngineCtrl, McResult,
+    McResult,
     config::EngineConfig,
     create_bl_engine, create_wl_engine,
     frontend::{certificate_check, frontend_from_model},
@@ -148,7 +149,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn install_interrupt_handler(ctrl: EngineCtrl) -> InterruptHandle {
+fn install_interrupt_handler(ctrl: Arc<dyn TerminateCtrl>) -> InterruptHandle {
     let interrupted = Arc::new(AtomicBool::new(false));
     let handler_interrupted = interrupted.clone();
     let _ = ctrlc::set_handler(move || {

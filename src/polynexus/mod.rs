@@ -1,17 +1,17 @@
 mod schd;
 
 use crate::{
-    BlCex, BlEngine, BlProof, Engine, EngineCtrl, McBlCertificate, McResult, MpEngine, MpMcResult,
+    BlCex, BlEngine, BlProof, Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig, WorkerConfigs},
     ic3::{IC3, IC3Config},
     impl_config_deref,
     polynexus::schd::Scheduler,
     tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
-    utils::StateIpcTx,
+    utils::{EngineCtrl, StateIpcTx},
 };
 use clap::Args;
-use giputils::hash::GHashMap;
+use giputils::{TerminateCtrl, hash::GHashMap};
 use ipc_channel::{
     TrySelectError,
     ipc::{self, IpcReceiverSet, IpcSelectionResult, IpcSender},
@@ -29,6 +29,7 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use std::{
     process::exit,
+    sync::Arc,
     thread,
     time::{Duration, Instant},
 };
@@ -68,7 +69,7 @@ pub struct PolyNexus {
     ts: Transys,
     rst: Restore,
     tracer: Tracer,
-    ctrl: EngineCtrl,
+    ctrl: Arc<EngineCtrl>,
     results: MpMcResult,
     certs: Vec<Option<McBlCertificate>>,
 }
@@ -87,7 +88,7 @@ impl PolyNexus {
             ts,
             rst,
             tracer: Tracer::new(),
-            ctrl: crate::EngineCtrl::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
             results,
             certs: (0..num_props).map(|_| None).collect(),
         }
@@ -430,7 +431,7 @@ impl Engine for PolyNexus {
         self.tracer.add_tracer(tracer);
     }
 
-    fn get_ctrl(&self) -> EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
     }
 }

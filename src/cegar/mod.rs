@@ -2,7 +2,7 @@ mod uf;
 
 use self::uf::Uf;
 use crate::{
-    BlEngine, Engine, EngineCtrl, McResult, WlCex, WlEngine, WlProof,
+    BlEngine, Engine, McResult, WlCex, WlEngine, WlProof,
     config::EngineConfigBase,
     ic3::{IC3, IC3Config},
     impl_config_deref,
@@ -10,8 +10,10 @@ use crate::{
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use clap::Args;
+use giputils::TerminateCtrl;
 use logicrs::VarSymbols;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct CegarConfig {
@@ -82,7 +84,7 @@ impl Engine for Cegar {
         self.model.ic3.statistic();
     }
 
-    fn get_ctrl(&self) -> EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.model.ic3.get_ctrl()
     }
 }

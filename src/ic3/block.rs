@@ -3,6 +3,7 @@ use crate::ic3::{
     mic::{DropVarParameter, MicType},
     proofoblig::ProofObligation,
 };
+use giputils::TerminateCtrl;
 use log::{debug, info};
 use logicrs::{LitOrdVec, LitVec, satif::Satif};
 use std::time::Instant;

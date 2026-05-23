@@ -32,61 +32,9 @@ use crate::{
     },
 };
 use enum_as_inner::EnumAsInner;
+use giputils::TerminateCtrl;
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::BitOr,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
-
-/// External control handle for engines.
-#[derive(Clone, Debug)]
-pub struct EngineCtrl {
-    terminate: Arc<AtomicBool>,
-    // TODO: implement stop/resume support
-    #[allow(dead_code)]
-    stop: Arc<AtomicBool>,
-    #[allow(dead_code)]
-    resume: Arc<AtomicBool>,
-}
-
-impl Default for EngineCtrl {
-    fn default() -> Self {
-        Self {
-            terminate: Arc::new(AtomicBool::new(false)),
-            stop: Arc::new(AtomicBool::new(false)),
-            resume: Arc::new(AtomicBool::new(false)),
-        }
-    }
-}
-
-impl EngineCtrl {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn terminate(&self) {
-        self.terminate.store(true, Ordering::Relaxed);
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        self.terminate.load(Ordering::Relaxed)
-    }
-
-    pub fn stop(&self) {
-        todo!("stop not yet implemented");
-    }
-
-    pub fn is_stopped(&self) -> bool {
-        todo!("is_stopped not yet implemented");
-    }
-
-    pub fn resume(&self) {
-        todo!("resume not yet implemented");
-    }
-}
+use std::{ops::BitOr, sync::Arc};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, EnumAsInner)]
 pub enum McResult {
@@ -182,7 +130,7 @@ pub trait Engine: Send {
 
     fn statistic(&mut self) {}
 
-    fn get_ctrl(&self) -> EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         panic!("unsupport get_ctrl");
     }
 }

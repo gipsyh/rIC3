@@ -6,12 +6,11 @@ use crate::frontend::Frontend;
 use crate::tracer::{Tracer, TracerIf};
 use crate::transys::Transys;
 use crate::transys::certify::Restore;
-use crate::utils::{CertIpcRx, CertIpcTx, LemmaIpcRx, StateIpcTx};
-use crate::{
-    BlEngine, Engine, EngineCtrl, McBlCertificate, McResult, create_bl_engine, impl_config_deref,
-};
+use crate::utils::{CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx};
+use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
 use anyhow::Context;
 use clap::{Args, Parser};
+use giputils::TerminateCtrl;
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
 use ipc_channel::ipc;
@@ -27,6 +26,7 @@ use nix::unistd::Pid;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::iter;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{path::PathBuf, process::exit, sync::mpsc, thread::spawn};
 use tempfile::TempDir;
@@ -71,7 +71,7 @@ pub struct Portfolio {
     engines: Vec<Worker>,
     running: GHashMap<Pid, usize>,
     winner_idx: Option<usize>,
-    ctrl: EngineCtrl,
+    ctrl: Arc<EngineCtrl>,
     tracer: Tracer,
     #[allow(unused)]
     temp_dir: TempDir,
@@ -177,7 +177,7 @@ impl Portfolio {
             running: GHashMap::new(),
             winner_idx: None,
             temp_dir,
-            ctrl: EngineCtrl::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
             tracer: Tracer::new(),
             st_recv: IpcReceiverSet::new().unwrap(),
             stid_to_wid: GHashMap::new(),
@@ -375,7 +375,7 @@ impl Portfolio {
         }
     }
 
-    pub fn get_ctrl(&self) -> EngineCtrl {
+    pub fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
     }
 }
@@ -391,7 +391,7 @@ pub struct LightPortfolio {
     cfg: LightPortfolioConfig,
     ecfgs: Vec<EngineConfig>,
     engines: Vec<Box<dyn BlEngine>>,
-    ctrl: EngineCtrl,
+    ctrl: Arc<EngineCtrl>,
 }
 
 impl LightPortfolio {
@@ -407,7 +407,7 @@ impl LightPortfolio {
             ts,
             sym,
             engines: Vec::new(),
-            ctrl: EngineCtrl::new(),
+            ctrl: Arc::new(EngineCtrl::new()),
         }
     }
 }
@@ -473,7 +473,7 @@ impl Engine for LightPortfolio {
         })
     }
 
-    fn get_ctrl(&self) -> EngineCtrl {
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
         self.ctrl.clone()
     }
 }
