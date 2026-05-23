@@ -124,69 +124,145 @@ fn format_status_line(
     let time = format_duration(elapsed);
 
     let w = usize::from(width);
-    let layout = if w >= 68 {
-        StatusLayout::Full
-    } else if w >= 42 {
-        StatusLayout::Compact
-    } else {
-        StatusLayout::Tiny
+    let icon_span = Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color));
+    let result_span = Span::raw(result_label).style(result_style);
+    let level_full = vec![
+        Span::raw("Level ").dark_gray(),
+        Span::raw(level.to_string()).cyan().bold(),
+    ];
+    let level_compact = vec![Span::raw(format!("L{level}")).cyan().bold()];
+    let time_full = vec![
+        Span::raw("time ").dark_gray(),
+        Span::raw(time.clone()).white().bold(),
+    ];
+    let time_compact = vec![Span::raw(time).white().bold()];
+
+    let make_name_group = |name_width| {
+        vec![
+            icon_span.clone(),
+            Span::raw(compact_name(name, name_width)).magenta().bold(),
+        ]
     };
 
-    let spans = match layout {
-        StatusLayout::Full => {
-            let mut spans = vec![
-                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
-                Span::raw(name.to_string()).magenta().bold(),
-                separator(),
-                Span::raw("Level ").dark_gray(),
-                Span::raw(level.to_string()).cyan().bold(),
-                separator(),
-                Span::raw("time ").dark_gray(),
-                Span::raw(time).white().bold(),
-            ];
-            spans.push(separator());
-            spans.push(Span::raw(result_label).style(result_style));
-            spans
+    if w >= 68 {
+        let groups = fit_status_groups(
+            w,
+            vec![
+                make_name_group(name.chars().count()),
+                level_full.clone(),
+                time_full,
+                vec![result_span.clone()],
+            ],
+            0,
+        );
+        if let Some(groups) = groups {
+            return spaced_status_line(groups, w);
         }
-        StatusLayout::Compact => {
-            let mut spans = vec![
-                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
-                Span::raw(name.to_string()).magenta().bold(),
-                Span::raw("  L").dark_gray(),
-                Span::raw(level.to_string()).cyan().bold(),
-                Span::raw("  ").dark_gray(),
-                Span::raw(time).white().bold(),
-            ];
-            spans.push(Span::raw("  ").dark_gray());
-            spans.push(Span::raw(result_label).style(result_style));
-            spans
+    }
+
+    if w >= 42 {
+        let groups = fit_status_groups(
+            w,
+            vec![
+                make_name_group(name.chars().count()),
+                level_compact.clone(),
+                time_compact,
+                vec![result_span.clone()],
+            ],
+            0,
+        );
+        if let Some(groups) = groups {
+            return spaced_status_line(groups, w);
         }
-        StatusLayout::Tiny => {
-            let mut spans = vec![
-                Span::raw(format!("{icon} ")).style(status_icon_style(finish, result_color)),
-                Span::raw(compact_name(name, w.saturating_sub(18)))
-                    .magenta()
-                    .bold(),
-                Span::raw(" ").dark_gray(),
-                Span::raw(format!("L{level}")).cyan().bold(),
-            ];
-            spans.push(Span::raw(" ").dark_gray());
-            spans.push(Span::raw(result_label).style(result_style));
-            spans
+    }
+
+    let fixed_width = icon_span.width() + level_compact.iter().map(Span::width).sum::<usize>();
+    let result_width = result_span.width();
+    let min_gap_width = 2;
+    let name_width = w.saturating_sub(fixed_width + result_width + min_gap_width);
+    let groups = vec![
+        make_name_group(name_width),
+        level_compact,
+        vec![result_span.clone()],
+    ];
+    if status_groups_width(&groups) + 2 > w && result_width <= w {
+        return spaced_status_line(vec![vec![result_span]], w);
+    }
+    spaced_status_line(groups, w)
+}
+
+fn fit_status_groups(
+    width: usize,
+    mut groups: Vec<Vec<Span<'static>>>,
+    name_group_idx: usize,
+) -> Option<Vec<Vec<Span<'static>>>> {
+    if groups.is_empty() {
+        return Some(groups);
+    }
+
+    let gaps = groups.len().saturating_sub(1);
+    let content_width = status_groups_width(&groups);
+    if content_width + gaps <= width {
+        return Some(groups);
+    }
+
+    let overflow = content_width + gaps - width;
+    let name_span = groups.get_mut(name_group_idx)?.get_mut(1)?;
+    let name_width = name_span.width();
+    if overflow >= name_width {
+        return None;
+    }
+    let next_name_width = name_width - overflow;
+    let style = name_span.style;
+    name_span.content = compact_name(&name_span.content, next_name_width).into();
+    name_span.style = style;
+
+    Some(groups)
+}
+
+fn spaced_status_line(mut groups: Vec<Vec<Span<'static>>>, width: usize) -> Line<'static> {
+    if groups.is_empty() {
+        return Line::default();
+    }
+
+    let content_width = status_groups_width(&groups);
+    let gaps = groups.len().saturating_sub(1);
+    if gaps == 0 {
+        let mut spans = Vec::new();
+        if content_width < width {
+            spans.push(Span::raw(" ".repeat(width - content_width)).dark_gray());
         }
+        spans.extend(groups.remove(0));
+        return Line::from(spans);
+    }
+
+    let gap_widths = if content_width + gaps <= width && gaps > 0 {
+        distribute_spaces(width - content_width, gaps)
+    } else {
+        vec![1; gaps]
     };
+
+    let mut spans = Vec::new();
+    for (idx, group) in groups.drain(..).enumerate() {
+        spans.extend(group);
+        if let Some(gap_width) = gap_widths.get(idx) {
+            spans.push(Span::raw(" ".repeat(*gap_width)).dark_gray());
+        }
+    }
 
     Line::from(spans)
 }
 
-enum StatusLayout {
-    Full,
-    Compact,
-    Tiny,
+fn status_groups_width(groups: &[Vec<Span<'static>>]) -> usize {
+    groups.iter().flatten().map(Span::width).sum()
 }
 
-fn separator() -> Span<'static> {
-    Span::raw("  ·  ").dark_gray()
+fn distribute_spaces(total: usize, gaps: usize) -> Vec<usize> {
+    let base = total / gaps;
+    let extra = total % gaps;
+    (0..gaps)
+        .map(|idx| base + usize::from(idx < extra))
+        .collect()
 }
 
 fn status_icon_style(finish: bool, result_color: Color) -> Style {
