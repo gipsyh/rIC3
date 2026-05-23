@@ -4,11 +4,14 @@ use crate::{
     impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
+    utils::EngineCtrl,
 };
 use clap::{Args, Parser};
+use giputils::TerminateCtrl;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct KindConfig {
@@ -66,6 +69,23 @@ pub struct Kind {
     ots: Transys,
     rst: Restore,
     tracer: Tracer,
+    ctrl: Arc<KindCtrl>,
+}
+
+struct KindCtrl {
+    base: EngineCtrl,
+    solver: Mutex<Box<dyn TerminateCtrl>>,
+}
+
+impl TerminateCtrl for KindCtrl {
+    fn terminate(&self) {
+        self.base.terminate();
+        self.solver.lock().unwrap().terminate();
+    }
+
+    fn is_terminated(&self) -> bool {
+        self.base.is_terminated()
+    }
 }
 
 impl Kind {
@@ -93,7 +113,8 @@ impl Kind {
         if cfg.simple_path {
             uts.enable_simple_path();
         }
-        let solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
+        let mut solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
+        let solver_ctrl = solver.get_terminate_ctrl();
         Self {
             uts,
             cfg,
@@ -103,6 +124,10 @@ impl Kind {
             ots,
             rst,
             tracer: Tracer::new(),
+            ctrl: Arc::new(KindCtrl {
+                base: EngineCtrl::new(),
+                solver: Mutex::new(solver_ctrl),
+            }),
         }
     }
 
@@ -136,12 +161,20 @@ impl Kind {
 impl Engine for Kind {
     fn check(&mut self) -> McResult {
         for k in self.cfg.start..=self.cfg.end {
+            if self.ctrl.is_terminated() {
+                return McResult::Unknown(k.checked_sub(1));
+            }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             if k > 0 {
                 self.load_bad_to(k - 1);
                 let bad = self.get_bad(k);
-                let res = self.solver.solve(&[bad]);
+                let Some(res) = self.solver.try_solve(&[bad], vec![]) else {
+                    if self.ctrl.is_terminated() {
+                        return McResult::Unknown(k.checked_sub(1));
+                    }
+                    continue;
+                };
                 if !res {
                     self.tracer.trace_state(None, McResult::UNSAT);
                     return McResult::UNSAT;
@@ -150,7 +183,13 @@ impl Engine for Kind {
             if !self.cfg.skip_bmc {
                 let mut assump: LitVec = self.uts.ts.inits().iter().flatten().copied().collect();
                 assump.push(self.get_bad(k));
-                if self.solver.solve(&assump) {
+                let Some(res) = self.solver.try_solve(&assump, vec![]) else {
+                    if self.ctrl.is_terminated() {
+                        return McResult::Unknown(k.checked_sub(1));
+                    }
+                    continue;
+                };
+                if res {
                     self.tracer.trace_state(None, McResult::SAT(k));
                     return McResult::SAT(k);
                 }
@@ -163,6 +202,10 @@ impl Engine for Kind {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
+        self.ctrl.clone()
     }
 }
 
