@@ -111,6 +111,7 @@ fn format_status_line(
         McResult::SAT(_) => Color::Red,
         McResult::Unknown(_) => Color::Yellow,
     };
+    let result_style = Style::default().fg(result_color).bold();
     let icon = if finish {
         match result {
             McResult::UNSAT => "✔",
@@ -143,10 +144,8 @@ fn format_status_line(
                 Span::raw("time ").dark_gray(),
                 Span::raw(time).white().bold(),
             ];
-            if finish {
-                spans.push(separator());
-                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
-            }
+            spans.push(separator());
+            spans.push(Span::raw(result_label).style(result_style));
             spans
         }
         StatusLayout::Compact => {
@@ -158,10 +157,8 @@ fn format_status_line(
                 Span::raw("  ").dark_gray(),
                 Span::raw(time).white().bold(),
             ];
-            if finish {
-                spans.push(Span::raw("  ").dark_gray());
-                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
-            }
+            spans.push(Span::raw("  ").dark_gray());
+            spans.push(Span::raw(result_label).style(result_style));
             spans
         }
         StatusLayout::Tiny => {
@@ -173,10 +170,8 @@ fn format_status_line(
                 Span::raw(" ").dark_gray(),
                 Span::raw(format!("L{level}")).cyan().bold(),
             ];
-            if finish {
-                spans.push(Span::raw(" ").dark_gray());
-                spans.push(Span::raw(result_label).style(Style::default().fg(result_color).bold()));
-            }
+            spans.push(Span::raw(" ").dark_gray());
+            spans.push(Span::raw(result_label).style(result_style));
             spans
         }
     };
