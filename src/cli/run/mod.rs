@@ -137,15 +137,10 @@ impl Run {
     }
 
     pub(crate) fn run(&mut self) -> anyhow::Result<()> {
+        self.launch_nexus();
         match self.cfg.ui.resolve() {
-            RunUi::Tui => {
-                self.launch_nexus();
-                self.run_tui()
-            }
-            RunUi::Plain => {
-                self.launch_nexus();
-                self.run_plain()
-            }
+            RunUi::Tui => self.run_tui(),
+            RunUi::Plain => self.run_plain(),
             RunUi::Auto => unreachable!("RunUi::Auto must be resolved before dispatch"),
         }
     }
