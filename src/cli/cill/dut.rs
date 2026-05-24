@@ -1,7 +1,9 @@
 use crate::cli::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
 use anyhow::Context;
+use btor::Btor;
 use giputils::file::recreate_dir;
 use log::info;
+use rIC3::frontend::{Frontend, btor::BtorFrontend};
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -44,10 +46,25 @@ pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     if !rcfg.dut.defines.is_empty() {
         anyhow::bail!("`ric3 cill prepare` does not support dut.defines");
     }
-    let out_dir = rp.path("cill/dut");
-    recreate_dir(&out_dir)?;
-    Yosys::generate_btor(&rcfg, &out_dir)?;
-    generate_shadow(&rcfg, &out_dir)?;
-    println!("CIll prepare artifacts generated in {}.", out_dir.display());
+    let dut_dir = rp.path("dut");
+    recreate_dir(&dut_dir)?;
+    Yosys::generate_btor(&rcfg, &dut_dir)?;
+    let cill_dir = rp.path("cill");
+    generate_shadow(&rcfg, &cill_dir)?;
+    println!(
+        "CIll prepare artifacts generated in {}.",
+        cill_dir.display()
+    );
+    dut2wts(dut_dir)?;
     Ok(())
+}
+
+pub fn dut2wts(p: PathBuf) -> anyhow::Result<()> {
+    let mut btor = BtorFrontend::new(Btor::from_file(p.join("dut.btor")));
+    let (mut wts, sym) = btor.wts();
+    wts.simplify();
+    let simp_btor = Btor::from(&wts);
+    println!("{}", simp_btor.to_string());
+    // dbg!(sym.values());
+    todo!()
 }
