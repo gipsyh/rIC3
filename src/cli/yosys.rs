@@ -106,10 +106,8 @@ impl Yosys {
         yosys.add_command("formalff -clk2ff -ff2anyinit -hierarchy -assume");
         yosys.add_command("memory_map -formal");
         yosys.add_command("dffunmap");
-        yosys.add_command("setundef -undriven -anyseq");
         yosys.add_command("opt -fast");
         yosys.add_command("opt_clean");
-        yosys.add_command("rename -witness");
         yosys.add_command("check");
         let dp = PathBuf::from("..");
         yosys.add_command(&format!(
@@ -117,9 +115,7 @@ impl Yosys {
             dp.join(format!("{stem}.il")).display()
         ));
         yosys.add_command(&format!(
-            "write_btor -ywmap {} -i {} {}",
-            dp.join(format!("{stem}.ywb")).display(),
-            dp.join(format!("{stem}.info")).display(),
+            "write_btor {}",
             dp.join(format!("{stem}.btor")).display(),
         ));
         let plugin = if slang {
