@@ -50,12 +50,12 @@ pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     recreate_dir(&dut_dir)?;
     Yosys::generate_btor(&rcfg, &dut_dir)?;
     let cill_dir = rp.path("cill");
+    dut2wts(dut_dir)?;
     generate_shadow(&rcfg, &cill_dir)?;
     println!(
         "CIll prepare artifacts generated in {}.",
         cill_dir.display()
     );
-    dut2wts(dut_dir)?;
     Ok(())
 }
 
