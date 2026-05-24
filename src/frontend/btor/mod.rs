@@ -60,6 +60,21 @@ impl From<&WlTransys> for Btor {
     }
 }
 
+impl WlTransys {
+    pub fn to_btor_with_sym(&self, symbols: &WlTsSymbol) -> Btor {
+        Btor {
+            input: self.input.clone(),
+            latch: self.latch.clone(),
+            init: self.init.clone(),
+            next: self.next.clone(),
+            bad: self.bad.clone(),
+            constraint: self.constraint.clone(),
+            symbols: symbols.signal.clone(),
+            prop_label: symbols.prop.clone(),
+        }
+    }
+}
+
 #[allow(unused)]
 pub struct BtorFrontend {
     owts: WlTransys,

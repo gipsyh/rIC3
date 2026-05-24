@@ -61,9 +61,9 @@ pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
 
 pub fn dut2wts(p: PathBuf) -> anyhow::Result<()> {
     let mut btor = BtorFrontend::new(Btor::from_file(p.join("dut.btor")));
-    let (mut wts, sym) = btor.wts();
-    wts.simplify();
-    let simp_btor = Btor::from(&wts);
+    let (mut wts, mut sym) = btor.wts();
+    wts.simplify_with_symbols(&mut sym);
+    let simp_btor = wts.to_btor_with_sym(&sym);
     println!("{}", simp_btor.to_string());
     // dbg!(sym.values());
     todo!()
