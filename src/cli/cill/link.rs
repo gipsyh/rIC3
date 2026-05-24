@@ -376,9 +376,10 @@ pub fn link(rcfg: Ric3Config, rp: Ric3Proj, invariants: PathBuf) -> anyhow::Resu
     if !invariants.exists() {
         anyhow::bail!("invariants file not found: {}", invariants.display());
     }
-    let dut_dir = rp.path("cill/dut");
-    let shadow = dut_dir.join("shadow.sv");
-    let link_map = dut_dir.join("link_map.toml");
+    let dut_dir = rp.path("dut");
+    let cill_dir = rp.path("cill");
+    let shadow = cill_dir.join("shadow.sv");
+    let link_map = cill_dir.join("link_map.toml");
     let core = dut_dir.join("dut.btor");
     for path in [&shadow, &link_map, &core] {
         if !path.exists() {
