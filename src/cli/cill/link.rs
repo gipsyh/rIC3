@@ -230,14 +230,19 @@ pub fn link(rcfg: Ric3Config, rp: Ric3Proj, invariants: PathBuf) -> anyhow::Resu
     let mut core_bf = BtorFrontend::new(Btor::from_file(rp.path("dut/dut.btor")));
     let (core_wts, core_wsym) = core_bf.wts();
 
-    let mut cadinv_bf = BtorFrontend::new(Btor::from_file(candinv_dir.join("monitor.btor")));
-    let (cadinv_wts, cadinv_wsym) = cadinv_bf.wts();
+    let mut candinv_bf = BtorFrontend::new(Btor::from_file(candinv_dir.join("monitor.btor")));
+    let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
+    candinv_wts.simplify_with_symbols(&mut candinv_wsym);
+    dbg!(&candinv_wsym.values());
+    let candinv_btor = candinv_wts.to_btor_with_sym(&candinv_wsym);
+    println!("{}", candinv_btor);
+    todo!();
 
     link_monitor(
         core_wts,
         core_wsym,
-        cadinv_wts,
-        cadinv_wsym,
+        candinv_wts,
+        candinv_wsym,
         link_map,
         candinv_dir.join("linked.btor"),
     )?;

@@ -20,30 +20,11 @@ impl Deref for WlTsSymbol {
 
 impl WlTsSymbol {
     pub fn transform(&mut self, transform: &GHashMap<Term, Term>) {
-        let entries: Vec<_> = take(&mut self.signal)
-            .into_iter()
-            .map(|(term, names)| {
-                let mapped = transform
-                    .get(&term)
-                    .cloned()
-                    .unwrap_or_else(|| term.clone());
-                (term, mapped, names)
-            })
-            .collect();
-        let mut signal = GHashMap::new();
-        for unchanged in [true, false] {
-            for (term, mapped, names) in entries.iter() {
-                if (term == mapped) != unchanged {
-                    continue;
-                }
-                let entry: &mut Vec<String> = signal.entry(mapped.clone()).or_default();
-                for name in names {
-                    if !entry.contains(&name) {
-                        entry.push(name.clone());
-                    }
-                }
+        for (k, v) in take(&mut self.signal) {
+            if let Some(t) = transform.get(&k) {
+                let entry = self.signal.entry(t.clone()).or_default();
+                entry.extend(v);
             }
         }
-        self.signal = signal;
     }
 }
