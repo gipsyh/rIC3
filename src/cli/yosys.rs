@@ -104,7 +104,7 @@ impl Yosys {
         yosys.add_command("chformal -early");
         yosys.add_command("async2sync");
         yosys.add_command("formalff -clk2ff -ff2anyinit -hierarchy -assume");
-        yosys.add_command("memory_map -formal");
+        // yosys.add_command("memory_map -formal");
         yosys.add_command("dffunmap");
         yosys.add_command("opt -fast");
         yosys.add_command("opt_clean");
