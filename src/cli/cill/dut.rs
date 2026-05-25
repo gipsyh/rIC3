@@ -4,7 +4,7 @@ use giputils::file::recreate_dir;
 use logicrs::fol::Sort;
 use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
-    wltransys::symbol::WlTsSymbol,
+    wltransys::{WlTransys, symbol::WlTsSymbol},
 };
 use std::{
     collections::BTreeMap,
@@ -34,7 +34,14 @@ pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     Yosys::generate_btor(&rcfg, &dut_dir)?;
     let cill_dir = rp.path("cill");
     recreate_dir(&cill_dir)?;
-    dut2wts(dut_dir, &rcfg.dut.top, &cill_dir)?;
+    let (wts, wsym) = dut2wts(dut_dir);
+    let symbols = collect_symbol_sorts(&wsym)?;
+    write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
+
+    let btor = wts.to_btor_with_sym(&wsym);
+    let wts_dir = rp.path("wts");
+    recreate_dir(&wts_dir)?;
+    btor.to_file(wts_dir.join("wts.btor"));
     println!(
         "CIll prepare artifacts generated in {}.",
         cill_dir.display()
@@ -230,10 +237,9 @@ fn collect_symbol_sorts(sym: &WlTsSymbol) -> anyhow::Result<BTreeMap<String, Sor
     Ok(symbols)
 }
 
-pub fn dut2wts(p: PathBuf, top: &str, out_dir: &Path) -> anyhow::Result<()> {
+pub fn dut2wts(p: PathBuf) -> (WlTransys, WlTsSymbol) {
     let mut btor = BtorFrontend::new(Btor::from_file(p.join("dut.btor")));
     let (mut wts, mut sym) = btor.wts();
     wts.simplify_with_symbols(&mut sym);
-    let symbols = collect_symbol_sorts(&sym)?;
-    write_shadow(top, &symbols, out_dir)
+    (wts, sym)
 }
