@@ -67,45 +67,43 @@ fn push_symbol(symbols: &mut WlTsSymbol, term: Term, name: String) {
 }
 
 fn link_wts(
-    core_wts: &WlTransys,
-    core_wsym: &WlTsSymbol,
-    monitor_wts: WlTransys,
-    monitor_wsym: WlTsSymbol,
+    x_wts: &WlTransys,
+    x_wsym: &WlTsSymbol,
+    y_wts: WlTransys,
+    y_wsym: WlTsSymbol,
 ) -> anyhow::Result<(WlTransys, WlTsSymbol, Vec<String>)> {
-    let (subst, notes) = make_substitution(&core_wsym, &monitor_wsym)?;
-    let mut linked_wts = core_wts.clone();
-    let mut linked_wsym = core_wsym.clone();
-    for input in &monitor_wts.input {
+    let (subst, notes) = make_substitution(&x_wsym, &y_wsym)?;
+    let mut linked_wts = x_wts.clone();
+    let mut linked_wsym = x_wsym.clone();
+    for input in &y_wts.input {
         if !subst.contains_key(input) {
             linked_wts.add_input(input);
         }
     }
-    for latch in &monitor_wts.latch {
+    for latch in &y_wts.latch {
         if !subst.contains_key(latch) {
-            let init = monitor_wts
-                .init(latch)
-                .map(|term| apply_subst(&term, &subst));
-            let next = apply_subst(&monitor_wts.next(latch), &subst);
+            let init = y_wts.init(latch).map(|term| apply_subst(&term, &subst));
+            let next = apply_subst(&y_wts.next(latch), &subst);
             linked_wts.add_latch(latch.clone(), init, next);
         }
     }
     linked_wts
         .bad
-        .extend(monitor_wts.bad.iter().map(|term| apply_subst(term, &subst)));
+        .extend(y_wts.bad.iter().map(|term| apply_subst(term, &subst)));
     linked_wts.constraint.extend(
-        monitor_wts
+        y_wts
             .constraint
             .iter()
             .map(|term| apply_subst(term, &subst)),
     );
 
-    for (term, names) in monitor_wsym.signal {
+    for (term, names) in y_wsym.signal {
         let mapped = apply_subst(&term, &subst);
         for name in names {
             push_symbol(&mut linked_wsym, mapped.clone(), name);
         }
     }
-    linked_wsym.prop.extend(monitor_wsym.prop);
+    linked_wsym.prop.extend(y_wsym.prop);
 
     Ok((linked_wts, linked_wsym, notes))
 }

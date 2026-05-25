@@ -15,11 +15,7 @@ use tabled::{
 };
 
 impl CIll {
-    pub fn save_cex(
-        &mut self,
-        cex: &BlCex,
-        vcd: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    pub fn save_cex(&mut self, cex: &BlCex, vcd: impl AsRef<Path>) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
         let vcd_file = BufWriter::new(File::create(&vcd)?);
@@ -77,39 +73,6 @@ impl CIll {
         println!("{}", table);
 
         Ok(())
-
-        // loop {
-        //     print!("Please enter the ID of the property to generate CTI (or 'q' to quit): ");
-        //     io::stdout().flush()?;
-        //     let mut input = String::new();
-        //     io::stdin().read_line(&mut input)?;
-        //     let input = input.trim();
-
-        //     if input == "q" {
-        //         return Ok(None);
-        //     }
-
-        //     match input.parse::<usize>() {
-        //         Ok(id) => {
-        //             if id < self.res.len() {
-        //                 if self.res[id] {
-        //                     println!(
-        //                         "{} is inductive, cannot generate CTI.",
-        //                         results[id].property
-        //                     );
-        //                 } else {
-        //                     println!("{} is selected for CTI generation.", results[id].property);
-        //                     return Ok(Some(id));
-        //                 }
-        //             } else {
-        //                 println!("Invalid ID.");
-        //             }
-        //         }
-        //         Err(_) => {
-        //             println!("Invalid input.");
-        //         }
-        //     }
-        // }
     }
 }
 
