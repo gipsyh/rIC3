@@ -1,31 +1,32 @@
-mod dut;
+mod correct;
 mod ind;
 mod kind;
 mod link;
+mod prepare;
 mod utils;
 
-use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::{cli::cache::DutHash, logger_init};
-use anyhow::Ok;
+use super::{Ric3Config, cache::Ric3Proj};
+use crate::{
+    cli::{cache::DutHash, cill::prepare::cill_prepare},
+    logger_init,
+};
+use anyhow::{Ok, bail};
 use btor::Btor;
-use chrono::TimeDelta;
 use clap::Subcommand;
 use giputils::{
-    file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
+    file::{create_dir_if_not_exists, remove_if_exists},
     logger::with_log_level,
 };
 use log::{LevelFilter, info};
 use rIC3::{
-    BlEngine, Engine, McResult,
-    bmc::{BMC, BMCConfig},
+    McResult,
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{env, fs, time::Instant};
+use std::{env, fs};
 use strum::AsRefStr;
 use utils::CIllStat;
 
@@ -116,65 +117,6 @@ impl CIll {
             res: Vec::new(),
         })
     }
-
-    fn check_safety(&mut self) -> anyhow::Result<McResult> {
-        info!("BMC: Checking correctness of all properties.");
-        let bmc_start = Instant::now();
-        let steps = [0, 1, 3, 5, 10, 15];
-        let mut results: Vec<(McResult, BMC)> = with_log_level(LevelFilter::Warn, || {
-            steps
-                .into_par_iter()
-                .map(|step| {
-                    let mut cfg = BMCConfig::default();
-                    cfg.preproc.scorr = false;
-                    cfg.preproc.frts = false;
-                    if step == 0 {
-                        cfg.end = 5;
-                    } else {
-                        cfg.time_limit = Some(15);
-                        cfg.step = step;
-                    }
-                    let mut bmc = BMC::new(cfg, self.ts.clone());
-                    let res = bmc.check();
-                    (res, bmc)
-                })
-                .collect()
-        });
-        results.retain(|(r, _)| r.is_sat());
-        let min_res = results
-            .into_iter()
-            .min_by_key(|(r, _)| r.into_sat().unwrap());
-
-        let cex = self.rp.path("cill/cex");
-        let cex_vcd = self.rp.path("cill/cex.vcd");
-        remove_if_exists(&cex)?;
-        remove_if_exists(&cex_vcd)?;
-
-        let mut stat = CIllStat::load(&self.rp)?;
-        stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
-        stat.save(&self.rp)?;
-
-        match min_res {
-            Some((r, mut bmc)) => {
-                let witness = bmc.cex();
-                self.save_cex(&witness, cex, Some(&cex_vcd))?;
-                let name = &self.wsym.prop[witness.bad_id];
-                println!(
-                    "{}",
-                    format!(
-                        "A CEX violating {name} was found. VCD generated at {}.",
-                        cex_vcd.display()
-                    )
-                    .red()
-                );
-                Ok(r)
-            }
-            None => {
-                info!("BMC found no CEX in limited steps.");
-                Ok(McResult::Unknown(None))
-            }
-        }
-    }
 }
 
 pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
@@ -186,7 +128,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let rp = Ric3Proj::new()?;
     let cill_state = rp.get_cill_state()?;
     match cmd {
-        CIllCommands::Prepare => dut::prepare(rcfg, rp),
+        CIllCommands::Prepare => prepare::cill_prepare(&rcfg, &rp),
         CIllCommands::Link => link::link(rcfg, rp),
         CIllCommands::Check => check(rcfg, rp, cill_state),
         CIllCommands::Abort => abort(rcfg, rp, cill_state),
@@ -195,28 +137,24 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
 }
 
 fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()> {
-    recreate_dir(rp.path("tmp"))?;
     let dut_hash = rcfg.dut.src_hash()?;
     match rp.check_cached_dut(&dut_hash)? {
         Some(false) => {
-            Yosys::generate_btor(&rcfg, rp.path("tmp/dut"))?;
-            rp.refresh_cti(&rp.path("dut"), &rp.path("tmp/dut"))?;
-            fs::remove_dir_all(rp.path("dut"))?;
-            fs::rename(rp.path("tmp/dut"), rp.path("dut"))?;
-            rp.cache_dut(&dut_hash)?;
+            bail!("DUT sources changed, CIll does not allow DUT changes");
         }
         None => {
-            Yosys::generate_btor(&rcfg, rp.path("dut"))?;
+            cill_prepare(&rcfg, &rp)?;
             rp.cache_dut(&dut_hash)?;
         }
         Some(true) => (),
     }
 
-    let btor = Btor::from_file(rp.path("dut/dut.btor"));
+    let btor = Btor::from_file(rp.path("wts/wts.btor"));
     let btorfe = BtorFrontend::new(btor);
     let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
+    // recreate_dir(rp.path("tmp"))?;
 
-    if !matches!(cill.check_safety()?, McResult::Unknown(_)) {
+    if !matches!(cill.check_correct()?, McResult::Unknown(_)) {
         return Ok(());
     }
 

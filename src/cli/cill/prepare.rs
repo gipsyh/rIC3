@@ -1,4 +1,5 @@
 use crate::cli::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use anyhow::bail;
 use btor::Btor;
 use giputils::file::recreate_dir;
 use logicrs::fol::Sort;
@@ -25,16 +26,16 @@ struct ShadowModule {
     children: BTreeMap<String, ShadowModule>,
 }
 
-pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
+pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     if !rcfg.dut.defines.is_empty() {
-        anyhow::bail!("`ric3 cill prepare` does not support dut.defines");
+        bail!("`ric3 cill prepare` does not support dut.defines");
     }
     let dut_dir = rp.path("dut");
     recreate_dir(&dut_dir)?;
     Yosys::generate_btor(&rcfg, &dut_dir)?;
+    let (wts, wsym) = dut2wts(dut_dir);
     let cill_dir = rp.path("cill");
     recreate_dir(&cill_dir)?;
-    let (wts, wsym) = dut2wts(dut_dir);
     let symbols = collect_symbol_sorts(&wsym)?;
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
@@ -42,10 +43,6 @@ pub fn prepare(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     let wts_dir = rp.path("wts");
     recreate_dir(&wts_dir)?;
     btor.to_file(wts_dir.join("wts.btor"));
-    println!(
-        "CIll prepare artifacts generated in {}.",
-        cill_dir.display()
-    );
     Ok(())
 }
 
