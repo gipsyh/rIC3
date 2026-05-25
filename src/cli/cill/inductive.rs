@@ -89,7 +89,6 @@ impl CIll {
         let mut kinds = Vec::new();
         let mut results = vec![None; num_prop];
         for (b, r, kind) in kind_results {
-            dbg!(b, r.is_none());
             results[b] = r;
             kinds.push(kind);
         }

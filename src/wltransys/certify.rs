@@ -44,7 +44,7 @@ impl WlCex {
                     continue;
                 }
                 let val = t.simulate(&mut val);
-                if !val.as_bv().unwrap().all_x() {
+                if !val.all_x() {
                     self.state[k].push(TermValue::new(t.clone(), val));
                 }
             }
