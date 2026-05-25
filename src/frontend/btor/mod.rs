@@ -13,7 +13,7 @@ use crate::{
 };
 use btor::Btor;
 use giputils::hash::{GHashMap, GHashSet};
-use log::{debug, error, warn};
+use log::{debug, error};
 use logicrs::{
     LboolVec, VarSymbols,
     fol::{self, BvTermValue, Term, TermValue},
@@ -88,11 +88,7 @@ pub struct BtorFrontend {
 
 impl BtorFrontend {
     pub fn new(btor: Btor) -> Self {
-        let (mut owts, symbols) = WlTransys::from_btor(&btor);
-        if owts.bad.is_empty() {
-            warn!("empty property in btor");
-            owts.bad.push(Term::bool_const(false));
-        }
+        let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);
