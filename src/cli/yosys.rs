@@ -77,9 +77,12 @@ impl Yosys {
         }
         let mut yosys = Self::new();
         let mut read = if slang {
-            "read_slang -Wnone -D FORMAL -D YOSYS_SLANG"
+            format!(
+                "read_slang -Wnone -D FORMAL -D YOSYS_SLANG -top {}",
+                cfg.dut.top
+            )
         } else {
-            "read_verilog -formal -sv"
+            "read_verilog -formal -sv".to_string()
         }
         .to_string();
         for define in define_args(&cfg.dut.defines) {
@@ -90,8 +93,7 @@ impl Yosys {
         }
         yosys.add_command(&read);
         yosys.add_command("setundef -undriven -anyseq");
-        yosys.add_command(&format!("prep -flatten -top {}", cfg.dut.top));
-        yosys.add_command("hierarchy -smtcheck -nokeep_prints");
+        yosys.add_command("opt_clean");
         yosys.add_command("memory_nordff");
         if let Some(reset) = &cfg.dut.reset {
             if reset.starts_with("!") {
@@ -105,10 +107,8 @@ impl Yosys {
         yosys.add_command("chformal -early");
         yosys.add_command("async2sync");
         yosys.add_command("formalff -clk2ff -ff2anyinit -hierarchy -assume");
-        // yosys.add_command("memory_map -formal");
         yosys.add_command("dffunmap");
         yosys.add_command("opt -fast");
-        yosys.add_command("opt_clean");
         yosys.add_command("check");
         let dp = PathBuf::from("..");
         yosys.add_command(&format!(
