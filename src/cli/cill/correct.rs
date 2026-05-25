@@ -6,7 +6,7 @@ use rIC3::{
     BlEngine, Engine, McResult,
     bmc::{BMC, BMCConfig},
 };
-use ratatui::style::Stylize;
+use ratatui::crossterm::style::Stylize;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::time::Instant;
 

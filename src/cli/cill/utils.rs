@@ -24,7 +24,6 @@ impl CIll {
         };
         cex.enrich(&self.wsym.keys().cloned().collect());
         wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
-        todo!();
         // let bwit = self
         //     .btorfe
         //     .wl_certificate(McWlCertificate::SAT(cex.clone()));

@@ -8,7 +8,7 @@ use rIC3::{
     ic3::{IC3, IC3Config},
     transys::{certify::BlCex, unroll::TransysUnroll},
 };
-use ratatui::style::Stylize;
+use ratatui::crossterm::style::Stylize;
 use rayon::prelude::*;
 use std::{fs::create_dir, time::Instant};
 use tabled::{
