@@ -89,6 +89,7 @@ impl Yosys {
             read.push_str(&format!(" {}", file.display()));
         }
         yosys.add_command(&read);
+        yosys.add_command("setundef -undriven -anyseq");
         yosys.add_command(&format!("prep -flatten -top {}", cfg.dut.top));
         yosys.add_command("hierarchy -smtcheck -nokeep_prints");
         yosys.add_command("memory_nordff");
