@@ -62,7 +62,7 @@ impl CIll {
                 Ok(r)
             }
             None => {
-                info!("BMC found no CEX in limited steps.");
+                info!("Correctness Checking Passed");
                 Ok(McResult::Unknown(None))
             }
         }

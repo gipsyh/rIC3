@@ -18,7 +18,7 @@ use tabled::{
 
 impl CIll {
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
-        info!("Checking inductiveness of all properties.");
+        info!("Checking Inductiveness");
         let ind_start = Instant::now();
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
@@ -78,7 +78,7 @@ impl CIll {
                 .map(|b| {
                     let mut kind = CIllKind::new(b, self.ts.clone(), invariants.clone(), None);
                     let mut cex = None;
-                    if kind.check().is_sat() {
+                    if !kind.check().is_unsat() {
                         cex = Some(kind.cex());
                     }
                     (b, cex, kind)
@@ -89,6 +89,7 @@ impl CIll {
         let mut kinds = Vec::new();
         let mut results = vec![None; num_prop];
         for (b, r, kind) in kind_results {
+            dbg!(b, r.is_none());
             results[b] = r;
             kinds.push(kind);
         }
@@ -156,7 +157,7 @@ impl CIll {
             };
             results.push(InductiveResult {
                 id: i,
-                property: name.to_string(),
+                property: name,
                 result: status,
             });
         }
