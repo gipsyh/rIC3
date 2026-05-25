@@ -6,11 +6,11 @@ use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
     BlEngine, Engine, McResult,
     ic3::{IC3, IC3Config},
-    transys::unroll::TransysUnroll,
+    transys::{certify::BlCex, unroll::TransysUnroll},
 };
 use ratatui::style::Stylize;
 use rayon::prelude::*;
-use std::time::Instant;
+use std::{fs::create_dir, time::Instant};
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
@@ -87,12 +87,12 @@ impl CIll {
         });
 
         let mut kinds = Vec::new();
-        self.res = vec![None; num_prop];
+        let mut results = vec![None; num_prop];
         for (b, r, kind) in kind_results {
-            self.res[b] = r;
+            results[b] = r;
             kinds.push(kind);
         }
-        let res = self.res.iter().all(|l| l.is_none());
+        let res = results.iter().all(|l| l.is_none());
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.ind_time += TimeDelta::from_std(ind_start.elapsed())?;
@@ -128,10 +128,11 @@ impl CIll {
         //         .certify(&self.rp.path("dut/dut.btor"), &self.rp.path("cill/cert"))
         // );
         // }
+        self.print_and_save_res(results)?;
         Ok(res)
     }
 
-    pub fn print_inductive_res(&mut self) -> anyhow::Result<()> {
+    fn print_and_save_res(&mut self, res: Vec<Option<BlCex>>) -> anyhow::Result<()> {
         #[derive(Tabled)]
         struct InductiveResult {
             #[tabled(rename = "ID")]
@@ -141,14 +142,17 @@ impl CIll {
             #[tabled(rename = "Result")]
             result: String,
         }
-
+        assert!(!self.rp.has_cti());
+        let cti_path = self.rp.path("cill/cti");
+        create_dir(&cti_path)?;
         let mut results = Vec::new();
-        for (i, res) in self.res.iter().enumerate() {
-            let name = &self.wsym.prop[i];
-            let status = if res.is_none() {
-                "Inductive".green().to_string()
-            } else {
+        for (i, res) in res.iter().enumerate() {
+            let name = self.wsym.prop[i].clone();
+            let status = if let Some(cex) = res {
+                self.save_cex(cex, cti_path.join(format!("{}.vcd", name)))?;
                 "Not Inductive".red().to_string()
+            } else {
+                "Inductive".green().to_string()
             };
             results.push(InductiveResult {
                 id: i,

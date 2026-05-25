@@ -71,9 +71,12 @@ impl Ric3Proj {
         Ok(())
     }
 
+    fn has_cti(&self) -> bool {
+        self.path("cill/cti").exists()
+    }
+
     fn clear_cti(&self) -> anyhow::Result<()> {
         remove_if_exists(self.path("cill/cti"))?;
-        remove_if_exists(self.path("cill/cti.vcd"))?;
         Ok(())
     }
 }
@@ -90,7 +93,6 @@ pub struct CIll {
     bb_map: BitblastMap,
     ts_rst: Restore,
     dut_bf: BtorFrontend,
-    res: Vec<Option<BlCex>>,
 }
 
 impl CIll {
@@ -119,7 +121,6 @@ impl CIll {
             ts,
             ts_rst,
             bb_map,
-            res: Vec::new(),
         })
     }
 }
@@ -172,7 +173,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()
     //     dh: dut_hash,
     // };
     // cill.rp.save_serde_obj(&select_info, "cill/select.ron")?;
-    cill.print_inductive_res()?;
     if let CIllState::Block(prop) = rp.get_cill_state()? {
         if cill.check_cti()? {
             println!("{}", "The CTI has been successfully blocked.".green());
