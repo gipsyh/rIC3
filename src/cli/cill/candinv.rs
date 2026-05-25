@@ -132,7 +132,7 @@ fn link_monitor(
     Ok(())
 }
 
-pub fn link(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
+pub fn link(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     let invariants = rcfg
         .formal
         .as_ref()

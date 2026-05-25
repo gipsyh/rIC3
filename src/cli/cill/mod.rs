@@ -1,13 +1,16 @@
+mod candinv;
 mod correct;
 mod ind;
 mod kind;
-mod link;
 mod prepare;
 mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj};
 use crate::{
-    cli::{cache::DutHash, cill::prepare::cill_prepare},
+    cli::{
+        cache::DutHash,
+        cill::{candinv::link, prepare::cill_prepare},
+    },
     logger_init,
 };
 use anyhow::{Ok, bail};
@@ -99,6 +102,8 @@ impl CIll {
         let mut btorfe = BtorFrontend::new(btor);
         let (wts, wsym) = btorfe.wts();
 
+        link(&rcfg, &rp);
+
         // TODO link
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
@@ -132,7 +137,7 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let cill_state = rp.get_cill_state()?;
     match cmd {
         CIllCommands::Prepare => prepare::cill_prepare(&rcfg, &rp),
-        CIllCommands::Link => link::link(rcfg, rp),
+        CIllCommands::Link => candinv::link(&rcfg, &rp),
         CIllCommands::Check => check(rcfg, rp, cill_state),
         CIllCommands::Abort => abort(rcfg, rp, cill_state),
         CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),
