@@ -23,31 +23,25 @@ impl CIll {
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
-        let bwit = self
-            .btorfe
-            .wl_certificate(McWlCertificate::SAT(cex.clone()));
-        fs::write(&p, format!("{}", bwit))?;
-        let Some(vcd) = vcd else {
-            return Ok(());
-        };
-        let vcd_file = BufWriter::new(File::create(&vcd)?);
-        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
-            t.as_str()
-                .strip_prefix(&self.rcfg.dut.top)
-                .map(|s| s.strip_prefix('.').unwrap_or(s))
-                .unwrap()
-        } else {
-            ""
-        };
-        cex.enrich(&self.wsym.keys().cloned().collect());
-        wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
-        // crate::cli::yosys::Yosys::btor_wit_to_vcd(
-        //     self.rp.path("dut"),
-        //     &cti_file,
-        //     &vcd,
-        //     false,
-        //     self.rcfg.trace.as_ref(),
-        // )?;
+        todo!();
+        // let bwit = self
+        //     .btorfe
+        //     .wl_certificate(McWlCertificate::SAT(cex.clone()));
+        // fs::write(&p, format!("{}", bwit))?;
+        // let Some(vcd) = vcd else {
+        //     return Ok(());
+        // };
+        // let vcd_file = BufWriter::new(File::create(&vcd)?);
+        // let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
+        //     t.as_str()
+        //         .strip_prefix(&self.rcfg.dut.top)
+        //         .map(|s| s.strip_prefix('.').unwrap_or(s))
+        //         .unwrap()
+        // } else {
+        //     ""
+        // };
+        // cex.enrich(&self.wsym.keys().cloned().collect());
+        // wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
         Ok(())
     }
 }

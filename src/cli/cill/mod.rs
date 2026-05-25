@@ -9,20 +9,19 @@ use super::{Ric3Config, cache::Ric3Proj};
 use crate::{
     cli::{
         cache::DutHash,
-        cill::{candinv::link, prepare::cill_prepare},
+        cill::{
+            candinv::{link_candinv, synthesis_candinv},
+            prepare::cill_prepare,
+        },
     },
     logger_init,
 };
 use anyhow::{Ok, bail};
 use btor::Btor;
 use clap::Subcommand;
-use giputils::{
-    file::{create_dir_if_not_exists, remove_if_exists},
-    logger::with_log_level,
-};
+use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::{LevelFilter, info};
 use rIC3::{
-    McResult,
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
@@ -37,9 +36,6 @@ use utils::CIllStat;
 pub enum CIllCommands {
     /// Prepare shadow DUT artifacts
     Prepare,
-
-    /// Link helper invariants against the prepared DUT
-    Link,
 
     /// Check all the properties
     Check,
@@ -92,30 +88,28 @@ pub struct CIll {
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
-    btorfe: BtorFrontend,
+    dut_bf: BtorFrontend,
     res: Vec<bool>,
 }
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<Self> {
         let btor = Btor::from_file(rp.path("wts/wts.btor"));
-        let mut btorfe = BtorFrontend::new(btor);
-        let (wts, wsym) = btorfe.wts();
+        let mut dut_bf = BtorFrontend::new(btor);
+        let (dut_wts, dut_wsym) = dut_bf.wts();
 
-        link(&rcfg, &rp);
-
-        // TODO link
+        let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
+        let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
         let mut ts_rst = Restore::new(&ts);
         with_log_level(LevelFilter::Warn, || ts.simplify(&mut ts_rst));
-        ts.remove_gate_init(&mut ts_rst);
-        assert!(ts_rst.init_var().is_none());
+        assert!(!ts.has_gate_init());
         Ok(Self {
             rcfg,
             rp,
-            btorfe,
+            dut_bf,
             wsym,
             wts,
             ots,
@@ -137,7 +131,6 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let cill_state = rp.get_cill_state()?;
     match cmd {
         CIllCommands::Prepare => prepare::cill_prepare(&rcfg, &rp),
-        CIllCommands::Link => candinv::link(&rcfg, &rp),
         CIllCommands::Check => check(rcfg, rp, cill_state),
         CIllCommands::Abort => abort(rcfg, rp, cill_state),
         CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),

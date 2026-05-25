@@ -4,7 +4,7 @@ use giputils::{file::recreate_dir, hash::GHashMap};
 use logicrs::fol::Term;
 use rIC3::frontend::{Frontend, btor::BtorFrontend};
 use rIC3::wltransys::{WlTransys, symbol::WlTsSymbol};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 fn symbols_by_name(symbols: &WlTsSymbol) -> HashMap<String, Term> {
     symbols
@@ -67,16 +67,17 @@ fn push_symbol(symbols: &mut WlTsSymbol, term: Term, name: String) {
 }
 
 fn link_wts(
-    mut core_wts: WlTransys,
-    mut core_wsym: WlTsSymbol,
+    core_wts: &WlTransys,
+    core_wsym: &WlTsSymbol,
     monitor_wts: WlTransys,
     monitor_wsym: WlTsSymbol,
 ) -> anyhow::Result<(WlTransys, WlTsSymbol, Vec<String>)> {
     let (subst, notes) = make_substitution(&core_wsym, &monitor_wsym)?;
-
+    let mut linked_wts = core_wts.clone();
+    let mut linked_wsym = core_wsym.clone();
     for input in &monitor_wts.input {
         if !subst.contains_key(input) {
-            core_wts.add_input(input);
+            linked_wts.add_input(input);
         }
     }
     for latch in &monitor_wts.latch {
@@ -85,21 +86,15 @@ fn link_wts(
                 .init(latch)
                 .map(|term| apply_subst(&term, &subst));
             let next = apply_subst(&monitor_wts.next(latch), &subst);
-            core_wts.add_latch(latch.clone(), init, next);
+            linked_wts.add_latch(latch.clone(), init, next);
         }
     }
-    core_wts
+    linked_wts
         .bad
         .extend(monitor_wts.bad.iter().map(|term| apply_subst(term, &subst)));
-    core_wts.constraint.extend(
+    linked_wts.constraint.extend(
         monitor_wts
             .constraint
-            .iter()
-            .map(|term| apply_subst(term, &subst)),
-    );
-    core_wts.justice.extend(
-        monitor_wts
-            .justice
             .iter()
             .map(|term| apply_subst(term, &subst)),
     );
@@ -107,61 +102,44 @@ fn link_wts(
     for (term, names) in monitor_wsym.signal {
         let mapped = apply_subst(&term, &subst);
         for name in names {
-            push_symbol(&mut core_wsym, mapped.clone(), name);
+            push_symbol(&mut linked_wsym, mapped.clone(), name);
         }
     }
-    core_wsym.prop.extend(monitor_wsym.prop);
+    linked_wsym.prop.extend(monitor_wsym.prop);
 
-    Ok((core_wts, core_wsym, notes))
+    Ok((linked_wts, linked_wsym, notes))
 }
 
-fn link_monitor(
-    core_wts: WlTransys,
-    core_wsym: WlTsSymbol,
-    monitor_wts: WlTransys,
-    monitor_wsym: WlTsSymbol,
-    linked: PathBuf,
-) -> anyhow::Result<()> {
+pub fn link_candinv(
+    core_wts: &WlTransys,
+    core_wsym: &WlTsSymbol,
+    candinv_bf: &mut BtorFrontend,
+) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
+    let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
+    candinv_wts.simplify_with_symbols(&mut candinv_wsym);
+
     let (linked_wts, linked_wsym, notes) =
-        link_wts(core_wts, core_wsym, monitor_wts, monitor_wsym)?;
-    linked_wts.to_btor_with_sym(&linked_wsym).to_file(linked);
+        link_wts(core_wts, core_wsym, candinv_wts, candinv_wsym)?;
     println!("\nLinked signals:");
     for note in notes {
         println!("  {note}");
     }
-    Ok(())
+    Ok((linked_wts, linked_wsym))
 }
 
-pub fn link(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
-    let invariants = rcfg
+pub fn synthesis_candinv(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<BtorFrontend> {
+    let candinv = rcfg
         .formal
         .as_ref()
         .and_then(|formal| formal.invariants.clone())
         .ok_or_else(|| anyhow::anyhow!("missing required config: formal.invariants"))?;
-    let cill_dir = rp.path("cill");
-    let shadow = cill_dir.join("shadow.sv");
+    let shadow = rp.path("cill/shadow.sv");
 
     let candinv_dir = rp.path("cill/candinv");
     recreate_dir(&candinv_dir)?;
-    Yosys::generate_btor_with_files(&rcfg, &[shadow, invariants], &candinv_dir, "invariants")?;
+    Yosys::generate_btor_with_files(&rcfg, &[shadow, candinv], &candinv_dir, "invariants")?;
 
-    let mut core_bf = BtorFrontend::new(Btor::from_file(rp.path("wts/wts.btor")));
-    let (core_wts, core_wsym) = core_bf.wts();
-
-    let mut candinv_bf = BtorFrontend::new(Btor::from_file(candinv_dir.join("invariants.btor")));
-    let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
-    candinv_wts.simplify_with_symbols(&mut candinv_wsym);
-
-    link_monitor(
-        core_wts,
-        core_wsym,
-        candinv_wts,
-        candinv_wsym,
-        candinv_dir.join("linked.btor"),
-    )?;
-    println!(
-        "CIll helper artifacts generated in {}.",
-        candinv_dir.display()
-    );
-    Ok(())
+    Ok(BtorFrontend::new(Btor::from_file(
+        candinv_dir.join("invariants.btor"),
+    )))
 }

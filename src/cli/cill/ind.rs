@@ -138,22 +138,23 @@ impl CIll {
     pub fn check_cti(&mut self) -> anyhow::Result<bool> {
         let cti_file = self.rp.path("cill/cti");
         let cti = fs::read_to_string(&cti_file)?;
-        let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
-        let cti = self.bb_map.bitblast_cex(&cti);
-        let cti = self.ts_rst.forward_cex(&cti);
-        let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
-        let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
-        if kind.check().is_unsat() {
-            return Ok(true);
-        }
-        self.rp.clear_cti()?;
-        let witness = kind.cex();
-        self.save_cex(
-            &witness,
-            self.rp.path("cill/cti"),
-            Some(self.rp.path("cill/cti.vcd")),
-        )?;
-        Ok(false)
+        todo!();
+        // let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
+        // let cti = self.bb_map.bitblast_cex(&cti);
+        // let cti = self.ts_rst.forward_cex(&cti);
+        // let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
+        // let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
+        // if kind.check().is_unsat() {
+        //     return Ok(true);
+        // }
+        // self.rp.clear_cti()?;
+        // let witness = kind.cex();
+        // self.save_cex(
+        //     &witness,
+        //     self.rp.path("cill/cti"),
+        //     Some(self.rp.path("cill/cti.vcd")),
+        // )?;
+        // Ok(false)
     }
 
     pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlCex> {
