@@ -20,7 +20,7 @@ use anyhow::{Ok, bail};
 use btor::Btor;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
-use log::{LevelFilter, info};
+use log::LevelFilter;
 use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
@@ -100,6 +100,8 @@ impl CIll {
 
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
+        wts.to_btor_with_sym(&wsym)
+            .to_file(rp.path("cill/candinv/linked.btor"));
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
@@ -230,7 +232,8 @@ fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow
         return Ok(());
     }
     let cex = cill.get_cti(id)?;
-    cill.save_cex(&cex, rp.path("cill/cti"), Some(rp.path("cill/cti.vcd")))?;
+    // cill.save_cex(&cex, rp.path("cill/cti"), rp.path("cill/cti.vcd"))?;
+    cill.save_cex(&cex, rp.path("cill/cti.vcd"))?;
     let name = &cill.wsym.prop[cex.bad_id];
     println!(
         "CTI VCD generated in {}.",

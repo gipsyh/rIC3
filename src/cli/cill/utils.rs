@@ -18,30 +18,26 @@ impl CIll {
     pub fn save_cex(
         &mut self,
         cex: &BlCex,
-        p: impl AsRef<Path>,
-        vcd: Option<impl AsRef<Path>>,
+        vcd: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
+        let vcd_file = BufWriter::new(File::create(&vcd)?);
+        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
+            t.as_str()
+                .strip_prefix(&self.rcfg.dut.top)
+                .map(|s| s.strip_prefix('.').unwrap_or(s))
+                .unwrap()
+        } else {
+            ""
+        };
+        cex.enrich(&self.wsym.keys().cloned().collect());
+        wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
         todo!();
         // let bwit = self
         //     .btorfe
         //     .wl_certificate(McWlCertificate::SAT(cex.clone()));
         // fs::write(&p, format!("{}", bwit))?;
-        // let Some(vcd) = vcd else {
-        //     return Ok(());
-        // };
-        // let vcd_file = BufWriter::new(File::create(&vcd)?);
-        // let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
-        //     t.as_str()
-        //         .strip_prefix(&self.rcfg.dut.top)
-        //         .map(|s| s.strip_prefix('.').unwrap_or(s))
-        //         .unwrap()
-        // } else {
-        //     ""
-        // };
-        // cex.enrich(&self.wsym.keys().cloned().collect());
-        // wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
         Ok(())
     }
 }
