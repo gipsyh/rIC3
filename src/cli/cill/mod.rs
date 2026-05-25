@@ -1,5 +1,6 @@
 mod candinv;
 mod correct;
+mod effective;
 mod ind;
 mod kind;
 mod prepare;
@@ -34,9 +35,6 @@ use utils::CIllStat;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum CIllCommands {
-    /// Prepare shadow DUT artifacts
-    Prepare,
-
     /// Check all the properties
     Check,
 
@@ -132,7 +130,6 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     let rp = Ric3Proj::new()?;
     let cill_state = rp.get_cill_state()?;
     match cmd {
-        CIllCommands::Prepare => prepare::cill_prepare(&rcfg, &rp),
         CIllCommands::Check => check(rcfg, rp, cill_state),
         CIllCommands::Abort => abort(rcfg, rp, cill_state),
         CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),
