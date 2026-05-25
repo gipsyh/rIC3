@@ -1,7 +1,7 @@
 mod candinv;
 mod correct;
 mod effective;
-mod ind;
+mod inductive;
 mod kind;
 mod prepare;
 mod utils;
@@ -199,6 +199,11 @@ struct SelectInfo {
 }
 
 fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
+    let dut_hash = rcfg.dut.src_hash()?;
+    if rp.check_cached_dut(&dut_hash)?.is_some_and(|c| !c) {
+        bail!("DUT sources changed, CIll does not allow DUT changes");
+    }
+
     if !rp.path("cill/select.ron").exists() {
         println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
     }
