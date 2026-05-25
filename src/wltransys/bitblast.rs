@@ -194,7 +194,7 @@ impl BitblastMap {
             let sort = w.sort();
             let entry = map
                 .entry(w.clone())
-                .or_insert_with(|| Value::default_from(&w.sort()));
+                .or_insert_with(|| Value::default_from(w.sort()));
             match entry {
                 Value::Bv(bv) => bv.set_bool(*b, l.polarity()),
                 Value::Array(array) => {
