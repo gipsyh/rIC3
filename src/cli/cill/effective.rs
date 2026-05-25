@@ -35,14 +35,6 @@ impl CIll {
         // )?;
         // Ok(false)
     }
-
-    pub fn get_cti(&mut self, id: usize) -> anyhow::Result<BlCex> {
-        let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
-        let mut kind = CIllKind::new(id, self.ts.clone(), invariants, None);
-        assert!(kind.check().is_unknown());
-        let cex = kind.cex();
-        Ok(cex)
-    }
 }
 
 impl Ric3Proj {

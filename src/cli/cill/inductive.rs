@@ -4,12 +4,17 @@ use giputils::logger::with_log_level;
 use log::{LevelFilter, info};
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
-    Engine, McResult,
+    BlEngine, Engine, McResult,
     ic3::{IC3, IC3Config},
     transys::unroll::TransysUnroll,
 };
+use ratatui::style::Stylize;
 use rayon::prelude::*;
 use std::time::Instant;
+use tabled::{
+    Table, Tabled,
+    settings::{Format, Modify, Style, object::Rows},
+};
 
 impl CIll {
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
@@ -18,10 +23,11 @@ impl CIll {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.preproc.preproc = false;
+        let num_prop = self.ts.bad.len();
         // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
         cfg.time_limit = Some(10);
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
-            (0..self.ts.bad.len())
+            (0..num_prop)
                 .into_par_iter()
                 .map(|i| {
                     let ic3res: Vec<_> = [true, false]
@@ -61,7 +67,6 @@ impl CIll {
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
-        self.rp.save_serde_obj(&invariants, "cill/inv.ron")?;
         let kind_results: Vec<_> = with_log_level(LevelFilter::Error, || {
             results
                 .iter()
@@ -72,19 +77,22 @@ impl CIll {
                 .into_par_iter()
                 .map(|b| {
                     let mut kind = CIllKind::new(b, self.ts.clone(), invariants.clone(), None);
-                    let r = kind.check().is_unsat();
-                    (b, r, kind)
+                    let mut cex = None;
+                    if kind.check().is_sat() {
+                        cex = Some(kind.cex());
+                    }
+                    (b, cex, kind)
                 })
                 .collect()
         });
 
         let mut kinds = Vec::new();
+        self.res = vec![None; num_prop];
         for (b, r, kind) in kind_results {
-            results[b] = r;
+            self.res[b] = r;
             kinds.push(kind);
         }
-        self.res = results;
-        let res = self.res.iter().all(|l| *l);
+        let res = self.res.iter().all(|l| l.is_none());
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.ind_time += TimeDelta::from_std(ind_start.elapsed())?;
@@ -121,5 +129,41 @@ impl CIll {
         // );
         // }
         Ok(res)
+    }
+
+    pub fn print_inductive_res(&mut self) -> anyhow::Result<()> {
+        #[derive(Tabled)]
+        struct InductiveResult {
+            #[tabled(rename = "ID")]
+            id: usize,
+            #[tabled(rename = "Property")]
+            property: String,
+            #[tabled(rename = "Result")]
+            result: String,
+        }
+
+        let mut results = Vec::new();
+        for (i, res) in self.res.iter().enumerate() {
+            let name = &self.wsym.prop[i];
+            let status = if res.is_none() {
+                "Inductive".green().to_string()
+            } else {
+                "Not Inductive".red().to_string()
+            };
+            results.push(InductiveResult {
+                id: i,
+                property: name.to_string(),
+                result: status,
+            });
+        }
+
+        let mut table = Table::new(&results);
+        table.with(Style::empty()).with(
+            Modify::new(Rows::first()).with(Format::content(|s| s.yellow().bold().to_string())),
+        );
+
+        println!("{}", table);
+
+        Ok(())
     }
 }

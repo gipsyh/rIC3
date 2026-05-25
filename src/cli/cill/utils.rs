@@ -1,17 +1,12 @@
 use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
-use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
-use ratatui::crossterm::style::Stylize;
+use rIC3::transys::certify::BlCex;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     fs::{self, File},
     io::BufWriter,
     path::Path,
-};
-use tabled::{
-    Table, Tabled,
-    settings::{Format, Modify, Style, object::Rows},
 };
 
 impl CIll {
@@ -34,44 +29,6 @@ impl CIll {
         //     .btorfe
         //     .wl_certificate(McWlCertificate::SAT(cex.clone()));
         // fs::write(&p, format!("{}", bwit))?;
-        Ok(())
-    }
-}
-
-#[derive(Tabled)]
-struct InductiveResult {
-    #[tabled(rename = "ID")]
-    id: usize,
-    #[tabled(rename = "Property")]
-    property: String,
-    #[tabled(rename = "Result")]
-    result: String,
-}
-
-impl CIll {
-    pub fn print_ind_res(&mut self) -> anyhow::Result<()> {
-        let mut results = Vec::new();
-        for (i, &res) in self.res.iter().enumerate() {
-            let name = &self.wsym.prop[i];
-            let status = if res {
-                "Inductive".green().to_string()
-            } else {
-                "Not Inductive".red().to_string()
-            };
-            results.push(InductiveResult {
-                id: i,
-                property: name.to_string(),
-                result: status,
-            });
-        }
-
-        let mut table = Table::new(&results);
-        table.with(Style::empty()).with(
-            Modify::new(Rows::first()).with(Format::content(|s| s.yellow().bold().to_string())),
-        );
-
-        println!("{}", table);
-
         Ok(())
     }
 }
