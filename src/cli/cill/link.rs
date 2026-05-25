@@ -202,10 +202,15 @@ fn link_monitor(
     Ok(())
 }
 
-pub fn link(rcfg: Ric3Config, rp: Ric3Proj, invariants: PathBuf) -> anyhow::Result<()> {
+pub fn link(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     if !rcfg.dut.defines.is_empty() {
         anyhow::bail!("`ric3 cill link` does not support dut.defines");
     }
+    let invariants = rcfg
+        .formal
+        .as_ref()
+        .and_then(|formal| formal.invariants.clone())
+        .ok_or_else(|| anyhow::anyhow!("missing required config: formal.invariants"))?;
     if !invariants.exists() {
         anyhow::bail!("invariants file not found: {}", invariants.display());
     }
