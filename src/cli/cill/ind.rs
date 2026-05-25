@@ -26,6 +26,7 @@ use std::{
 
 impl CIll {
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
+        info!("Checking inductiveness of all properties.");
         let ind_start = Instant::now();
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;

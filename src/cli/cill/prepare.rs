@@ -1,4 +1,4 @@
-use crate::cli::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::{Ric3Config, cache::Ric3Proj, cill::utils::CIllStat, yosys::Yosys};
 use anyhow::bail;
 use btor::Btor;
 use giputils::file::recreate_dir;
@@ -28,7 +28,7 @@ struct ShadowModule {
 
 pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     if !rcfg.dut.defines.is_empty() {
-        bail!("`ric3 cill prepare` does not support dut.defines");
+        bail!("CIll does not support dut.defines");
     }
     let dut_dir = rp.path("dut");
     recreate_dir(&dut_dir)?;
@@ -43,6 +43,7 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     let wts_dir = rp.path("wts");
     recreate_dir(&wts_dir)?;
     btor.to_file(wts_dir.join("wts.btor"));
+    CIllStat::init(&rp)?;
     Ok(())
 }
 

@@ -94,10 +94,13 @@ pub struct CIll {
 }
 
 impl CIll {
-    pub fn new(rcfg: Ric3Config, rp: Ric3Proj, mut btorfe: BtorFrontend) -> anyhow::Result<Self> {
-        create_dir_if_not_exists(rp.path("cill"))?;
-        CIllStat::init(&rp)?;
+    pub fn new(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<Self> {
+        let btor = Btor::from_file(rp.path("wts/wts.btor"));
+        let mut btorfe = BtorFrontend::new(btor);
         let (wts, wsym) = btorfe.wts();
+
+        // TODO link
+
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
         let mut ts_rst = Restore::new(&ts);
@@ -149,16 +152,12 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()
         Some(true) => (),
     }
 
-    let btor = Btor::from_file(rp.path("wts/wts.btor"));
-    let btorfe = BtorFrontend::new(btor);
-    let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
-    // recreate_dir(rp.path("tmp"))?;
+    let mut cill = CIll::new(rcfg, rp.clone())?;
 
-    if !matches!(cill.check_correct()?, McResult::Unknown(_)) {
+    if !cill.check_correct()?.is_unknown() {
         return Ok(());
     }
 
-    info!("Checking inductiveness of all properties.");
     if cill.check_inductive()? {
         let stat = CIllStat::load(&rp)?;
         println!("CIll Statistic: {}", stat);
@@ -222,9 +221,7 @@ fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow
         rp.check_cached_dut(&rcfg.dut.src_hash()?)?,
         Some(true)
     ));
-    let btor = Btor::from_file(rp.path("dut/dut.btor"));
-    let btorfe = BtorFrontend::new(btor);
-    let mut cill = CIll::new(rcfg, rp.clone(), btorfe)?;
+    let mut cill = CIll::new(rcfg, rp.clone())?;
     cill.res = select_info.res;
     if cill.res[id] {
         cill.print_ind_res()?;

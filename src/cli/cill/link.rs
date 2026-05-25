@@ -26,7 +26,7 @@ fn replacement_for_symbol(
     let target_sort = target.sort();
     if monitor_sort != target_sort {
         anyhow::bail!(
-            "shadow symbol type mismatch for {sym}: monitor {:?}, DUT {:?}",
+            "shadow symbol type mismatch for {sym}: invariants {:?}, DUT {:?}",
             monitor_sort,
             target_sort
         );
@@ -125,7 +125,7 @@ fn link_monitor(
     let (linked_wts, linked_wsym, notes) =
         link_wts(core_wts, core_wsym, monitor_wts, monitor_wsym)?;
     linked_wts.to_btor_with_sym(&linked_wsym).to_file(linked);
-    println!("\nLinked monitor signals:");
+    println!("\nLinked signals:");
     for note in notes {
         println!("  {note}");
     }
@@ -133,38 +133,22 @@ fn link_monitor(
 }
 
 pub fn link(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
-    if !rcfg.dut.defines.is_empty() {
-        anyhow::bail!("`ric3 cill link` does not support dut.defines");
-    }
     let invariants = rcfg
         .formal
         .as_ref()
         .and_then(|formal| formal.invariants.clone())
         .ok_or_else(|| anyhow::anyhow!("missing required config: formal.invariants"))?;
-    if !invariants.exists() {
-        anyhow::bail!("invariants file not found: {}", invariants.display());
-    }
-    let wts_dir = rp.path("wts");
     let cill_dir = rp.path("cill");
     let shadow = cill_dir.join("shadow.sv");
-    let core = wts_dir.join("wts.btor");
-    for path in [&shadow, &core] {
-        if !path.exists() {
-            anyhow::bail!(
-                "missing prepared DUT artifact: {}. Run `ric3 cill prepare` first.",
-                path.display()
-            );
-        }
-    }
 
     let candinv_dir = rp.path("cill/candinv");
     recreate_dir(&candinv_dir)?;
-    Yosys::generate_btor_with_files(&rcfg, &[shadow, invariants], &candinv_dir, "monitor")?;
+    Yosys::generate_btor_with_files(&rcfg, &[shadow, invariants], &candinv_dir, "invariants")?;
 
-    let mut core_bf = BtorFrontend::new(Btor::from_file(rp.path("dut/dut.btor")));
+    let mut core_bf = BtorFrontend::new(Btor::from_file(rp.path("wts/wts.btor")));
     let (core_wts, core_wsym) = core_bf.wts();
 
-    let mut candinv_bf = BtorFrontend::new(Btor::from_file(candinv_dir.join("monitor.btor")));
+    let mut candinv_bf = BtorFrontend::new(Btor::from_file(candinv_dir.join("invariants.btor")));
     let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
     candinv_wts.simplify_with_symbols(&mut candinv_wsym);
 
