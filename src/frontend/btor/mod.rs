@@ -255,8 +255,17 @@ impl BtorFrontend {
             let mut idw = Vec::new();
             for tv in state {
                 let id = self.idmap[tv.t()];
-                let bv = tv.into_bv();
-                idw.push((id, format!("{id} {:b}", bv.v())));
+                match tv.v() {
+                    fol::Value::Bv(bv) => {
+                        idw.push((id, format!("{id} {:b}", bv)));
+                    }
+                    fol::Value::Array(array) => {
+                        let (index_width, _) = tv.t().sort().array();
+                        for (index, value) in array.iter() {
+                            idw.push((id, format!("{id} [{index:0index_width$b}] {:b}", value)));
+                        }
+                    }
+                }
             }
             idw.sort();
             res.extend(idw.into_iter().map(|(_, v)| v));

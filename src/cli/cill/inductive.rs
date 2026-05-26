@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::logger::with_log_level;
+use giputils::{file::create_dir_if_not_exists, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
@@ -144,7 +144,7 @@ impl CIll {
         }
         assert!(!self.rp.has_cti());
         let cti_path = self.rp.path("cill/cti");
-        create_dir(&cti_path)?;
+        create_dir_if_not_exists(&cti_path)?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
