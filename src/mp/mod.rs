@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     BlEngine, Engine, McResult, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
@@ -8,6 +10,7 @@ use crate::{
         Transys,
         certify::{BlCex, BlProof, Restore},
     },
+    utils::EngineCtrl,
 };
 use clap::{ArgAction, Args};
 use giputils::logger::with_log_level;
@@ -49,6 +52,7 @@ pub struct MultiProp {
     tracer: Tracer,
     parallel: bool,
     results: MpMcResult,
+    ctrl: Arc<EngineCtrl>,
 }
 
 impl MultiProp {
@@ -61,7 +65,7 @@ impl MultiProp {
         let mut ic3_cfg = IC3Config::default();
         ic3_cfg.local_proof = true;
         ic3_cfg.pred_prop = true;
-        ic3_cfg.inn = true;
+        ic3_cfg.inn = false;
         ic3_cfg.preproc.frts = false;
         ic3_cfg.preproc.scorr = false;
         let parallel = cfg.parallel;
@@ -74,6 +78,7 @@ impl MultiProp {
             ic3_cfg,
             tracer: Tracer::new(),
             parallel,
+            ctrl: Arc::new(EngineCtrl::new()),
         }
     }
 }
@@ -122,6 +127,10 @@ impl Engine for MultiProp {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn giputils::TerminateCtrl> {
+        self.ctrl.clone()
     }
 }
 
