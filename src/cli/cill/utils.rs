@@ -1,4 +1,4 @@
-use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
+use crate::cli::{cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
 use giputils::hash::GHashSet;
 use logicrs::fol::Term;
@@ -28,24 +28,17 @@ impl CIll {
             .cloned()
             .collect();
         cex = cex.filter(|t| dut_terms.contains(t));
-        let vcd_file = BufWriter::new(File::create(&vcd)?);
-        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
-            t.as_str()
-                .strip_prefix(&self.rcfg.dut.top)
-                .map(|s| s.strip_prefix('.').unwrap_or(s))
-                .unwrap()
-        } else {
-            ""
-        };
 
-        cex.enrich(&self.dut_wsym.keys().cloned().collect());
-        wlwitness_vcd(&cex, &self.dut_wsym, vcd_file, filter)?;
         if let Some(p) = p {
             let bwit = self
                 .dut_bf
                 .wl_certificate(McWlCertificate::SAT(cex.clone()));
             fs::write(&p, format!("{}", bwit))?;
         }
+
+        let vcd_file = BufWriter::new(File::create(&vcd)?);
+        cex.enrich(&self.dut_wsym.keys().cloned().collect());
+        wlwitness_vcd(&cex, &self.dut_wsym, vcd_file, "")?;
         Ok(())
     }
 }
