@@ -14,7 +14,7 @@ You can use it to check whether the assertions are inductive and generate CTI.
 - `ric3 cill check`: Performs the following steps automatically:
   1. Correctness Checking: Checks the correctness of helper assertions by Bounded Model Checking. If a CEX is found, it is saved to `ric3proj/cill/cex.vcd`, and the violated assertion is reported. You should analyze the CEX and fix the incorrect assertion.
   2. Inductiveness Check: CIll first attempts to prove assertions using IC3; if IC3 times out, CIll falls back to 3-induction with *local proof*. Under local proof, when verifying a set of $n$ properties, we prove a target property $P_t$ while assuming the remaining properties hold as invariants, using them as additional constraints. Formally, the $k$-induction check is: for any path $s_0,\ldots,s_k$, $\left(\bigwedge_{i=0}^{k-1}\ \bigwedge_{j=0}^{n-1} P_j(s_i)\ \land\ \bigwedge_{i=0}^{k-1} T(s_i, s_{i+1}) \right) \Rightarrow P_t(s_k)$. The inductiveness result of each assertions is printed.
-     - Output: Generates CTI of each properties to `ric3proj/cill/cti/<prop label>.vcd`. The CTI contains only the signals relevant to the induction failure; irrelevant signals are either omitted or marked with `'x'`/`'X'`. The CTI trace consists of 4 steps: the first 3 steps satisfy all assertions, while the final step violates the selected assertion.
+     - Generates a CTI for each non-inductive property at `ric3proj/cill/cti/<prop>.vcd`. The CTI contains only the signals relevant to the induction failure; irrelevant signals are either omitted or marked with `'x'`/`'X'`. The CTI trace consists of 4 steps: the first 3 steps satisfy all assertions, while the final step violates the selected assertion.
 
 - `ric3 cill abort`: Discards the current CTI context. Use this if you delete the assertion that generated the CTI, or if you decide not to block the current CTI.
 
@@ -64,4 +64,3 @@ always @(posedge clk) begin
   anyconst_reg <= anyconst_reg;
 end
 ```
-
