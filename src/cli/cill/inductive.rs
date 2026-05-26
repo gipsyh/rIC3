@@ -139,26 +139,33 @@ impl CIll {
             property: String,
             #[tabled(rename = "Result")]
             result: String,
+            #[tabled(rename = "VCD")]
+            vcd: String,
         }
         let cti_path = self.rp.path("cill/cti");
         create_dir_if_not_exists(&cti_path)?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
-            let status = if let Some(cex) = res {
+            let vcd_path = cti_path.join(format!("{}.vcd", name));
+            let (status, vcd) = if let Some(cex) = res {
                 self.save_trace(
                     cex,
                     true,
                     Some(&cti_path.join(format!("{}.cti", name))),
-                    cti_path.join(format!("{}.vcd", name)),
+                    &vcd_path,
                 )?;
-                "Not Inductive".red().to_string()
+                (
+                    "Not Inductive".red().to_string(),
+                    vcd_path.display().to_string(),
+                )
             } else {
-                "Inductive".green().to_string()
+                ("Inductive".green().to_string(), "-".to_string())
             };
             results.push(InductiveResult {
                 property: name,
                 result: status,
+                vcd,
             });
         }
 
