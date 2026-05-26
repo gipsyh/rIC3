@@ -1,5 +1,7 @@
 use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
+use giputils::hash::GHashSet;
+use logicrs::fol::Term;
 use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -18,6 +20,14 @@ impl CIll {
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
+        let dut_terms: GHashSet<Term> = self
+            .dut_wts
+            .input
+            .iter()
+            .chain(self.dut_wts.latch.iter())
+            .cloned()
+            .collect();
+        cex = cex.filter(|t| dut_terms.contains(t));
         let vcd_file = BufWriter::new(File::create(&vcd)?);
         let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
             t.as_str()
@@ -27,8 +37,9 @@ impl CIll {
         } else {
             ""
         };
-        cex.enrich(&self.wsym.keys().cloned().collect());
-        wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
+
+        cex.enrich(&self.dut_wsym.keys().cloned().collect());
+        wlwitness_vcd(&cex, &self.dut_wsym, vcd_file, filter)?;
         if let Some(p) = p {
             let bwit = self
                 .dut_bf

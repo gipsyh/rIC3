@@ -72,6 +72,8 @@ pub struct CIll {
     bb_map: BitblastMap,
     ts_rst: Restore,
     dut_bf: BtorFrontend,
+    dut_wts: WlTransys,
+    dut_wsym: WlTsSymbol,
 }
 
 impl CIll {
@@ -94,6 +96,8 @@ impl CIll {
             rcfg,
             rp,
             dut_bf,
+            dut_wts,
+            dut_wsym,
             wsym,
             wts,
             ots,

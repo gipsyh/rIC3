@@ -50,6 +50,22 @@ impl WlCex {
             }
         }
     }
+
+    pub fn filter(&self, f: impl Fn(&Term) -> bool) -> Self {
+        Self {
+            input: self
+                .input
+                .iter()
+                .map(|frame| frame.iter().filter(|v| f(v.t())).cloned().collect())
+                .collect(),
+            state: self
+                .state
+                .iter()
+                .map(|frame| frame.iter().filter(|v| f(v.t())).cloned().collect())
+                .collect(),
+            bad_id: self.bad_id,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
