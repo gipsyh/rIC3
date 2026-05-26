@@ -10,7 +10,7 @@ use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{
     DagCnf, Lbool, LboolVec, Lit, LitVec, Var,
     fol::{
-        BvTermValue, FolOp, Sort, Term, TermValue, TermVec, Value,
+        FolOp, Sort, Term, TermValue, TermVec, Value,
         bitblast::{bitblast_terms, cnf_encode_terms},
     },
 };
@@ -210,14 +210,35 @@ impl BitblastMap {
         map.into_iter().map(|(t, v)| TermValue::new(t, v)).collect()
     }
 
-    pub fn map_termval(&self, tv: &BvTermValue) -> LitVec {
-        let b = &self.w2b[tv.t()];
-        assert!(b.len() == tv.v().len());
-        b.iter()
-            .zip(tv.v().iter())
-            .filter(|&(_, v)| !(v.is_none()))
-            .map(|(s, v)| Lit::new(*s, v.is_true()))
-            .collect()
+    pub fn map_value(&self, term: &Term, value: &Value) -> LitVec {
+        let b = &self.w2b[term];
+        match value {
+            Value::Bv(bv) => {
+                assert!(b.len() == bv.len());
+                b.iter()
+                    .zip(bv.iter())
+                    .filter(|&(_, v)| !(v.is_none()))
+                    .map(|(s, v)| Lit::new(*s, v.is_true()))
+                    .collect()
+            }
+            Value::Array(array) => {
+                let (_, elew) = term.sort().array();
+                let mut res = LitVec::new();
+                for (index, value) in array.iter() {
+                    assert!(value.len() == elew);
+                    let offset = index * elew;
+                    assert!(offset + elew <= b.len());
+                    res.extend(
+                        b[offset..offset + elew]
+                            .iter()
+                            .zip(value.iter())
+                            .filter(|&(_, v)| !(v.is_none()))
+                            .map(|(s, v)| Lit::new(*s, v.is_true())),
+                    );
+                }
+                res
+            }
+        }
     }
 
     pub fn restore_var(&self, v: Var) -> Term {
@@ -255,12 +276,12 @@ impl BitblastMap {
         for t in 0..cex.len() {
             let lv: LitVec = cex.input[t]
                 .iter()
-                .flat_map(|t| self.map_termval(t))
+                .flat_map(|t| self.map_value(t.t(), &Value::Bv(t.v().clone())))
                 .collect();
             res.input.push(lv);
             let lv: LitVec = cex.state[t]
                 .iter()
-                .flat_map(|t| self.map_termval(&t.into_bv()))
+                .flat_map(|t| self.map_value(t.t(), t.v()))
                 .collect();
             res.state.push(lv);
         }

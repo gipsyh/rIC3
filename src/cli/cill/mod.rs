@@ -25,7 +25,7 @@ use rIC3::{
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
-use std::{env, fs};
+use std::{collections::HashSet, env, fs};
 use utils::CIllStat;
 
 #[derive(Subcommand, Debug, Clone)]
@@ -51,6 +51,30 @@ impl Ric3Proj {
     fn clear_cti(&self) -> anyhow::Result<()> {
         remove_if_exists(self.path("cill/cti"))?;
         Ok(())
+    }
+
+    fn remove_unused_cti(&self, props: &[String]) {
+        let props: HashSet<_> = props.iter().cloned().collect();
+        let Ok(entries) = fs::read_dir(self.path("cill/cti")) else {
+            return;
+        };
+
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("cti") {
+                continue;
+            }
+
+            let Some(name) = path.file_stem().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if props.contains(name) {
+                continue;
+            }
+
+            let _ = fs::remove_file(&path);
+            let _ = fs::remove_file(path.with_extension("vcd"));
+        }
     }
 }
 
@@ -78,6 +102,7 @@ impl CIll {
 
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
+        rp.remove_unused_cti(&wsym.prop);
         wts.to_btor_with_sym(&wsym)
             .to_file(rp.path("cill/candinv/linked.btor"));
 
@@ -134,8 +159,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    cill.check_effective()?;
-
     if cill.check_inductive()? {
         let stat = CIllStat::load(&rp)?;
         println!("CIll Statistic: {}", stat);
@@ -146,25 +169,7 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // if let CIllState::Block(prop) = rp.get_cill_state()? {
-    //     if cill.check_cti()? {
-    //         println!("{}", "The CTI has been successfully blocked.".green());
-    //         rp.clear_cti()?;
-    //     } else {
-    //         println!(
-    //             "{}",
-    //             format!(
-    //                 "The CTI of {prop} has not been blocked yet. {} refreshed.",
-    //                 rp.path("cill/cti.vcd").display()
-    //             )
-    //             .red()
-    //         );
-    //         return Ok(());
-    //     }
-    // }
-    // println!(
-    //     "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
-    // );
+    // cill.check_effective()?;
     Ok(())
 }
 
