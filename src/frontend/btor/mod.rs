@@ -123,6 +123,7 @@ impl BtorFrontend {
         cex.bad_id = bad_id;
         let mut current_frame = 0;
         let mut is_state = false;
+        let mut array_values = GHashMap::new();
 
         for line in lines {
             if line == "." {
@@ -147,8 +148,25 @@ impl BtorFrontend {
                 continue;
             }
             let parts: Vec<&str> = line.split_whitespace().collect();
-            assert!(parts.len() == 2);
             let id = parts[0].parse::<usize>().unwrap();
+            if parts.len() == 3 {
+                assert!(is_state);
+                let term = self.owts.latch[id].clone();
+                let (index_width, _) = term.sort().array();
+                let index = parts[1]
+                    .strip_prefix('[')
+                    .and_then(|s| s.strip_suffix(']'))
+                    .unwrap();
+                assert!(index.len() == index_width);
+                let index = usize::from_str_radix(index, 2).unwrap();
+                let val = LboolVec::from(parts[2]);
+                let entry = array_values
+                    .entry((current_frame, id))
+                    .or_insert_with(|| fol::ArrayValue::default_from(term.sort()));
+                entry.insert(index, val);
+                continue;
+            }
+            assert!(parts.len() == 2);
             let val = LboolVec::from(parts[1]);
             if is_state {
                 let term = self.owts.latch[id].clone();
@@ -159,6 +177,11 @@ impl BtorFrontend {
                 let bv = BvTermValue::new(term, val);
                 cex.input[current_frame].push(bv);
             }
+        }
+        for ((k, id), val) in array_values {
+            let term = self.owts.latch[id].clone();
+            let tv = TermValue::new(term, fol::Value::Array(val));
+            cex.state[k].push(tv);
         }
         for k in 0..cex.len() {
             for s in take(&mut cex.state[k]) {
