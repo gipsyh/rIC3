@@ -7,6 +7,9 @@ use std::fs;
 impl CIll {
     pub fn check_effective(&mut self) -> anyhow::Result<()> {
         let cti_dir = self.rp.path("cill/cti");
+        if !self.rp.has_cti() {
+            return Ok(());
+        }
 
         let mut effect_res = GHashMap::new();
         for entry in fs::read_dir(&cti_dir)? {

@@ -17,7 +17,7 @@ use crate::{
     },
     logger_init,
 };
-use anyhow::{Ok, bail};
+use anyhow::bail;
 use btor::Btor;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
@@ -45,7 +45,13 @@ pub enum CIllCommands {
 
 impl Ric3Proj {
     fn has_cti(&self) -> bool {
-        self.path("cill/cti").exists()
+        let Ok(entries) = fs::read_dir(self.path("cill/cti")) else {
+            return false;
+        };
+        entries.filter_map(Result::ok).any(|entry| {
+            entry.file_type().is_ok_and(|ty| ty.is_file())
+                && entry.path().extension().and_then(|ext| ext.to_str()) == Some("cti")
+        })
     }
 
     fn clear_cti(&self) -> anyhow::Result<()> {
@@ -130,6 +136,8 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         return Ok(());
     }
 
+    cill.check_effective()?;
+
     if cill.check_inductive()? {
         let stat = CIllStat::load(&rp)?;
         println!("CIll Statistic: {}", stat);
@@ -140,7 +148,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    cill.check_effective()?;
     // if let CIllState::Block(prop) = rp.get_cill_state()? {
     //     if cill.check_cti()? {
     //         println!("{}", "The CTI has been successfully blocked.".green());
