@@ -142,7 +142,6 @@ impl CIll {
             #[tabled(rename = "Result")]
             result: String,
         }
-        assert!(!self.rp.has_cti());
         let cti_path = self.rp.path("cill/cti");
         create_dir_if_not_exists(&cti_path)?;
         let mut results = Vec::new();
