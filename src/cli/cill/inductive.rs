@@ -18,7 +18,7 @@ use tabled::{
 
 impl CIll {
     pub fn check_inductive(&mut self) -> anyhow::Result<bool> {
-        info!("Checking Inductiveness");
+        println!("Checking Inductiveness");
         let ind_start = Instant::now();
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
