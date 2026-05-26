@@ -38,6 +38,7 @@ pub enum CIllCommands {
 }
 
 impl Ric3Proj {
+    #[allow(unused)]
     fn has_cti(&self) -> bool {
         let Ok(entries) = fs::read_dir(self.path("cill/cti")) else {
             return false;
@@ -90,6 +91,7 @@ pub struct CIll {
     ts_rst: Restore,
     dut_bf: BtorFrontend,
     dut_wts: WlTransys,
+    #[allow(unused)]
     dut_wsym: WlTsSymbol,
 }
 
@@ -171,16 +173,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn abort(_rcfg: Ric3Config, _rp: Ric3Proj) -> anyhow::Result<()> {
-    // match state {
-    //     CIllState::Check => {
-    //         println!("No CTI exists; abort is not required.");
-    //     }
-    //     CIllState::Block(_) => {
-    //         rp.clear_cti()?;
-    //         println!("Successfully aborted the CTI.");
-    //         rp.set_cill_state(CIllState::Check)?;
-    //     }
-    // }
-    Ok(())
+fn abort(_rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
+    rp.clear_cti()
 }
