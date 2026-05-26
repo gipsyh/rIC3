@@ -135,8 +135,6 @@ impl CIll {
     fn print_and_save_res(&mut self, res: Vec<Option<BlCex>>) -> anyhow::Result<()> {
         #[derive(Tabled)]
         struct InductiveResult {
-            #[tabled(rename = "ID")]
-            id: usize,
             #[tabled(rename = "Property")]
             property: String,
             #[tabled(rename = "Result")]
@@ -159,7 +157,6 @@ impl CIll {
                 "Inductive".green().to_string()
             };
             results.push(InductiveResult {
-                id: i,
                 property: name,
                 result: status,
             });
