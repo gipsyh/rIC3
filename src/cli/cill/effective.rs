@@ -1,109 +1,46 @@
-use crate::cli::{
-    cache::Ric3Proj,
-    cill::{CIll, kind::CIllKind},
-};
-use btor::Btor;
-use giputils::hash::GHashMap;
-use log::info;
-use logicrs::fol::{self, BvTermValue, TermValue};
-use rIC3::{
-    BlEngine, Engine, McWlCertificate,
-    frontend::{Frontend, btor::BtorFrontend},
-    transys::certify::BlCex,
-};
-use std::{fs, mem::take, path::Path};
+use crate::cli::cill::{CIll, kind::CIllKind};
+use giputils::{file::remove_if_exists, hash::GHashMap};
+use logicrs::LitVvec;
+use rIC3::{BlEngine, Engine};
+use std::fs;
 
 impl CIll {
-    pub fn check_cti(&mut self) -> anyhow::Result<bool> {
-        let cti_file = self.rp.path("cill/cti");
-        let cti = fs::read_to_string(&cti_file)?;
-        todo!();
-        // let cti = self.btorfe.deserialize_wl_unsafe_certificate(cti);
-        // let cti = self.bb_map.bitblast_cex(&cti);
-        // let cti = self.ts_rst.forward_cex(&cti);
-        // let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
-        // let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
-        // if kind.check().is_unsat() {
-        //     return Ok(true);
-        // }
-        // self.rp.clear_cti()?;
-        // let witness = kind.cex();
-        // self.save_cex(
-        //     &witness,
-        //     self.rp.path("cill/cti"),
-        //     Some(self.rp.path("cill/cti.vcd")),
-        // )?;
-        // Ok(false)
-    }
-}
+    pub fn check_effective(&mut self) -> anyhow::Result<()> {
+        let cti_dir = self.rp.path("cill/cti");
 
-impl Ric3Proj {
-    pub fn refresh_cti(&self, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
-        // let prop = match self.get_cill_state()? {
-        //     CIllState::Check => {
-        //         self.clear_cti()?;
-        //         return Ok(());
-        //     }
-        //     CIllState::Block(prop) => {
-        //         assert!(self.path("cill/cti").exists());
-        //         prop
-        //     }
-        // };
-        todo!();
-        let btor_old = Btor::from_file(dut_old.join("dut.btor"));
-        let btorfe_old = BtorFrontend::new(btor_old.clone());
-        let mut cti = btorfe_old
-            .deserialize_wl_unsafe_certificate(fs::read_to_string(self.path("cill/cti"))?);
-        let ywbc_old = fs::read_to_string(dut_old.join("dut.ywb"))?;
-        let ywb_old = btor_old.ywb(&ywbc_old);
-        let wb_old = btor_old.witness_map(&ywbc_old);
-        let wb_old: GHashMap<_, _> = wb_old
-            .into_iter()
-            .filter(|(_, v)| v[0].path[0] != "\\_witness_")
-            .map(|(k, v)| (v, k))
-            .collect();
-
-        let btor_new = Btor::from_file(dut_new.join("dut.btor"));
-        let mut btorfe_new = BtorFrontend::new(btor_new.clone());
-        let ywbc_new = fs::read_to_string(dut_new.join("dut.ywb"))?;
-        let ywb_new = btor_new.ywb(&ywbc_new);
-        let wb_new = btor_new.witness_map(&ywbc_new);
-
-        let Some(bad_id) = ywb_new
-            .asserts
-            .iter()
-            .position(|s| s.eq(&ywb_old.asserts[cti.bad_id]))
-        else {
-            todo!();
-            // info!("{prop} not found. CTI has been removed.");
-            self.clear_cti()?;
-            return Ok(());
-        };
-        cti.bad_id = bad_id;
-
-        let mut term_map = GHashMap::new();
-        for (n, s) in wb_new {
-            if let Some(o) = wb_old.get(&s) {
-                term_map.insert(o, n);
+        let mut effect_res = GHashMap::new();
+        for entry in fs::read_dir(&cti_dir)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                continue;
             }
+            let cti_path = entry.path();
+            if !(cti_path.extension().and_then(|ext| ext.to_str()) == Some("cti")) {
+                continue;
+            }
+            let name = cti_path.file_name().unwrap().to_str().unwrap().to_string();
+
+            let cti = fs::read_to_string(&cti_path)?;
+            let vcd_path = cti_path.with_extension("vcd");
+            remove_if_exists(&cti_path)?;
+            remove_if_exists(&vcd_path)?;
+            let cti = self.dut_bf.deserialize_wl_unsafe_certificate(cti);
+            let cti = self.bb_map.bitblast_cex(&cti);
+            let cti = self.ts_rst.forward_cex(&cti);
+            // let invariants = self.rp.load_serde_obj("cill/inv.ron")?;
+            let invariants = LitVvec::new();
+            let mut kind = CIllKind::new(cti.bad_id, self.ts.clone(), invariants, Some(cti));
+            let kind_res = kind.check().is_unsat();
+            if !kind_res {
+                let witness = kind.cex();
+                self.save_cex(&witness, Some(&cti_path), vcd_path)?;
+                println!("The CTI for {} has not been blocked, CTI refreshed.", name);
+            } else {
+                println!("The CTI for {} has been successfully blocked.", name);
+            }
+            effect_res.insert(name, kind_res);
         }
-        for k in 0..cti.len() {
-            for x in take(&mut cti.input[k]) {
-                if let Some(n) = term_map.get(x.t()) {
-                    cti.input[k].push(BvTermValue::new(n.clone(), x.v().clone()));
-                }
-            }
-            for x in take(&mut cti.state[k]) {
-                if let Some(n) = term_map.get(x.t()) {
-                    let x = x.into_bv();
-                    cti.state[k].push(TermValue::new(n.clone(), fol::Value::Bv(x.v().clone())));
-                }
-            }
-        }
-        fs::write(
-            self.path("cill/cti"),
-            format!("{}", btorfe_new.wl_certificate(McWlCertificate::SAT(cti))),
-        )?;
+
         Ok(())
     }
 }

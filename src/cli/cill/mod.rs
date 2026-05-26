@@ -31,9 +31,7 @@ use rIC3::{
     wltransys::{WlTransys, bitblast::BitblastMap, certify::WlCex, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
-use serde::{Deserialize, Serialize};
 use std::{env, fs};
-use strum::AsRefStr;
 use utils::CIllStat;
 
 #[derive(Subcommand, Debug, Clone)]
@@ -43,9 +41,6 @@ pub enum CIllCommands {
 
     /// Abort generated CTI
     Abort,
-
-    /// Select porperty that not inductive to generate CTI
-    Select { id: usize },
 }
 
 impl Ric3Proj {
@@ -113,7 +108,6 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     match cmd {
         CIllCommands::Check => check(rcfg, rp),
         CIllCommands::Abort => abort(rcfg, rp),
-        CIllCommands::Select { id } => select(rcfg, rp, id),
     }
 }
 
@@ -145,11 +139,8 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         );
         return Ok(());
     }
-    // let select_info = SelectInfo {
-    //     res: cill.res.clone(),
-    //     dh: dut_hash,
-    // };
-    // cill.rp.save_serde_obj(&select_info, "cill/select.ron")?;
+
+    cill.check_effective()?;
     // if let CIllState::Block(prop) = rp.get_cill_state()? {
     //     if cill.check_cti()? {
     //         println!("{}", "The CTI has been successfully blocked.".green());
@@ -170,60 +161,6 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
     Ok(())
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-struct SelectInfo {
-    res: Vec<bool>,
-    dh: DutHash,
-}
-
-fn select(rcfg: Ric3Config, rp: Ric3Proj, id: usize) -> anyhow::Result<()> {
-    let dut_hash = rcfg.dut.src_hash()?;
-    if rp.check_cached_dut(&dut_hash)?.is_some_and(|c| !c) {
-        bail!("DUT sources changed, CIll does not allow DUT changes");
-    }
-
-    if !rp.has_cti() {
-        println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
-    }
-
-    todo!();
-
-    // if let CIllState::Block(p) = state {
-    //     println!("A CTI for {p} already exists. It has been cleared.");
-    //     rp.clear_cti()?;
-    //     rp.set_cill_state(CIllState::Check)?;
-    // }
-    // let select_info: SelectInfo = rp.load_serde_obj("cill/select.ron")?;
-    // if select_info.dh != rcfg.dut.src_hash()? {
-    //     println!("DUT modified, selection cannot proceed. Please re-run the 'check'.");
-    //     rp.set_cill_state(CIllState::Check)?;
-    //     return Ok(());
-    // }
-    // let rcfg = Ric3Config::from_file("ric3.toml")?;
-    // assert!(matches!(
-    //     rp.check_cached_dut(&rcfg.dut.src_hash()?)?,
-    //     Some(true)
-    // ));
-    // let mut cill = CIll::new(rcfg, rp.clone())?;
-    // cill.res = select_info.res;
-    // if cill.res[id] {
-    //     cill.print_ind_res()?;
-    //     println!(
-    //         "{} is inductive, please select a non-inductive assertion.",
-    //         cill.wsym.prop[id]
-    //     );
-    //     return Ok(());
-    // }
-    // let cex = cill.get_cti(id)?;
-    // // cill.save_cex(&cex, rp.path("cill/cti"), rp.path("cill/cti.vcd"))?;
-    // cill.save_cex(&cex, rp.path("cill/cti.vcd"))?;
-    // let name = &cill.wsym.prop[cex.bad_id];
-    // println!(
-    //     "CTI VCD generated in {}.",
-    //     rp.path("cill/cti.vcd").display()
-    // );
 }
 
 fn abort(_rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
