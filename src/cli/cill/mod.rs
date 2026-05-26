@@ -79,7 +79,6 @@ impl Ric3Proj {
 }
 
 pub struct CIll {
-    rcfg: Ric3Config,
     rp: Ric3Proj,
     #[allow(unused)]
     wts: WlTransys,
@@ -112,7 +111,6 @@ impl CIll {
         with_log_level(LevelFilter::Warn, || ts.simplify(&mut ts_rst));
         assert!(!ts.has_gate_init());
         Ok(Self {
-            rcfg,
             rp,
             dut_bf,
             dut_wts,

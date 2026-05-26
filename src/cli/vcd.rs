@@ -42,6 +42,7 @@ impl Scope {
         &self,
         writer: &mut vcd::Writer<impl Write>,
         term_ids: &mut GHashMap<Term, Vec<DumpTarget>>,
+        array_indices: &GHashMap<Term, GHashSet<usize>>,
     ) -> io::Result<()> {
         match self {
             Scope::Node(node) => {
@@ -49,7 +50,7 @@ impl Scope {
                     match child {
                         Scope::Node(_) => {
                             writer.add_module(name)?;
-                            child.define_scope_rec(writer, term_ids)?;
+                            child.define_scope_rec(writer, term_ids, array_indices)?;
                             writer.upscope()?;
                         }
                         Scope::Var(t) => match t.sort() {
@@ -60,19 +61,22 @@ impl Scope {
                                     array_index: None,
                                 });
                             }
-                            Sort::Array(index_width, element_width) => {
-                                let depth = 1usize.checked_shl(index_width as _).unwrap();
-                                for index in 0..depth {
-                                    let id = writer.add_var(
-                                        VarType::Wire,
-                                        element_width as _,
-                                        name,
-                                        Some(ReferenceIndex::BitSelect(index as i32)),
-                                    )?;
-                                    term_ids.entry(t.clone()).or_default().push(DumpTarget {
-                                        id,
-                                        array_index: Some(index),
-                                    });
+                            Sort::Array(_, element_width) => {
+                                if let Some(indices) = array_indices.get(t) {
+                                    let mut indices: Vec<_> = indices.iter().copied().collect();
+                                    indices.sort_unstable();
+                                    for index in indices {
+                                        let id = writer.add_var(
+                                            VarType::Wire,
+                                            element_width as _,
+                                            name,
+                                            Some(ReferenceIndex::BitSelect(index as i32)),
+                                        )?;
+                                        term_ids.entry(t.clone()).or_default().push(DumpTarget {
+                                            id,
+                                            array_index: Some(index),
+                                        });
+                                    }
                                 }
                             }
                         },
@@ -88,14 +92,15 @@ impl Scope {
         &self,
         writer: &mut vcd::Writer<impl Write>,
         term_ids: &mut GHashMap<Term, Vec<DumpTarget>>,
+        array_indices: &GHashMap<Term, GHashSet<usize>>,
     ) -> io::Result<()> {
         let node = self.as_node().unwrap();
         if node.values().any(|s| s.is_var()) {
             writer.add_module("")?;
-            self.define_scope_rec(writer, term_ids)?;
+            self.define_scope_rec(writer, term_ids, array_indices)?;
             writer.upscope()?;
         } else {
-            self.define_scope_rec(writer, term_ids)?;
+            self.define_scope_rec(writer, term_ids, array_indices)?;
         }
         Ok(())
     }
@@ -122,6 +127,7 @@ pub fn wlwitness_vcd(
     writer.timescale(1, TimescaleUnit::NS)?;
 
     let mut present_terms = GHashSet::default();
+    let mut array_indices = GHashMap::<Term, GHashSet<usize>>::default();
     for frame in &cex.input {
         for tv in frame {
             present_terms.insert(tv.t().clone());
@@ -130,6 +136,16 @@ pub fn wlwitness_vcd(
     for frame in &cex.state {
         for tv in frame {
             present_terms.insert(tv.t().clone());
+            if let FolValue::Array(array) = tv.v() {
+                for (index, value) in array.iter() {
+                    if !value.all_x() {
+                        array_indices
+                            .entry(tv.t().clone())
+                            .or_default()
+                            .insert(*index);
+                    }
+                }
+            }
         }
     }
     let mut root = Scope::default();
@@ -162,7 +178,7 @@ pub fn wlwitness_vcd(
         }
     }
     let mut term_ids = GHashMap::default();
-    root.define_scope(&mut writer, &mut term_ids)?;
+    root.define_scope(&mut writer, &mut term_ids, &array_indices)?;
     writer.enddefinitions()?;
 
     for t in 0..cex.len() {
@@ -182,9 +198,13 @@ pub fn wlwitness_vcd(
                     let vcd_val = match (val, target.array_index) {
                         (FolValue::Bv(val), None) => lbool_vec_to_vcd(val),
                         (FolValue::Array(array), Some(index)) => {
-                            let (_, element_width) = term.sort().array();
-                            let unknown = LboolVec::from_elem(Lbool::NONE, element_width);
-                            lbool_vec_to_vcd(array.get(&index).unwrap_or(&unknown))
+                            let Some(val) = array.get(&index) else {
+                                continue;
+                            };
+                            if val.all_x() {
+                                continue;
+                            }
+                            lbool_vec_to_vcd(val)
                         }
                         _ => continue,
                     };
