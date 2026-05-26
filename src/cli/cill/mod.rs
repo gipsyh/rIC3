@@ -8,12 +8,9 @@ mod utils;
 
 use super::{Ric3Config, cache::Ric3Proj};
 use crate::{
-    cli::{
-        cache::DutHash,
-        cill::{
-            candinv::{link_candinv, synthesis_candinv},
-            prepare::cill_prepare,
-        },
+    cli::cill::{
+        candinv::{link_candinv, synthesis_candinv},
+        prepare::cill_prepare,
     },
     logger_init,
 };
@@ -24,11 +21,8 @@ use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::LevelFilter;
 use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
-    transys::{
-        Transys,
-        certify::{BlCex, Restore},
-    },
-    wltransys::{WlTransys, bitblast::BitblastMap, certify::WlCex, symbol::WlTsSymbol},
+    transys::{Transys, certify::Restore},
+    wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
 use std::{env, fs};
@@ -168,13 +162,13 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     //         return Ok(());
     //     }
     // }
-    println!(
-        "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
-    );
+    // println!(
+    //     "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
+    // );
     Ok(())
 }
 
-fn abort(_rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
+fn abort(_rcfg: Ric3Config, _rp: Ric3Proj) -> anyhow::Result<()> {
     // match state {
     //     CIllState::Check => {
     //         println!("No CTI exists; abort is not required.");

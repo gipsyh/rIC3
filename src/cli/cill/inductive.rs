@@ -10,7 +10,7 @@ use rIC3::{
 };
 use ratatui::crossterm::style::Stylize;
 use rayon::prelude::*;
-use std::{fs::create_dir, time::Instant};
+use std::time::Instant;
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
