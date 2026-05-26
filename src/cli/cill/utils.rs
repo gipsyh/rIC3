@@ -29,17 +29,17 @@ impl CIll {
                 .chain(self.dut_wts.latch.iter())
                 .cloned()
                 .collect();
-            cex = cex.filter(|t| dut_terms.contains(t));
+            let filtered_cex = cex.filter(|t| dut_terms.contains(t));
             if let Some(p) = p {
                 let bwit = self
                     .dut_bf
-                    .wl_certificate(McWlCertificate::SAT(cex.clone()));
+                    .wl_certificate(McWlCertificate::SAT(filtered_cex));
                 fs::write(&p, format!("{}", bwit))?;
             }
 
             let vcd_file = BufWriter::new(File::create(&vcd)?);
-            cex.enrich(&self.dut_wsym.keys().cloned().collect());
-            wlwitness_vcd(&cex, &self.dut_wsym, vcd_file, "")?;
+            cex.enrich(&self.wsym.keys().cloned().collect());
+            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         } else {
             if let Some(_) = p {
                 todo!();
