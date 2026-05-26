@@ -48,29 +48,7 @@ pub enum CIllCommands {
     Select { id: usize },
 }
 
-#[derive(Serialize, Deserialize, AsRefStr)]
-enum CIllState {
-    Check,
-    Block(String),
-}
-
 impl Ric3Proj {
-    fn get_cill_state(&self) -> anyhow::Result<CIllState> {
-        let p = self.path("cill/state.ron");
-        if p.exists() {
-            let state: CIllState = ron::from_str(&fs::read_to_string(p)?)?;
-            Ok(state)
-        } else {
-            Ok(CIllState::Check)
-        }
-    }
-
-    fn set_cill_state(&self, s: CIllState) -> anyhow::Result<()> {
-        let p = self.path("cill/state.ron");
-        fs::write(p, ron::to_string(&s)?)?;
-        Ok(())
-    }
-
     fn has_cti(&self) -> bool {
         self.path("cill/cti").exists()
     }
@@ -132,15 +110,14 @@ pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
     logger_init();
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     let rp = Ric3Proj::new()?;
-    let cill_state = rp.get_cill_state()?;
     match cmd {
-        CIllCommands::Check => check(rcfg, rp, cill_state),
-        CIllCommands::Abort => abort(rcfg, rp, cill_state),
-        CIllCommands::Select { id } => select(rcfg, rp, cill_state, id),
+        CIllCommands::Check => check(rcfg, rp),
+        CIllCommands::Abort => abort(rcfg, rp),
+        CIllCommands::Select { id } => select(rcfg, rp, id),
     }
 }
 
-fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()> {
+fn check(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
     let dut_hash = rcfg.dut.src_hash()?;
     match rp.check_cached_dut(&dut_hash)? {
         Some(false) => {
@@ -173,26 +150,26 @@ fn check(rcfg: Ric3Config, rp: Ric3Proj, _state: CIllState) -> anyhow::Result<()
     //     dh: dut_hash,
     // };
     // cill.rp.save_serde_obj(&select_info, "cill/select.ron")?;
-    if let CIllState::Block(prop) = rp.get_cill_state()? {
-        if cill.check_cti()? {
-            println!("{}", "The CTI has been successfully blocked.".green());
-            rp.clear_cti()?;
-        } else {
-            println!(
-                "{}",
-                format!(
-                    "The CTI of {prop} has not been blocked yet. {} refreshed.",
-                    rp.path("cill/cti.vcd").display()
-                )
-                .red()
-            );
-            return Ok(());
-        }
-    }
+    // if let CIllState::Block(prop) = rp.get_cill_state()? {
+    //     if cill.check_cti()? {
+    //         println!("{}", "The CTI has been successfully blocked.".green());
+    //         rp.clear_cti()?;
+    //     } else {
+    //         println!(
+    //             "{}",
+    //             format!(
+    //                 "The CTI of {prop} has not been blocked yet. {} refreshed.",
+    //                 rp.path("cill/cti.vcd").display()
+    //             )
+    //             .red()
+    //         );
+    //         return Ok(());
+    //     }
+    // }
     println!(
         "Please run 'ric3 cill select <ID>' to select an non-inductive assertion for CTI generation."
     );
-    rp.set_cill_state(CIllState::Check)
+    Ok(())
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -201,16 +178,18 @@ struct SelectInfo {
     dh: DutHash,
 }
 
-fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow::Result<()> {
+fn select(rcfg: Ric3Config, rp: Ric3Proj, id: usize) -> anyhow::Result<()> {
     let dut_hash = rcfg.dut.src_hash()?;
     if rp.check_cached_dut(&dut_hash)?.is_some_and(|c| !c) {
         bail!("DUT sources changed, CIll does not allow DUT changes");
     }
+
+    if !rp.has_cti() {
+        println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
+    }
+
     todo!();
 
-    // if !rp.path("cill/select.ron").exists() {
-    //     println!("Unable to select: `cill check` has not been run. Please run `cill check`.");
-    // }
     // if let CIllState::Block(p) = state {
     //     println!("A CTI for {p} already exists. It has been cleared.");
     //     rp.clear_cti()?;
@@ -245,19 +224,18 @@ fn select(rcfg: Ric3Config, rp: Ric3Proj, state: CIllState, id: usize) -> anyhow
     //     "CTI VCD generated in {}.",
     //     rp.path("cill/cti.vcd").display()
     // );
-    // rp.set_cill_state(CIllState::Block(name.to_string()))
 }
 
-fn abort(_rcfg: Ric3Config, rp: Ric3Proj, state: CIllState) -> anyhow::Result<()> {
-    match state {
-        CIllState::Check => {
-            println!("No CTI exists; abort is not required.");
-        }
-        CIllState::Block(_) => {
-            rp.clear_cti()?;
-            println!("Successfully aborted the CTI.");
-            rp.set_cill_state(CIllState::Check)?;
-        }
-    }
+fn abort(_rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<()> {
+    // match state {
+    //     CIllState::Check => {
+    //         println!("No CTI exists; abort is not required.");
+    //     }
+    //     CIllState::Block(_) => {
+    //         rp.clear_cti()?;
+    //         println!("Successfully aborted the CTI.");
+    //         rp.set_cill_state(CIllState::Check)?;
+    //     }
+    // }
     Ok(())
 }

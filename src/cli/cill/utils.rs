@@ -1,6 +1,6 @@
 use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
-use rIC3::transys::certify::BlCex;
+use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -10,7 +10,12 @@ use std::{
 };
 
 impl CIll {
-    pub fn save_cex(&mut self, cex: &BlCex, vcd: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub fn save_cex(
+        &mut self,
+        cex: &BlCex,
+        p: Option<&Path>,
+        vcd: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
         let vcd_file = BufWriter::new(File::create(&vcd)?);
@@ -24,10 +29,12 @@ impl CIll {
         };
         cex.enrich(&self.wsym.keys().cloned().collect());
         wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
-        // let bwit = self
-        //     .btorfe
-        //     .wl_certificate(McWlCertificate::SAT(cex.clone()));
-        // fs::write(&p, format!("{}", bwit))?;
+        if let Some(p) = p {
+            let bwit = self
+                .dut_bf
+                .wl_certificate(McWlCertificate::SAT(cex.clone()));
+            fs::write(&p, format!("{}", bwit))?;
+        }
         Ok(())
     }
 }

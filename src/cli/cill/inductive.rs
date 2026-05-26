@@ -149,7 +149,11 @@ impl CIll {
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
             let status = if let Some(cex) = res {
-                self.save_cex(cex, cti_path.join(format!("{}.vcd", name)))?;
+                self.save_cex(
+                    cex,
+                    Some(&cti_path.join(format!("{}.cti", name))),
+                    cti_path.join(format!("{}.vcd", name)),
+                )?;
                 "Not Inductive".red().to_string()
             } else {
                 "Inductive".green().to_string()

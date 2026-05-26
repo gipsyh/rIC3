@@ -1,6 +1,6 @@
 use crate::cli::{
     cache::Ric3Proj,
-    cill::{CIll, CIllState, kind::CIllKind},
+    cill::{CIll, kind::CIllKind},
 };
 use btor::Btor;
 use giputils::hash::GHashMap;
@@ -39,16 +39,17 @@ impl CIll {
 
 impl Ric3Proj {
     pub fn refresh_cti(&self, dut_old: &Path, dut_new: &Path) -> anyhow::Result<()> {
-        let prop = match self.get_cill_state()? {
-            CIllState::Check => {
-                self.clear_cti()?;
-                return Ok(());
-            }
-            CIllState::Block(prop) => {
-                assert!(self.path("cill/cti").exists());
-                prop
-            }
-        };
+        // let prop = match self.get_cill_state()? {
+        //     CIllState::Check => {
+        //         self.clear_cti()?;
+        //         return Ok(());
+        //     }
+        //     CIllState::Block(prop) => {
+        //         assert!(self.path("cill/cti").exists());
+        //         prop
+        //     }
+        // };
+        todo!();
         let btor_old = Btor::from_file(dut_old.join("dut.btor"));
         let btorfe_old = BtorFrontend::new(btor_old.clone());
         let mut cti = btorfe_old
@@ -73,9 +74,9 @@ impl Ric3Proj {
             .iter()
             .position(|s| s.eq(&ywb_old.asserts[cti.bad_id]))
         else {
-            info!("{prop} not found. CTI has been removed.");
+            todo!();
+            // info!("{prop} not found. CTI has been removed.");
             self.clear_cti()?;
-            self.set_cill_state(CIllState::Check)?;
             return Ok(());
         };
         cti.bad_id = bad_id;
