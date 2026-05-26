@@ -36,7 +36,7 @@ impl CIll {
             let kind_res = kind.check().is_unsat();
             if !kind_res {
                 let witness = kind.cex();
-                self.save_cex(&witness, Some(&cti_path), vcd_path)?;
+                self.save_trace(&witness, true, Some(&cti_path), vcd_path)?;
                 println!("The CTI for {} has not been blocked, CTI refreshed.", name);
             } else {
                 println!("The CTI for {} has been successfully blocked.", name);

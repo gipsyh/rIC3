@@ -12,22 +12,25 @@ use std::{
 };
 
 impl CIll {
-    pub fn save_cex(
+    pub fn save_trace(
         &mut self,
         cex: &BlCex,
+        filter_dut: bool,
         p: Option<&Path>,
         vcd: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
-        let dut_terms: GHashSet<Term> = self
-            .dut_wts
-            .input
-            .iter()
-            .chain(self.dut_wts.latch.iter())
-            .cloned()
-            .collect();
-        cex = cex.filter(|t| dut_terms.contains(t));
+        if filter_dut {
+            let dut_terms: GHashSet<Term> = self
+                .dut_wts
+                .input
+                .iter()
+                .chain(self.dut_wts.latch.iter())
+                .cloned()
+                .collect();
+            cex = cex.filter(|t| dut_terms.contains(t));
+        }
 
         if let Some(p) = p {
             let bwit = self

@@ -49,7 +49,7 @@ impl CIll {
         match min_res {
             Some((r, mut bmc)) => {
                 let witness = bmc.cex();
-                self.save_cex(&witness, None, &vcd)?;
+                self.save_trace(&witness, false, None, &vcd)?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(
                     "{}",

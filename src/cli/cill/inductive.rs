@@ -149,8 +149,9 @@ impl CIll {
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
             let status = if let Some(cex) = res {
-                self.save_cex(
+                self.save_trace(
                     cex,
+                    true,
                     Some(&cti_path.join(format!("{}.cti", name))),
                     cti_path.join(format!("{}.vcd", name)),
                 )?;
