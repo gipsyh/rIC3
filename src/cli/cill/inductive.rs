@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::{file::create_dir_if_not_exists, logger::with_log_level};
+use giputils::{file::recreate_dir, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
@@ -146,18 +146,14 @@ impl CIll {
             vcd: String,
         }
         let cti_path = self.rp.path("cill/cti");
-        create_dir_if_not_exists(&cti_path)?;
+        recreate_dir(&cti_path)?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
+            let cti_file = cti_path.join(format!("{}.cti", name));
             let vcd_path = cti_path.join(format!("{}.vcd", name));
             let (status, vcd) = if let Some(cex) = res {
-                self.save_trace(
-                    cex,
-                    true,
-                    Some(&cti_path.join(format!("{}.cti", name))),
-                    &vcd_path,
-                )?;
+                self.save_trace(cex, true, Some(&cti_file), &vcd_path)?;
                 (
                     "Not Inductive".red().to_string(),
                     vcd_path.display().to_string(),
