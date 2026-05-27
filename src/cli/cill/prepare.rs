@@ -70,10 +70,8 @@ fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyh
     cfg.preproc.scorr = false;
     let num_prop = ts.bad.len();
     println!("{}", ts.statistic());
-    // loop {}
-    // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
-    cfg.time_limit = Some(10);
-    let pool = ThreadPoolBuilder::new().num_threads(6).build()?;
+    cfg.time_limit = Some(20);
+    let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
     let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
         pool.install(|| {
             (0..num_prop)
