@@ -23,6 +23,7 @@ impl CIll {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.preproc.preproc = false;
+        cfg.preproc.bve = false;
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
         let num_prop = self.ts.bad.len();
