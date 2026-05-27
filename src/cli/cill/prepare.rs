@@ -69,7 +69,7 @@ fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyh
     cfg.preproc.frts = false;
     cfg.preproc.scorr = false;
     let num_prop = ts.bad.len();
-    println!("{}", ts.statistic());
+    info!("{}", ts.statistic());
     cfg.time_limit = Some(20);
     let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
     let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
