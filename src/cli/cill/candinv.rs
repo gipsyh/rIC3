@@ -4,7 +4,7 @@ use giputils::{file::recreate_dir, hash::GHashMap};
 use logicrs::fol::Term;
 use rIC3::frontend::{Frontend, btor::BtorFrontend};
 use rIC3::wltransys::{WlTransys, symbol::WlTsSymbol};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 fn symbols_by_name(symbols: &WlTsSymbol) -> HashMap<String, Term> {
     symbols
@@ -18,7 +18,7 @@ fn replacement_for_symbol(
     sym: &str,
     monitor_term: &Term,
     core_symbols: &HashMap<String, Term>,
-) -> anyhow::Result<Option<(Term, String)>> {
+) -> anyhow::Result<Option<Term>> {
     let Some(target) = core_symbols.get(sym) else {
         return Ok(None);
     };
@@ -31,7 +31,7 @@ fn replacement_for_symbol(
             target_sort
         );
     }
-    Ok(Some((target.clone(), format!("{sym} -> {sym}"))))
+    Ok(Some(target.clone()))
 }
 
 fn make_substitution(
@@ -40,19 +40,22 @@ fn make_substitution(
 ) -> anyhow::Result<(GHashMap<Term, Term>, Vec<String>)> {
     let core_symbols = symbols_by_name(core_wsym);
     let mut subst = GHashMap::new();
-    let mut notes = Vec::new();
+    let mut unlinked = BTreeSet::new();
     for (monitor_term, names) in monitor_wsym.signal.iter() {
+        let mut replacement = None;
         for name in names {
-            if let Some((replacement, note)) =
-                replacement_for_symbol(name, monitor_term, &core_symbols)?
-            {
-                subst.insert(monitor_term.clone(), replacement);
-                notes.push(note);
+            if let Some(term) = replacement_for_symbol(name, monitor_term, &core_symbols)? {
+                replacement = Some(term);
                 break;
             }
         }
+        if let Some(replacement) = replacement {
+            subst.insert(monitor_term.clone(), replacement);
+        } else {
+            unlinked.extend(names.iter().cloned());
+        }
     }
-    Ok((subst, notes))
+    Ok((subst, unlinked.into_iter().collect()))
 }
 
 fn apply_subst(term: &Term, subst: &GHashMap<Term, Term>) -> Term {
@@ -72,7 +75,7 @@ fn link_wts(
     y_wts: WlTransys,
     y_wsym: WlTsSymbol,
 ) -> anyhow::Result<(WlTransys, WlTsSymbol, Vec<String>)> {
-    let (subst, notes) = make_substitution(&x_wsym, &y_wsym)?;
+    let (subst, unlinked_symbols) = make_substitution(&x_wsym, &y_wsym)?;
     let mut linked_wts = x_wts.clone();
     let mut linked_wsym = x_wsym.clone();
     for input in &y_wts.input {
@@ -105,7 +108,7 @@ fn link_wts(
     }
     linked_wsym.prop.extend(y_wsym.prop);
 
-    Ok((linked_wts, linked_wsym, notes))
+    Ok((linked_wts, linked_wsym, unlinked_symbols))
 }
 
 pub fn link_candinv(
@@ -116,11 +119,11 @@ pub fn link_candinv(
     let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
     candinv_wts.simplify_with_symbols(&mut candinv_wsym);
 
-    let (linked_wts, linked_wsym, notes) =
+    let (linked_wts, linked_wsym, mut unlinked_symbols) =
         link_wts(core_wts, core_wsym, candinv_wts, candinv_wsym)?;
-    println!("\nLinked signals:");
-    for note in notes {
-        println!("  {note}");
+    unlinked_symbols.retain(|s| !s.starts_with("invariants."));
+    if !unlinked_symbols.is_empty() {
+        println!("Unlinked candinv signals: {}", unlinked_symbols.join(","));
     }
     Ok((linked_wts, linked_wsym))
 }
