@@ -9,7 +9,7 @@ use rIC3::{
     transys::{certify::BlCex, unroll::TransysUnroll},
 };
 use ratatui::crossterm::style::Stylize;
-use rayon::prelude::*;
+use rayon::{ThreadPoolBuilder, prelude::*};
 use std::time::Instant;
 use tabled::{
     Table, Tabled,
@@ -28,31 +28,34 @@ impl CIll {
         let num_prop = self.ts.bad.len();
         // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
         cfg.time_limit = Some(30);
+        let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
-            (0..num_prop)
-                .into_par_iter()
-                .map(|i| {
-                    let ic3res: Vec<_> = [true, false]
-                        .into_par_iter()
-                        .map(|lp| {
-                            let mut cfg = cfg.clone();
-                            cfg.local_proof = lp;
-                            cfg.inn = !lp;
-                            cfg.pred_prop = lp;
-                            cfg.preproc.preproc = !lp;
-                            cfg.prop = Some(i);
-                            let mut ic3 =
-                                IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
-                            let res = ic3.check();
-                            let inv = ic3.invariant();
-                            (matches!(res, McResult::UNSAT), inv)
-                        })
-                        .collect();
-                    let [(sr, mut si), (ir, ii)] = ic3res.try_into().unwrap();
-                    si.extend(ii);
-                    (sr || ir, si)
-                })
-                .collect()
+            pool.install(|| {
+                (0..num_prop)
+                    .into_par_iter()
+                    .map(|i| {
+                        let ic3res: Vec<_> = [true, false]
+                            .into_par_iter()
+                            .map(|lp| {
+                                let mut cfg = cfg.clone();
+                                cfg.local_proof = lp;
+                                cfg.inn = !lp;
+                                cfg.pred_prop = lp;
+                                cfg.preproc.preproc = !lp;
+                                cfg.prop = Some(i);
+                                let mut ic3 =
+                                    IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
+                                let res = ic3.check();
+                                let inv = ic3.invariant();
+                                (matches!(res, McResult::UNSAT), inv)
+                            })
+                            .collect();
+                        let [(sr, mut si), (ir, ii)] = ic3res.try_into().unwrap();
+                        si.extend(ii);
+                        (sr || ir, si)
+                    })
+                    .collect()
+            })
         });
         let mut invariants = LitVvec::new();
         let mut results = Vec::new();
