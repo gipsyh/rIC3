@@ -23,9 +23,11 @@ impl CIll {
         let mut cfg = IC3Config::default();
         cfg.pred_prop = true;
         cfg.preproc.preproc = false;
+        cfg.preproc.scorr = false;
+        cfg.preproc.frts = false;
         let num_prop = self.ts.bad.len();
         // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
-        cfg.time_limit = Some(10);
+        cfg.time_limit = Some(30);
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             (0..num_prop)
                 .into_par_iter()
@@ -37,6 +39,7 @@ impl CIll {
                             cfg.local_proof = lp;
                             cfg.inn = !lp;
                             cfg.pred_prop = lp;
+                            cfg.preproc.preproc = !lp;
                             cfg.prop = Some(i);
                             let mut ic3 =
                                 IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
