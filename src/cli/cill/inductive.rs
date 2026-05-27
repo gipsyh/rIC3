@@ -28,7 +28,7 @@ impl CIll {
         let num_prop = self.ts.bad.len();
         // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
         cfg.time_limit = Some(30);
-        let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
+        let pool = ThreadPoolBuilder::new().num_threads(12).build()?;
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             pool.install(|| {
                 (0..num_prop)
