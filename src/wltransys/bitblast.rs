@@ -12,6 +12,7 @@ use logicrs::{
     fol::{
         FolOp, Sort, Term, TermValue, TermVec, Value,
         bitblast::{bitblast_terms, cnf_encode_terms},
+        term_gc,
     },
 };
 
@@ -141,7 +142,7 @@ impl WlTransys {
         )
     }
 
-    pub fn bitblast_to_ts(&self) -> (Transys, BitblastMap) {
+    fn bitblast_to_ts_inner(&self) -> (Transys, BitblastMap) {
         let (bitblast, bb_map, bb_rst) = self.bitblast();
         let (ts, v2t) = bitblast.lower_to_ts();
         let t2v: GHashMap<Term, Var> = v2t.iter().map(|(&x, y)| (y.clone(), x)).collect();
@@ -157,6 +158,12 @@ impl WlTransys {
             b2w.insert(k, bb_rst[&v].clone());
         }
         (ts, BitblastMap { w2b, b2w })
+    }
+
+    pub fn bitblast_to_ts(&self) -> (Transys, BitblastMap) {
+        let res = self.bitblast_to_ts_inner();
+        term_gc();
+        res
     }
 }
 

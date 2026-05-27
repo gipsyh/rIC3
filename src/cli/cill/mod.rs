@@ -19,7 +19,6 @@ use btor::Btor;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::LevelFilter;
-use logicrs::fol::term_gc;
 use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
@@ -109,7 +108,6 @@ impl CIll {
             .to_file(rp.path("cill/candinv/linked.btor"));
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
-        term_gc();
         let ots = ts.clone();
         let mut ts_rst = Restore::new(&ts);
         with_log_level(LevelFilter::Warn, || ts.simplify(&mut ts_rst));

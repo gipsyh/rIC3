@@ -1,17 +1,26 @@
-use crate::cli::{Ric3Config, cache::Ric3Proj, cill::utils::CIllStat, yosys::Yosys};
+use crate::cli::{
+    Ric3Config, cache::PropMcInfo, cache::Ric3Proj, cill::utils::CIllStat, yosys::Yosys,
+};
 use anyhow::bail;
 use btor::Btor;
-use giputils::file::recreate_dir;
-use logicrs::fol::Sort;
+use giputils::{file::recreate_dir, logger::with_log_level};
+use log::{LevelFilter, info};
+use logicrs::{
+    VarSymbols,
+    fol::{Sort, term_gc},
+};
 use rIC3::{
+    Engine,
     frontend::{Frontend, btor::BtorFrontend},
+    ic3::{IC3, IC3Config},
+    transys::{TransysIf, certify::Restore},
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
+use rayon::{
+    ThreadPoolBuilder,
+    iter::{IntoParallelIterator, ParallelIterator},
 };
+use std::{collections::BTreeMap, fs, mem::take, path::Path};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ShadowSignal {
@@ -30,10 +39,14 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     if !rcfg.dut.defines.is_empty() {
         bail!("CIll does not support dut.defines");
     }
+    recreate_dir(rp.path("res"))?;
     let dut_dir = rp.path("dut");
     recreate_dir(&dut_dir)?;
     Yosys::generate_btor(&rcfg, &dut_dir)?;
-    let (wts, wsym) = dut2wts(dut_dir);
+    let mut btor = BtorFrontend::new(Btor::from_file(dut_dir.join("dut.btor")));
+    let (mut wts, mut wsym) = btor.wts();
+    preprocess(rp, &mut wts, &mut wsym)?;
+
     let cill_dir = rp.path("cill");
     recreate_dir(&cill_dir)?;
     let symbols = collect_symbol_sorts(&wsym)?;
@@ -44,6 +57,57 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     recreate_dir(&wts_dir)?;
     btor.to_file(wts_dir.join("wts.btor"));
     CIllStat::init(&rp)?;
+    Ok(())
+}
+
+fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyhow::Result<()> {
+    wts.simplify_with_symbols(wsym);
+    let (mut ts, _) = wts.bitblast_to_ts();
+    ts.simplify(&mut Restore::new(&ts));
+    let mut cfg = IC3Config::default();
+    cfg.pred_prop = true;
+    cfg.preproc.frts = false;
+    cfg.preproc.scorr = false;
+    let num_prop = ts.bad.len();
+    println!("{}", ts.statistic());
+    // loop {}
+    // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
+    cfg.time_limit = Some(10);
+    let pool = ThreadPoolBuilder::new().num_threads(6).build()?;
+    let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
+        pool.install(|| {
+            (0..num_prop)
+                .into_par_iter()
+                .map(|i| {
+                    let mut cfg = cfg.clone();
+                    // cfg.inn = !lp;
+                    cfg.pred_prop = true;
+                    cfg.prop = Some(i);
+                    let mut ic3 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
+                    ic3.check()
+                })
+                .collect()
+        })
+    });
+    let bad = take(&mut wts.bad);
+    let prop = take(&mut wsym.prop);
+    let mut cache = Vec::new();
+    for ((bad, name), res) in bad.into_iter().zip(prop).zip(ic3_results) {
+        cache.push(PropMcInfo {
+            id: 0,
+            name: name.clone(),
+            res,
+            config: None,
+        });
+        if res.is_unknown() {
+            wts.bad.push(bad);
+            wsym.prop.push(name);
+        }
+    }
+    rp.cache_res(cache)?;
+    info!("Preprocess solved {} properties.", num_prop - wts.bad.len());
+    wts.simplify_with_symbols(wsym);
+    term_gc();
     Ok(())
 }
 
@@ -234,11 +298,4 @@ fn collect_symbol_sorts(sym: &WlTsSymbol) -> anyhow::Result<BTreeMap<String, Sor
         }
     }
     Ok(symbols)
-}
-
-pub fn dut2wts(p: PathBuf) -> (WlTransys, WlTsSymbol) {
-    let mut btor = BtorFrontend::new(Btor::from_file(p.join("dut.btor")));
-    let (mut wts, mut sym) = btor.wts();
-    wts.simplify_with_symbols(&mut sym);
-    (wts, sym)
 }

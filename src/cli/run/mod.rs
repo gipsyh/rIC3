@@ -1,12 +1,12 @@
 mod ui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::cache::PropMcInfo;
 use btor::Btor;
 use clap::{Args, ValueEnum};
 use giputils::file::recreate_dir;
 use rIC3::{
     Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
-    config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     polynexus::{PolyNexus, PolyNexusConfig},
     tracer::{
@@ -15,7 +15,6 @@ use rIC3::{
     utils::{InterruptHandle, install_interrupt_handler},
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
-use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{BufWriter, IsTerminal},
@@ -45,14 +44,6 @@ pub enum RunUi {
     Tui,
     /// Print one line per status update
     Plain,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PropMcInfo {
-    pub id: usize,
-    pub name: String,
-    pub res: McResult,
-    pub config: Option<EngineConfig>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, AsRefStr)]

@@ -1,7 +1,7 @@
 use crate::cli::cill::{CIll, utils::CIllStat};
 use chrono::TimeDelta;
 use giputils::{file::remove_if_exists, logger::with_log_level};
-use log::{LevelFilter, info};
+use log::LevelFilter;
 use rIC3::{
     BlEngine, Engine, McResult,
     bmc::{BMC, BMCConfig},
