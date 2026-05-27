@@ -66,6 +66,8 @@ impl WlTransys {
         for c in self.constraint.iter_mut() {
             *c = c.simplify(&mut map);
         }
+        self.constraint
+            .retain(|c| !c.try_bool_const().is_some_and(|f| f));
         for b in self.bad.iter_mut() {
             *b = b.simplify(&mut map);
         }
