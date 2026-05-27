@@ -129,7 +129,6 @@ impl Ric3Proj {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PropMcInfo {
-    pub id: usize,
     pub name: String,
     pub res: McResult,
     pub config: Option<EngineConfig>,

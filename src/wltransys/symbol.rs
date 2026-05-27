@@ -19,6 +19,10 @@ impl Deref for WlTsSymbol {
 }
 
 impl WlTsSymbol {
+    pub fn prop_index_by_name(&self, name: &str) -> usize {
+        self.prop.iter().position(|prop| prop == name).unwrap()
+    }
+
     pub fn transform(&mut self, transform: &GHashMap<Term, Term>) {
         for (k, v) in take(&mut self.signal) {
             if let Some(t) = transform.get(&k) {

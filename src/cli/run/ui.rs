@@ -84,7 +84,7 @@ impl PropMcState {
         let property = truncate(&self.prop.name, property_width);
         format!(
             "{} {} {} {} {}",
-            format!("{:<ID_WIDTH$}", format!("p{}", self.prop.id))
+            format!("{:<ID_WIDTH$}", format!("p{}", self.id))
                 .magenta()
                 .bold(),
             format!("{property:<property_width$}").white(),
@@ -270,7 +270,7 @@ fn run_table_row(prop: &PropMcState, prop_width: usize, tick: usize) -> Row<'sta
     let total_time = prop.time + prop.start_time.map_or(Duration::ZERO, |t| t.elapsed());
     Row::new(vec![
         progress_cell(prop, tick),
-        Cell::from(format!("p{}", prop.prop.id)).style(Style::default().fg(Color::Magenta).bold()),
+        Cell::from(format!("p{}", prop.id)).style(Style::default().fg(Color::Magenta).bold()),
         Cell::from(truncate(&prop.prop.name, prop_width)).style(Style::default().fg(Color::White)),
         state_cell(prop),
         bound_cell(prop),

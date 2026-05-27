@@ -92,7 +92,6 @@ fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyh
     let mut cache = Vec::new();
     for ((bad, name), res) in bad.into_iter().zip(prop).zip(ic3_results) {
         cache.push(PropMcInfo {
-            id: 0,
             name: name.clone(),
             res,
             config: None,
