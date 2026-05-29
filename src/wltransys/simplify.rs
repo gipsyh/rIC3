@@ -6,64 +6,13 @@ use std::{mem::take, ops::Deref};
 
 impl WlTransys {
     pub fn coi_refine(&mut self) -> WlRemoveTf {
-        let mut queue: Vec<_> = self
-            .constraint
-            .iter()
-            .chain(self.bad.iter())
-            .chain(self.justice.iter())
-            .cloned()
-            .collect();
-        for l in self.latch.iter() {
-            if let Some(init) = self.init.get(l)
-                && !init.is_const()
-            {
-                queue.push(init.clone());
-                queue.push(l.clone());
-            }
-        }
-        let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
-        while let Some(t) = queue.pop() {
-            match &t.deref() {
-                TermType::Const(_) => (),
-                TermType::Var(_) => {
-                    if let Some(n) = self.next.get(&t)
-                        && touch.insert(n.clone())
-                    {
-                        queue.push(n.clone());
-                    }
-                }
-                TermType::Op(op) => {
-                    for s in op.terms.iter() {
-                        if touch.insert(s.clone()) {
-                            queue.push(s.clone());
-                        }
-                    }
-                }
-            };
-        }
-        let mut removed = GHashSet::new();
-        for x in take(&mut self.input) {
-            if touch.contains(&x) {
-                self.input.push(x);
-            } else {
-                removed.insert(x);
-            }
-        }
-        for x in take(&mut self.latch) {
-            if touch.contains(&x) {
-                self.latch.push(x);
-            } else {
-                removed.insert(x);
-            }
-        }
-        self.init.retain(|k, _| touch.contains(k));
-        self.next.retain(|k, _| touch.contains(k));
-        WlRemoveTf::new(removed)
+        CoiPass::apply(self).unwrap()
     }
-
     pub fn simplify(&mut self) -> WlTransformStack {
         let mut tf = WlTransformStack::new();
-        tf.add(Box::new(self.coi_refine()));
+        if let Some(t) = CoiPass::apply(self) {
+            tf.add(Box::new(t));
+        }
         let mut map = GHashMap::new();
         for (_, i) in self.init.iter_mut() {
             *i = i.simplify(&mut map);
@@ -90,7 +39,69 @@ impl WlTransys {
 pub trait WlTsSimpPass {
     type WlTransform: WlTransform;
 
-    fn simplify(wts: &mut WlTransys) -> impl WlTransform;
+    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform>;
+}
+
+pub struct CoiPass;
+
+impl WlTsSimpPass for CoiPass {
+    type WlTransform = WlRemoveTf;
+
+    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform> {
+        let mut queue: Vec<_> = wts
+            .constraint
+            .iter()
+            .chain(wts.bad.iter())
+            .chain(wts.justice.iter())
+            .cloned()
+            .collect();
+        for l in wts.latch.iter() {
+            if let Some(init) = wts.init.get(l)
+                && !init.is_const()
+            {
+                queue.push(init.clone());
+                queue.push(l.clone());
+            }
+        }
+        let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
+        while let Some(t) = queue.pop() {
+            match &t.deref() {
+                TermType::Const(_) => (),
+                TermType::Var(_) => {
+                    if let Some(n) = wts.next.get(&t)
+                        && touch.insert(n.clone())
+                    {
+                        queue.push(n.clone());
+                    }
+                }
+                TermType::Op(op) => {
+                    for s in op.terms.iter() {
+                        if touch.insert(s.clone()) {
+                            queue.push(s.clone());
+                        }
+                    }
+                }
+            };
+        }
+        let mut removed = GHashSet::new();
+        for x in take(&mut wts.input) {
+            if touch.contains(&x) {
+                wts.input.push(x);
+            } else {
+                removed.insert(x);
+            }
+        }
+        for x in take(&mut wts.latch) {
+            if touch.contains(&x) {
+                wts.latch.push(x);
+            } else {
+                removed.insert(x);
+            }
+        }
+        wts.init.retain(|k, _| touch.contains(k));
+        wts.next.retain(|k, _| touch.contains(k));
+        Some(WlRemoveTf::new(removed))
+    }
 }
 
 pub struct ConstraintInputPass;
@@ -98,7 +109,7 @@ pub struct ConstraintInputPass;
 impl WlTsSimpPass for ConstraintInputPass {
     type WlTransform = WlTransformStack;
 
-    fn simplify(wts: &mut WlTransys) -> WlTransformStack {
+    fn apply(wts: &mut WlTransys) -> Option<WlTransformStack> {
         let tf = WlTransformStack::new();
         todo!()
     }
