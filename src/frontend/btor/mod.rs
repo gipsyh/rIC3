@@ -7,7 +7,7 @@ use crate::{
     wltransys::{
         WlTransys,
         bitblast::BitblastMap,
-        certify::{Restore, WlCex, WlProof},
+        cert::{Restore, WlCex, WlProof},
         symbol::WlTsSymbol,
     },
 };

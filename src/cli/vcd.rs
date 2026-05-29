@@ -4,7 +4,7 @@ use logicrs::{
     Lbool, LboolVec,
     fol::{Sort, Term, Value as FolValue},
 };
-use rIC3::wltransys::{certify::WlCex, symbol::WlTsSymbol};
+use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
 use std::io::{self, Write};
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 

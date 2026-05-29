@@ -4,7 +4,7 @@ use crate::{
         Transys, TransysIf,
         certify::{BlCex, BlProof},
     },
-    wltransys::certify::{WlCex, WlProof},
+    wltransys::cert::{WlCex, WlProof},
 };
 use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::{

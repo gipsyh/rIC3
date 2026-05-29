@@ -1,4 +1,4 @@
-use crate::wltransys::{WlTransys, certify::WlCex};
+use crate::wltransys::{WlTransys, cert::WlCex};
 use bitwuzla::Bitwuzla;
 use giputils::hash::GHashMap;
 use logicrs::{
