@@ -1,7 +1,7 @@
 use super::WlTransys;
 use crate::wltransys::transform::{WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack};
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{Term, TermType};
+use logicrs::fol::{FolOp, Term, TermType};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
@@ -10,6 +10,9 @@ impl WlTransys {
     }
     pub fn simplify(&mut self) -> WlTransformStack {
         let mut tf = WlTransformStack::new();
+        if let Some(t) = ConstraintInputPass::apply(self) {
+            tf.add(Box::new(t));
+        }
         if let Some(t) = CoiPass::apply(self) {
             tf.add(Box::new(t));
         }
@@ -122,6 +125,18 @@ impl WlTsSimpPass for ConstraintInputPass {
     type WlTransform = WlTransformStack;
 
     fn apply(wts: &mut WlTransys) -> Option<WlTransformStack> {
+        let inputs: GHashSet<_> = wts.input.iter().cloned().collect();
+        let mut map = GHashMap::new();
+        for cst in wts.constraint.iter() {
+            if cst.is_var() && inputs.contains(cst) {
+                map.insert(cst.clone(), true);
+            } else if let Some(op) = cst.try_op() {
+                if op.op == FolOp::Not && inputs.contains(&op.terms[0]) {
+                    map.insert(cst.clone(), false);
+                }
+            }
+        }
+        dbg!(map.len());
         let tf = WlTransformStack::new();
         todo!()
     }
