@@ -1,11 +1,11 @@
-use super::{WlTransys, symbol::WlTsSymbol};
-use crate::wltransys::transform::{WlInnTermMapTf, WlTransform};
+use super::WlTransys;
+use crate::wltransys::transform::{WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack};
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Term, TermType};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
-    pub fn coi_refine(&mut self) {
+    pub fn coi_refine(&mut self) -> WlRemoveTf {
         let mut queue: Vec<_> = self
             .constraint
             .iter()
@@ -41,22 +41,29 @@ impl WlTransys {
                 }
             };
         }
+        let mut removed = GHashSet::new();
         for x in take(&mut self.input) {
             if touch.contains(&x) {
                 self.input.push(x);
+            } else {
+                removed.insert(x);
             }
         }
         for x in take(&mut self.latch) {
             if touch.contains(&x) {
                 self.latch.push(x);
+            } else {
+                removed.insert(x);
             }
         }
         self.init.retain(|k, _| touch.contains(k));
         self.next.retain(|k, _| touch.contains(k));
+        WlRemoveTf::new(removed)
     }
 
-    pub fn simplify(&mut self) -> WlInnTermMapTf {
-        self.coi_refine();
+    pub fn simplify(&mut self) -> WlTransformStack {
+        let mut tf = WlTransformStack::new();
+        tf.add(Box::new(self.coi_refine()));
         let mut map = GHashMap::new();
         for (_, i) in self.init.iter_mut() {
             *i = i.simplify(&mut map);
@@ -75,11 +82,24 @@ impl WlTransys {
         for j in self.justice.iter_mut() {
             *j = j.simplify(&mut map);
         }
-        WlInnTermMapTf::new(map)
+        tf.add(Box::new(WlInnTermMapTf::new(map)));
+        tf
     }
+}
 
-    pub fn simplify_with_symbols(&mut self, symbols: &mut WlTsSymbol) {
-        let map = self.simplify();
-        map.trans_sym(symbols);
+pub trait WlTsSimpPass {
+    type WlTransform: WlTransform;
+
+    fn simplify(wts: &mut WlTransys) -> impl WlTransform;
+}
+
+pub struct ConstraintInputPass;
+
+impl WlTsSimpPass for ConstraintInputPass {
+    type WlTransform = WlTransformStack;
+
+    fn simplify(wts: &mut WlTransys) -> WlTransformStack {
+        let tf = WlTransformStack::new();
+        todo!()
     }
 }

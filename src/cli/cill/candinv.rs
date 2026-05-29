@@ -3,6 +3,7 @@ use btor::Btor;
 use giputils::{file::recreate_dir, hash::GHashMap};
 use logicrs::fol::Term;
 use rIC3::frontend::{Frontend, btor::BtorFrontend};
+use rIC3::wltransys::transform::WlTransform;
 use rIC3::wltransys::{WlTransys, symbol::WlTsSymbol};
 use std::collections::{BTreeSet, HashMap};
 
@@ -117,7 +118,8 @@ pub fn link_candinv(
     candinv_bf: &mut BtorFrontend,
 ) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
     let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
-    candinv_wts.simplify_with_symbols(&mut candinv_wsym);
+    let candinv_tf = candinv_wts.simplify();
+    candinv_tf.trans_sym(&mut candinv_wsym);
 
     let (linked_wts, linked_wsym, mut unlinked_symbols) =
         link_wts(core_wts, core_wsym, candinv_wts, candinv_wsym)?;

@@ -2,18 +2,18 @@ use crate::wltransys::{
     cert::{WlCex, WlProof},
     symbol::WlTsSymbol,
 };
-use giputils::hash::GHashMap;
+use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::Term;
 use std::mem::take;
 
 pub trait WlTransform {
-    fn trans_sym(&self, sym: &mut WlTsSymbol);
+    fn trans_sym(&self, _sym: &mut WlTsSymbol) {}
 
     /// Inversely transform word-level counterexample.
-    fn inv_trans_cex(&self, cex: &mut WlCex);
+    fn inv_trans_cex(&self, _cex: &mut WlCex) {}
 
     /// Inversely transform word-level proof.
-    fn inv_trans_proof(&self, proof: &mut WlProof);
+    fn inv_trans_proof(&self, _proof: &mut WlProof) {}
 }
 
 pub struct WlTransformStack {
@@ -70,11 +70,23 @@ impl WlTransform for WlInnTermMapTf {
         }
     }
 
-    fn inv_trans_cex(&self, _cex: &mut WlCex) {
-        // No action is needed because this map does not affect inputs or latches.
+    // No action is needed for inv cert because this map does not affect inputs or latches.
+}
+
+pub struct WlRemoveTf {
+    removed: GHashSet<Term>,
+}
+
+impl WlRemoveTf {
+    pub fn new(removed: GHashSet<Term>) -> Self {
+        Self { removed }
+    }
+}
+
+impl WlTransform for WlRemoveTf {
+    fn trans_sym(&self, sym: &mut WlTsSymbol) {
+        sym.signal.retain(|term, _| !self.removed.contains(term));
     }
 
-    fn inv_trans_proof(&self, _proof: &mut WlProof) {
-        // No action is needed because this map does not affect inputs or latches.
-    }
+    // No action is needed for inv cert because the removed terms are irrelevant to the property.
 }

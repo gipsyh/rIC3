@@ -14,7 +14,7 @@ use rIC3::{
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
     transys::{TransysIf, certify::Restore},
-    wltransys::{WlTransys, symbol::WlTsSymbol},
+    wltransys::{WlTransys, symbol::WlTsSymbol, transform::WlTransform},
 };
 use rayon::{
     ThreadPoolBuilder,
@@ -61,7 +61,8 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
 }
 
 fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyhow::Result<()> {
-    wts.simplify_with_symbols(wsym);
+    let tf = wts.simplify();
+    tf.trans_sym(wsym);
     let (mut ts, _) = wts.bitblast_to_ts();
     ts.simplify(&mut Restore::new(&ts));
     let mut cfg = IC3Config::default();
@@ -103,7 +104,8 @@ fn preprocess(rp: &Ric3Proj, wts: &mut WlTransys, wsym: &mut WlTsSymbol) -> anyh
     }
     rp.cache_res(cache)?;
     info!("Preprocess solved {} properties.", num_prop - wts.bad.len());
-    wts.simplify_with_symbols(wsym);
+    let tf = wts.simplify();
+    tf.trans_sym(wsym);
     term_gc();
     Ok(())
 }
