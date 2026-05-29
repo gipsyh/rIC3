@@ -25,8 +25,8 @@ impl WlTransformStack {
         Self { trans: Vec::new() }
     }
 
-    pub fn add(&mut self, trans: Box<dyn WlTransform>) {
-        self.trans.push(trans);
+    pub fn add(&mut self, trans: impl WlTransform + 'static) {
+        self.trans.push(Box::new(trans));
     }
 }
 
@@ -50,6 +50,7 @@ impl WlTransform for WlTransformStack {
     }
 }
 
+// Internal Term Map Transform
 pub struct WlInnTermMapTf {
     map: GHashMap<Term, Term>,
 }
@@ -71,6 +72,37 @@ impl WlTransform for WlInnTermMapTf {
     }
 
     // No action is needed for inv cert because this map does not affect inputs or latches.
+}
+
+/// External term map transform.
+/// Ensure that no other term in the transition system depends on the mapped term.
+pub struct WlExtTermMapTf {
+    map: GHashMap<Term, Term>,
+}
+
+impl WlExtTermMapTf {
+    pub fn new(map: GHashMap<Term, Term>) -> Self {
+        Self { map }
+    }
+}
+
+impl WlTransform for WlExtTermMapTf {
+    fn trans_sym(&self, sym: &mut WlTsSymbol) {
+        for (k, v) in self.map.iter() {
+            if let Some(s) = sym.remove(k) {
+                let ns = sym.entry(v.clone()).or_default();
+                ns.extend(s);
+            }
+        }
+    }
+
+    fn inv_trans_cex(&self, _cex: &mut WlCex) {
+        todo!();
+    }
+
+    fn inv_trans_proof(&self, _proof: &mut WlProof) {
+        todo!()
+    }
 }
 
 pub struct WlRemoveTf {

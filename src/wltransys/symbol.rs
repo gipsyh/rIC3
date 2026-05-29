@@ -1,6 +1,6 @@
 use giputils::hash::GHashMap;
 use logicrs::fol::Term;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
 pub struct WlTsSymbol {
@@ -14,6 +14,13 @@ impl Deref for WlTsSymbol {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.signal
+    }
+}
+
+impl DerefMut for WlTsSymbol {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.signal
     }
 }
 

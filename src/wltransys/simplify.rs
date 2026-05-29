@@ -1,23 +1,64 @@
 use super::WlTransys;
-use crate::wltransys::transform::{WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack};
+use crate::wltransys::transform::{
+    WlExtTermMapTf, WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack,
+};
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{FolOp, Term, TermType};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
+    pub fn term_apply(&mut self, r: impl Fn(&Term) -> Option<Term>) -> GHashMap<Term, Term> {
+        let mut map = GHashMap::new();
+        for input in self.input.iter_mut() {
+            *input = input.cached_apply(&r, &mut map);
+        }
+        for latch in self.latch.iter_mut() {
+            *latch = latch.cached_apply(&r, &mut map);
+        }
+        self.init = take(&mut self.init)
+            .into_iter()
+            .map(|(latch, init)| {
+                (
+                    latch.cached_apply(&r, &mut map),
+                    init.cached_apply(&r, &mut map),
+                )
+            })
+            .collect();
+        self.next = take(&mut self.next)
+            .into_iter()
+            .map(|(latch, next)| {
+                (
+                    latch.cached_apply(&r, &mut map),
+                    next.cached_apply(&r, &mut map),
+                )
+            })
+            .collect();
+        for bad in self.bad.iter_mut() {
+            *bad = bad.cached_apply(&r, &mut map);
+        }
+        for constraint in self.constraint.iter_mut() {
+            *constraint = constraint.cached_apply(&r, &mut map);
+        }
+        for justice in self.justice.iter_mut() {
+            *justice = justice.cached_apply(&r, &mut map);
+        }
+        map
+    }
+
     pub fn coi_refine(&mut self) -> WlRemoveTf {
         CoiPass::apply(self).unwrap()
     }
+
     pub fn simplify(&mut self) -> WlTransformStack {
         let mut tf = WlTransformStack::new();
         if let Some(t) = ConstraintInputPass::apply(self) {
-            tf.add(Box::new(t));
+            tf.add(t);
         }
         if let Some(t) = CoiPass::apply(self) {
-            tf.add(Box::new(t));
+            tf.add(t);
         }
         if let Some(t) = InnTermSimpPass::apply(self) {
-            tf.add(Box::new(t));
+            tf.add(t);
         }
         tf
     }
@@ -126,18 +167,29 @@ impl WlTsSimpPass for ConstraintInputPass {
 
     fn apply(wts: &mut WlTransys) -> Option<WlTransformStack> {
         let inputs: GHashSet<_> = wts.input.iter().cloned().collect();
-        let mut map = GHashMap::new();
+        let mut ext_map = GHashMap::new();
         for cst in wts.constraint.iter() {
             if cst.is_var() && inputs.contains(cst) {
-                map.insert(cst.clone(), true);
+                ext_map.insert(cst.clone(), Term::bool_const(true));
             } else if let Some(op) = cst.try_op() {
                 if op.op == FolOp::Not && inputs.contains(&op.terms[0]) {
-                    map.insert(cst.clone(), false);
+                    ext_map.insert(op.terms[0].clone(), Term::bool_const(false));
                 }
             }
         }
-        dbg!(map.len());
-        let tf = WlTransformStack::new();
-        todo!()
+        if ext_map.is_empty() {
+            return None;
+        }
+        let mut inn_map = wts.term_apply(|t| ext_map.get(t).cloned());
+        wts.input.retain(|t| !ext_map.contains_key(t));
+        for k in ext_map.keys() {
+            inn_map.remove(k);
+        }
+        let inn_map = WlInnTermMapTf::new(inn_map);
+        let ext_map = WlExtTermMapTf::new(ext_map);
+        let mut tf = WlTransformStack::new();
+        tf.add(inn_map);
+        tf.add(ext_map);
+        Some(tf)
     }
 }
