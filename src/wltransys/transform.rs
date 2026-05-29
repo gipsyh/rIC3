@@ -74,19 +74,19 @@ impl WlTransform for WlInnTermMapTf {
     // No action is needed for inv cert because this map does not affect inputs or latches.
 }
 
-/// External term map transform.
+/// External term merge transform.
 /// Ensure that no other term in the transition system depends on the mapped term.
-pub struct WlExtTermMapTf {
+pub struct WlExtTermMergeTf {
     map: GHashMap<Term, Term>,
 }
 
-impl WlExtTermMapTf {
+impl WlExtTermMergeTf {
     pub fn new(map: GHashMap<Term, Term>) -> Self {
         Self { map }
     }
 }
 
-impl WlTransform for WlExtTermMapTf {
+impl WlTransform for WlExtTermMergeTf {
     fn trans_sym(&self, sym: &mut WlTsSymbol) {
         for (k, v) in self.map.iter() {
             if let Some(s) = sym.remove(k) {

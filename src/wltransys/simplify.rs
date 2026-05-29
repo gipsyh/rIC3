@@ -1,6 +1,6 @@
 use super::WlTransys;
 use crate::wltransys::transform::{
-    WlExtTermMapTf, WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack,
+    WlExtTermMergeTf, WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack,
 };
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{FolOp, Term, TermType};
@@ -186,7 +186,7 @@ impl WlTsSimpPass for ConstraintInputPass {
             inn_map.remove(k);
         }
         let inn_map = WlInnTermMapTf::new(inn_map);
-        let ext_map = WlExtTermMapTf::new(ext_map);
+        let ext_map = WlExtTermMergeTf::new(ext_map);
         let mut tf = WlTransformStack::new();
         tf.add(inn_map);
         tf.add(ext_map);
