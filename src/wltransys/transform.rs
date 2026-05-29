@@ -20,6 +20,36 @@ pub struct WlTransformStack {
     trans: Vec<Box<dyn WlTransform>>,
 }
 
+impl WlTransformStack {
+    pub fn new() -> Self {
+        Self { trans: Vec::new() }
+    }
+
+    pub fn add(&mut self, trans: Box<dyn WlTransform>) {
+        self.trans.push(trans);
+    }
+}
+
+impl WlTransform for WlTransformStack {
+    fn trans_sym(&self, sym: &mut WlTsSymbol) {
+        for trans in self.trans.iter() {
+            trans.trans_sym(sym);
+        }
+    }
+
+    fn inv_trans_cex(&self, cex: &mut WlCex) {
+        for trans in self.trans.iter().rev() {
+            trans.inv_trans_cex(cex);
+        }
+    }
+
+    fn inv_trans_proof(&self, proof: &mut WlProof) {
+        for trans in self.trans.iter().rev() {
+            trans.inv_trans_proof(proof);
+        }
+    }
+}
+
 pub struct WlInnTermMapTf {
     map: GHashMap<Term, Term>,
 }
