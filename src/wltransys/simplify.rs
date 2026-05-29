@@ -13,25 +13,9 @@ impl WlTransys {
         if let Some(t) = CoiPass::apply(self) {
             tf.add(Box::new(t));
         }
-        let mut map = GHashMap::new();
-        for (_, i) in self.init.iter_mut() {
-            *i = i.simplify(&mut map);
+        if let Some(t) = InnTermSimpPass::apply(self) {
+            tf.add(Box::new(t));
         }
-        for (_, n) in self.next.iter_mut() {
-            *n = n.simplify(&mut map);
-        }
-        for c in self.constraint.iter_mut() {
-            *c = c.simplify(&mut map);
-        }
-        self.constraint
-            .retain(|c| !c.try_bool_const().is_some_and(|f| f));
-        for b in self.bad.iter_mut() {
-            *b = b.simplify(&mut map);
-        }
-        for j in self.justice.iter_mut() {
-            *j = j.simplify(&mut map);
-        }
-        tf.add(Box::new(WlInnTermMapTf::new(map)));
         tf
     }
 }
@@ -42,7 +26,7 @@ pub trait WlTsSimpPass {
     fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform>;
 }
 
-pub struct CoiPass;
+struct CoiPass;
 
 impl WlTsSimpPass for CoiPass {
     type WlTransform = WlRemoveTf;
@@ -101,6 +85,34 @@ impl WlTsSimpPass for CoiPass {
         wts.init.retain(|k, _| touch.contains(k));
         wts.next.retain(|k, _| touch.contains(k));
         Some(WlRemoveTf::new(removed))
+    }
+}
+
+struct InnTermSimpPass;
+
+impl WlTsSimpPass for InnTermSimpPass {
+    type WlTransform = WlInnTermMapTf;
+
+    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform> {
+        let mut map = GHashMap::new();
+        for (_, i) in wts.init.iter_mut() {
+            *i = i.simplify(&mut map);
+        }
+        for (_, n) in wts.next.iter_mut() {
+            *n = n.simplify(&mut map);
+        }
+        for c in wts.constraint.iter_mut() {
+            *c = c.simplify(&mut map);
+        }
+        wts.constraint
+            .retain(|c| !c.try_bool_const().is_some_and(|f| f));
+        for b in wts.bad.iter_mut() {
+            *b = b.simplify(&mut map);
+        }
+        for j in wts.justice.iter_mut() {
+            *j = j.simplify(&mut map);
+        }
+        Some(WlInnTermMapTf::new(map))
     }
 }
 
