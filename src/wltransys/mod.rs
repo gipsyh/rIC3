@@ -3,9 +3,10 @@ pub mod cert;
 mod preproc;
 mod simplify;
 pub mod symbol;
+pub mod transform;
 pub mod unroll;
 
-use crate::wltransys::certify::Restore;
+use crate::wltransys::cert::Restore;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{FolOp, Sort, Term};
 use std::mem::take;

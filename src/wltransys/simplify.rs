@@ -1,4 +1,5 @@
 use super::{WlTransys, symbol::WlTsSymbol};
+use crate::wltransys::transform::{WlInnTermMapTf, WlTransform};
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Term, TermType};
 use std::{mem::take, ops::Deref};
@@ -54,7 +55,7 @@ impl WlTransys {
         self.next.retain(|k, _| touch.contains(k));
     }
 
-    pub fn simplify(&mut self) -> GHashMap<Term, Term> {
+    pub fn simplify(&mut self) -> WlInnTermMapTf {
         self.coi_refine();
         let mut map = GHashMap::new();
         for (_, i) in self.init.iter_mut() {
@@ -74,11 +75,11 @@ impl WlTransys {
         for j in self.justice.iter_mut() {
             *j = j.simplify(&mut map);
         }
-        map
+        WlInnTermMapTf::new(map)
     }
 
     pub fn simplify_with_symbols(&mut self, symbols: &mut WlTsSymbol) {
         let map = self.simplify();
-        symbols.transform(&map);
+        map.trans_sym(symbols);
     }
 }

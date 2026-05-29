@@ -1,6 +1,5 @@
 use giputils::hash::GHashMap;
 use logicrs::fol::Term;
-use std::mem::take;
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
@@ -21,14 +20,5 @@ impl Deref for WlTsSymbol {
 impl WlTsSymbol {
     pub fn prop_index_by_name(&self, name: &str) -> usize {
         self.prop.iter().position(|prop| prop == name).unwrap()
-    }
-
-    pub fn transform(&mut self, transform: &GHashMap<Term, Term>) {
-        for (k, v) in take(&mut self.signal) {
-            if let Some(t) = transform.get(&k) {
-                let entry = self.signal.entry(t.clone()).or_default();
-                entry.extend(v);
-            }
-        }
     }
 }
