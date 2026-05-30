@@ -3,7 +3,11 @@ use crate::wltransys::transform::{
     WlExtTermMergeTf, WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack,
 };
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{FolOp, Term, TermType};
+use log::debug;
+use logicrs::{
+    OptLevel,
+    fol::{FolOp, Term, TermType, simplify::SimplifyCtx},
+};
 use std::{mem::take, ops::Deref};
 
 impl WlTransys {
@@ -46,18 +50,19 @@ impl WlTransys {
     }
 
     pub fn coi_refine(&mut self) -> WlRemoveTf {
-        CoiPass::apply(self).unwrap()
+        CoiPass::apply(self, ()).unwrap()
     }
 
     pub fn simplify(&mut self) -> WlTransformStack {
         let mut tf = WlTransformStack::new();
-        if let Some(t) = ConstraintInputPass::apply(self) {
+        tf.add(self.coi_refine());
+        if let Some(t) = InnTermSimpPass::apply(self, OptLevel::O0) {
             tf.add(t);
         }
-        if let Some(t) = CoiPass::apply(self) {
+        if let Some(t) = ConstraintInputPass::apply(self, ()) {
             tf.add(t);
         }
-        if let Some(t) = InnTermSimpPass::apply(self) {
+        if let Some(t) = InnTermSimpPass::apply(self, OptLevel::O3) {
             tf.add(t);
         }
         tf
@@ -67,15 +72,18 @@ impl WlTransys {
 pub trait WlTsSimpPass {
     type WlTransform: WlTransform;
 
-    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform>;
+    type PassArgs;
+
+    fn apply(wts: &mut WlTransys, args: Self::PassArgs) -> Option<Self::WlTransform>;
 }
 
 struct CoiPass;
 
 impl WlTsSimpPass for CoiPass {
     type WlTransform = WlRemoveTf;
+    type PassArgs = ();
 
-    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform> {
+    fn apply(wts: &mut WlTransys, _args: ()) -> Option<Self::WlTransform> {
         let mut queue: Vec<_> = wts
             .constraint
             .iter()
@@ -136,25 +144,27 @@ struct InnTermSimpPass;
 
 impl WlTsSimpPass for InnTermSimpPass {
     type WlTransform = WlInnTermMapTf;
+    type PassArgs = OptLevel;
 
-    fn apply(wts: &mut WlTransys) -> Option<Self::WlTransform> {
+    fn apply(wts: &mut WlTransys, args: OptLevel) -> Option<Self::WlTransform> {
         let mut map = GHashMap::new();
+        let ctx = SimplifyCtx { level: args };
         for (_, i) in wts.init.iter_mut() {
-            *i = i.simplify(&mut map);
+            *i = i.simplify_with_ctx(&ctx, &mut map);
         }
         for (_, n) in wts.next.iter_mut() {
-            *n = n.simplify(&mut map);
+            *n = n.simplify_with_ctx(&ctx, &mut map);
         }
         for c in wts.constraint.iter_mut() {
-            *c = c.simplify(&mut map);
+            *c = c.simplify_with_ctx(&ctx, &mut map);
         }
         wts.constraint
             .retain(|c| !c.try_bool_const().is_some_and(|f| f));
         for b in wts.bad.iter_mut() {
-            *b = b.simplify(&mut map);
+            *b = b.simplify_with_ctx(&ctx, &mut map);
         }
         for j in wts.justice.iter_mut() {
-            *j = j.simplify(&mut map);
+            *j = j.simplify_with_ctx(&ctx, &mut map);
         }
         Some(WlInnTermMapTf::new(map))
     }
@@ -164,8 +174,9 @@ pub struct ConstraintInputPass;
 
 impl WlTsSimpPass for ConstraintInputPass {
     type WlTransform = WlTransformStack;
+    type PassArgs = ();
 
-    fn apply(wts: &mut WlTransys) -> Option<WlTransformStack> {
+    fn apply(wts: &mut WlTransys, _args: ()) -> Option<WlTransformStack> {
         let inputs: GHashSet<_> = wts.input.iter().cloned().collect();
         let mut ext_map = GHashMap::new();
         for cst in wts.constraint.iter() {
@@ -180,11 +191,16 @@ impl WlTsSimpPass for ConstraintInputPass {
         if ext_map.is_empty() {
             return None;
         }
+        let input: Vec<_> = take(&mut wts.input)
+            .into_iter()
+            .filter(|t| !ext_map.contains_key(t))
+            .collect();
         let mut inn_map = wts.term_apply(|t| ext_map.get(t).cloned());
-        wts.input.retain(|t| !ext_map.contains_key(t));
+        wts.input = input;
         for k in ext_map.keys() {
             inn_map.remove(k);
         }
+        debug!("ConstraintInputPass removed {} inputs.", ext_map.len());
         let inn_map = WlInnTermMapTf::new(inn_map);
         let ext_map = WlExtTermMergeTf::new(ext_map);
         let mut tf = WlTransformStack::new();

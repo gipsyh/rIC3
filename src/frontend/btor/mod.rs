@@ -9,6 +9,7 @@ use crate::{
         bitblast::BitblastMap,
         cert::{Restore, WlCex, WlProof},
         symbol::WlTsSymbol,
+        transform::{WlTransform, WlTransformStack},
     },
 };
 use btor::Btor;
@@ -83,6 +84,7 @@ pub struct BtorFrontend {
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
+    tf: WlTransformStack,
     bb_rst: Option<BitblastMap>,
 }
 
@@ -106,6 +108,7 @@ impl BtorFrontend {
             idmap,
             no_next,
             rst,
+            tf: WlTransformStack::new(),
             bb_rst: None,
         }
     }
@@ -199,8 +202,8 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
-        wts.simplify();
-        wts.coi_refine();
+        let tf = wts.simplify();
+        self.tf.extend(tf);
         // let btor = Btor::from(&wts);
         // btor.to_file("simp.btor");
         let (ts, bb_rst) = wts.bitblast_to_ts();
@@ -242,7 +245,8 @@ impl Frontend for BtorFrontend {
 }
 
 impl BtorFrontend {
-    fn wl_safe_certificate(&mut self, proof: WlProof) -> Box<dyn Display> {
+    fn wl_safe_certificate(&mut self, mut proof: WlProof) -> Box<dyn Display> {
+        self.tf.inv_trans_proof(&mut proof);
         let mut btor = self.owts.clone();
         for l in proof.input.iter() {
             if !self.idmap.contains_key(l) {
@@ -259,6 +263,7 @@ impl BtorFrontend {
     }
 
     fn wl_unsafe_certificate(&mut self, mut cex: WlCex) -> Box<dyn Display> {
+        self.tf.inv_trans_cex(&mut cex);
         let mut res = vec!["sat".to_string(), format!("b{}", cex.bad_id)];
         for i in 0..cex.len() {
             if let Some(iv) = self.rst.init_var() {

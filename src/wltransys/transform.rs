@@ -3,10 +3,13 @@ use crate::wltransys::{
     symbol::WlTsSymbol,
 };
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::Term;
-use std::mem::take;
+use logicrs::{
+    LboolVec,
+    fol::{BvTermValue, Term},
+};
+use std::{mem::take, vec::IntoIter};
 
-pub trait WlTransform {
+pub trait WlTransform: Send {
     fn trans_sym(&self, _sym: &mut WlTsSymbol) {}
 
     /// Inversely transform word-level counterexample.
@@ -16,6 +19,7 @@ pub trait WlTransform {
     fn inv_trans_proof(&self, _proof: &mut WlProof) {}
 }
 
+#[derive(Default)]
 pub struct WlTransformStack {
     trans: Vec<Box<dyn WlTransform>>,
 }
@@ -27,6 +31,20 @@ impl WlTransformStack {
 
     pub fn add(&mut self, trans: impl WlTransform + 'static) {
         self.trans.push(Box::new(trans));
+    }
+
+    pub fn extend<I: IntoIterator<Item = Box<dyn WlTransform>>>(&mut self, iter: I) {
+        self.trans.extend(iter);
+    }
+}
+
+impl IntoIterator for WlTransformStack {
+    type Item = Box<dyn WlTransform>;
+
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.trans.into_iter()
     }
 }
 
@@ -96,13 +114,17 @@ impl WlTransform for WlExtTermMergeTf {
         }
     }
 
-    fn inv_trans_cex(&self, _cex: &mut WlCex) {
-        todo!();
+    fn inv_trans_cex(&self, cex: &mut WlCex) {
+        for input in cex.input.iter_mut() {
+            for (k, v) in self.map.iter() {
+                let v = v.try_bv_const().unwrap();
+                let v = LboolVec::from(v.clone());
+                input.push(BvTermValue::new(k.clone(), v));
+            }
+        }
     }
 
-    fn inv_trans_proof(&self, _proof: &mut WlProof) {
-        todo!()
-    }
+    fn inv_trans_proof(&self, _proof: &mut WlProof) {}
 }
 
 pub struct WlRemoveTf {
