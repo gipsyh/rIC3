@@ -203,9 +203,12 @@ impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
         let tf = wts.simplify();
+        let mut wsym = self.symbols.clone();
+        tf.trans_sym(&mut wsym);
         self.tf.extend(tf);
-        // let btor = Btor::from(&wts);
+        // let btor = wts.to_btor_with_sym(&wsym);
         // btor.to_file("simp.btor");
+        // panic!();
         let (ts, bb_rst) = wts.bitblast_to_ts();
         self.bb_rst = Some(bb_rst);
         (ts, VarSymbols::new())
