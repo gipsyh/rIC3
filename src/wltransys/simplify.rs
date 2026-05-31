@@ -1,6 +1,6 @@
 use super::WlTransys;
 use crate::wltransys::transform::{
-    WlExtTermMergeTf, WlInnTermMapTf, WlRemoveTf, WlTransform, WlTransformStack,
+    WlExtTermMergeTf, WlInnTermMapTf, WlKeepTf, WlTransform, WlTransformStack,
 };
 use giputils::hash::{GHashMap, GHashSet};
 use log::debug;
@@ -49,7 +49,7 @@ impl WlTransys {
         map
     }
 
-    pub fn coi_refine(&mut self) -> WlRemoveTf {
+    pub fn coi_refine(&mut self) -> WlKeepTf {
         CoiPass::apply(&mut WlTsSimpCtx::default(), self, ()).unwrap()
     }
 
@@ -168,7 +168,7 @@ impl WlTsSimpPass for ResetToInitPass {
 struct CoiPass;
 
 impl WlTsSimpPass for CoiPass {
-    type WlTransform = WlRemoveTf;
+    type WlTransform = WlKeepTf;
     type PassArgs<'a> = ();
 
     fn apply<'a>(
@@ -212,24 +212,19 @@ impl WlTsSimpPass for CoiPass {
                 }
             };
         }
-        let mut removed = GHashSet::new();
         for x in take(&mut wts.input) {
             if touch.contains(&x) {
                 wts.input.push(x);
-            } else {
-                removed.insert(x);
             }
         }
         for x in take(&mut wts.latch) {
             if touch.contains(&x) {
                 wts.latch.push(x);
-            } else {
-                removed.insert(x);
             }
         }
         wts.init.retain(|k, _| touch.contains(k));
         wts.next.retain(|k, _| touch.contains(k));
-        Some(WlRemoveTf::new(removed))
+        Some(WlKeepTf::new(touch))
     }
 }
 

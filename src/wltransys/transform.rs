@@ -144,3 +144,21 @@ impl WlTransform for WlRemoveTf {
 
     // No action is needed for inv cert because the removed terms are irrelevant to the property.
 }
+
+pub struct WlKeepTf {
+    keep: GHashSet<Term>,
+}
+
+impl WlKeepTf {
+    pub fn new(keep: GHashSet<Term>) -> Self {
+        Self { keep }
+    }
+}
+
+impl WlTransform for WlKeepTf {
+    fn trans_sym(&self, sym: &mut WlTsSymbol) {
+        sym.signal.retain(|term, _| self.keep.contains(term));
+    }
+
+    // No action is needed for inv cert because the removed terms are irrelevant to the property.
+}
