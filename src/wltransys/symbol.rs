@@ -28,4 +28,13 @@ impl WlTsSymbol {
     pub fn prop_index_by_name(&self, name: &str) -> usize {
         self.prop.iter().position(|prop| prop == name).unwrap()
     }
+
+    pub fn get_term_by_name(&self, name: &str) -> Option<Term> {
+        for (k, v) in self.signal.iter() {
+            if v.iter().any(|s| s == name) {
+                return Some(k.clone());
+            }
+        }
+        None
+    }
 }

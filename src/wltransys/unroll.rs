@@ -88,7 +88,7 @@ impl WlTransysUnroll {
     }
 
     pub fn apply_next(&self, t: &Term, k: usize) -> Term {
-        t.apply(|t| self.next_map.get(t).map(|n| n[k].clone()))
+        t.apply(&|t| self.next_map.get(t).map(|n| n[k].clone()))
     }
 
     pub fn cex(&self, slv: &mut Bitwuzla) -> WlCex {

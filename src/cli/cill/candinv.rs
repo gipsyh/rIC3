@@ -60,7 +60,7 @@ fn make_substitution(
 }
 
 fn apply_subst(term: &Term, subst: &GHashMap<Term, Term>) -> Term {
-    term.apply(|term| subst.get(term).cloned())
+    term.apply(&|term| subst.get(term).cloned())
 }
 
 fn push_symbol(symbols: &mut WlTsSymbol, term: Term, name: String) {
