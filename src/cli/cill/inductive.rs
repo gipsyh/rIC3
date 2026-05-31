@@ -35,7 +35,7 @@ impl CIll {
                 (0..num_prop)
                     .into_par_iter()
                     .map(|i| {
-                        let ic3res: Vec<_> = [true]
+                        let ic3res: Vec<_> = [true, false]
                             .into_par_iter()
                             .map(|lp| {
                                 let mut cfg = cfg.clone();
@@ -51,11 +51,11 @@ impl CIll {
                                 (matches!(res, McResult::UNSAT), inv, lp as u32 + 1)
                             })
                             .collect();
-                        // let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
-                        // si.extend(ii);
-                        // (sr || ir, si, se + ie)
-                        let [(sr, si, se)] = ic3res.try_into().unwrap();
-                        (sr, si, se)
+                        let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
+                        si.extend(ii);
+                        (sr || ir, si, se + ie)
+                        // let [(sr, si, se)] = ic3res.try_into().unwrap();
+                        // (sr, si, se)
                     })
                     .collect()
             })
