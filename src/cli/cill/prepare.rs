@@ -42,7 +42,7 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     recreate_dir(rp.path("res"))?;
     let dut_dir = rp.path("dut");
     recreate_dir(&dut_dir)?;
-    Yosys::generate_btor_with_files(&rcfg, &rcfg.dut.files, &dut_dir, "dut", false)?;
+    Yosys::generate_btor_with_files(&rcfg, &rcfg.dut.files, &dut_dir, "dut", true)?;
     let mut btor = BtorFrontend::new(Btor::from_file(dut_dir.join("dut.btor")));
     let (mut wts, mut wsym) = btor.wts();
     preprocess(rcfg, rp, &mut wts, &mut wsym)?;
@@ -61,16 +61,16 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
 }
 
 fn preprocess(
-    rcfg: &Ric3Config,
+    _rcfg: &Ric3Config,
     rp: &Ric3Proj,
     wts: &mut WlTransys,
     wsym: &mut WlTsSymbol,
 ) -> anyhow::Result<()> {
-    let mut tf = wts.simplify();
-    let (rst, pol) = rcfg.reset().unwrap();
-    let rst = wsym.get_term_by_name(&rst).unwrap();
-    tf.extend(wts.reset_to_init(&rst, pol).unwrap());
-    tf.extend(wts.simplify());
+    let tf = wts.simplify();
+    // let (rst, pol) = rcfg.reset().unwrap();
+    // let rst = wsym.get_term_by_name(&rst).unwrap();
+    // tf.extend(wts.reset_to_init(&rst, pol).unwrap());
+    // tf.extend(wts.simplify());
     tf.trans_sym(wsym);
     let (mut ts, _) = wts.bitblast_to_ts();
     ts.simplify(&mut Restore::new(&ts));
