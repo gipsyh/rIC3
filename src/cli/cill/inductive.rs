@@ -51,9 +51,11 @@ impl CIll {
                                 (matches!(res, McResult::UNSAT), inv, lp as u32 + 1)
                             })
                             .collect();
-                        let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
-                        si.extend(ii);
-                        (sr || ir, si, se + ie)
+                        // let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
+                        // si.extend(ii);
+                        // (sr || ir, si, se + ie)
+                        let [(sr, si, se)] = ic3res.try_into().unwrap();
+                        (sr, si, se)
                     })
                     .collect()
             })
