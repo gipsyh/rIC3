@@ -64,10 +64,10 @@ impl CIll {
         let mut results = Vec::new();
         let mut ic3_proved = Vec::new();
         let mut engines = vec![None; num_prop];
-        for (id, (r, inv, _lp)) in ic3_results.into_iter().enumerate() {
+        for (id, (r, inv, lp)) in ic3_results.into_iter().enumerate() {
             if r {
                 ic3_proved.push(id);
-                engines[id] = Some(format!("IC3"));
+                engines[id] = Some(format!("IC3({lp})"));
             }
             results.push(r);
             invariants.extend(inv);
