@@ -83,13 +83,13 @@ fn preprocess(
     tf.trans_sym(wsym);
     let (mut ts, _) = wts.bitblast_to_ts();
     ts.simplify(&mut Restore::new(&ts));
+    info!("{}", ts.statistic());
     let mut cfg = IC3Config::default();
     cfg.pred_prop = true;
-    cfg.preproc.frts = false;
-    cfg.preproc.scorr = false;
+    cfg.local_proof = true;
+    cfg.preproc.preproc = false;
     let num_prop = ts.bad.len();
-    info!("{}", ts.statistic());
-    cfg.time_limit = Some(20);
+    cfg.time_limit = Some(30);
     let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
     let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
         pool.install(|| {
@@ -97,9 +97,7 @@ fn preprocess(
                 .into_par_iter()
                 .map(|i| {
                     let mut cfg = cfg.clone();
-                    cfg.pred_prop = true;
                     cfg.prop = Some(i);
-                    cfg.local_proof = true;
                     let mut ic3 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
                     ic3.check()
                 })
