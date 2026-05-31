@@ -122,7 +122,6 @@ fn preprocess(
     }
     rp.cache_res(cache)?;
     info!("Preprocess solved {} properties.", num_prop - wts.bad.len());
-    dbg!(keep.len());
     let tf = wts.simplify(&mut keep);
     tf.trans_sym(wsym);
     term_gc();
