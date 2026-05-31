@@ -90,7 +90,7 @@ fn preprocess(
     cfg.preproc.preproc = false;
     let num_prop = ts.bad.len();
     cfg.time_limit = Some(30);
-    let pool = ThreadPoolBuilder::new().num_threads(8).build()?;
+    let pool = ThreadPoolBuilder::new().num_threads(16).build()?;
     let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
         pool.install(|| {
             (0..num_prop)
