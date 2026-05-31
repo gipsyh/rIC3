@@ -65,6 +65,7 @@ impl WlTransys {
         if let Some(t) = InnTermSimpPass::apply(self, OptLevel::O3) {
             tf.add(t);
         }
+        tf.add(self.coi_refine());
         tf
     }
 }
