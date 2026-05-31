@@ -47,7 +47,7 @@ impl Yosys {
     }
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
-        Self::generate_btor_with_files(cfg, &cfg.dut.files, p, "dut")
+        Self::generate_btor_with_files(cfg, &cfg.dut.files, p, "dut", true)
     }
 
     pub fn generate_btor_with_files(
@@ -55,6 +55,7 @@ impl Yosys {
         input_files: &[PathBuf],
         p: impl AsRef<Path>,
         stem: &str,
+        reset: bool,
     ) -> anyhow::Result<()> {
         info!("Yosys: parsing SystemVerilog and generating BTOR.");
         let slang = cfg
@@ -95,13 +96,12 @@ impl Yosys {
         yosys.add_command("setundef -undriven -anyseq");
         yosys.add_command("opt_clean");
         yosys.add_command("memory_nordff");
-        if let Some(reset) = &cfg.dut.reset {
-            if reset.starts_with("!") {
-                let reset = reset.strip_prefix("!").unwrap();
-                yosys.add_command(&format!("fminit -seq {} 0,1", reset));
-            } else {
-                yosys.add_command(&format!("fminit -seq {} 1,0", reset));
-            }
+        if reset && let Some((reset, pol)) = cfg.reset() {
+            yosys.add_command(&format!(
+                "fminit -seq {} {}",
+                reset,
+                if pol { "1,0" } else { "0,1" }
+            ));
         }
         yosys.add_command("chformal -cover -remove");
         yosys.add_command("chformal -early");

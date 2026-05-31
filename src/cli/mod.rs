@@ -123,6 +123,16 @@ impl Ric3Config {
         }
         Ok(config)
     }
+
+    fn reset(&self) -> Option<(String, bool)> {
+        let reset = self.dut.reset.clone()?;
+        Some(if reset.starts_with("!") {
+            let reset = reset.strip_prefix("!").unwrap();
+            (reset.to_string(), false)
+        } else {
+            (reset.to_string(), true)
+        })
+    }
 }
 
 #[derive(Deserialize, Debug)]
