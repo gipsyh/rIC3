@@ -97,9 +97,9 @@ fn preprocess(
                 .into_par_iter()
                 .map(|i| {
                     let mut cfg = cfg.clone();
-                    // cfg.inn = !lp;
                     cfg.pred_prop = true;
                     cfg.prop = Some(i);
+                    cfg.local_proof = true;
                     let mut ic3 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
                     ic3.check()
                 })
