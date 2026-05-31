@@ -68,6 +68,10 @@ impl WlTransys {
         tf.add(self.coi_refine());
         tf
     }
+
+    pub fn reset_to_init(&mut self, rst: &Term, polarity: bool) -> Option<WlTransformStack> {
+        ResetToInitPass::apply(self, (rst.clone(), polarity))
+    }
 }
 
 pub trait WlTsSimpPass {
@@ -76,6 +80,70 @@ pub trait WlTsSimpPass {
     type PassArgs;
 
     fn apply(wts: &mut WlTransys, args: Self::PassArgs) -> Option<Self::WlTransform>;
+}
+
+struct ResetToInitPass;
+
+impl WlTsSimpPass for ResetToInitPass {
+    type WlTransform = WlTransformStack;
+    type PassArgs = (Term, bool);
+
+    fn apply(wts: &mut WlTransys, (rst, polarity): (Term, bool)) -> Option<Self::WlTransform> {
+        if !rst.is_var() || !rst.sort().is_bool() || !wts.input.iter().any(|i| i == &rst) {
+            return None;
+        }
+
+        let reset_value = Term::bool_const(polarity);
+        let normal_value = Term::bool_const(!polarity);
+        let mut init_updates = Vec::new();
+        let mut self_hold = 0;
+        let mut non_const_init = 0;
+        for latch in wts.latch.iter() {
+            let Some(next) = wts.next.get(latch) else {
+                continue;
+            };
+            let reset_next = next.apply(&|t| (t == &rst).then(|| reset_value.clone()));
+            let normal_next = next.apply(&|t| (t == &rst).then(|| normal_value.clone()));
+            if reset_next == normal_next {
+                continue;
+            }
+            if reset_next == latch {
+                self_hold += 1;
+            } else if reset_next.is_const() {
+                init_updates.push((latch.clone(), reset_next));
+            } else {
+                non_const_init += 1;
+            }
+        }
+        if non_const_init > 0 {
+            debug!("ResetToInitPass skipped because {non_const_init} reset values are non-const.");
+            return None;
+        }
+
+        let const_init = init_updates.len();
+        for (latch, reset_next) in init_updates {
+            wts.init.insert(latch, reset_next);
+        }
+
+        let input: Vec<_> = take(&mut wts.input)
+            .into_iter()
+            .filter(|t| t != &rst)
+            .collect();
+        let ext_map = GHashMap::from_iter([(rst, normal_value)]);
+        let mut inn_map = wts.term_apply(|t| ext_map.get(t).cloned());
+        wts.input = input;
+        for k in ext_map.keys() {
+            inn_map.remove(k);
+        }
+
+        debug!(
+            "ResetToInitPass moved {const_init} const reset values to init and kept {self_hold} self-holding reset values unconstrained."
+        );
+        let mut tf = WlTransformStack::new();
+        tf.add(WlInnTermMapTf::new(inn_map));
+        tf.add(WlExtTermMergeTf::new(ext_map));
+        Some(tf)
+    }
 }
 
 struct CoiPass;
