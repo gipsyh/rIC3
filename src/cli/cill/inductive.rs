@@ -48,12 +48,12 @@ impl CIll {
                                     IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
                                 let res = ic3.check();
                                 let inv = ic3.invariant();
-                                (matches!(res, McResult::UNSAT), inv)
+                                (matches!(res, McResult::UNSAT), inv, lp as u32 + 1)
                             })
                             .collect();
-                        let [(sr, mut si), (ir, ii)] = ic3res.try_into().unwrap();
+                        let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
                         si.extend(ii);
-                        (sr || ir, si)
+                        (sr || ir, si, se + ie)
                     })
                     .collect()
             })
@@ -62,10 +62,10 @@ impl CIll {
         let mut results = Vec::new();
         let mut ic3_proved = Vec::new();
         let mut engines = vec![None; num_prop];
-        for (id, (r, inv)) in ic3_results.into_iter().enumerate() {
+        for (id, (r, inv, lp)) in ic3_results.into_iter().enumerate() {
             if r {
                 ic3_proved.push(id);
-                engines[id] = Some("IC3");
+                engines[id] = Some(format!("IC3{lp}"));
             }
             results.push(r);
             invariants.extend(inv);
@@ -96,7 +96,7 @@ impl CIll {
         let mut results = vec![None; num_prop];
         for (b, r, kind) in kind_results {
             if r.is_none() {
-                engines[b] = Some("K-Ind")
+                engines[b] = Some("K-Ind".to_string())
             }
             results[b] = r;
             kinds.push(kind);
@@ -144,7 +144,7 @@ impl CIll {
     fn print_and_save_res(
         &mut self,
         res: Vec<Option<BlCex>>,
-        engines: Vec<Option<&str>>,
+        engines: Vec<Option<String>>,
     ) -> anyhow::Result<()> {
         #[derive(Tabled)]
         struct InductiveResult {
@@ -162,6 +162,10 @@ impl CIll {
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
+            let name = name
+                .strip_prefix("invariants.")
+                .map(|s| s.to_string())
+                .unwrap_or(name);
             let cti_file = cti_path.join(format!("{}.cti", name));
             let vcd_path = cti_path.join(format!("{}.vcd", name));
             let (status, vcd) = if let Some(cex) = res {
@@ -176,7 +180,7 @@ impl CIll {
             results.push(InductiveResult {
                 property: name,
                 result: status,
-                engine: engines[i].unwrap_or("-").to_string(),
+                engine: engines[i].clone().unwrap_or("-".to_string()),
                 vcd,
             });
         }
