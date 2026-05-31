@@ -1,7 +1,7 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
 use giputils::{file::recreate_dir, logger::with_log_level};
-use log::{LevelFilter, info};
+use log::LevelFilter;
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -61,15 +61,14 @@ impl CIll {
         let mut invariants = LitVvec::new();
         let mut results = Vec::new();
         let mut ic3_proved = Vec::new();
+        let mut engines = vec![None; num_prop];
         for (id, (r, inv)) in ic3_results.into_iter().enumerate() {
             if r {
                 ic3_proved.push(id);
+                engines[id] = Some("IC3");
             }
             results.push(r);
             invariants.extend(inv);
-        }
-        if !ic3_proved.is_empty() {
-            info!("IC3 proved {:?} prop.", ic3_proved);
         }
         invariants.subsume_simplify();
         let mut uts = TransysUnroll::new(&self.ts);
@@ -96,6 +95,9 @@ impl CIll {
         let mut kinds = Vec::new();
         let mut results = vec![None; num_prop];
         for (b, r, kind) in kind_results {
+            if r.is_none() {
+                engines[b] = Some("K-Ind")
+            }
             results[b] = r;
             kinds.push(kind);
         }
@@ -135,17 +137,23 @@ impl CIll {
         //         .certify(&self.rp.path("dut/dut.btor"), &self.rp.path("cill/cert"))
         // );
         // }
-        self.print_and_save_res(results)?;
+        self.print_and_save_res(results, engines)?;
         Ok(res)
     }
 
-    fn print_and_save_res(&mut self, res: Vec<Option<BlCex>>) -> anyhow::Result<()> {
+    fn print_and_save_res(
+        &mut self,
+        res: Vec<Option<BlCex>>,
+        engines: Vec<Option<&str>>,
+    ) -> anyhow::Result<()> {
         #[derive(Tabled)]
         struct InductiveResult {
             #[tabled(rename = "Property")]
             property: String,
             #[tabled(rename = "Result")]
             result: String,
+            #[tabled(rename = "Engine")]
+            engine: String,
             #[tabled(rename = "VCD")]
             vcd: String,
         }
@@ -168,6 +176,7 @@ impl CIll {
             results.push(InductiveResult {
                 property: name,
                 result: status,
+                engine: engines[i].unwrap_or("-").to_string(),
                 vcd,
             });
         }
