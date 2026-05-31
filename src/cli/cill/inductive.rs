@@ -35,7 +35,7 @@ impl CIll {
                 (0..num_prop)
                     .into_par_iter()
                     .map(|i| {
-                        let ic3res: Vec<_> = [true, false]
+                        let ic3res: Vec<_> = [true]
                             .into_par_iter()
                             .map(|lp| {
                                 let mut cfg = cfg.clone();
@@ -62,10 +62,10 @@ impl CIll {
         let mut results = Vec::new();
         let mut ic3_proved = Vec::new();
         let mut engines = vec![None; num_prop];
-        for (id, (r, inv, lp)) in ic3_results.into_iter().enumerate() {
+        for (id, (r, inv, _lp)) in ic3_results.into_iter().enumerate() {
             if r {
                 ic3_proved.push(id);
-                engines[id] = Some(format!("IC3{lp}"));
+                engines[id] = Some(format!("IC3"));
             }
             results.push(r);
             invariants.extend(inv);
