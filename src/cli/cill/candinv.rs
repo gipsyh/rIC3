@@ -118,7 +118,7 @@ pub fn link_candinv(
     candinv_bf: &mut BtorFrontend,
 ) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
     let (mut candinv_wts, mut candinv_wsym) = candinv_bf.wts();
-    let candinv_tf = candinv_wts.simplify();
+    let candinv_tf = candinv_wts.simplify(&mut vec![]);
     candinv_tf.trans_sym(&mut candinv_wsym);
 
     let (linked_wts, linked_wsym, mut unlinked_symbols) =

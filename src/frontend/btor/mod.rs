@@ -54,6 +54,7 @@ impl From<&WlTransys> for Btor {
             init: wl.init.clone(),
             next: wl.next.clone(),
             bad: wl.bad.clone(),
+            output: Vec::new(),
             constraint: wl.constraint.clone(),
             symbols: Default::default(),
             prop_label: vec![String::new(); wl.bad.len()],
@@ -69,6 +70,7 @@ impl WlTransys {
             init: self.init.clone(),
             next: self.next.clone(),
             bad: self.bad.clone(),
+            output: Vec::new(),
             constraint: self.constraint.clone(),
             symbols: symbols.signal.clone(),
             prop_label: symbols.prop.clone(),
@@ -202,8 +204,15 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
-        let tf = wts.simplify();
         let mut wsym = self.symbols.clone();
+        let tf = wts.simplify(&mut vec![]);
+        // if let Some(reset) = wsym.get_term_by_name("reset")
+        //     && let Some(reset_tf) = wts.reset_to_init(&reset, true)
+        // {
+        //     tf.extend(reset_tf);
+        // }
+        // tf.extend(wts.simplify(None));
+
         tf.trans_sym(&mut wsym);
         self.tf.extend(tf);
         // let btor = wts.to_btor_with_sym(&wsym);

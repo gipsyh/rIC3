@@ -7,14 +7,18 @@ use giputils::{file::recreate_dir, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{
     VarSymbols,
-    fol::{Sort, term_gc},
+    fol::{Sort, Term, term_gc},
 };
 use rIC3::{
     Engine,
     frontend::{Frontend, btor::BtorFrontend},
     ic3::{IC3, IC3Config},
     transys::{TransysIf, certify::Restore},
-    wltransys::{WlTransys, symbol::WlTsSymbol, transform::WlTransform},
+    wltransys::{
+        WlTransys,
+        symbol::WlTsSymbol,
+        transform::{WlTransform, WlTransformStack},
+    },
 };
 use rayon::{
     ThreadPoolBuilder,
@@ -45,14 +49,15 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     Yosys::generate_btor_with_files(&rcfg, &rcfg.dut.files, &dut_dir, "dut", true)?;
     let mut btor = BtorFrontend::new(Btor::from_file(dut_dir.join("dut.btor")));
     let (mut wts, mut wsym) = btor.wts();
-    preprocess(rcfg, rp, &mut wts, &mut wsym)?;
+    let keep = preprocess(rcfg, rp, &mut wts, &mut wsym)?;
 
     let cill_dir = rp.path("cill");
     recreate_dir(&cill_dir)?;
     let symbols = collect_symbol_sorts(&wsym)?;
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
-    let btor = wts.to_btor_with_sym(&wsym);
+    let mut btor = wts.to_btor_with_sym(&wsym);
+    btor.output = keep;
     let wts_dir = rp.path("wts");
     recreate_dir(&wts_dir)?;
     btor.to_file(wts_dir.join("wts.btor"));
@@ -65,8 +70,12 @@ fn preprocess(
     rp: &Ric3Proj,
     wts: &mut WlTransys,
     wsym: &mut WlTsSymbol,
-) -> anyhow::Result<()> {
-    let tf = wts.simplify();
+) -> anyhow::Result<Vec<Term>> {
+    let mut tf = WlTransformStack::new();
+    tf.add(wts.coi_refine());
+    tf.trans_sym(wsym);
+    let mut keep: Vec<_> = wsym.keys().cloned().collect();
+    tf.extend(wts.simplify(&mut keep));
     // let (rst, pol) = rcfg.reset().unwrap();
     // let rst = wsym.get_term_by_name(&rst).unwrap();
     // tf.extend(wts.reset_to_init(&rst, pol).unwrap());
@@ -113,10 +122,11 @@ fn preprocess(
     }
     rp.cache_res(cache)?;
     info!("Preprocess solved {} properties.", num_prop - wts.bad.len());
-    let tf = wts.simplify();
+    dbg!(keep.len());
+    let tf = wts.simplify(&mut keep);
     tf.trans_sym(wsym);
     term_gc();
-    Ok(())
+    Ok(keep)
 }
 
 fn simple_sv_ident(name: &str) -> bool {

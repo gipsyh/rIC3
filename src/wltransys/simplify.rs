@@ -50,45 +50,64 @@ impl WlTransys {
     }
 
     pub fn coi_refine(&mut self) -> WlRemoveTf {
-        CoiPass::apply(self, ()).unwrap()
+        CoiPass::apply(&mut WlTsSimpCtx::default(), self, ()).unwrap()
     }
 
-    pub fn simplify(&mut self) -> WlTransformStack {
+    pub fn simplify(&mut self, keep: &mut Vec<Term>) -> WlTransformStack {
+        let mut ctx = WlTsSimpCtx { keep: keep.clone() };
         let mut tf = WlTransformStack::new();
-        tf.add(self.coi_refine());
-        if let Some(t) = InnTermSimpPass::apply(self, OptLevel::O0) {
+        if let Some(t) = CoiPass::apply(&mut ctx, self, ()) {
             tf.add(t);
         }
-        if let Some(t) = ConstraintInputPass::apply(self, ()) {
+        if let Some(t) = InnTermSimpPass::apply(&mut ctx, self, OptLevel::O0) {
             tf.add(t);
         }
-        if let Some(t) = InnTermSimpPass::apply(self, OptLevel::O3) {
+        if let Some(t) = ConstraintInputPass::apply(&mut ctx, self, ()) {
             tf.add(t);
         }
-        tf.add(self.coi_refine());
+        if let Some(t) = InnTermSimpPass::apply(&mut ctx, self, OptLevel::O3) {
+            tf.add(t);
+        }
+        if let Some(t) = CoiPass::apply(&mut ctx, self, ()) {
+            tf.add(t);
+        }
+        *keep = ctx.keep;
         tf
     }
 
     pub fn reset_to_init(&mut self, rst: &Term, polarity: bool) -> Option<WlTransformStack> {
-        ResetToInitPass::apply(self, (rst.clone(), polarity))
+        ResetToInitPass::apply(&mut WlTsSimpCtx::default(), self, (rst.clone(), polarity))
     }
 }
 
 pub trait WlTsSimpPass {
     type WlTransform: WlTransform;
 
-    type PassArgs;
+    type PassArgs<'a>;
 
-    fn apply(wts: &mut WlTransys, args: Self::PassArgs) -> Option<Self::WlTransform>;
+    fn apply<'a>(
+        ctx: &mut WlTsSimpCtx,
+        wts: &mut WlTransys,
+        args: Self::PassArgs<'a>,
+    ) -> Option<Self::WlTransform>;
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct WlTsSimpCtx {
+    keep: Vec<Term>,
 }
 
 struct ResetToInitPass;
 
 impl WlTsSimpPass for ResetToInitPass {
     type WlTransform = WlTransformStack;
-    type PassArgs = (Term, bool);
+    type PassArgs<'a> = (Term, bool);
 
-    fn apply(wts: &mut WlTransys, (rst, polarity): (Term, bool)) -> Option<Self::WlTransform> {
+    fn apply<'a>(
+        _ctx: &mut WlTsSimpCtx,
+        wts: &mut WlTransys,
+        (rst, polarity): Self::PassArgs<'a>,
+    ) -> Option<Self::WlTransform> {
         if !rst.is_var() || !rst.sort().is_bool() || !wts.input.iter().any(|i| i == &rst) {
             return None;
         }
@@ -150,14 +169,19 @@ struct CoiPass;
 
 impl WlTsSimpPass for CoiPass {
     type WlTransform = WlRemoveTf;
-    type PassArgs = ();
+    type PassArgs<'a> = ();
 
-    fn apply(wts: &mut WlTransys, _args: ()) -> Option<Self::WlTransform> {
+    fn apply<'a>(
+        ctx: &mut WlTsSimpCtx,
+        wts: &mut WlTransys,
+        _args: Self::PassArgs<'a>,
+    ) -> Option<Self::WlTransform> {
         let mut queue: Vec<_> = wts
             .constraint
             .iter()
             .chain(wts.bad.iter())
             .chain(wts.justice.iter())
+            .chain(ctx.keep.iter())
             .cloned()
             .collect();
         for l in wts.latch.iter() {
@@ -213,27 +237,34 @@ struct InnTermSimpPass;
 
 impl WlTsSimpPass for InnTermSimpPass {
     type WlTransform = WlInnTermMapTf;
-    type PassArgs = OptLevel;
+    type PassArgs<'a> = OptLevel;
 
-    fn apply(wts: &mut WlTransys, args: OptLevel) -> Option<Self::WlTransform> {
+    fn apply<'a>(
+        ctx: &mut WlTsSimpCtx,
+        wts: &mut WlTransys,
+        opt: Self::PassArgs<'a>,
+    ) -> Option<Self::WlTransform> {
         let mut map = GHashMap::new();
-        let ctx = SimplifyCtx { level: args };
+        let fol_ctx = SimplifyCtx::new(opt);
         for (_, i) in wts.init.iter_mut() {
-            *i = i.simplify_with_ctx(&ctx, &mut map);
+            *i = i.simplify_with_ctx(&fol_ctx, &mut map);
         }
         for (_, n) in wts.next.iter_mut() {
-            *n = n.simplify_with_ctx(&ctx, &mut map);
+            *n = n.simplify_with_ctx(&fol_ctx, &mut map);
         }
         for c in wts.constraint.iter_mut() {
-            *c = c.simplify_with_ctx(&ctx, &mut map);
+            *c = c.simplify_with_ctx(&fol_ctx, &mut map);
         }
         wts.constraint
             .retain(|c| !c.try_bool_const().is_some_and(|f| f));
         for b in wts.bad.iter_mut() {
-            *b = b.simplify_with_ctx(&ctx, &mut map);
+            *b = b.simplify_with_ctx(&fol_ctx, &mut map);
         }
         for j in wts.justice.iter_mut() {
-            *j = j.simplify_with_ctx(&ctx, &mut map);
+            *j = j.simplify_with_ctx(&fol_ctx, &mut map);
+        }
+        for t in ctx.keep.iter_mut() {
+            *t = t.simplify_with_ctx(&fol_ctx, &mut map);
         }
         Some(WlInnTermMapTf::new(map))
     }
@@ -243,17 +274,27 @@ pub struct ConstraintInputPass;
 
 impl WlTsSimpPass for ConstraintInputPass {
     type WlTransform = WlTransformStack;
-    type PassArgs = ();
+    type PassArgs<'a> = ();
 
-    fn apply(wts: &mut WlTransys, _args: ()) -> Option<WlTransformStack> {
+    fn apply<'a>(
+        ctx: &mut WlTsSimpCtx,
+        wts: &mut WlTransys,
+        _args: Self::PassArgs<'a>,
+    ) -> Option<WlTransformStack> {
         let inputs: GHashSet<_> = wts.input.iter().cloned().collect();
+        let keep: GHashSet<_> = ctx.keep.iter().cloned().collect();
         let mut ext_map = GHashMap::new();
         for cst in wts.constraint.iter() {
             if cst.is_var() && inputs.contains(cst) {
-                ext_map.insert(cst.clone(), Term::bool_const(true));
+                if !keep.contains(cst) {
+                    ext_map.insert(cst.clone(), Term::bool_const(true));
+                }
             } else if let Some(op) = cst.try_op() {
                 if op.op == FolOp::Not && inputs.contains(&op.terms[0]) {
-                    ext_map.insert(op.terms[0].clone(), Term::bool_const(false));
+                    let input = &op.terms[0];
+                    if !keep.contains(input) {
+                        ext_map.insert(input.clone(), Term::bool_const(false));
+                    }
                 }
             }
         }
