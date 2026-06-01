@@ -17,6 +17,7 @@ pub struct WlTransys {
     pub init: GHashMap<Term, Term>,
     pub next: GHashMap<Term, Term>,
     pub bad: Vec<Term>,
+    pub output: Vec<Term>,
     pub constraint: Vec<Term>,
     pub justice: Vec<Term>,
 }
@@ -25,6 +26,7 @@ impl WlTransys {
     pub fn print_info(&self) {
         println!("num input: {}", self.input.len());
         println!("num latch: {}", self.latch.len());
+        println!("num output: {}", self.output.len());
         println!("num constraint: {}", self.constraint.len());
     }
 

@@ -72,6 +72,9 @@ impl Uf {
         for bad in proof.bad.iter_mut() {
             *bad = self.substitute_term(bad, &mut cache);
         }
+        for output in proof.output.iter_mut() {
+            *output = self.substitute_term(output, &mut cache);
+        }
         for constraint in proof.constraint.iter_mut() {
             *constraint = self.substitute_term(constraint, &mut cache);
         }
@@ -132,6 +135,9 @@ impl UfAbstractor {
         }
         for bad in wts.bad.iter_mut() {
             *bad = self.abstract_term(bad);
+        }
+        for output in wts.output.iter_mut() {
+            *output = self.abstract_term(output);
         }
         for constraint in wts.constraint.iter_mut() {
             *constraint = self.abstract_term(constraint);

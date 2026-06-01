@@ -94,6 +94,9 @@ fn link_wts(
     linked_wts
         .bad
         .extend(y_wts.bad.iter().map(|term| apply_subst(term, &subst)));
+    linked_wts
+        .output
+        .extend(y_wts.output.iter().map(|term| apply_subst(term, &subst)));
     linked_wts.constraint.extend(
         y_wts
             .constraint

@@ -66,6 +66,9 @@ impl WlTransys {
         let bad: Vec<Term> = bitblast_terms(self.bad.iter(), &mut map)
             .flatten()
             .collect();
+        let output: Vec<Term> = bitblast_terms(self.output.iter(), &mut map)
+            .flatten()
+            .collect();
         let constraint: Vec<Term> = bitblast_terms(self.constraint.iter(), &mut map)
             .flatten()
             .collect();
@@ -83,6 +86,7 @@ impl WlTransys {
                 init,
                 next,
                 bad,
+                output,
                 constraint,
                 justice,
             },
