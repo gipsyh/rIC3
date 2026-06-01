@@ -18,8 +18,8 @@ use std::{
 };
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 
-const SIGNAL_IRRELEVANT: &str = "<SIGNAL IRRELEVANT>";
-const SIGNAL_NOT_FOUND: &str = "<SIGNAL NOT FOUND>";
+const SIGNAL_IRRELEVANT: &str = "<IRRELEVANT>";
+const SIGNAL_NOT_FOUND: &str = "<NOT FOUND>";
 
 #[derive(Debug)]
 struct DumpTarget {
