@@ -8,12 +8,16 @@ use logicrs::{
 };
 use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
 use regex::Regex;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use rmcp::{
+    ServerHandler, ServiceExt, handler::server::wrapper::Parameters, schemars, tool, tool_handler,
+    tool_router,
+};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::{self, BufRead, Write},
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
@@ -575,191 +579,70 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SearchSignalsArgs {
+    #[schemars(description = "Absolute path to the .strace file.")]
     vcd_path: String,
+
+    #[schemars(description = "Regex pattern to search for.")]
     pattern: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SignalValuesArgs {
+    #[schemars(description = "Absolute path to the .strace file.")]
     vcd_path: String,
+
+    #[schemars(description = "Signal names to read.")]
     signals: Vec<String>,
 }
 
-#[derive(Deserialize)]
-struct ToolCallParams {
-    name: String,
-    #[serde(default)]
-    arguments: JsonValue,
+#[derive(Clone)]
+struct TraceMcpServer;
+
+#[tool_router]
+impl TraceMcpServer {
+    #[tool(
+        description = "Search signals in a WlSymbolTrace .strace file by regex pattern. Returns matching signal names. The vcd_path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned."
+    )]
+    fn search_signals(
+        &self,
+        Parameters(SearchSignalsArgs { vcd_path, pattern }): Parameters<SearchSignalsArgs>,
+    ) -> Result<rmcp::Json<Vec<String>>, String> {
+        search_signals_file(vcd_path, &pattern)
+            .map(rmcp::Json)
+            .map_err(|err| err.to_string())
+    }
+
+    #[tool(
+        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The vcd_path argument is kept for compatibility and should point to the .strace file."
+    )]
+    fn signal_values(
+        &self,
+        Parameters(SignalValuesArgs { vcd_path, signals }): Parameters<SignalValuesArgs>,
+    ) -> Result<rmcp::Json<BTreeMap<String, JsonValue>>, String> {
+        signal_values_file(vcd_path, &signals)
+            .map(rmcp::Json)
+            .map_err(|err| err.to_string())
+    }
 }
+
+#[tool_handler(
+    name = "ric3-trace-tools",
+    instructions = "Tools for inspecting .strace files."
+)]
+impl ServerHandler for TraceMcpServer {}
 
 fn run_mcp_server() -> anyhow::Result<()> {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout().lock();
-
-    for line in stdin.lock().lines() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let request: JsonValue = match serde_json::from_str(&line) {
-            Ok(request) => request,
-            Err(err) => {
-                write_json_line(
-                    &mut stdout,
-                    rpc_error(json!(null), -32700, &err.to_string()),
-                )?;
-                continue;
-            }
-        };
-
-        let Some(method) = request.get("method").and_then(JsonValue::as_str) else {
-            let id = request.get("id").cloned().unwrap_or_else(|| json!(null));
-            write_json_line(&mut stdout, rpc_error(id, -32600, "missing method"))?;
-            continue;
-        };
-
-        let id = request.get("id").cloned();
-        if id.is_none() || method.starts_with("notifications/") {
-            continue;
-        }
-        let id = id.unwrap();
-        let params = request.get("params").cloned();
-
-        let response = match handle_mcp_request(method, params) {
-            Ok(result) => rpc_result(id, result),
-            Err(err) => rpc_error(id, -32603, &err.to_string()),
-        };
-        write_json_line(&mut stdout, response)?;
-    }
-
-    Ok(())
-}
-
-fn handle_mcp_request(method: &str, params: Option<JsonValue>) -> anyhow::Result<JsonValue> {
-    match method {
-        "initialize" => {
-            let protocol_version = params
-                .as_ref()
-                .and_then(|params| params.get("protocolVersion"))
-                .and_then(JsonValue::as_str)
-                .unwrap_or("2024-11-05");
-            Ok(json!({
-                "protocolVersion": protocol_version,
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "ric3-trace-tools",
-                    "version": env!("CARGO_PKG_VERSION")
-                }
-            }))
-        }
-        "ping" | "logging/setLevel" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": mcp_tools() })),
-        "tools/call" => Ok(call_mcp_tool(params)?),
-        "resources/list" => Ok(json!({ "resources": [] })),
-        "prompts/list" => Ok(json!({ "prompts": [] })),
-        _ => anyhow::bail!("unknown method: {method}"),
-    }
-}
-
-fn mcp_tools() -> JsonValue {
-    json!([
-        {
-            "name": "search_signals",
-            "description": "Search signals in a WlSymbolTrace .strace file by regex pattern. Returns matching signal names. The vcd_path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "vcd_path": {
-                        "type": "string",
-                        "description": "Absolute path to the .strace file."
-                    },
-                    "pattern": {
-                        "type": "string",
-                        "description": "Regex pattern to search for."
-                    }
-                },
-                "required": ["vcd_path", "pattern"]
-            }
-        },
-        {
-            "name": "signal_values",
-            "description": "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The vcd_path argument is kept for compatibility and should point to the .strace file.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "vcd_path": {
-                        "type": "string",
-                        "description": "Absolute path to the .strace file."
-                    },
-                    "signals": {
-                        "type": "array",
-                        "items": { "type": "string" },
-                        "description": "Signal names to read."
-                    }
-                },
-                "required": ["vcd_path", "signals"]
-            }
-        }
-    ])
-}
-
-fn call_mcp_tool(params: Option<JsonValue>) -> anyhow::Result<JsonValue> {
-    let params: ToolCallParams = parse_json_value(params.unwrap_or_else(|| json!({})))?;
-    let result = match params.name.as_str() {
-        "search_signals" => {
-            let args: SearchSignalsArgs = parse_json_value(params.arguments)?;
-            json!(search_signals_file(args.vcd_path, &args.pattern)?)
-        }
-        "signal_values" => {
-            let args: SignalValuesArgs = parse_json_value(params.arguments)?;
-            json!(signal_values_file(args.vcd_path, &args.signals)?)
-        }
-        name => anyhow::bail!("unknown tool: {name}"),
-    };
-
-    Ok(json!({
-        "content": [
-            {
-                "type": "text",
-                "text": serde_json::to_string_pretty(&result)?
-            }
-        ],
-        "structuredContent": result
-    }))
-}
-
-fn parse_json_value<T: DeserializeOwned>(value: JsonValue) -> anyhow::Result<T> {
-    serde_json::from_value(value).map_err(Into::into)
-}
-
-fn rpc_result(id: JsonValue, result: JsonValue) -> JsonValue {
-    json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": result
+    let runtime = tokio::runtime::Runtime::new()?;
+    runtime.block_on(async {
+        TraceMcpServer
+            .serve(rmcp::transport::stdio())
+            .await?
+            .waiting()
+            .await?;
+        anyhow::Ok(())
     })
-}
-
-fn rpc_error(id: JsonValue, code: i64, message: &str) -> JsonValue {
-    json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": {
-            "code": code,
-            "message": message
-        }
-    })
-}
-
-fn write_json_line(out: &mut impl Write, value: JsonValue) -> io::Result<()> {
-    serde_json::to_writer(&mut *out, &value)?;
-    writeln!(out)?;
-    out.flush()
 }
 
 #[cfg(test)]
