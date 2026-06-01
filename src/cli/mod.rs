@@ -11,6 +11,7 @@ use crate::cli::{
     cache::DutHash,
     check::CheckConfig,
     cill::{CIllCommands, cill},
+    trace::{TraceCommands, trace},
 };
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -64,6 +65,12 @@ pub enum Commands {
         #[command(subcommand)]
         cmd: CIllCommands,
     },
+
+    /// Inspect WlSymbolTrace .strace files.
+    Trace {
+        #[command(subcommand)]
+        cmd: TraceCommands,
+    },
 }
 
 pub fn cli_main() -> anyhow::Result<()> {
@@ -74,6 +81,7 @@ pub fn cli_main() -> anyhow::Result<()> {
         Commands::Check { chk, cfg } => check::check(chk, cfg),
         Commands::Clean => clean::clean(),
         Commands::Cill { cmd } => cill(cmd),
+        Commands::Trace { cmd } => trace(cmd),
     }
 }
 

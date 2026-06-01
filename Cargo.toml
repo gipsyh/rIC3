@@ -32,10 +32,12 @@ log = "0.4.30"
 time = { version = "0.3.46", features = ["formatting", "macros"] }
 toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 sha2 = "0.11"
 ratatui = "0.30.0"
 anyhow = "1.0.101"
 ron = "0.12.0"
+regex = "1.12.3"
 strum = "0.28"
 tabled = { version = "0.20.0", features = ["ansi"] }
 vcd = "0.7.0"

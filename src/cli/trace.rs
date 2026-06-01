@@ -1,3 +1,5 @@
+use anyhow::Context;
+use clap::Subcommand;
 use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{
@@ -5,9 +7,19 @@ use logicrs::{
     fol::{self, Sort, Term, Value as FolValue},
 };
 use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
-use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
+use regex::Regex;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Value as JsonValue, json};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    io::{self, BufRead, Write},
+    path::{Path, PathBuf},
+};
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
+
+const SIGNAL_IRRELEVANT: &str = "<SIGNAL IRRELEVANT>";
+const SIGNAL_NOT_FOUND: &str = "<SIGNAL NOT FOUND>";
 
 #[derive(Debug)]
 struct DumpTarget {
@@ -255,5 +267,563 @@ impl WlSymbolTrace {
             }
         }
         Self { trace }
+    }
+
+    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref();
+        let content = fs::read_to_string(path)
+            .with_context(|| format!("failed to read trace file: {}", path.display()))?;
+        ron::from_str(&content)
+            .with_context(|| format!("failed to parse trace file as RON: {}", path.display()))
+    }
+
+    fn signal_targets(&self) -> BTreeMap<String, SignalTarget> {
+        let mut targets = BTreeMap::new();
+        for (name, values) in self.trace.iter() {
+            let mut is_array = false;
+            let mut indices = BTreeSet::new();
+            for value in values {
+                if let FolValue::Array(array) = value {
+                    is_array = true;
+                    indices.extend(array.keys().copied());
+                }
+            }
+
+            if is_array {
+                if indices.is_empty() {
+                    targets.insert(name.clone(), SignalTarget::ArrayBase { name: name.clone() });
+                } else {
+                    for index in indices {
+                        let indexed_name = format!("{name}[{index}]");
+                        targets.insert(
+                            indexed_name.clone(),
+                            SignalTarget::ArrayIndex {
+                                base: name.clone(),
+                                index,
+                            },
+                        );
+                    }
+                }
+            } else {
+                targets.insert(name.clone(), SignalTarget::Bv { name: name.clone() });
+            }
+        }
+        targets
+    }
+
+    pub fn signal_names(&self) -> Vec<String> {
+        self.signal_targets().into_keys().collect()
+    }
+
+    pub fn search_signals(&self, pattern: &str) -> anyhow::Result<Vec<String>> {
+        let regex = Regex::new(pattern)?;
+        let matched: Vec<_> = self
+            .signal_names()
+            .into_iter()
+            .filter(|signal| regex.is_match(signal))
+            .collect();
+
+        if matched.len() > 50 {
+            let mut out = vec![format!(
+                "Too many signals matched ({}), only showing first 50.",
+                matched.len()
+            )];
+            out.extend(matched.into_iter().take(50));
+            Ok(out)
+        } else {
+            Ok(matched)
+        }
+    }
+
+    pub fn signal_values(&self, signals: &[String]) -> anyhow::Result<BTreeMap<String, JsonValue>> {
+        anyhow::ensure!(!signals.is_empty(), "signals must be a non-empty list");
+
+        let targets = self.signal_targets();
+        let available: Vec<_> = targets.keys().cloned().collect();
+        let (resolved, not_found) = expand_signal_names(&available, signals);
+
+        let mut result = BTreeMap::new();
+        for signal in resolved {
+            let target = targets
+                .get(&signal)
+                .with_context(|| format!("internal error: resolved unknown signal {signal}"))?;
+            result.insert(signal, self.target_values(target)?);
+        }
+
+        for signal in not_found {
+            result.insert(signal, json!(SIGNAL_NOT_FOUND));
+        }
+
+        Ok(result)
+    }
+
+    fn target_values(&self, target: &SignalTarget) -> anyhow::Result<JsonValue> {
+        match target {
+            SignalTarget::Bv { name } => {
+                let values = self
+                    .trace
+                    .get(name)
+                    .with_context(|| format!("Signal not found: {name}"))?;
+                values_to_json(values, |value| match value {
+                    FolValue::Bv(value) => Ok(Some(value)),
+                    FolValue::Array(_) => anyhow::bail!(
+                        "Signal {name} is an array; request indexed signals such as {name}[0]"
+                    ),
+                })
+            }
+            SignalTarget::ArrayIndex { base, index } => {
+                let values = self
+                    .trace
+                    .get(base)
+                    .with_context(|| format!("Signal not found: {base}"))?;
+                values_to_json(values, |value| match value {
+                    FolValue::Array(array) => Ok(array.get(index)),
+                    FolValue::Bv(_) => anyhow::bail!("Signal {base} is not an array"),
+                })
+            }
+            SignalTarget::ArrayBase { name } => {
+                let values = self
+                    .trace
+                    .get(name)
+                    .with_context(|| format!("Signal not found: {name}"))?;
+                if values.iter().all(FolValue::all_x) {
+                    Ok(json!(SIGNAL_IRRELEVANT))
+                } else {
+                    anyhow::bail!("Signal {name} is an array; request indexed signals")
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum SignalTarget {
+    Bv { name: String },
+    ArrayIndex { base: String, index: usize },
+    ArrayBase { name: String },
+}
+
+fn values_to_json<'a>(
+    values: &'a [fol::Value],
+    mut get_bv: impl FnMut(&'a fol::Value) -> anyhow::Result<Option<&'a LboolVec>>,
+) -> anyhow::Result<JsonValue> {
+    let mut out = Vec::with_capacity(values.len());
+    let mut all_x = true;
+
+    for value in values {
+        let bv = get_bv(value)?;
+        let is_x = bv.is_none_or(LboolVec::all_x);
+        if !is_x {
+            all_x = false;
+        }
+        out.push(match bv {
+            Some(value) => format_lbool_vec(value),
+            None => "X".to_string(),
+        });
+    }
+
+    if all_x {
+        Ok(json!(SIGNAL_IRRELEVANT))
+    } else {
+        Ok(json!(out))
+    }
+}
+
+fn format_lbool_vec(value: &LboolVec) -> String {
+    if value.all_x() {
+        return "X".to_string();
+    }
+
+    if value.any_x() {
+        return format!("0b_{value}");
+    }
+
+    let hex = format!("{:x}", value.v());
+    let hex = hex.strip_prefix("0x").unwrap_or(&hex);
+    format!("0x_{hex}")
+}
+
+fn expand_signal_names(available: &[String], requested: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut resolved = Vec::new();
+    let mut not_found = Vec::new();
+
+    for name in requested {
+        if let Some(signal) = resolve_exact_signal_name(available, name) {
+            resolved.push(signal);
+            continue;
+        }
+
+        let mut matches: Vec<_> = available
+            .iter()
+            .filter(|signal| signal_matches_request(signal, name))
+            .cloned()
+            .collect();
+        if matches.is_empty() {
+            not_found.push(name.clone());
+            continue;
+        }
+
+        matches.sort();
+        resolved.extend(matches);
+    }
+
+    let mut seen = BTreeSet::new();
+    resolved.retain(|signal| seen.insert(signal.clone()));
+    (resolved, not_found)
+}
+
+fn resolve_exact_signal_name(available: &[String], name: &str) -> Option<String> {
+    let mut candidates = vec![name.to_string()];
+    if let Some(stripped) = name.strip_prefix('/') {
+        candidates.push(stripped.to_string());
+    } else {
+        candidates.push(format!("/{name}"));
+    }
+
+    for candidate in &candidates {
+        if let Some(signal) = available.iter().find(|signal| *signal == candidate) {
+            return Some(signal.clone());
+        }
+    }
+
+    for candidate in &candidates {
+        if let Some(signal) = available
+            .iter()
+            .find(|signal| signal.eq_ignore_ascii_case(candidate))
+        {
+            return Some(signal.clone());
+        }
+    }
+
+    None
+}
+
+fn signal_matches_request(signal: &str, request: &str) -> bool {
+    let request = request.strip_prefix('/').unwrap_or(request);
+    if signal.ends_with(&format!(".{request}")) || signal.ends_with(&format!("/{request}")) {
+        return true;
+    }
+
+    let base = array_base_name(signal).unwrap_or(signal);
+    base == request
+        || base.ends_with(&format!(".{request}"))
+        || base.ends_with(&format!("/{request}"))
+}
+
+fn array_base_name(name: &str) -> Option<&str> {
+    let without_bracket = name.strip_suffix(']')?;
+    let (base, index) = without_bracket.rsplit_once('[')?;
+    index.parse::<usize>().ok()?;
+    Some(base)
+}
+
+pub fn search_signals_file(
+    vcd_path: impl AsRef<Path>,
+    pattern: &str,
+) -> anyhow::Result<Vec<String>> {
+    WlSymbolTrace::load(vcd_path)?.search_signals(pattern)
+}
+
+pub fn signal_values_file(
+    vcd_path: impl AsRef<Path>,
+    signals: &[String],
+) -> anyhow::Result<BTreeMap<String, JsonValue>> {
+    WlSymbolTrace::load(vcd_path)?.signal_values(signals)
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum TraceCommands {
+    /// Search signals in a .strace file by regex and print matches.
+    #[command(alias = "search")]
+    SearchSignals {
+        /// Path to the .strace file.
+        path: PathBuf,
+
+        /// Regex used to match signal names.
+        pattern: String,
+    },
+
+    /// Print selected signal values from a .strace file as JSON.
+    #[command(alias = "values")]
+    SignalValues {
+        /// Path to the .strace file.
+        path: PathBuf,
+
+        /// Signal names to print. Suffix matches are supported.
+        #[arg(required = true)]
+        signals: Vec<String>,
+    },
+
+    /// Run the trace tools as an MCP stdio server.
+    Mcp,
+}
+
+pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
+    match cmd {
+        TraceCommands::SearchSignals { path, pattern } => {
+            for signal in search_signals_file(path, &pattern)? {
+                println!("{signal}");
+            }
+            Ok(())
+        }
+        TraceCommands::SignalValues { path, signals } => {
+            let values = signal_values_file(path, &signals)?;
+            println!("{}", serde_json::to_string_pretty(&values)?);
+            Ok(())
+        }
+        TraceCommands::Mcp => run_mcp_server(),
+    }
+}
+
+#[derive(Deserialize)]
+struct SearchSignalsArgs {
+    vcd_path: String,
+    pattern: String,
+}
+
+#[derive(Deserialize)]
+struct SignalValuesArgs {
+    vcd_path: String,
+    signals: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ToolCallParams {
+    name: String,
+    #[serde(default)]
+    arguments: JsonValue,
+}
+
+fn run_mcp_server() -> anyhow::Result<()> {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout().lock();
+
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let request: JsonValue = match serde_json::from_str(&line) {
+            Ok(request) => request,
+            Err(err) => {
+                write_json_line(
+                    &mut stdout,
+                    rpc_error(json!(null), -32700, &err.to_string()),
+                )?;
+                continue;
+            }
+        };
+
+        let Some(method) = request.get("method").and_then(JsonValue::as_str) else {
+            let id = request.get("id").cloned().unwrap_or_else(|| json!(null));
+            write_json_line(&mut stdout, rpc_error(id, -32600, "missing method"))?;
+            continue;
+        };
+
+        let id = request.get("id").cloned();
+        if id.is_none() || method.starts_with("notifications/") {
+            continue;
+        }
+        let id = id.unwrap();
+        let params = request.get("params").cloned();
+
+        let response = match handle_mcp_request(method, params) {
+            Ok(result) => rpc_result(id, result),
+            Err(err) => rpc_error(id, -32603, &err.to_string()),
+        };
+        write_json_line(&mut stdout, response)?;
+    }
+
+    Ok(())
+}
+
+fn handle_mcp_request(method: &str, params: Option<JsonValue>) -> anyhow::Result<JsonValue> {
+    match method {
+        "initialize" => {
+            let protocol_version = params
+                .as_ref()
+                .and_then(|params| params.get("protocolVersion"))
+                .and_then(JsonValue::as_str)
+                .unwrap_or("2024-11-05");
+            Ok(json!({
+                "protocolVersion": protocol_version,
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "ric3-trace-tools",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }))
+        }
+        "ping" | "logging/setLevel" => Ok(json!({})),
+        "tools/list" => Ok(json!({ "tools": mcp_tools() })),
+        "tools/call" => Ok(call_mcp_tool(params)?),
+        "resources/list" => Ok(json!({ "resources": [] })),
+        "prompts/list" => Ok(json!({ "prompts": [] })),
+        _ => anyhow::bail!("unknown method: {method}"),
+    }
+}
+
+fn mcp_tools() -> JsonValue {
+    json!([
+        {
+            "name": "search_signals",
+            "description": "Search signals in a WlSymbolTrace .strace file by regex pattern. Returns matching signal names. The vcd_path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "vcd_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .strace file."
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regex pattern to search for."
+                    }
+                },
+                "required": ["vcd_path", "pattern"]
+            }
+        },
+        {
+            "name": "signal_values",
+            "description": "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The vcd_path argument is kept for compatibility and should point to the .strace file.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "vcd_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .strace file."
+                    },
+                    "signals": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Signal names to read."
+                    }
+                },
+                "required": ["vcd_path", "signals"]
+            }
+        }
+    ])
+}
+
+fn call_mcp_tool(params: Option<JsonValue>) -> anyhow::Result<JsonValue> {
+    let params: ToolCallParams = parse_json_value(params.unwrap_or_else(|| json!({})))?;
+    let result = match params.name.as_str() {
+        "search_signals" => {
+            let args: SearchSignalsArgs = parse_json_value(params.arguments)?;
+            json!(search_signals_file(args.vcd_path, &args.pattern)?)
+        }
+        "signal_values" => {
+            let args: SignalValuesArgs = parse_json_value(params.arguments)?;
+            json!(signal_values_file(args.vcd_path, &args.signals)?)
+        }
+        name => anyhow::bail!("unknown tool: {name}"),
+    };
+
+    Ok(json!({
+        "content": [
+            {
+                "type": "text",
+                "text": serde_json::to_string_pretty(&result)?
+            }
+        ],
+        "structuredContent": result
+    }))
+}
+
+fn parse_json_value<T: DeserializeOwned>(value: JsonValue) -> anyhow::Result<T> {
+    serde_json::from_value(value).map_err(Into::into)
+}
+
+fn rpc_result(id: JsonValue, result: JsonValue) -> JsonValue {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "result": result
+    })
+}
+
+fn rpc_error(id: JsonValue, code: i64, message: &str) -> JsonValue {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "error": {
+            "code": code,
+            "message": message
+        }
+    })
+}
+
+fn write_json_line(out: &mut impl Write, value: JsonValue) -> io::Result<()> {
+    serde_json::to_writer(&mut *out, &value)?;
+    writeln!(out)?;
+    out.flush()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn symbol_trace(
+        entries: impl IntoIterator<Item = (&'static str, Vec<fol::Value>)>,
+    ) -> WlSymbolTrace {
+        WlSymbolTrace {
+            trace: entries
+                .into_iter()
+                .map(|(name, values)| (name.to_string(), values))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn all_x_signal_is_irrelevant_and_missing_signal_is_reported() {
+        let trace = symbol_trace([(
+            "top.sig",
+            vec![
+                FolValue::Bv(LboolVec::from("xx")),
+                FolValue::Bv(LboolVec::from("xx")),
+            ],
+        )]);
+
+        let values = trace
+            .signal_values(&["sig".to_string(), "absent".to_string()])
+            .unwrap();
+
+        assert_eq!(values.get("top.sig"), Some(&json!(SIGNAL_IRRELEVANT)));
+        assert_eq!(values.get("absent"), Some(&json!(SIGNAL_NOT_FOUND)));
+    }
+
+    #[test]
+    fn values_use_hex_unless_some_bits_are_x() {
+        let trace = symbol_trace([(
+            "sig",
+            vec![
+                FolValue::Bv(LboolVec::from("1010")),
+                FolValue::Bv(LboolVec::from("1x0")),
+                FolValue::Bv(LboolVec::from("xxx")),
+            ],
+        )]);
+
+        let values = trace.signal_values(&["sig".to_string()]).unwrap();
+
+        assert_eq!(values.get("sig"), Some(&json!(["0x_a", "0b_1x0", "X"])));
+    }
+
+    #[test]
+    fn array_signals_are_exposed_by_observed_indices() {
+        let mut frame0 = fol::ArrayValue::default_from(Sort::Array(2, 2));
+        frame0.insert(1, LboolVec::from("01"));
+        let frame1 = fol::ArrayValue::default_from(Sort::Array(2, 2));
+        let trace = symbol_trace([(
+            "mem",
+            vec![FolValue::Array(frame0), FolValue::Array(frame1)],
+        )]);
+
+        assert_eq!(trace.signal_names(), vec!["mem[1]"]);
+
+        let values = trace.signal_values(&["mem".to_string()]).unwrap();
+        assert_eq!(values.get("mem[1]"), Some(&json!(["0x_1", "X"])));
     }
 }
