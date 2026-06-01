@@ -1,12 +1,12 @@
 mod ui;
 
 use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::cache::PropMcInfo;
 use btor::Btor;
 use clap::{Args, ValueEnum};
 use giputils::file::recreate_dir;
 use rIC3::{
     Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
-    config::EngineConfig,
     frontend::{Frontend, btor::BtorFrontend},
     polynexus::{PolyNexus, PolyNexusConfig},
     tracer::{
@@ -15,7 +15,6 @@ use rIC3::{
     utils::{InterruptHandle, install_interrupt_handler},
     wltransys::{WlTransys, symbol::WlTsSymbol},
 };
-use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{BufWriter, IsTerminal},
@@ -47,14 +46,6 @@ pub enum RunUi {
     Plain,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PropMcInfo {
-    pub id: usize,
-    pub name: String,
-    pub res: McResult,
-    pub config: Option<EngineConfig>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, AsRefStr)]
 pub enum McStatus {
     Solving,
@@ -64,6 +55,7 @@ pub enum McStatus {
 
 #[derive(Debug)]
 pub(crate) struct PropMcState {
+    pub id: usize,
     pub prop: PropMcInfo,
     pub state: McStatus,
     pub start_time: Option<Instant>,
@@ -75,8 +67,8 @@ impl PropMcState {
         let mut mc = Vec::new();
         for id in 0..wts.bad.len() {
             mc.push(PropMcState {
+                id,
                 prop: PropMcInfo {
-                    id,
                     name: symbols.prop[id].clone(),
                     res: McResult::default(),
                     config: Default::default(),
@@ -85,6 +77,19 @@ impl PropMcState {
                 start_time: None,
                 time: Duration::ZERO,
             });
+        }
+        mc
+    }
+
+    pub(crate) fn from_cached_res(
+        wts: &WlTransys,
+        symbols: &WlTsSymbol,
+        cached: Vec<PropMcInfo>,
+    ) -> Vec<Self> {
+        let mut mc = Self::default_from_wts(wts, symbols);
+        for prop in cached {
+            let id = symbols.prop_index_by_name(&prop.name);
+            mc[id].prop = prop;
         }
         mc
     }
@@ -184,7 +189,7 @@ impl Run {
             .mc
             .iter()
             .filter(|m| matches!(m.prop.res, McResult::Unknown(_)) && m.state == McStatus::Wait)
-            .map(|m| m.prop.id)
+            .map(|m| m.id)
             .collect();
 
         if pending.is_empty() {
@@ -333,16 +338,7 @@ pub fn run(cfg: RunConfig) -> anyhow::Result<()> {
     let (wts, symbol) = btorfe.wts();
     let mc = ric3_proj
         .check_cached_res()?
-        .map(|p| {
-            p.into_iter()
-                .map(|p| PropMcState {
-                    prop: p,
-                    state: McStatus::Wait,
-                    start_time: None,
-                    time: Duration::ZERO,
-                })
-                .collect()
-        })
+        .map(|p| PropMcState::from_cached_res(&wts, &symbol, p))
         .unwrap_or(PropMcState::default_from_wts(&wts, &symbol));
     let mut run = Run::new(btor, mc, ric3_proj, symbol, cfg)?;
     run.run()?;

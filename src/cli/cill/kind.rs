@@ -27,7 +27,7 @@ impl CIllKind {
         assert!(!ts.has_gate_init());
         let mut uts = TransysUnroll::new(&ts);
         uts.enable_simple_path();
-        let solver: Box<dyn Satif> = Box::new(cadical::CaDiCaL::new());
+        let solver: Box<dyn Satif> = Box::new(kissat::Kissat::new());
         Self {
             prop,
             uts,
@@ -87,7 +87,8 @@ impl Engine for CIllKind {
         self.load_cex_assume();
         self.load_bad_to(k - 1);
         let bad = self.uts.lit_next(self.uts.ts.bad[self.prop], k);
-        let res = self.solver.solve(&[bad]);
+        self.solver.add_clause(&[bad]);
+        let res = self.solver.solve(&[]);
         if !res {
             return McResult::UNSAT;
         }

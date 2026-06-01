@@ -44,10 +44,26 @@ impl WlCex {
                     continue;
                 }
                 let val = t.simulate(&mut val);
-                if !val.as_bv().unwrap().all_x() {
+                if !val.all_x() {
                     self.state[k].push(TermValue::new(t.clone(), val));
                 }
             }
+        }
+    }
+
+    pub fn filter(&self, f: impl Fn(&Term) -> bool) -> Self {
+        Self {
+            input: self
+                .input
+                .iter()
+                .map(|frame| frame.iter().filter(|v| f(v.t())).cloned().collect())
+                .collect(),
+            state: self
+                .state
+                .iter()
+                .map(|frame| frame.iter().filter(|v| f(v.t())).cloned().collect())
+                .collect(),
+            bad_id: self.bad_id,
         }
     }
 }

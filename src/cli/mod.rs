@@ -80,13 +80,24 @@ pub fn cli_main() -> anyhow::Result<()> {
 #[derive(Deserialize, Debug)]
 pub struct Ric3Config {
     dut: Dut,
-    trace: Option<VcdConfig>,
     modeling: Option<Modeling>,
+    formal: Option<FormalConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct VcdConfig {
-    top: Option<String>,
+pub struct FormalConfig {
+    pub(crate) invariants: Option<PathBuf>,
+}
+
+impl FormalConfig {
+    fn validate(&self) -> anyhow::Result<()> {
+        if let Some(invariants) = &self.invariants
+            && !invariants.exists()
+        {
+            anyhow::bail!("formal invariants file not found: {:?}", invariants);
+        }
+        Ok(())
+    }
 }
 
 impl Ric3Config {
@@ -107,7 +118,20 @@ impl Ric3Config {
         };
         let config: Self = toml::from_str(&config_content)?;
         config.dut.validate()?;
+        if let Some(formal) = &config.formal {
+            formal.validate()?;
+        }
         Ok(config)
+    }
+
+    fn reset(&self) -> Option<(String, bool)> {
+        let reset = self.dut.reset.clone()?;
+        Some(if reset.starts_with("!") {
+            let reset = reset.strip_prefix("!").unwrap();
+            (reset.to_string(), false)
+        } else {
+            (reset.to_string(), true)
+        })
     }
 }
 

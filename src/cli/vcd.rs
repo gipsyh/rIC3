@@ -1,9 +1,18 @@
 use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{Sort, Term};
-use rIC3::wltransys::{certify::WlCex, symbol::WlTsSymbol};
+use logicrs::{
+    Lbool, LboolVec,
+    fol::{Sort, Term, Value as FolValue},
+};
+use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
 use std::io::{self, Write};
-use vcd::{TimescaleUnit, Value, VarType};
+use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
+
+#[derive(Debug)]
+struct DumpTarget {
+    id: vcd::IdCode,
+    array_index: Option<usize>,
+}
 
 #[derive(EnumAsInner, Debug)]
 enum Scope {
@@ -32,7 +41,8 @@ impl Scope {
     fn define_scope_rec(
         &self,
         writer: &mut vcd::Writer<impl Write>,
-        term_ids: &mut GHashMap<Term, Vec<vcd::IdCode>>,
+        term_ids: &mut GHashMap<Term, Vec<DumpTarget>>,
+        array_indices: &GHashMap<Term, GHashSet<usize>>,
     ) -> io::Result<()> {
         match self {
             Scope::Node(node) => {
@@ -40,14 +50,36 @@ impl Scope {
                     match child {
                         Scope::Node(_) => {
                             writer.add_module(name)?;
-                            child.define_scope_rec(writer, term_ids)?;
+                            child.define_scope_rec(writer, term_ids, array_indices)?;
                             writer.upscope()?;
                         }
-                        Scope::Var(t) => {
-                            let id =
-                                writer.add_var(VarType::Wire, t.sort().bv() as _, name, None)?;
-                            term_ids.entry(t.clone()).or_default().push(id);
-                        }
+                        Scope::Var(t) => match t.sort() {
+                            Sort::Bv(width) => {
+                                let id = writer.add_var(VarType::Wire, width as _, name, None)?;
+                                term_ids.entry(t.clone()).or_default().push(DumpTarget {
+                                    id,
+                                    array_index: None,
+                                });
+                            }
+                            Sort::Array(_, element_width) => {
+                                if let Some(indices) = array_indices.get(t) {
+                                    let mut indices: Vec<_> = indices.iter().copied().collect();
+                                    indices.sort_unstable();
+                                    for index in indices {
+                                        let id = writer.add_var(
+                                            VarType::Wire,
+                                            element_width as _,
+                                            name,
+                                            Some(ReferenceIndex::BitSelect(index as i32)),
+                                        )?;
+                                        term_ids.entry(t.clone()).or_default().push(DumpTarget {
+                                            id,
+                                            array_index: Some(index),
+                                        });
+                                    }
+                                }
+                            }
+                        },
                     }
                 }
             }
@@ -59,18 +91,30 @@ impl Scope {
     fn define_scope(
         &self,
         writer: &mut vcd::Writer<impl Write>,
-        term_ids: &mut GHashMap<Term, Vec<vcd::IdCode>>,
+        term_ids: &mut GHashMap<Term, Vec<DumpTarget>>,
+        array_indices: &GHashMap<Term, GHashSet<usize>>,
     ) -> io::Result<()> {
         let node = self.as_node().unwrap();
         if node.values().any(|s| s.is_var()) {
             writer.add_module("")?;
-            self.define_scope_rec(writer, term_ids)?;
+            self.define_scope_rec(writer, term_ids, array_indices)?;
             writer.upscope()?;
         } else {
-            self.define_scope_rec(writer, term_ids)?;
+            self.define_scope_rec(writer, term_ids, array_indices)?;
         }
         Ok(())
     }
+}
+
+fn lbool_vec_to_vcd(val: &LboolVec) -> Vec<VcdValue> {
+    (0..val.len())
+        .rev()
+        .map(|i| match val.get(i) {
+            Lbool::TRUE => VcdValue::V1,
+            Lbool::FALSE => VcdValue::V0,
+            _ => VcdValue::X,
+        })
+        .collect()
 }
 
 pub fn wlwitness_vcd(
@@ -83,6 +127,7 @@ pub fn wlwitness_vcd(
     writer.timescale(1, TimescaleUnit::NS)?;
 
     let mut present_terms = GHashSet::default();
+    let mut array_indices = GHashMap::<Term, GHashSet<usize>>::default();
     for frame in &cex.input {
         for tv in frame {
             present_terms.insert(tv.t().clone());
@@ -91,6 +136,16 @@ pub fn wlwitness_vcd(
     for frame in &cex.state {
         for tv in frame {
             present_terms.insert(tv.t().clone());
+            if let FolValue::Array(array) = tv.v() {
+                for (index, value) in array.iter() {
+                    if !value.all_x() {
+                        array_indices
+                            .entry(tv.t().clone())
+                            .or_default()
+                            .insert(*index);
+                    }
+                }
+            }
         }
     }
     let mut root = Scope::default();
@@ -123,7 +178,7 @@ pub fn wlwitness_vcd(
         }
     }
     let mut term_ids = GHashMap::default();
-    root.define_scope(&mut writer, &mut term_ids)?;
+    root.define_scope(&mut writer, &mut term_ids, &array_indices)?;
     writer.enddefinitions()?;
 
     for t in 0..cex.len() {
@@ -132,33 +187,28 @@ pub fn wlwitness_vcd(
         let mut frame_values = GHashMap::default();
 
         for tv in &cex.input[t] {
-            frame_values.insert(tv.t().clone(), tv.v().clone());
+            frame_values.insert(tv.t().clone(), FolValue::Bv(tv.v().clone()));
         }
         for tv in &cex.state[t] {
-            if let Sort::Bv(_) = tv.t().sort() {
-                let bv_tv = tv.into_bv();
-                frame_values.insert(bv_tv.t().clone(), bv_tv.v().clone());
-            }
+            frame_values.insert(tv.t().clone(), tv.v().clone());
         }
-        for (term, ids) in term_ids.iter() {
+        for (term, targets) in term_ids.iter() {
             if let Some(val) = frame_values.get(term) {
-                let len = val.len();
-                let vcd_val: Vec<Value> = (0..len)
-                    .rev()
-                    .map(|i| {
-                        let is_valid = val.mask().get(i);
-                        let is_true = val.v().get(i);
-                        if !is_valid {
-                            Value::X
-                        } else if is_true {
-                            Value::V1
-                        } else {
-                            Value::V0
+                for target in targets {
+                    let vcd_val = match (val, target.array_index) {
+                        (FolValue::Bv(val), None) => lbool_vec_to_vcd(val),
+                        (FolValue::Array(array), Some(index)) => {
+                            let Some(val) = array.get(&index) else {
+                                continue;
+                            };
+                            if val.all_x() {
+                                continue;
+                            }
+                            lbool_vec_to_vcd(val)
                         }
-                    })
-                    .collect();
-                for id in ids {
-                    writer.change_vector(*id, vcd_val.clone())?;
+                        _ => continue,
+                    };
+                    writer.change_vector(target.id, vcd_val)?;
                 }
             }
         }

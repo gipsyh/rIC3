@@ -1,6 +1,6 @@
 use crate::logger_init;
 use anyhow::{Context, bail};
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use log::info;
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -34,6 +34,10 @@ pub struct CheckConfig {
     #[arg(long, default_value_t = false)]
     pub cex: bool,
 
+    /// ui
+    #[arg(long = "ui", action = ArgAction::Set, default_value_t = true)]
+    pub ui: bool,
+
     /// interrupt statistic
     #[arg(long, default_value_t = false)]
     pub interrupt_statistic: bool,
@@ -65,7 +69,7 @@ fn report_res(chk: &CheckConfig, res: McResult) {
 
 pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
     if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", "warn") };
+        unsafe { env::set_var("RUST_LOG", if chk.ui { "warn" } else { "info" }) };
     }
     logger_init();
     if !chk.model.exists() {
@@ -92,7 +96,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         let (wts, _symbols) = frontend.wts();
         let mut engine = create_wl_engine(cfg.clone(), wts);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        let tui = UiRenderer::new(cfg.as_ref());
+        let tui = chk.ui.then(|| UiRenderer::new(cfg.as_ref())).flatten();
         if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
@@ -117,7 +121,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         info!("origin ts has {}", ts.statistic());
         let mut engine = create_bl_engine(cfg.clone(), ts, symbols);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        let tui = rIC3::ui::UiRenderer::new(cfg.as_ref());
+        let tui = chk.ui.then(|| UiRenderer::new(cfg.as_ref())).flatten();
         if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);

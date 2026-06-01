@@ -7,13 +7,14 @@ use crate::{
     wltransys::{
         WlTransys,
         bitblast::BitblastMap,
-        certify::{Restore, WlCex, WlProof},
+        cert::{Restore, WlCex, WlProof},
         symbol::WlTsSymbol,
+        transform::{WlTransform, WlTransformStack},
     },
 };
 use btor::Btor;
 use giputils::hash::{GHashMap, GHashSet};
-use log::{debug, error, warn};
+use log::{debug, error};
 use logicrs::{
     LboolVec, VarSymbols,
     fol::{self, BvTermValue, Term, TermValue},
@@ -53,9 +54,26 @@ impl From<&WlTransys> for Btor {
             init: wl.init.clone(),
             next: wl.next.clone(),
             bad: wl.bad.clone(),
+            output: Vec::new(),
             constraint: wl.constraint.clone(),
             symbols: Default::default(),
             prop_label: vec![String::new(); wl.bad.len()],
+        }
+    }
+}
+
+impl WlTransys {
+    pub fn to_btor_with_sym(&self, symbols: &WlTsSymbol) -> Btor {
+        Btor {
+            input: self.input.clone(),
+            latch: self.latch.clone(),
+            init: self.init.clone(),
+            next: self.next.clone(),
+            bad: self.bad.clone(),
+            output: Vec::new(),
+            constraint: self.constraint.clone(),
+            symbols: symbols.signal.clone(),
+            prop_label: symbols.prop.clone(),
         }
     }
 }
@@ -68,16 +86,13 @@ pub struct BtorFrontend {
     idmap: GHashMap<Term, usize>,
     no_next: GHashSet<Term>,
     rst: Restore,
+    tf: WlTransformStack,
     bb_rst: Option<BitblastMap>,
 }
 
 impl BtorFrontend {
     pub fn new(btor: Btor) -> Self {
-        let (mut owts, symbols) = WlTransys::from_btor(&btor);
-        if owts.bad.is_empty() {
-            warn!("empty property in btor");
-            owts.bad.push(Term::bool_const(false));
-        }
+        let (owts, symbols) = WlTransys::from_btor(&btor);
         let mut idmap = GHashMap::new();
         for (id, i) in owts.input.iter().enumerate() {
             idmap.insert(i.clone(), id);
@@ -95,6 +110,7 @@ impl BtorFrontend {
             idmap,
             no_next,
             rst,
+            tf: WlTransformStack::new(),
             bb_rst: None,
         }
     }
@@ -112,6 +128,7 @@ impl BtorFrontend {
         cex.bad_id = bad_id;
         let mut current_frame = 0;
         let mut is_state = false;
+        let mut array_values = GHashMap::new();
 
         for line in lines {
             if line == "." {
@@ -136,8 +153,25 @@ impl BtorFrontend {
                 continue;
             }
             let parts: Vec<&str> = line.split_whitespace().collect();
-            assert!(parts.len() == 2);
             let id = parts[0].parse::<usize>().unwrap();
+            if parts.len() == 3 {
+                assert!(is_state);
+                let term = self.owts.latch[id].clone();
+                let (index_width, _) = term.sort().array();
+                let index = parts[1]
+                    .strip_prefix('[')
+                    .and_then(|s| s.strip_suffix(']'))
+                    .unwrap();
+                assert!(index.len() == index_width);
+                let index = usize::from_str_radix(index, 2).unwrap();
+                let val = LboolVec::from(parts[2]);
+                let entry = array_values
+                    .entry((current_frame, id))
+                    .or_insert_with(|| fol::ArrayValue::default_from(term.sort()));
+                entry.insert(index, val);
+                continue;
+            }
+            assert!(parts.len() == 2);
             let val = LboolVec::from(parts[1]);
             if is_state {
                 let term = self.owts.latch[id].clone();
@@ -148,6 +182,11 @@ impl BtorFrontend {
                 let bv = BvTermValue::new(term, val);
                 cex.input[current_frame].push(bv);
             }
+        }
+        for ((k, id), val) in array_values {
+            let term = self.owts.latch[id].clone();
+            let tv = TermValue::new(term, fol::Value::Array(val));
+            cex.state[k].push(tv);
         }
         for k in 0..cex.len() {
             for s in take(&mut cex.state[k]) {
@@ -165,10 +204,20 @@ impl BtorFrontend {
 impl Frontend for BtorFrontend {
     fn ts(&mut self) -> (bl::Transys, VarSymbols) {
         let mut wts = self.wts.clone();
-        wts.simplify();
-        wts.coi_refine();
-        // let btor = Btor::from(&wts);
+        let mut wsym = self.symbols.clone();
+        let tf = wts.simplify(&mut vec![]);
+        // if let Some(reset) = wsym.get_term_by_name("reset")
+        //     && let Some(reset_tf) = wts.reset_to_init(&reset, true)
+        // {
+        //     tf.extend(reset_tf);
+        // }
+        // tf.extend(wts.simplify(None));
+
+        tf.trans_sym(&mut wsym);
+        self.tf.extend(tf);
+        // let btor = wts.to_btor_with_sym(&wsym);
         // btor.to_file("simp.btor");
+        // panic!();
         let (ts, bb_rst) = wts.bitblast_to_ts();
         self.bb_rst = Some(bb_rst);
         (ts, VarSymbols::new())
@@ -208,7 +257,8 @@ impl Frontend for BtorFrontend {
 }
 
 impl BtorFrontend {
-    fn wl_safe_certificate(&mut self, proof: WlProof) -> Box<dyn Display> {
+    fn wl_safe_certificate(&mut self, mut proof: WlProof) -> Box<dyn Display> {
+        self.tf.inv_trans_proof(&mut proof);
         let mut btor = self.owts.clone();
         for l in proof.input.iter() {
             if !self.idmap.contains_key(l) {
@@ -225,6 +275,7 @@ impl BtorFrontend {
     }
 
     fn wl_unsafe_certificate(&mut self, mut cex: WlCex) -> Box<dyn Display> {
+        self.tf.inv_trans_cex(&mut cex);
         let mut res = vec!["sat".to_string(), format!("b{}", cex.bad_id)];
         for i in 0..cex.len() {
             if let Some(iv) = self.rst.init_var() {
@@ -244,8 +295,17 @@ impl BtorFrontend {
             let mut idw = Vec::new();
             for tv in state {
                 let id = self.idmap[tv.t()];
-                let bv = tv.into_bv();
-                idw.push((id, format!("{id} {:b}", bv.v())));
+                match tv.v() {
+                    fol::Value::Bv(bv) => {
+                        idw.push((id, format!("{id} {:b}", bv)));
+                    }
+                    fol::Value::Array(array) => {
+                        let (index_width, _) = tv.t().sort().array();
+                        for (index, value) in array.iter() {
+                            idw.push((id, format!("{id} [{index:0index_width$b}] {:b}", value)));
+                        }
+                    }
+                }
             }
             idw.sort();
             res.extend(idw.into_iter().map(|(_, v)| v));

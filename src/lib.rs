@@ -28,7 +28,7 @@ use crate::{
     },
     wltransys::{
         WlTransys,
-        certify::{WlCex, WlProof},
+        cert::{WlCex, WlProof},
     },
 };
 use enum_as_inner::EnumAsInner;

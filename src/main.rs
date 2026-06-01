@@ -1,8 +1,7 @@
 mod cli;
 
-use env_logger::Target;
-
 use crate::cli::cli_main;
+use env_logger::Target;
 use std::{fs, io::Write};
 
 fn main() -> anyhow::Result<()> {

@@ -116,6 +116,10 @@ pub struct PreprocConfig {
     #[arg(long = "preproc", action = ArgAction::Set, default_value_t = true)]
     pub preproc: bool,
 
+    /// bounded variable elimination
+    #[arg(long = "bve", action = ArgAction::Set, default_value_t = true)]
+    pub bve: bool,
+
     /// function reduced transys
     #[arg(long = "frts", action = ArgAction::Set, default_value_t = true)]
     pub frts: bool,
@@ -137,6 +141,7 @@ impl Default for PreprocConfig {
     fn default() -> Self {
         Self {
             preproc: true,
+            bve: true,
             frts: true,
             frts_tl: 1000,
             scorr: true,

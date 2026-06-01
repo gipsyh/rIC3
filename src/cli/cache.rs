@@ -1,8 +1,8 @@
-use crate::cli::run::PropMcInfo;
 use giputils::{
     file::{create_dir_if_not_exists, remove_if_exists},
     hash::GHashMap,
 };
+use rIC3::{McResult, config::EngineConfig};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
@@ -125,4 +125,11 @@ impl Ric3Proj {
         fs::write(self.path("res/res.ron"), cache)?;
         Ok(())
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PropMcInfo {
+    pub name: String,
+    pub res: McResult,
+    pub config: Option<EngineConfig>,
 }

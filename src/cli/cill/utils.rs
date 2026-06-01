@@ -1,7 +1,8 @@
-use crate::cli::{VcdConfig, cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
+use crate::cli::{cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
 use chrono::{DateTime, Duration, Local};
+use giputils::hash::GHashSet;
+use logicrs::fol::Term;
 use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
-use ratatui::crossterm::style::Stylize;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -9,117 +10,47 @@ use std::{
     io::BufWriter,
     path::Path,
 };
-use tabled::{
-    Table, Tabled,
-    settings::{Format, Modify, Style, object::Rows},
-};
 
 impl CIll {
-    pub fn save_cex(
+    pub fn save_trace(
         &mut self,
         cex: &BlCex,
-        p: impl AsRef<Path>,
-        vcd: Option<impl AsRef<Path>>,
+        filter_dut: bool,
+        p: Option<&Path>,
+        vcd: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
-        let bwit = self
-            .btorfe
-            .wl_certificate(McWlCertificate::SAT(cex.clone()));
-        fs::write(&p, format!("{}", bwit))?;
-        let Some(vcd) = vcd else {
-            return Ok(());
-        };
-        let vcd_file = BufWriter::new(File::create(&vcd)?);
-        let filter = if let Some(VcdConfig { top: Some(t) }) = &self.rcfg.trace {
-            t.as_str()
-                .strip_prefix(&self.rcfg.dut.top)
-                .map(|s| s.strip_prefix('.').unwrap_or(s))
-                .unwrap()
+        if filter_dut {
+            let dut_terms: GHashSet<Term> = self
+                .dut_wts
+                .input
+                .iter()
+                .chain(self.dut_wts.latch.iter())
+                .cloned()
+                .collect();
+            let filtered_cex = cex.filter(|t| dut_terms.contains(t));
+            if let Some(p) = p {
+                let bwit = self
+                    .dut_bf
+                    .wl_certificate(McWlCertificate::SAT(filtered_cex));
+                fs::write(&p, format!("{}", bwit))?;
+            }
+
+            let vcd_file = BufWriter::new(File::create(&vcd)?);
+            cex.enrich(&self.wsym.keys().cloned().collect());
+            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         } else {
-            ""
-        };
-        cex.enrich(&self.wsym.keys().cloned().collect());
-        wlwitness_vcd(&cex, &self.wsym, vcd_file, filter)?;
-        // crate::cli::yosys::Yosys::btor_wit_to_vcd(
-        //     self.rp.path("dut"),
-        //     &cti_file,
-        //     &vcd,
-        //     false,
-        //     self.rcfg.trace.as_ref(),
-        // )?;
-        Ok(())
-    }
-}
+            if let Some(_) = p {
+                todo!();
+            }
 
-#[derive(Tabled)]
-struct InductiveResult {
-    #[tabled(rename = "ID")]
-    id: usize,
-    #[tabled(rename = "Property")]
-    property: String,
-    #[tabled(rename = "Result")]
-    result: String,
-}
-
-impl CIll {
-    pub fn print_ind_res(&mut self) -> anyhow::Result<()> {
-        let mut results = Vec::new();
-        for (i, &res) in self.res.iter().enumerate() {
-            let name = &self.wsym.prop[i];
-            let status = if res {
-                "Inductive".green().to_string()
-            } else {
-                "Not Inductive".red().to_string()
-            };
-            results.push(InductiveResult {
-                id: i,
-                property: name.to_string(),
-                result: status,
-            });
+            let vcd_file = BufWriter::new(File::create(&vcd)?);
+            cex.enrich(&self.wsym.keys().cloned().collect());
+            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         }
 
-        let mut table = Table::new(&results);
-        table.with(Style::empty()).with(
-            Modify::new(Rows::first()).with(Format::content(|s| s.yellow().bold().to_string())),
-        );
-
-        println!("{}", table);
-
         Ok(())
-
-        // loop {
-        //     print!("Please enter the ID of the property to generate CTI (or 'q' to quit): ");
-        //     io::stdout().flush()?;
-        //     let mut input = String::new();
-        //     io::stdin().read_line(&mut input)?;
-        //     let input = input.trim();
-
-        //     if input == "q" {
-        //         return Ok(None);
-        //     }
-
-        //     match input.parse::<usize>() {
-        //         Ok(id) => {
-        //             if id < self.res.len() {
-        //                 if self.res[id] {
-        //                     println!(
-        //                         "{} is inductive, cannot generate CTI.",
-        //                         results[id].property
-        //                     );
-        //                 } else {
-        //                     println!("{} is selected for CTI generation.", results[id].property);
-        //                     return Ok(Some(id));
-        //                 }
-        //             } else {
-        //                 println!("Invalid ID.");
-        //             }
-        //         }
-        //         Err(_) => {
-        //             println!("Invalid input.");
-        //         }
-        //     }
-        // }
     }
 }
 

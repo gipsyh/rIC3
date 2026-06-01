@@ -47,7 +47,17 @@ impl Yosys {
     }
 
     pub fn generate_btor(cfg: &Ric3Config, p: impl AsRef<Path>) -> anyhow::Result<()> {
-        info!("Yosys: parsing the DUT and generating BTOR.");
+        Self::generate_btor_with_files(cfg, &cfg.dut.files, p, "dut", true)
+    }
+
+    pub fn generate_btor_with_files(
+        cfg: &Ric3Config,
+        input_files: &[PathBuf],
+        p: impl AsRef<Path>,
+        stem: &str,
+        reset: bool,
+    ) -> anyhow::Result<()> {
+        info!("Yosys: parsing SystemVerilog and generating BTOR.");
         let slang = cfg
             .modeling
             .as_ref()
@@ -56,7 +66,7 @@ impl Yosys {
         let src_dir = p.as_ref().join("src");
         recreate_dir(&src_dir)?;
         let mut files = Vec::new();
-        for f in cfg.dut.files.iter() {
+        for f in input_files {
             let file_name = f.file_name().unwrap();
             let dest = src_dir.join(file_name);
             fs::copy(f, &dest)?;
@@ -68,9 +78,12 @@ impl Yosys {
         }
         let mut yosys = Self::new();
         let mut read = if slang {
-            "read_slang -Wnone -D FORMAL -D YOSYS_SLANG"
+            format!(
+                "read_slang -Wnone -D FORMAL -D YOSYS_SLANG -top {}",
+                cfg.dut.top
+            )
         } else {
-            "read_verilog -formal -sv"
+            "read_verilog -formal -sv".to_string()
         }
         .to_string();
         for define in define_args(&cfg.dut.defines) {
@@ -80,37 +93,31 @@ impl Yosys {
             read.push_str(&format!(" {}", file.display()));
         }
         yosys.add_command(&read);
-        yosys.add_command(&format!("prep -flatten -top {}", cfg.dut.top));
-        yosys.add_command("hierarchy -smtcheck -nokeep_prints");
-        yosys.add_command("scc -select; simplemap; select -clear");
+        yosys.add_command("setundef -undriven -anyseq");
+        yosys.add_command("opt_clean");
         yosys.add_command("memory_nordff");
-        if let Some(reset) = &cfg.dut.reset {
-            if reset.starts_with("!") {
-                let reset = reset.strip_prefix("!").unwrap();
-                yosys.add_command(&format!("fminit -seq {} 0,1", reset));
-            } else {
-                yosys.add_command(&format!("fminit -seq {} 1,0", reset));
-            }
+        if reset && let Some((reset, pol)) = cfg.reset() {
+            yosys.add_command(&format!(
+                "fminit -seq {} {}",
+                reset,
+                if pol { "1,0" } else { "0,1" }
+            ));
         }
         yosys.add_command("chformal -cover -remove");
         yosys.add_command("chformal -early");
         yosys.add_command("async2sync");
         yosys.add_command("formalff -clk2ff -ff2anyinit -hierarchy -assume");
-        yosys.add_command("memory_map -formal");
         yosys.add_command("dffunmap");
-        yosys.add_command("setundef -undriven -anyseq");
         yosys.add_command("opt -fast");
-        yosys.add_command("opt_clean");
-        yosys.add_command("delete -output");
-        yosys.add_command("rename -witness");
         yosys.add_command("check");
         let dp = PathBuf::from("..");
-        yosys.add_command(&format!("write_rtlil {}", dp.join("dut.il").display()));
         yosys.add_command(&format!(
-            "write_btor -ywmap {} -i {} {}",
-            dp.join("dut.ywb").display(),
-            dp.join("dut.info").display(),
-            dp.join("dut.btor").display(),
+            "write_rtlil {}",
+            dp.join(format!("{stem}.il")).display()
+        ));
+        yosys.add_command(&format!(
+            "write_btor {}",
+            dp.join(format!("{stem}.btor")).display(),
         ));
         let plugin = if slang {
             vec!["slang".to_string()]
