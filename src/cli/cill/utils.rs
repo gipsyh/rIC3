@@ -1,4 +1,8 @@
-use crate::cli::{cache::Ric3Proj, cill::CIll, trace::wlwitness_vcd};
+use crate::cli::{
+    cache::Ric3Proj,
+    cill::CIll,
+    trace::{WlSymbolTrace, wlwitness_vcd},
+};
 use chrono::{DateTime, Duration, Local};
 use giputils::hash::GHashSet;
 use logicrs::fol::Term;
@@ -17,6 +21,7 @@ impl CIll {
         cex: &BlCex,
         filter_dut: bool,
         p: Option<&Path>,
+        s: Option<&Path>,
         vcd: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
@@ -39,6 +44,11 @@ impl CIll {
 
             let vcd_file = BufWriter::new(File::create(&vcd)?);
             cex.enrich(&self.wsym.keys().cloned().collect());
+            if let Some(s) = s {
+                let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
+                fs::write(s, ron::to_string(&wsym_trace)?)?;
+            }
+
             wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         } else {
             if let Some(_) = p {
@@ -47,6 +57,10 @@ impl CIll {
 
             let vcd_file = BufWriter::new(File::create(&vcd)?);
             cex.enrich(&self.wsym.keys().cloned().collect());
+            if let Some(s) = s {
+                let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
+                fs::write(s, ron::to_string(&wsym_trace)?)?;
+            }
             wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         }
 

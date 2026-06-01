@@ -2,9 +2,10 @@ use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{
     Lbool, LboolVec,
-    fol::{Sort, Term, Value as FolValue},
+    fol::{self, Sort, Term, Value as FolValue},
 };
 use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
+use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 
@@ -216,4 +217,43 @@ pub fn wlwitness_vcd(
     writer.timestamp(cex.len() as u64)?;
 
     Ok(())
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WlSymbolTrace {
+    trace: GHashMap<String, Vec<fol::Value>>,
+}
+
+impl WlSymbolTrace {
+    pub fn new(cex: &WlCex, sym: &WlTsSymbol) -> Self {
+        let mut term_trace = GHashMap::<Term, Vec<fol::Value>>::default();
+        for t in sym.keys() {
+            term_trace.insert(
+                t.clone(),
+                vec![fol::Value::default_from(t.sort()); cex.len()],
+            );
+        }
+
+        for k in 0..cex.len() {
+            for tv in &cex.input[k] {
+                if let Some(trace) = term_trace.get_mut(tv.t()) {
+                    trace[k] = fol::Value::Bv(tv.v().clone());
+                }
+            }
+            for tv in &cex.state[k] {
+                if let Some(trace) = term_trace.get_mut(tv.t()) {
+                    trace[k] = tv.v().clone();
+                }
+            }
+        }
+
+        let mut trace = GHashMap::default();
+        for (term, names) in sym.iter() {
+            let values = term_trace.remove(term).unwrap();
+            for name in names {
+                assert!(trace.insert(name.clone(), values.clone()).is_none());
+            }
+        }
+        Self { trace }
+    }
 }

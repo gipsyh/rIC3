@@ -170,8 +170,9 @@ impl CIll {
                 .unwrap_or(name);
             let cti_file = cti_path.join(format!("{}.cti", name));
             let vcd_path = cti_path.join(format!("{}.vcd", name));
+            let strace_path = cti_path.join(format!("{}.strace", name));
             let (status, vcd) = if let Some(cex) = res {
-                self.save_trace(cex, true, Some(&cti_file), &vcd_path)?;
+                self.save_trace(cex, true, Some(&cti_file), Some(&strace_path), &vcd_path)?;
                 (
                     "Not Inductive".red().to_string(),
                     vcd_path.display().to_string(),
