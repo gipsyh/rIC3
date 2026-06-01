@@ -28,7 +28,7 @@ bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
 nix = { version = "0.31.1", features = ["signal", "term"] }
 env_logger = "0.11.10"
-log = "0.4.27"
+log = "0.4.30"
 time = { version = "0.3.46", features = ["formatting", "macros"] }
 toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
