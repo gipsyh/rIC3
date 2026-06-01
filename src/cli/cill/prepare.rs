@@ -7,7 +7,7 @@ use giputils::{file::recreate_dir, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{
     VarSymbols,
-    fol::{Sort, Term, term_gc},
+    fol::{Sort, term_gc},
 };
 use rIC3::{
     Engine,
@@ -49,15 +49,14 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     Yosys::generate_btor_with_files(&rcfg, &rcfg.dut.files, &dut_dir, "dut", true)?;
     let mut btor = BtorFrontend::new(Btor::from_file(dut_dir.join("dut.btor")));
     let (mut wts, mut wsym) = btor.wts();
-    let keep = preprocess(rcfg, rp, &mut wts, &mut wsym)?;
+    preprocess(rcfg, rp, &mut wts, &mut wsym)?;
 
     let cill_dir = rp.path("cill");
     recreate_dir(&cill_dir)?;
     let symbols = collect_symbol_sorts(&wsym)?;
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
-    let mut btor = wts.to_btor_with_sym(&wsym);
-    btor.output = keep;
+    let btor = wts.to_btor_with_sym(&wsym);
     let wts_dir = rp.path("wts");
     recreate_dir(&wts_dir)?;
     btor.to_file(wts_dir.join("wts.btor"));
@@ -70,11 +69,12 @@ fn preprocess(
     rp: &Ric3Proj,
     wts: &mut WlTransys,
     wsym: &mut WlTsSymbol,
-) -> anyhow::Result<Vec<Term>> {
+) -> anyhow::Result<()> {
     let mut tf = WlTransformStack::new();
     tf.add(wts.coi_refine());
     tf.trans_sym(wsym);
     let mut keep: Vec<_> = wsym.keys().cloned().collect();
+    wts.output = keep.clone();
     tf.extend(wts.simplify(&mut keep));
     // let (rst, pol) = rcfg.reset().unwrap();
     // let rst = wsym.get_term_by_name(&rst).unwrap();
@@ -123,7 +123,7 @@ fn preprocess(
     let tf = wts.simplify(&mut keep);
     tf.trans_sym(wsym);
     term_gc();
-    Ok(keep)
+    Ok(())
 }
 
 fn simple_sv_ident(name: &str) -> bool {
