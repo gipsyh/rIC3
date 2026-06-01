@@ -573,7 +573,7 @@ pub enum TraceCommands {
     },
 
     /// Print selected signal values from a .strace file as JSON.
-    Values {
+    Value {
         /// Path to the .strace file.
         path: PathBuf,
 
@@ -594,7 +594,7 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        TraceCommands::Values { path, signals } => {
+        TraceCommands::Value { path, signals } => {
             let values = signal_values_file(path, &signals)?;
             println!("{}", toml::to_string_pretty(&values)?);
             Ok(())
