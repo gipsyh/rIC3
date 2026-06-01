@@ -321,10 +321,16 @@ impl WlSymbolTrace {
 
     pub fn search_signals(&self, pattern: &str) -> anyhow::Result<Vec<String>> {
         let regex = Regex::new(pattern)?;
+        let targets = self.signal_targets();
         let matched: Vec<_> = self
             .signal_names()
             .into_iter()
             .filter(|signal| regex.is_match(signal))
+            .filter(|signal| {
+                targets
+                    .get(signal)
+                    .is_some_and(|target| self.target_has_relevant_value(target))
+            })
             .collect();
 
         if matched.len() > 50 {
@@ -336,6 +342,29 @@ impl WlSymbolTrace {
             Ok(out)
         } else {
             Ok(matched)
+        }
+    }
+
+    fn target_has_relevant_value(&self, target: &SignalTarget) -> bool {
+        match target {
+            SignalTarget::Bv { name } => self
+                .trace
+                .get(name)
+                .is_some_and(|values| values.iter().any(|value| !value.all_x())),
+            SignalTarget::ArrayIndex { base, index } => {
+                self.trace.get(base).is_some_and(|values| {
+                    values.iter().any(|value| match value {
+                        FolValue::Array(array) => {
+                            array.get(index).is_some_and(|value| !value.all_x())
+                        }
+                        FolValue::Bv(_) => false,
+                    })
+                })
+            }
+            SignalTarget::ArrayBase { name } => self
+                .trace
+                .get(name)
+                .is_some_and(|values| values.iter().any(|value| !value.all_x())),
         }
     }
 
@@ -681,6 +710,30 @@ mod tests {
 
         assert_eq!(values.get("top.sig"), Some(&json!(SIGNAL_IRRELEVANT)));
         assert_eq!(values.get("absent"), Some(&json!(SIGNAL_NOT_FOUND)));
+    }
+
+    #[test]
+    fn search_signals_omits_all_x_signals() {
+        let trace = symbol_trace([
+            (
+                "top.all_x",
+                vec![
+                    FolValue::Bv(LboolVec::from("xx")),
+                    FolValue::Bv(LboolVec::from("xx")),
+                ],
+            ),
+            (
+                "top.relevant",
+                vec![
+                    FolValue::Bv(LboolVec::from("xx")),
+                    FolValue::Bv(LboolVec::from("01")),
+                ],
+            ),
+        ]);
+
+        let matches = trace.search_signals("top\\.").unwrap();
+
+        assert_eq!(matches, vec!["top.relevant"]);
     }
 
     #[test]
