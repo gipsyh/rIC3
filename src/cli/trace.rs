@@ -535,8 +535,7 @@ pub fn signal_values_file(
 #[derive(Subcommand, Debug, Clone)]
 pub enum TraceCommands {
     /// Search signals in a .strace file by regex and print matches.
-    #[command(alias = "search")]
-    SearchSignals {
+    Search {
         /// Path to the .strace file.
         path: PathBuf,
 
@@ -545,8 +544,7 @@ pub enum TraceCommands {
     },
 
     /// Print selected signal values from a .strace file as JSON.
-    #[command(alias = "values")]
-    SignalValues {
+    Values {
         /// Path to the .strace file.
         path: PathBuf,
 
@@ -561,15 +559,15 @@ pub enum TraceCommands {
 
 pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
     match cmd {
-        TraceCommands::SearchSignals { path, pattern } => {
+        TraceCommands::Search { path, pattern } => {
             for signal in search_signals_file(path, &pattern)? {
                 println!("{signal}");
             }
             Ok(())
         }
-        TraceCommands::SignalValues { path, signals } => {
+        TraceCommands::Values { path, signals } => {
             let values = signal_values_file(path, &signals)?;
-            println!("{}", serde_json::to_string_pretty(&values)?);
+            println!("{}", toml::to_string_pretty(&values)?);
             Ok(())
         }
         TraceCommands::Mcp => run_mcp_server(),
