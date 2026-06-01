@@ -156,8 +156,8 @@ impl CIll {
             result: String,
             #[tabled(rename = "Engine")]
             engine: String,
-            #[tabled(rename = "VCD")]
-            vcd: String,
+            #[tabled(rename = "Trace")]
+            trace: String,
         }
         let cti_path = self.rp.path("cill/cti");
         recreate_dir(&cti_path)?;
@@ -169,13 +169,12 @@ impl CIll {
                 .map(|s| s.to_string())
                 .unwrap_or(name);
             let cti_file = cti_path.join(format!("{}.cti", name));
-            let vcd_path = cti_path.join(format!("{}.vcd", name));
             let strace_path = cti_path.join(format!("{}.strace", name));
-            let (status, vcd) = if let Some(cex) = res {
-                self.save_trace(cex, true, Some(&cti_file), Some(&strace_path), &vcd_path)?;
+            let (status, trace) = if let Some(cex) = res {
+                self.save_trace(cex, true, Some(&cti_file), Some(&strace_path))?;
                 (
                     "Not Inductive".red().to_string(),
-                    vcd_path.display().to_string(),
+                    strace_path.display().to_string(),
                 )
             } else {
                 ("Inductive".green().to_string(), "-".to_string())
@@ -184,7 +183,7 @@ impl CIll {
                 property: name,
                 result: status,
                 engine: engines[i].clone().unwrap_or("-".to_string()),
-                vcd,
+                trace,
             });
         }
 

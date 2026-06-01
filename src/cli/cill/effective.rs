@@ -24,9 +24,7 @@ impl CIll {
             let name = cti_path.file_name().unwrap().to_str().unwrap().to_string();
 
             let cti = fs::read_to_string(&cti_path)?;
-            let vcd_path = cti_path.with_extension("vcd");
             remove_if_exists(&cti_path)?;
-            remove_if_exists(&vcd_path)?;
             let cti = self.dut_bf.deserialize_wl_unsafe_certificate(cti);
             let cti = self.bb_map.bitblast_cex(&cti);
             let cti = self.ts_rst.forward_cex(&cti);
@@ -36,7 +34,7 @@ impl CIll {
             let kind_res = kind.check().is_unsat();
             if !kind_res {
                 let witness = kind.cex();
-                self.save_trace(&witness, true, None, Some(&cti_path), vcd_path)?;
+                self.save_trace(&witness, true, None, Some(&cti_path))?;
                 println!("The CTI for {} has not been blocked, CTI refreshed.", name);
             } else {
                 println!("The CTI for {} has been successfully blocked.", name);

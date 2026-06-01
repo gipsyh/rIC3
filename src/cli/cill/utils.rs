@@ -1,8 +1,4 @@
-use crate::cli::{
-    cache::Ric3Proj,
-    cill::CIll,
-    trace::{WlSymbolTrace, wlwitness_vcd},
-};
+use crate::cli::{cache::Ric3Proj, cill::CIll, trace::WlSymbolTrace};
 use chrono::{DateTime, Duration, Local};
 use giputils::hash::GHashSet;
 use logicrs::fol::Term;
@@ -10,8 +6,7 @@ use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
-    fs::{self, File},
-    io::BufWriter,
+    fs::{self},
     path::Path,
 };
 
@@ -22,7 +17,6 @@ impl CIll {
         filter_dut: bool,
         p: Option<&Path>,
         s: Option<&Path>,
-        vcd: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut cex = self.bb_map.restore_cex(&cex);
@@ -42,26 +36,21 @@ impl CIll {
                 fs::write(&p, format!("{}", bwit))?;
             }
 
-            let vcd_file = BufWriter::new(File::create(&vcd)?);
             cex.enrich(&self.wsym.keys().cloned().collect());
             if let Some(s) = s {
                 let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
                 fs::write(s, ron::to_string(&wsym_trace)?)?;
             }
-
-            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         } else {
             if let Some(_) = p {
                 todo!();
             }
 
-            let vcd_file = BufWriter::new(File::create(&vcd)?);
             cex.enrich(&self.wsym.keys().cloned().collect());
             if let Some(s) = s {
                 let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
                 fs::write(s, ron::to_string(&wsym_trace)?)?;
             }
-            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
         }
 
         Ok(())
