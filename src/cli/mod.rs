@@ -4,7 +4,7 @@ mod check;
 mod cill;
 mod clean;
 mod run;
-mod vcd;
+mod trace;
 mod yosys;
 
 use crate::cli::{

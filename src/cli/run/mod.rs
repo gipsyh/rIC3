@@ -276,7 +276,7 @@ impl Run {
             cex.enrich(&self.wsym.keys().cloned().collect());
             let vcd_path = self.ric3_proj.path(format!("res/p{prop_id}.vcd"));
             let vcd_file = BufWriter::new(File::create(vcd_path)?);
-            crate::cli::vcd::wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
+            crate::cli::trace::wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
             updates.witness.push(prop_id);
         }
         Ok(())
