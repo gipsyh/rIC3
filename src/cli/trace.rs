@@ -521,18 +521,15 @@ fn array_base_name(name: &str) -> Option<&str> {
     Some(base)
 }
 
-pub fn search_signals_file(
-    vcd_path: impl AsRef<Path>,
-    pattern: &str,
-) -> anyhow::Result<Vec<String>> {
-    WlSymbolTrace::load(vcd_path)?.search_signals(pattern)
+pub fn search_signals_file(path: impl AsRef<Path>, pattern: &str) -> anyhow::Result<Vec<String>> {
+    WlSymbolTrace::load(path)?.search_signals(pattern)
 }
 
 pub fn signal_values_file(
-    vcd_path: impl AsRef<Path>,
+    path: impl AsRef<Path>,
     signals: &[String],
 ) -> anyhow::Result<BTreeMap<String, JsonValue>> {
-    WlSymbolTrace::load(vcd_path)?.signal_values(signals)
+    WlSymbolTrace::load(path)?.signal_values(signals)
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -582,7 +579,7 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SearchSignalsArgs {
     #[schemars(description = "Absolute path to the .strace file.")]
-    vcd_path: String,
+    path: String,
 
     #[schemars(description = "Regex pattern to search for.")]
     pattern: String,
@@ -591,7 +588,7 @@ struct SearchSignalsArgs {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SignalValuesArgs {
     #[schemars(description = "Absolute path to the .strace file.")]
-    vcd_path: String,
+    path: String,
 
     #[schemars(description = "Signal names to read.")]
     signals: Vec<String>,
@@ -613,25 +610,25 @@ struct TraceMcpServer;
 #[tool_router]
 impl TraceMcpServer {
     #[tool(
-        description = "Search signals in a WlSymbolTrace .strace file by regex pattern. Returns matching signal names. The vcd_path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned."
+        description = "Search signals in a .strace file by regex pattern. Returns matching signal names. The path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned."
     )]
     fn search_signals(
         &self,
-        Parameters(SearchSignalsArgs { vcd_path, pattern }): Parameters<SearchSignalsArgs>,
+        Parameters(SearchSignalsArgs { path, pattern }): Parameters<SearchSignalsArgs>,
     ) -> Result<rmcp::Json<SearchSignalsOutput>, String> {
-        search_signals_file(vcd_path, &pattern)
+        search_signals_file(path, &pattern)
             .map(|signals| rmcp::Json(SearchSignalsOutput { signals }))
             .map_err(|err| err.to_string())
     }
 
     #[tool(
-        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The vcd_path argument is kept for compatibility and should point to the .strace file."
+        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The path argument is kept for compatibility and should point to the .strace file."
     )]
     fn signal_values(
         &self,
-        Parameters(SignalValuesArgs { vcd_path, signals }): Parameters<SignalValuesArgs>,
+        Parameters(SignalValuesArgs { path, signals }): Parameters<SignalValuesArgs>,
     ) -> Result<rmcp::Json<SignalValuesOutput>, String> {
-        signal_values_file(vcd_path, &signals)
+        signal_values_file(path, &signals)
             .map(|values| rmcp::Json(SignalValuesOutput { values }))
             .map_err(|err| err.to_string())
     }
