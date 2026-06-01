@@ -597,6 +597,16 @@ struct SignalValuesArgs {
     signals: Vec<String>,
 }
 
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+struct SearchSignalsOutput {
+    signals: Vec<String>,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+struct SignalValuesOutput {
+    values: BTreeMap<String, JsonValue>,
+}
+
 #[derive(Clone)]
 struct TraceMcpServer;
 
@@ -608,9 +618,9 @@ impl TraceMcpServer {
     fn search_signals(
         &self,
         Parameters(SearchSignalsArgs { vcd_path, pattern }): Parameters<SearchSignalsArgs>,
-    ) -> Result<rmcp::Json<Vec<String>>, String> {
+    ) -> Result<rmcp::Json<SearchSignalsOutput>, String> {
         search_signals_file(vcd_path, &pattern)
-            .map(rmcp::Json)
+            .map(|signals| rmcp::Json(SearchSignalsOutput { signals }))
             .map_err(|err| err.to_string())
     }
 
@@ -620,9 +630,9 @@ impl TraceMcpServer {
     fn signal_values(
         &self,
         Parameters(SignalValuesArgs { vcd_path, signals }): Parameters<SignalValuesArgs>,
-    ) -> Result<rmcp::Json<BTreeMap<String, JsonValue>>, String> {
+    ) -> Result<rmcp::Json<SignalValuesOutput>, String> {
         signal_values_file(vcd_path, &signals)
-            .map(rmcp::Json)
+            .map(|values| rmcp::Json(SignalValuesOutput { values }))
             .map_err(|err| err.to_string())
     }
 }
