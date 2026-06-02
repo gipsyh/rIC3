@@ -2,7 +2,7 @@
 mod tests {
     use super::super::*;
     use giputils::bitvec::BitVec;
-    use logicrs::fol::{Sort, current_term_mgr};
+    use logicrs::fol::{Sort, term_mgr};
 
     #[test]
     fn wltransys_round_trip_by_term_id() {
@@ -24,7 +24,7 @@ mod tests {
         };
 
         let content = ron::to_string(&wts).unwrap();
-        current_term_mgr().enable_id_map();
+        term_mgr().enable_id_map();
         let restored: WlTransys = ron::from_str(&content).unwrap();
 
         assert_eq!(restored.input, vec![input]);
