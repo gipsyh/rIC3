@@ -168,10 +168,10 @@ impl CIll {
                 .strip_prefix("invariants.")
                 .map(|s| s.to_string())
                 .unwrap_or(name);
-            let cti_file = cti_path.join(format!("{}.cti", name));
+            // let cti_file = cti_path.join(format!("{}.cti", name));
             let strace_path = cti_path.join(format!("{}.strace", name));
             let (status, trace) = if let Some(cex) = res {
-                self.save_trace(cex, true, Some(&cti_file), Some(&strace_path))?;
+                self.save_trace(cex, true, Some(&strace_path))?;
                 (
                     "Not Inductive".red().to_string(),
                     strace_path.display().to_string(),

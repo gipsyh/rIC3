@@ -2,7 +2,7 @@ use crate::cli::{cache::Ric3Proj, cill::CIll, trace::WlSymbolTrace};
 use chrono::{DateTime, Duration, Local};
 use giputils::hash::GHashSet;
 use logicrs::fol::Term;
-use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
+use rIC3::transys::certify::BlCex;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -15,7 +15,7 @@ impl CIll {
         &mut self,
         cex: &BlCex,
         filter_dut: bool,
-        p: Option<&Path>,
+        // p: Option<&Path>,
         s: Option<&Path>,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
@@ -28,13 +28,13 @@ impl CIll {
                 .chain(self.dut_wts.latch.iter())
                 .cloned()
                 .collect();
-            let filtered_cex = cex.filter(|t| dut_terms.contains(t));
-            if let Some(p) = p {
-                let bwit = self
-                    .dut_bf
-                    .wl_certificate(McWlCertificate::SAT(filtered_cex));
-                fs::write(&p, format!("{}", bwit))?;
-            }
+            let _filtered_cex = cex.filter(|t| dut_terms.contains(t));
+            // if let Some(p) = p {
+            //     let bwit = self
+            //         .dut_bf
+            //         .wl_certificate(McWlCertificate::SAT(filtered_cex));
+            //     fs::write(&p, format!("{}", bwit))?;
+            // }
 
             cex.enrich(&self.wsym.keys().cloned().collect());
             if let Some(s) = s {
@@ -42,10 +42,6 @@ impl CIll {
                 fs::write(s, ron::to_string(&wsym_trace)?)?;
             }
         } else {
-            if let Some(_) = p {
-                todo!();
-            }
-
             cex.enrich(&self.wsym.keys().cloned().collect());
             if let Some(s) = s {
                 let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);

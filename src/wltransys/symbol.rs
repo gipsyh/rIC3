@@ -1,8 +1,9 @@
 use giputils::hash::GHashMap;
 use logicrs::fol::Term;
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WlTsSymbol {
     pub signal: GHashMap<Term, Vec<String>>,
     pub prop: Vec<String>,

@@ -15,12 +15,11 @@ use crate::{
     logger_init,
 };
 use anyhow::bail;
-use btor::Btor;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::LevelFilter;
+use logicrs::fol::{TermManager, current_term_mgr, set_term_mgr, term_gc};
 use rIC3::{
-    frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
@@ -89,7 +88,6 @@ pub struct CIll {
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
-    dut_bf: BtorFrontend,
     dut_wts: WlTransys,
     #[allow(unused)]
     dut_wsym: WlTsSymbol,
@@ -97,9 +95,14 @@ pub struct CIll {
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<Self> {
-        let btor = Btor::from_file(rp.path("wts/wts.btor"));
-        let mut dut_bf = BtorFrontend::new(btor);
-        let (dut_wts, dut_wsym) = dut_bf.wts();
+        term_gc();
+        assert!(current_term_mgr().is_empty());
+        let term_mgr: TermManager = rp.load_serde_obj("wts/term.ron")?;
+        set_term_mgr(term_mgr);
+        current_term_mgr().enable_id_map();
+        let dut_wts: WlTransys = rp.load_serde_obj("wts/wts.ron")?;
+        let dut_wsym: WlTsSymbol = rp.load_serde_obj("wts/wsym.ron")?;
+        current_term_mgr().disable_id_map();
 
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
@@ -114,7 +117,6 @@ impl CIll {
         assert!(!ts.has_gate_init());
         Ok(Self {
             rp,
-            dut_bf,
             dut_wts,
             dut_wsym,
             wsym,
