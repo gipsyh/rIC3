@@ -1,5 +1,6 @@
 pub mod bitblast;
 pub mod cert;
+mod serial;
 mod simplify;
 pub mod symbol;
 pub mod transform;
