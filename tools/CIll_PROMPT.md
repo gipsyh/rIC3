@@ -18,6 +18,8 @@ You can use it to check whether the assertions are inductive and generate CTI.
 
 - `ric3 cill abort`: Discards the current CTI context. Use this if you delete the assertion that generated the CTI, or if you decide not to block the current CTI.
 
+- If `ric3` is not available in the current environment, it may be available through Docker. In that case, use `docker run -v $HOME:$HOME -w $PWD -it --rm ric3 cill <command>`.
+
 ## `ric3_trace_tools` (MCP):
 - `search_signals(path, pattern)`: Search signal names in a `.strace` file by regex `pattern`. Pass the `.strace` path reported by `ric3 cill check`. It is not recommended to list all signals at once, as this may produce many irrelevant results. Instead, search for the signals you need.
 - `signal_values(path, signals=[...])`: Inspect selected signal values in a `.strace` file. Signal names must match exactly (no fuzzy matching or regex).
