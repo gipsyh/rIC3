@@ -1,7 +1,5 @@
-use crate::cli::{cill::CIll, rproj::Ric3Proj, trace::WlSymbolTrace};
+use crate::cli::{cill::CIll, rproj::Ric3Proj};
 use chrono::{DateTime, Duration, Local};
-use giputils::hash::GHashSet;
-use logicrs::fol::Term;
 use rIC3::transys::certify::BlCex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,35 +12,33 @@ impl CIll {
     pub fn save_trace(
         &mut self,
         cex: &BlCex,
-        filter_dut: bool,
+        _filter_dut: bool,
         // p: Option<&Path>,
         path: &Path,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
         let mut trace = self.bb_map.restore_cex(&cex);
-        if filter_dut {
-            let dut_terms: GHashSet<Term> = self
-                .dut_wts
-                .input
-                .iter()
-                .chain(self.dut_wts.latch.iter())
-                .cloned()
-                .collect();
-            let _filtered_cex = trace.filter(|t| dut_terms.contains(t));
-            // if let Some(p) = p {
-            //     let bwit = self
-            //         .dut_bf
-            //         .wl_certificate(McWlCertificate::SAT(filtered_cex));
-            //     fs::write(&p, format!("{}", bwit))?;
-            // }
+        // if filter_dut {
+        //     let dut_terms: GHashSet<Term> = self
+        //         .dut_wts
+        //         .input
+        //         .iter()
+        //         .chain(self.dut_wts.latch.iter())
+        //         .cloned()
+        //         .collect();
+        //     let _filtered_cex = trace.filter(|t| dut_terms.contains(t));
+        //     // if let Some(p) = p {
+        //     //     let bwit = self
+        //     //         .dut_bf
+        //     //         .wl_certificate(McWlCertificate::SAT(filtered_cex));
+        //     //     fs::write(&p, format!("{}", bwit))?;
+        //     // }
 
-            trace.enrich(&self.wsym.keys().cloned().collect());
-            let wsym_trace = WlSymbolTrace::new(&trace, &self.wsym);
-            fs::write(path, ron::to_string(&wsym_trace)?)?;
-        } else {
-            trace.enrich(&self.wsym.keys().cloned().collect());
-            self.rp.save_serde_obj(&trace, path)?;
-        }
+        //     trace.enrich(&self.wsym.keys().cloned().collect());
+        //     fs::write(path, ron::to_string(&wsym_trace)?)?;
+        // }
+        trace.enrich(&self.wsym.keys().cloned().collect());
+        self.rp.save_serde_obj(&trace, path)?;
 
         Ok(())
     }
