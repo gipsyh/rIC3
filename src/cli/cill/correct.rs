@@ -39,8 +39,8 @@ impl CIll {
             .into_iter()
             .min_by_key(|(r, _)| r.into_sat().unwrap());
 
-        let strace = self.rp.path("cill/cex.strace");
-        remove_if_exists(&strace)?;
+        let trace = self.rp.path("cill/cex.rtrc");
+        remove_if_exists(&trace)?;
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
@@ -49,13 +49,13 @@ impl CIll {
         match min_res {
             Some((r, mut bmc)) => {
                 let witness = bmc.cex();
-                self.save_trace(&witness, false, Some(&strace))?;
+                self.save_trace(&witness, false, &trace)?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(
                     "{}",
                     format!(
                         "A CEX violating {name} was found. Trace generated at {}.",
-                        strace.display()
+                        trace.display()
                     )
                     .red()
                 );

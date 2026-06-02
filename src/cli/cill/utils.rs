@@ -16,10 +16,10 @@ impl CIll {
         cex: &BlCex,
         filter_dut: bool,
         // p: Option<&Path>,
-        s: Option<&Path>,
+        path: &Path,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
-        let mut cex = self.bb_map.restore_cex(&cex);
+        let mut trace = self.bb_map.restore_cex(&cex);
         if filter_dut {
             let dut_terms: GHashSet<Term> = self
                 .dut_wts
@@ -28,7 +28,7 @@ impl CIll {
                 .chain(self.dut_wts.latch.iter())
                 .cloned()
                 .collect();
-            let _filtered_cex = cex.filter(|t| dut_terms.contains(t));
+            let _filtered_cex = trace.filter(|t| dut_terms.contains(t));
             // if let Some(p) = p {
             //     let bwit = self
             //         .dut_bf
@@ -36,17 +36,12 @@ impl CIll {
             //     fs::write(&p, format!("{}", bwit))?;
             // }
 
-            cex.enrich(&self.wsym.keys().cloned().collect());
-            if let Some(s) = s {
-                let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
-                fs::write(s, ron::to_string(&wsym_trace)?)?;
-            }
+            trace.enrich(&self.wsym.keys().cloned().collect());
+            let wsym_trace = WlSymbolTrace::new(&trace, &self.wsym);
+            fs::write(path, ron::to_string(&wsym_trace)?)?;
         } else {
-            cex.enrich(&self.wsym.keys().cloned().collect());
-            if let Some(s) = s {
-                let wsym_trace = WlSymbolTrace::new(&cex, &self.wsym);
-                fs::write(s, ron::to_string(&wsym_trace)?)?;
-            }
+            trace.enrich(&self.wsym.keys().cloned().collect());
+            self.rp.save_serde_obj(&trace, path)?;
         }
 
         Ok(())

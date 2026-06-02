@@ -563,18 +563,18 @@ pub fn signal_values_file(
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum TraceCommands {
-    /// Search signals in a .strace file by regex and print matches.
+    /// Search signals in a .rtrc file by regex and print matches.
     Search {
-        /// Path to the .strace file.
+        /// Path to the .rtrc file.
         path: PathBuf,
 
         /// Regex used to match signal names.
         pattern: String,
     },
 
-    /// Print selected signal values from a .strace file as JSON.
+    /// Print selected signal values from a .rtrc file as JSON.
     Value {
-        /// Path to the .strace file.
+        /// Path to the .rtrc file.
         path: PathBuf,
 
         /// Signal names to print. Suffix matches are supported.
@@ -605,7 +605,7 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SearchSignalsArgs {
-    #[schemars(description = "Absolute path to the .strace file.")]
+    #[schemars(description = "Absolute path to the .rtrc file.")]
     path: String,
 
     #[schemars(description = "Regex pattern to search for.")]
@@ -614,7 +614,7 @@ struct SearchSignalsArgs {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SignalValuesArgs {
-    #[schemars(description = "Absolute path to the .strace file.")]
+    #[schemars(description = "Absolute path to the .rtrc file.")]
     path: String,
 
     #[schemars(description = "Signal names to read.")]
@@ -637,7 +637,7 @@ struct TraceMcpServer;
 #[tool_router]
 impl TraceMcpServer {
     #[tool(
-        description = "Search signals in a .strace file by regex pattern. Returns matching signal names. The path argument is kept for compatibility and should point to the .strace file. If more than 50 signals match, only the first 50 are returned."
+        description = "Search signals in a .rtrc file by regex pattern. Returns matching signal names. The path argument is kept for compatibility and should point to the .rtrc file. If more than 50 signals match, only the first 50 are returned."
     )]
     fn search_signals(
         &self,
@@ -649,7 +649,7 @@ impl TraceMcpServer {
     }
 
     #[tool(
-        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The path argument is kept for compatibility and should point to the .strace file."
+        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The path argument is kept for compatibility and should point to the .rtrc file."
     )]
     fn signal_values(
         &self,
@@ -663,7 +663,7 @@ impl TraceMcpServer {
 
 #[tool_handler(
     name = "ric3-trace-tools",
-    instructions = "Tools for inspecting .strace files."
+    instructions = "Tools for inspecting .rtrc files."
 )]
 impl ServerHandler for TraceMcpServer {}
 

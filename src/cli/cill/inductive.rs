@@ -169,12 +169,12 @@ impl CIll {
                 .map(|s| s.to_string())
                 .unwrap_or(name);
             // let cti_file = cti_path.join(format!("{}.cti", name));
-            let strace_path = cti_path.join(format!("{}.strace", name));
+            let trace_path = cti_path.join(format!("{}.rtrc", name));
             let (status, trace) = if let Some(cex) = res {
-                self.save_trace(cex, true, Some(&strace_path))?;
+                self.save_trace(cex, true, &trace_path)?;
                 (
                     "Not Inductive".red().to_string(),
-                    strace_path.display().to_string(),
+                    trace_path.display().to_string(),
                 )
             } else {
                 ("Inductive".green().to_string(), "-".to_string())

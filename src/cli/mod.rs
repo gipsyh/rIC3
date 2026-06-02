@@ -66,7 +66,7 @@ pub enum Commands {
         cmd: CIllCommands,
     },
 
-    /// Inspect WlSymbolTrace .strace files.
+    /// Inspect WlSymbolTrace .rtrc files.
     Trace {
         #[command(subcommand)]
         cmd: TraceCommands,
