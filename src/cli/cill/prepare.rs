@@ -7,7 +7,7 @@ use giputils::{file::recreate_dir, logger::with_log_level};
 use log::{LevelFilter, info};
 use logicrs::{
     VarSymbols,
-    fol::{Sort, term_gc, term_mgr},
+    fol::{Sort, term_gc},
 };
 use rIC3::{
     Engine,
@@ -56,10 +56,7 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     let symbols = collect_symbol_sorts(&wsym)?;
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
-    recreate_dir(&rp.path("wts"))?;
-    rp.save_serde_obj(term_mgr(), "wts/term.ron")?;
-    rp.save_serde_obj(&wts, "wts/wts.ron")?;
-    rp.save_serde_obj(&wsym, "wts/wsym.ron")?;
+    rp.save_wts(&wts, Some(&wsym), "wts")?;
     CIllStat::init(&rp)?;
     Ok(())
 }

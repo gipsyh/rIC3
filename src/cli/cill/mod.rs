@@ -107,8 +107,8 @@ impl CIll {
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
         rp.remove_unused_cti(&wsym.prop);
-        wts.to_btor_with_sym(&wsym)
-            .to_file(rp.path("cill/candinv/linked.btor"));
+
+        rp.save_wts(&wts, Some(&wsym), "cill/candinv/link")?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();

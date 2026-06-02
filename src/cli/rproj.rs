@@ -1,8 +1,13 @@
 use giputils::{
-    file::{create_dir_if_not_exists, remove_if_exists},
+    file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
     hash::GHashMap,
 };
-use rIC3::{McResult, config::EngineConfig};
+use logicrs::fol::{term_gc, term_mgr};
+use rIC3::{
+    McResult,
+    config::EngineConfig,
+    wltransys::{WlTransys, symbol::WlTsSymbol},
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
@@ -123,6 +128,22 @@ impl Ric3Proj {
     pub fn cache_res(&self, res: Vec<PropMcInfo>) -> anyhow::Result<()> {
         let cache = ron::to_string(&res)?;
         fs::write(self.path("res/res.ron"), cache)?;
+        Ok(())
+    }
+
+    pub fn save_wts(
+        &self,
+        wts: &WlTransys,
+        wsym: Option<&WlTsSymbol>,
+        path: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        recreate_dir(&self.path(path.as_ref()))?;
+        term_gc();
+        self.save_serde_obj(term_mgr(), path.as_ref().join("term.ron"))?;
+        self.save_serde_obj(&wts, path.as_ref().join("wts.ron"))?;
+        if let Some(wsym) = wsym {
+            self.save_serde_obj(wsym, path.as_ref().join("wsym.ron"))?;
+        }
         Ok(())
     }
 }
