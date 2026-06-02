@@ -56,7 +56,7 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     let symbols = collect_symbol_sorts(&wsym)?;
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
-    rp.save_wts(&wts, Some(&wsym), "wts")?;
+    rp.save_wts(&wts, &wsym, "wts")?;
     CIllStat::init(&rp)?;
     Ok(())
 }

@@ -144,7 +144,6 @@ pub fn synthesis_candinv(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<Bto
     let candinv_dir = rp.path("cill/candinv");
     recreate_dir(&candinv_dir)?;
     Yosys::generate_btor_with_files(&rcfg, &[shadow, candinv], &candinv_dir, "invariants", true)?;
-
     Ok(BtorFrontend::new(Btor::from_file(
         candinv_dir.join("invariants.btor"),
     )))

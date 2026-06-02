@@ -18,7 +18,6 @@ use anyhow::bail;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::LevelFilter;
-use logicrs::fol::{TermManager, set_term_mgr, term_gc, term_mgr};
 use rIC3::{
     transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
@@ -95,20 +94,12 @@ pub struct CIll {
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<Self> {
-        term_gc();
-        assert!(term_mgr().is_empty());
-        let tm: TermManager = rp.load_serde_obj("wts/term.ron")?;
-        set_term_mgr(tm);
-        term_mgr().enable_id_map();
-        let dut_wts: WlTransys = rp.load_serde_obj("wts/wts.ron")?;
-        let dut_wsym: WlTsSymbol = rp.load_serde_obj("wts/wsym.ron")?;
-        term_mgr().disable_id_map();
-
+        let (dut_wts, dut_wsym) = rp.load_wts("wts")?;
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
         rp.remove_unused_cti(&wsym.prop);
 
-        rp.save_wts(&wts, Some(&wsym), "cill/candinv/link")?;
+        rp.save_wts(&wts, &wsym, "cill/candinv/link")?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();

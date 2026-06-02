@@ -2,7 +2,7 @@ use giputils::{
     file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
     hash::GHashMap,
 };
-use logicrs::fol::{term_gc, term_mgr};
+use logicrs::fol::{TermManager, set_term_mgr, term_gc, term_mgr};
 use rIC3::{
     McResult,
     config::EngineConfig,
@@ -134,17 +134,27 @@ impl Ric3Proj {
     pub fn save_wts(
         &self,
         wts: &WlTransys,
-        wsym: Option<&WlTsSymbol>,
+        wsym: &WlTsSymbol,
         path: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
         recreate_dir(&self.path(path.as_ref()))?;
         term_gc();
         self.save_serde_obj(term_mgr(), path.as_ref().join("term.ron"))?;
         self.save_serde_obj(&wts, path.as_ref().join("wts.ron"))?;
-        if let Some(wsym) = wsym {
-            self.save_serde_obj(wsym, path.as_ref().join("wsym.ron"))?;
-        }
+        self.save_serde_obj(wsym, path.as_ref().join("wsym.ron"))?;
         Ok(())
+    }
+
+    pub fn load_wts(&self, path: impl AsRef<Path>) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
+        term_gc();
+        assert!(term_mgr().is_empty());
+        let tm: TermManager = self.load_serde_obj(path.as_ref().join("term.ron"))?;
+        set_term_mgr(tm);
+        term_mgr().enable_id_map();
+        let wts: WlTransys = self.load_serde_obj(path.as_ref().join("wts.ron"))?;
+        let wsym: WlTsSymbol = self.load_serde_obj(path.as_ref().join("wsym.ron"))?;
+        term_mgr().disable_id_map();
+        Ok((wts, wsym))
     }
 }
 
