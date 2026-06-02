@@ -468,12 +468,12 @@ fn format_lbool_vec(value: &LboolVec) -> String {
     }
 
     if value.any_x() {
-        return format!("0b_{value}");
+        return format!("{}'b{value}", value.len());
     }
 
     let hex = format!("{:x}", value.v());
     let hex = hex.strip_prefix("0x").unwrap_or(&hex);
-    format!("0x_{hex}")
+    format!("{}'h{hex}", value.len())
 }
 
 fn expand_signal_names(available: &[String], requested: &[String]) -> (Vec<String>, Vec<String>) {
@@ -737,7 +737,7 @@ mod tests {
     }
 
     #[test]
-    fn values_use_hex_unless_some_bits_are_x() {
+    fn values_include_hardware_literal_widths() {
         let trace = symbol_trace([(
             "sig",
             vec![
@@ -749,7 +749,7 @@ mod tests {
 
         let values = trace.signal_values(&["sig".to_string()]).unwrap();
 
-        assert_eq!(values.get("sig"), Some(&json!(["0x_a", "0b_1x0", "X"])));
+        assert_eq!(values.get("sig"), Some(&json!(["4'ha", "3'b1x0", "X"])));
     }
 
     #[test]
@@ -765,6 +765,6 @@ mod tests {
         assert_eq!(trace.signal_names(), vec!["mem[1]"]);
 
         let values = trace.signal_values(&["mem".to_string()]).unwrap();
-        assert_eq!(values.get("mem[1]"), Some(&json!(["0x_1", "X"])));
+        assert_eq!(values.get("mem[1]"), Some(&json!(["2'h1", "X"])));
     }
 }
