@@ -1,16 +1,16 @@
 mod build;
-mod cache;
 mod check;
 mod cill;
 mod clean;
+mod rproj;
 mod run;
 mod trace;
 mod yosys;
 
 use crate::cli::{
-    cache::DutHash,
     check::CheckConfig,
     cill::{CIllCommands, cill},
+    rproj::DutHash,
     trace::{TraceCommands, trace},
 };
 use anyhow::Context;

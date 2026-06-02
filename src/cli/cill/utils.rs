@@ -1,4 +1,4 @@
-use crate::cli::{cache::Ric3Proj, cill::CIll, trace::WlSymbolTrace};
+use crate::cli::{cill::CIll, rproj::Ric3Proj, trace::WlSymbolTrace};
 use chrono::{DateTime, Duration, Local};
 use giputils::hash::GHashSet;
 use logicrs::fol::Term;

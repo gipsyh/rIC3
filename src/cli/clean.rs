@@ -1,4 +1,4 @@
-use crate::cli::cache::Ric3Proj;
+use crate::cli::rproj::Ric3Proj;
 use giputils::file::remove_if_exists;
 
 pub fn clean() -> anyhow::Result<()> {

@@ -6,7 +6,7 @@ mod kind;
 mod prepare;
 mod utils;
 
-use super::{Ric3Config, cache::Ric3Proj};
+use super::{Ric3Config, rproj::Ric3Proj};
 use crate::{
     cli::cill::{
         candinv::{link_candinv, synthesis_candinv},

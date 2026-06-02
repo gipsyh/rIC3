@@ -1,5 +1,5 @@
 use crate::cli::{
-    Ric3Config, cache::PropMcInfo, cache::Ric3Proj, cill::utils::CIllStat, yosys::Yosys,
+    Ric3Config, cill::utils::CIllStat, rproj::PropMcInfo, rproj::Ric3Proj, yosys::Yosys,
 };
 use anyhow::bail;
 use btor::Btor;

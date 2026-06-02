@@ -1,4 +1,4 @@
-use crate::cli::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::{Ric3Config, rproj::Ric3Proj, yosys::Yosys};
 
 pub fn build() -> anyhow::Result<()> {
     let ric3_cfg = Ric3Config::from_file("ric3.toml")?;

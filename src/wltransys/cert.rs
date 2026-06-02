@@ -1,9 +1,10 @@
 use crate::wltransys::WlTransys;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{self, BvTermValue, Term, TermValue};
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlCex {
     pub input: Vec<Vec<BvTermValue>>,
     pub state: Vec<Vec<TermValue>>,

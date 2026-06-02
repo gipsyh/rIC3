@@ -1,4 +1,4 @@
-use crate::cli::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
+use crate::cli::{Ric3Config, rproj::Ric3Proj, yosys::Yosys};
 use btor::Btor;
 use giputils::{file::recreate_dir, hash::GHashMap};
 use logicrs::fol::Term;

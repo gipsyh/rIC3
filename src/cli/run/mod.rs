@@ -1,7 +1,7 @@
 mod ui;
 
-use super::{Ric3Config, cache::Ric3Proj, yosys::Yosys};
-use crate::cli::cache::PropMcInfo;
+use super::{Ric3Config, rproj::Ric3Proj, yosys::Yosys};
+use crate::cli::rproj::PropMcInfo;
 use btor::Btor;
 use clap::{Args, ValueEnum};
 use giputils::file::recreate_dir;
