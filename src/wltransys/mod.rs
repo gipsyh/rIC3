@@ -1,17 +1,18 @@
 pub mod bitblast;
 pub mod cert;
-mod serial;
 mod simplify;
 pub mod symbol;
+mod test;
 pub mod transform;
 pub mod unroll;
 
 use crate::wltransys::cert::Restore;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{FolOp, Sort, Term};
+use serde::{Deserialize, Serialize};
 use std::mem::take;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlTransys {
     pub input: Vec<Term>,
     pub latch: Vec<Term>,
