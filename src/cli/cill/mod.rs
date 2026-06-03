@@ -100,7 +100,7 @@ impl CIll {
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
         rp.remove_unused_cti(&wsym.prop);
 
-        rp.save_wts(&wts, &wsym, "cill/link")?;
+        rp.save_wts(&wts, &wsym, "cill/linked")?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();

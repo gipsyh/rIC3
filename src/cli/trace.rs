@@ -22,7 +22,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, read_to_string},
     io::{self, Write},
-    path::PathBuf,
 };
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 
@@ -240,10 +239,6 @@ pub fn wlwitness_vcd(
 }
 
 impl Ric3Proj {
-    fn trace_path(&self, name: impl AsRef<str>) -> PathBuf {
-        self.path("trace").join(format!("{}.rtrc", name.as_ref()))
-    }
-
     pub fn clear_trace(&self) -> anyhow::Result<()> {
         remove_if_exists(self.path("trace"))?;
         Ok(())
@@ -263,17 +258,16 @@ impl Ric3Proj {
         } else {
             fs::write(&wtsln_path, wts_path)?;
         }
-        self.save_serde_obj(t, self.trace_path(name))
+        self.save_serde_obj(t, format!("trace/{}.rtrc", name.as_ref()))
     }
 
     pub fn load_trace(&self, name: impl AsRef<str>) -> anyhow::Result<WlCex> {
-        self.load_serde_obj(self.trace_path(name))
+        self.load_serde_obj(format!("trace/{}.rtrc", name.as_ref()))
     }
 
     pub fn load_wts_of_trace(&self) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
         let wtsln = read_to_string(self.path("trace/wtsln"))?;
-        let wts_path = self.path(wtsln);
-        let res = self.load_wts(wts_path)?;
+        let res = self.load_wts(wtsln)?;
         term_mgr().enable_id_map();
         Ok(res)
     }
@@ -619,7 +613,7 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
         }
         TraceCommands::Value { property, signals } => {
             let values = signal_values_file(property, &signals)?;
-            println!("{}", toml::to_string_pretty(&values)?);
+            println!("{}", toml::to_string(&values)?);
             Ok(())
         }
         TraceCommands::Mcp => run_mcp_server(),
