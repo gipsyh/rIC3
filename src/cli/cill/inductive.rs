@@ -161,6 +161,7 @@ impl CIll {
         }
         let cti_path = self.rp.path("cill/cti");
         recreate_dir(&cti_path)?;
+        self.rp.save_term_mgr("cill/cti/term.ron")?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();

@@ -76,8 +76,8 @@ impl Ric3Proj {
 
     pub fn load_serde_obj<D: DeserializeOwned>(&self, path: impl AsRef<Path>) -> anyhow::Result<D> {
         let s = fs::read_to_string(self.path(path))?;
-        let inv: D = ron::from_str(&s)?;
-        Ok(inv)
+        let obj: D = ron::from_str(&s)?;
+        Ok(obj)
     }
 
     pub fn clear_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -130,6 +130,16 @@ impl Ric3Proj {
         fs::write(self.path("res/res.ron"), cache)?;
         Ok(())
     }
+
+    pub fn save_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        term_gc();
+        self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
+    }
+
+    // pub fn load_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+    //     // term_gc();
+    //     // self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
+    // }
 
     pub fn save_wts(
         &self,

@@ -1,16 +1,15 @@
-use giputils::hash::GHashMap;
-use logicrs::fol::Term;
+use logicrs::fol::{Term, TermSymbol};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WlTsSymbol {
-    pub signal: GHashMap<Term, Vec<String>>,
+    pub signal: TermSymbol,
     pub prop: Vec<String>,
 }
 
 impl Deref for WlTsSymbol {
-    type Target = GHashMap<Term, Vec<String>>;
+    type Target = TermSymbol;
 
     #[inline]
     fn deref(&self) -> &Self::Target {

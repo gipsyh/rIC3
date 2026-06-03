@@ -13,7 +13,6 @@ impl CIll {
         &mut self,
         cex: &BlCex,
         _filter_dut: bool,
-        // p: Option<&Path>,
         path: &Path,
     ) -> anyhow::Result<()> {
         let cex = self.ts_rst.restore_cex(cex);
@@ -27,12 +26,9 @@ impl CIll {
         //         .cloned()
         //         .collect();
         //     let _filtered_cex = trace.filter(|t| dut_terms.contains(t));
-        //     // if let Some(p) = p {
         //     //     let bwit = self
         //     //         .dut_bf
         //     //         .wl_certificate(McWlCertificate::SAT(filtered_cex));
-        //     //     fs::write(&p, format!("{}", bwit))?;
-        //     // }
 
         //     trace.enrich(&self.wsym.keys().cloned().collect());
         //     fs::write(path, ron::to_string(&wsym_trace)?)?;

@@ -40,7 +40,9 @@ impl CIll {
             .min_by_key(|(r, _)| r.into_sat().unwrap());
 
         let trace = self.rp.path("cill/cex.rtrc");
+        let term = self.rp.path("cill/term.ron");
         remove_if_exists(&trace)?;
+        remove_if_exists(&term)?;
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
@@ -49,6 +51,7 @@ impl CIll {
         match min_res {
             Some((r, mut bmc)) => {
                 let witness = bmc.cex();
+                self.rp.save_term_mgr("cill/term.ron")?;
                 self.save_trace(&witness, false, &trace)?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(

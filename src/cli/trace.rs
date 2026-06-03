@@ -4,7 +4,7 @@ use enum_as_inner::EnumAsInner;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{
     Lbool, LboolVec,
-    fol::{self, Sort, Term, Value as FolValue},
+    fol::{self, Sort, Term, TermManager, Value as FolValue, set_term_mgr, term_mgr},
 };
 use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
 use regex::Regex;
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
+    fs::{self, read_to_string},
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -241,46 +241,6 @@ pub struct WlSymbolTrace {
 }
 
 impl WlSymbolTrace {
-    pub fn new(cex: &WlCex, sym: &WlTsSymbol) -> Self {
-        let mut term_trace = GHashMap::<Term, Vec<fol::Value>>::default();
-        for t in sym.keys() {
-            term_trace.insert(
-                t.clone(),
-                vec![fol::Value::default_from(t.sort()); cex.len()],
-            );
-        }
-
-        for k in 0..cex.len() {
-            for tv in &cex.input[k] {
-                if let Some(trace) = term_trace.get_mut(tv.t()) {
-                    trace[k] = fol::Value::Bv(tv.v().clone());
-                }
-            }
-            for tv in &cex.state[k] {
-                if let Some(trace) = term_trace.get_mut(tv.t()) {
-                    trace[k] = tv.v().clone();
-                }
-            }
-        }
-
-        let mut trace = GHashMap::default();
-        for (term, names) in sym.iter() {
-            let values = term_trace.remove(term).unwrap();
-            for name in names {
-                assert!(trace.insert(name.clone(), values.clone()).is_none());
-            }
-        }
-        Self { trace }
-    }
-
-    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let path = path.as_ref();
-        let content = fs::read_to_string(path)
-            .with_context(|| format!("failed to read trace file: {}", path.display()))?;
-        ron::from_str(&content)
-            .with_context(|| format!("failed to parse trace file as RON: {}", path.display()))
-    }
-
     fn signal_targets(&self) -> BTreeMap<String, SignalTarget> {
         let mut targets = BTreeMap::new();
         for (name, values) in self.trace.iter() {
@@ -550,15 +510,34 @@ fn array_base_name(name: &str) -> Option<&str> {
     Some(base)
 }
 
+fn load_term(path: impl AsRef<Path>) -> anyhow::Result<()> {
+    let path = path.as_ref().parent().map_or_else(
+        || PathBuf::from("term.ron"),
+        |parent| parent.join("term.ron"),
+    );
+    assert!(term_mgr().is_empty());
+    let s = fs::read_to_string(path)?;
+    let term: TermManager = ron::from_str(&s)?;
+    set_term_mgr(term);
+    term_mgr().enable_id_map();
+    Ok(())
+}
+
 pub fn search_signals_file(path: impl AsRef<Path>, pattern: &str) -> anyhow::Result<Vec<String>> {
-    WlSymbolTrace::load(path)?.search_signals(pattern)
+    load_term(&path)?;
+    let trace: WlCex = ron::from_str(&read_to_string(path)?)?;
+    // WlSymbolTrace::load(path)?.search_signals(pattern)
+    todo!();
 }
 
 pub fn signal_values_file(
     path: impl AsRef<Path>,
     signals: &[String],
 ) -> anyhow::Result<BTreeMap<String, JsonValue>> {
-    WlSymbolTrace::load(path)?.signal_values(signals)
+    load_term(&path)?;
+    let trace: WlCex = ron::from_str(&read_to_string(path)?)?;
+    todo!();
+    // WlSymbolTrace::load(path)?.signal_values(signals)
 }
 
 #[derive(Subcommand, Debug, Clone)]
