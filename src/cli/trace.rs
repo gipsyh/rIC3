@@ -1,14 +1,10 @@
 use crate::cli::rproj::Ric3Proj;
 use anyhow::Context;
 use clap::Subcommand;
-use enum_as_inner::EnumAsInner;
-use giputils::{
-    file::{create_dir_if_not_exists, remove_if_exists},
-    hash::{GHashMap, GHashSet},
-};
+use giputils::file::{create_dir_if_not_exists, remove_if_exists};
 use logicrs::{
-    Lbool, LboolVec,
-    fol::{self, Sort, Term, Value as FolValue, term_mgr},
+    LboolVec,
+    fol::{self, Term, Value as FolValue, term_mgr},
 };
 use rIC3::wltransys::{WlTransys, cert::WlCex, symbol::WlTsSymbol};
 use regex::Regex;
@@ -21,9 +17,7 @@ use serde_json::{Value as JsonValue, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, read_to_string},
-    io::{self, Write},
 };
-use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 
 const SIGNAL_IRRELEVANT: &str = "<IRRELEVANT>";
 const SIGNAL_NOT_FOUND: &str = "<NOT FOUND>";
@@ -489,7 +483,7 @@ fn run_mcp_server() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use logicrs::fol::TermValue;
+    use logicrs::fol::{Sort, TermValue};
 
     fn witness_trace(
         entries: impl IntoIterator<Item = (&'static str, Vec<fol::Value>)>,
