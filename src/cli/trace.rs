@@ -1,12 +1,16 @@
+use crate::cli::rproj::Ric3Proj;
 use anyhow::Context;
 use clap::Subcommand;
 use enum_as_inner::EnumAsInner;
-use giputils::hash::{GHashMap, GHashSet};
+use giputils::{
+    file::{create_dir_if_not_exists, remove_if_exists},
+    hash::{GHashMap, GHashSet},
+};
 use logicrs::{
     Lbool, LboolVec,
-    fol::{self, Sort, Term, TermManager, Value as FolValue, set_term_mgr, term_mgr},
+    fol::{self, Sort, Term, Value as FolValue, term_mgr},
 };
-use rIC3::wltransys::{cert::WlCex, symbol::WlTsSymbol};
+use rIC3::wltransys::{WlTransys, cert::WlCex, symbol::WlTsSymbol};
 use regex::Regex;
 use rmcp::{
     ServerHandler, ServiceExt, handler::server::wrapper::Parameters, schemars, tool, tool_handler,
@@ -18,7 +22,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, read_to_string},
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use vcd::{ReferenceIndex, TimescaleUnit, Value as VcdValue, VarType};
 
@@ -235,176 +239,226 @@ pub fn wlwitness_vcd(
     Ok(())
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WlSymbolTrace {
-    trace: GHashMap<String, Vec<fol::Value>>,
-}
-
-impl WlSymbolTrace {
-    fn signal_targets(&self) -> BTreeMap<String, SignalTarget> {
-        let mut targets = BTreeMap::new();
-        for (name, values) in self.trace.iter() {
-            let mut is_array = false;
-            let mut indices = BTreeSet::new();
-            for value in values {
-                if let FolValue::Array(array) = value {
-                    is_array = true;
-                    indices.extend(array.keys().copied());
-                }
-            }
-
-            if is_array {
-                if indices.is_empty() {
-                    targets.insert(name.clone(), SignalTarget::ArrayBase { name: name.clone() });
-                } else {
-                    for index in indices {
-                        let indexed_name = format!("{name}[{index}]");
-                        targets.insert(
-                            indexed_name.clone(),
-                            SignalTarget::ArrayIndex {
-                                base: name.clone(),
-                                index,
-                            },
-                        );
-                    }
-                }
-            } else {
-                targets.insert(name.clone(), SignalTarget::Bv { name: name.clone() });
-            }
-        }
-        targets
+impl Ric3Proj {
+    fn trace_path(&self, name: impl AsRef<str>) -> PathBuf {
+        self.path("trace").join(format!("{}.rtrc", name.as_ref()))
     }
 
-    pub fn signal_names(&self) -> Vec<String> {
-        self.signal_targets().into_keys().collect()
+    pub fn clear_trace(&self) -> anyhow::Result<()> {
+        remove_if_exists(self.path("trace"))?;
+        Ok(())
     }
 
-    pub fn search_signals(&self, pattern: &str) -> anyhow::Result<Vec<String>> {
-        let regex = Regex::new(pattern)?;
-        let targets = self.signal_targets();
-        let matched: Vec<_> = self
-            .signal_names()
-            .into_iter()
-            .filter(|signal| regex.is_match(signal))
-            .filter(|signal| {
-                targets
-                    .get(signal)
-                    .is_some_and(|target| self.target_has_relevant_value(target))
-            })
-            .collect();
-
-        if matched.len() > 50 {
-            let mut out = vec![format!(
-                "Too many signals matched ({}), only showing first 50.",
-                matched.len()
-            )];
-            out.extend(matched.into_iter().take(50));
-            Ok(out)
+    pub fn save_trace(
+        &self,
+        wts_path: impl AsRef<str>,
+        t: &WlCex,
+        name: impl AsRef<str>,
+    ) -> anyhow::Result<()> {
+        create_dir_if_not_exists(self.path("trace"))?;
+        let wts_path = wts_path.as_ref();
+        let wtsln_path = self.path("trace/wtsln");
+        if wtsln_path.exists() {
+            assert!(fs::read(&wtsln_path)? == wts_path.as_bytes());
         } else {
-            Ok(matched)
+            fs::write(&wtsln_path, wts_path)?;
         }
+        self.save_serde_obj(t, self.trace_path(name))
     }
 
-    fn target_has_relevant_value(&self, target: &SignalTarget) -> bool {
-        match target {
-            SignalTarget::Bv { name } => self
-                .trace
-                .get(name)
-                .is_some_and(|values| values.iter().any(|value| !value.all_x())),
-            SignalTarget::ArrayIndex { base, index } => {
-                self.trace.get(base).is_some_and(|values| {
-                    values.iter().any(|value| match value {
-                        FolValue::Array(array) => {
-                            array.get(index).is_some_and(|value| !value.all_x())
-                        }
-                        FolValue::Bv(_) => false,
-                    })
-                })
-            }
-            SignalTarget::ArrayBase { name } => self
-                .trace
-                .get(name)
-                .is_some_and(|values| values.iter().any(|value| !value.all_x())),
-        }
+    pub fn load_trace(&self, name: impl AsRef<str>) -> anyhow::Result<WlCex> {
+        self.load_serde_obj(self.trace_path(name))
     }
 
-    pub fn signal_values(&self, signals: &[String]) -> anyhow::Result<BTreeMap<String, JsonValue>> {
-        anyhow::ensure!(!signals.is_empty(), "signals must be a non-empty list");
-
-        let targets = self.signal_targets();
-        let available: Vec<_> = targets.keys().cloned().collect();
-        let (resolved, not_found) = expand_signal_names(&available, signals);
-
-        let mut result = BTreeMap::new();
-        for signal in resolved {
-            let target = targets
-                .get(&signal)
-                .with_context(|| format!("internal error: resolved unknown signal {signal}"))?;
-            result.insert(signal, self.target_values(target)?);
-        }
-
-        for signal in not_found {
-            result.insert(signal, json!(SIGNAL_NOT_FOUND));
-        }
-
-        Ok(result)
-    }
-
-    fn target_values(&self, target: &SignalTarget) -> anyhow::Result<JsonValue> {
-        match target {
-            SignalTarget::Bv { name } => {
-                let values = self
-                    .trace
-                    .get(name)
-                    .with_context(|| format!("Signal not found: {name}"))?;
-                values_to_json(values, |value| match value {
-                    FolValue::Bv(value) => Ok(Some(value)),
-                    FolValue::Array(_) => anyhow::bail!(
-                        "Signal {name} is an array; request indexed signals such as {name}[0]"
-                    ),
-                })
-            }
-            SignalTarget::ArrayIndex { base, index } => {
-                let values = self
-                    .trace
-                    .get(base)
-                    .with_context(|| format!("Signal not found: {base}"))?;
-                values_to_json(values, |value| match value {
-                    FolValue::Array(array) => Ok(array.get(index)),
-                    FolValue::Bv(_) => anyhow::bail!("Signal {base} is not an array"),
-                })
-            }
-            SignalTarget::ArrayBase { name } => {
-                let values = self
-                    .trace
-                    .get(name)
-                    .with_context(|| format!("Signal not found: {name}"))?;
-                if values.iter().all(FolValue::all_x) {
-                    Ok(json!(SIGNAL_IRRELEVANT))
-                } else {
-                    anyhow::bail!("Signal {name} is an array; request indexed signals")
-                }
-            }
-        }
+    pub fn load_wts_of_trace(&self) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
+        let wtsln = read_to_string(self.path("trace/wtsln"))?;
+        let wts_path = self.path(wtsln);
+        let res = self.load_wts(wts_path)?;
+        term_mgr().enable_id_map();
+        Ok(res)
     }
 }
 
 #[derive(Clone, Debug)]
 enum SignalTarget {
-    Bv { name: String },
-    ArrayIndex { base: String, index: usize },
-    ArrayBase { name: String },
+    Bv { term: Term },
+    ArrayIndex { term: Term, index: usize },
+    ArrayBase { term: Term },
+}
+
+#[derive(Clone, Copy)]
+enum TraceValue<'a> {
+    Bv(&'a LboolVec),
+    Array(&'a fol::ArrayValue),
+}
+
+impl TraceValue<'_> {
+    fn all_x(self) -> bool {
+        match self {
+            TraceValue::Bv(value) => value.all_x(),
+            TraceValue::Array(value) => value.is_empty(),
+        }
+    }
+}
+
+fn signal_targets(cex: &WlCex, sym: &WlTsSymbol) -> BTreeMap<String, SignalTarget> {
+    let mut targets = BTreeMap::new();
+    for (term, names) in sym.iter() {
+        let mut is_array = false;
+        let mut indices = BTreeSet::new();
+        for value in term_values(cex, term).into_iter().flatten() {
+            if let TraceValue::Array(array) = value {
+                is_array = true;
+                indices.extend(array.keys().copied());
+            }
+        }
+
+        for name in names {
+            if is_array {
+                if indices.is_empty() {
+                    targets.insert(name.clone(), SignalTarget::ArrayBase { term: term.clone() });
+                } else {
+                    for index in &indices {
+                        targets.insert(
+                            format!("{name}[{index}]"),
+                            SignalTarget::ArrayIndex {
+                                term: term.clone(),
+                                index: *index,
+                            },
+                        );
+                    }
+                }
+            } else {
+                targets.insert(name.clone(), SignalTarget::Bv { term: term.clone() });
+            }
+        }
+    }
+    targets
+}
+
+fn term_values<'a>(cex: &'a WlCex, term: &Term) -> Vec<Option<TraceValue<'a>>> {
+    let mut values = Vec::with_capacity(cex.len());
+    for t in 0..cex.len() {
+        if let Some(value) = cex.state[t]
+            .iter()
+            .find(|value| value.t() == term)
+            .map(|value| value.v())
+        {
+            let value = match value {
+                FolValue::Bv(value) => TraceValue::Bv(value),
+                FolValue::Array(value) => TraceValue::Array(value),
+            };
+            values.push(Some(value));
+        } else if let Some(value) = cex.input[t]
+            .iter()
+            .find(|value| value.t() == term)
+            .map(|value| value.v())
+        {
+            values.push(Some(TraceValue::Bv(value)));
+        } else {
+            values.push(None);
+        }
+    }
+    values
+}
+
+fn target_has_relevant_value(cex: &WlCex, target: &SignalTarget) -> bool {
+    match target {
+        SignalTarget::Bv { term } | SignalTarget::ArrayBase { term } => {
+            term_values(cex, term)
+                .iter()
+                .any(|value| value.is_some_and(|value| !value.all_x()))
+        }
+        SignalTarget::ArrayIndex { term, index } => term_values(cex, term).iter().any(|value| {
+            matches!(
+                value,
+                Some(TraceValue::Array(array)) if array.get(index).is_some_and(|value| !value.all_x())
+            )
+        }),
+    }
+}
+
+fn search_signals(cex: &WlCex, sym: &WlTsSymbol, pattern: &str) -> anyhow::Result<Vec<String>> {
+    let regex = Regex::new(pattern)?;
+    let targets = signal_targets(cex, sym);
+    let matched: Vec<_> = targets
+        .iter()
+        .filter(|(signal, target)| regex.is_match(signal) && target_has_relevant_value(cex, target))
+        .map(|(signal, _)| signal.clone())
+        .collect();
+
+    if matched.len() > 50 {
+        let mut out = vec![format!(
+            "Too many signals matched ({}), only showing first 50.",
+            matched.len()
+        )];
+        out.extend(matched.into_iter().take(50));
+        Ok(out)
+    } else {
+        Ok(matched)
+    }
+}
+
+fn signal_values(
+    cex: &WlCex,
+    sym: &WlTsSymbol,
+    signals: &[String],
+) -> anyhow::Result<BTreeMap<String, JsonValue>> {
+    anyhow::ensure!(!signals.is_empty(), "signals must be a non-empty list");
+
+    let targets = signal_targets(cex, sym);
+    let available: Vec<_> = targets.keys().cloned().collect();
+    let (resolved, not_found) = expand_signal_names(&available, signals);
+
+    let mut result = BTreeMap::new();
+    for signal in resolved {
+        let target = targets
+            .get(&signal)
+            .with_context(|| format!("internal error: resolved unknown signal {signal}"))?;
+        result.insert(signal, target_values(cex, target)?);
+    }
+
+    for signal in not_found {
+        result.insert(signal, json!(SIGNAL_NOT_FOUND));
+    }
+
+    Ok(result)
+}
+
+fn target_values(cex: &WlCex, target: &SignalTarget) -> anyhow::Result<JsonValue> {
+    match target {
+        SignalTarget::Bv { term } => values_to_json(term_values(cex, term), |value| match value {
+            TraceValue::Bv(value) => Ok(Some(value)),
+            TraceValue::Array(_) => anyhow::bail!("Signal is an array; request indexed signals"),
+        }),
+        SignalTarget::ArrayIndex { term, index } => {
+            values_to_json(term_values(cex, term), |value| match value {
+                TraceValue::Array(array) => Ok(array.get(index)),
+                TraceValue::Bv(_) => anyhow::bail!("Signal is not an array"),
+            })
+        }
+        SignalTarget::ArrayBase { term } => {
+            if term_values(cex, term)
+                .iter()
+                .all(|value| value.is_none_or(|value| value.all_x()))
+            {
+                Ok(json!(SIGNAL_IRRELEVANT))
+            } else {
+                anyhow::bail!("Signal is an array; request indexed signals")
+            }
+        }
+    }
 }
 
 fn values_to_json<'a>(
-    values: &'a [fol::Value],
-    mut get_bv: impl FnMut(&'a fol::Value) -> anyhow::Result<Option<&'a LboolVec>>,
+    values: Vec<Option<TraceValue<'a>>>,
+    mut get_bv: impl FnMut(TraceValue<'a>) -> anyhow::Result<Option<&'a LboolVec>>,
 ) -> anyhow::Result<JsonValue> {
     let mut out = Vec::with_capacity(values.len());
     let mut all_x = true;
 
-    for value in values {
-        let bv = get_bv(value)?;
+    for value in &values {
+        let bv = value.map_or(Ok(None), &mut get_bv)?;
         let is_x = bv.is_none_or(LboolVec::all_x);
         if !is_x {
             all_x = false;
@@ -510,51 +564,41 @@ fn array_base_name(name: &str) -> Option<&str> {
     Some(base)
 }
 
-fn load_term(path: impl AsRef<Path>) -> anyhow::Result<()> {
-    let path = path.as_ref().parent().map_or_else(
-        || PathBuf::from("term.ron"),
-        |parent| parent.join("term.ron"),
-    );
-    assert!(term_mgr().is_empty());
-    let s = fs::read_to_string(path)?;
-    let term: TermManager = ron::from_str(&s)?;
-    set_term_mgr(term);
-    term_mgr().enable_id_map();
-    Ok(())
-}
-
-pub fn search_signals_file(path: impl AsRef<Path>, pattern: &str) -> anyhow::Result<Vec<String>> {
-    load_term(&path)?;
-    let trace: WlCex = ron::from_str(&read_to_string(path)?)?;
-    // WlSymbolTrace::load(path)?.search_signals(pattern)
-    todo!();
+pub fn search_signals_file(
+    property: impl AsRef<str>,
+    pattern: &str,
+) -> anyhow::Result<Vec<String>> {
+    let rp = Ric3Proj::new()?;
+    let (_, wsym) = rp.load_wts_of_trace()?;
+    let trace: WlCex = rp.load_trace(property)?;
+    search_signals(&trace, &wsym, pattern)
 }
 
 pub fn signal_values_file(
-    path: impl AsRef<Path>,
+    property: impl AsRef<str>,
     signals: &[String],
 ) -> anyhow::Result<BTreeMap<String, JsonValue>> {
-    load_term(&path)?;
-    let trace: WlCex = ron::from_str(&read_to_string(path)?)?;
-    todo!();
-    // WlSymbolTrace::load(path)?.signal_values(signals)
+    let rp = Ric3Proj::new()?;
+    let (_, wsym) = rp.load_wts_of_trace()?;
+    let trace: WlCex = rp.load_trace(property)?;
+    signal_values(&trace, &wsym, signals)
 }
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum TraceCommands {
-    /// Search signals in a .rtrc file by regex and print matches.
+    /// Search signals in a property's trace by regex and print matches.
     Search {
-        /// Path to the .rtrc file.
-        path: PathBuf,
+        /// Property name whose trace should be inspected.
+        property: String,
 
         /// Regex used to match signal names.
         pattern: String,
     },
 
-    /// Print selected signal values from a .rtrc file as JSON.
+    /// Print selected signal values from a property's trace as JSON.
     Value {
-        /// Path to the .rtrc file.
-        path: PathBuf,
+        /// Property name whose trace should be inspected.
+        property: String,
 
         /// Signal names to print. Suffix matches are supported.
         #[arg(required = true)]
@@ -567,14 +611,14 @@ pub enum TraceCommands {
 
 pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
     match cmd {
-        TraceCommands::Search { path, pattern } => {
-            for signal in search_signals_file(path, &pattern)? {
+        TraceCommands::Search { property, pattern } => {
+            for signal in search_signals_file(property, &pattern)? {
                 println!("{signal}");
             }
             Ok(())
         }
-        TraceCommands::Value { path, signals } => {
-            let values = signal_values_file(path, &signals)?;
+        TraceCommands::Value { property, signals } => {
+            let values = signal_values_file(property, &signals)?;
             println!("{}", toml::to_string_pretty(&values)?);
             Ok(())
         }
@@ -584,8 +628,8 @@ pub fn trace(cmd: TraceCommands) -> anyhow::Result<()> {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SearchSignalsArgs {
-    #[schemars(description = "Absolute path to the .rtrc file.")]
-    path: String,
+    #[schemars(description = "Property name whose trace should be inspected.")]
+    property: String,
 
     #[schemars(description = "Regex pattern to search for.")]
     pattern: String,
@@ -593,8 +637,8 @@ struct SearchSignalsArgs {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SignalValuesArgs {
-    #[schemars(description = "Absolute path to the .rtrc file.")]
-    path: String,
+    #[schemars(description = "Property name whose trace should be inspected.")]
+    property: String,
 
     #[schemars(description = "Signal names to read.")]
     signals: Vec<String>,
@@ -616,25 +660,25 @@ struct TraceMcpServer;
 #[tool_router]
 impl TraceMcpServer {
     #[tool(
-        description = "Search signals in a .rtrc file by regex pattern. Returns matching signal names. The path argument is kept for compatibility and should point to the .rtrc file. If more than 50 signals match, only the first 50 are returned."
+        description = "Search signals in a property's trace by regex pattern. Returns matching signal names. If more than 50 signals match, only the first 50 are returned."
     )]
     fn search_signals(
         &self,
-        Parameters(SearchSignalsArgs { path, pattern }): Parameters<SearchSignalsArgs>,
+        Parameters(SearchSignalsArgs { property, pattern }): Parameters<SearchSignalsArgs>,
     ) -> Result<rmcp::Json<SearchSignalsOutput>, String> {
-        search_signals_file(path, &pattern)
+        search_signals_file(property, &pattern)
             .map(|signals| rmcp::Json(SearchSignalsOutput { signals }))
             .map_err(|err| err.to_string())
     }
 
     #[tool(
-        description = "Returns the values of selected signals as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step. The path argument is kept for compatibility and should point to the .rtrc file."
+        description = "Returns the values of selected signals from a property's trace as a JSON object. Keys are signal names, and values are arrays representing the signal state at each step."
     )]
     fn signal_values(
         &self,
-        Parameters(SignalValuesArgs { path, signals }): Parameters<SignalValuesArgs>,
+        Parameters(SignalValuesArgs { property, signals }): Parameters<SignalValuesArgs>,
     ) -> Result<rmcp::Json<SignalValuesOutput>, String> {
-        signal_values_file(path, &signals)
+        signal_values_file(property, &signals)
             .map(|values| rmcp::Json(SignalValuesOutput { values }))
             .map_err(|err| err.to_string())
     }
@@ -642,7 +686,7 @@ impl TraceMcpServer {
 
 #[tool_handler(
     name = "ric3-trace-tools",
-    instructions = "Tools for inspecting .rtrc files."
+    instructions = "Tools for inspecting saved property traces."
 )]
 impl ServerHandler for TraceMcpServer {}
 
@@ -661,21 +705,38 @@ fn run_mcp_server() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use logicrs::fol::TermValue;
 
-    fn symbol_trace(
+    fn witness_trace(
         entries: impl IntoIterator<Item = (&'static str, Vec<fol::Value>)>,
-    ) -> WlSymbolTrace {
-        WlSymbolTrace {
-            trace: entries
-                .into_iter()
-                .map(|(name, values)| (name.to_string(), values))
-                .collect(),
+    ) -> (WlCex, WlTsSymbol) {
+        let mut cex = WlCex::new();
+        let mut sym = WlTsSymbol {
+            signal: Default::default(),
+            prop: Vec::new(),
+        };
+        for (name, values) in entries {
+            if cex.len() == 0 {
+                cex.resize(values.len());
+            } else {
+                assert_eq!(cex.len(), values.len());
+            }
+            let sort = match &values[0] {
+                FolValue::Bv(value) => Sort::Bv(value.len()),
+                FolValue::Array(value) => value.sort(),
+            };
+            let term = Term::new_var(sort);
+            sym.signal.insert(term.clone(), vec![name.to_string()]);
+            for (frame, value) in values.into_iter().enumerate() {
+                cex.state[frame].push(TermValue::new(term.clone(), value));
+            }
         }
+        (cex, sym)
     }
 
     #[test]
     fn all_x_signal_is_irrelevant_and_missing_signal_is_reported() {
-        let trace = symbol_trace([(
+        let (trace, sym) = witness_trace([(
             "top.sig",
             vec![
                 FolValue::Bv(LboolVec::from("xx")),
@@ -683,9 +744,8 @@ mod tests {
             ],
         )]);
 
-        let values = trace
-            .signal_values(&["sig".to_string(), "absent".to_string()])
-            .unwrap();
+        let values =
+            signal_values(&trace, &sym, &["sig".to_string(), "absent".to_string()]).unwrap();
 
         assert_eq!(values.get("top.sig"), Some(&json!(SIGNAL_IRRELEVANT)));
         assert_eq!(values.get("absent"), Some(&json!(SIGNAL_NOT_FOUND)));
@@ -693,7 +753,7 @@ mod tests {
 
     #[test]
     fn search_signals_omits_all_x_signals() {
-        let trace = symbol_trace([
+        let (trace, sym) = witness_trace([
             (
                 "top.all_x",
                 vec![
@@ -710,14 +770,14 @@ mod tests {
             ),
         ]);
 
-        let matches = trace.search_signals("top\\.").unwrap();
+        let matches = search_signals(&trace, &sym, "top\\.").unwrap();
 
         assert_eq!(matches, vec!["top.relevant"]);
     }
 
     #[test]
     fn values_include_hardware_literal_widths() {
-        let trace = symbol_trace([(
+        let (trace, sym) = witness_trace([(
             "sig",
             vec![
                 FolValue::Bv(LboolVec::from("1010")),
@@ -726,7 +786,7 @@ mod tests {
             ],
         )]);
 
-        let values = trace.signal_values(&["sig".to_string()]).unwrap();
+        let values = signal_values(&trace, &sym, &["sig".to_string()]).unwrap();
 
         assert_eq!(values.get("sig"), Some(&json!(["4'ha", "3'b1x0", "X"])));
     }
@@ -736,14 +796,17 @@ mod tests {
         let mut frame0 = fol::ArrayValue::default_from(Sort::Array(2, 2));
         frame0.insert(1, LboolVec::from("01"));
         let frame1 = fol::ArrayValue::default_from(Sort::Array(2, 2));
-        let trace = symbol_trace([(
+        let (trace, sym) = witness_trace([(
             "mem",
             vec![FolValue::Array(frame0), FolValue::Array(frame1)],
         )]);
 
-        assert_eq!(trace.signal_names(), vec!["mem[1]"]);
+        assert_eq!(
+            signal_targets(&trace, &sym).into_keys().collect::<Vec<_>>(),
+            vec!["mem[1]"]
+        );
 
-        let values = trace.signal_values(&["mem".to_string()]).unwrap();
+        let values = signal_values(&trace, &sym, &["mem".to_string()]).unwrap();
         assert_eq!(values.get("mem[1]"), Some(&json!(["2'h1", "X"])));
     }
 }

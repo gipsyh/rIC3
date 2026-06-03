@@ -87,6 +87,7 @@ pub struct CIll {
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
+    #[allow(unused)]
     dut_wts: WlTransys,
     #[allow(unused)]
     dut_wsym: WlTsSymbol,
@@ -99,7 +100,7 @@ impl CIll {
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
         rp.remove_unused_cti(&wsym.prop);
 
-        rp.save_wts(&wts, &wsym, "cill/candinv/link")?;
+        rp.save_wts(&wts, &wsym, "cill/link")?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();

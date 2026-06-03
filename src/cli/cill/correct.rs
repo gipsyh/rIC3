@@ -41,8 +41,10 @@ impl CIll {
 
         let trace = self.rp.path("cill/cex.rtrc");
         let term = self.rp.path("cill/term.ron");
+        let tsym = self.rp.path("cill/tsym.ron");
         remove_if_exists(&trace)?;
         remove_if_exists(&term)?;
+        remove_if_exists(&tsym)?;
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
@@ -52,6 +54,7 @@ impl CIll {
             Some((r, mut bmc)) => {
                 let witness = bmc.cex();
                 self.rp.save_term_mgr("cill/term.ron")?;
+                self.rp.save_serde_obj(&self.wsym.signal, "cill/tsym.ron")?;
                 self.save_trace(&witness, false, &trace)?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(

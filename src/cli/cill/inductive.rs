@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::{file::recreate_dir, logger::with_log_level};
+use giputils::logger::with_log_level;
 use log::LevelFilter;
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
@@ -156,12 +156,8 @@ impl CIll {
             result: String,
             #[tabled(rename = "Engine")]
             engine: String,
-            #[tabled(rename = "Trace")]
-            trace: String,
         }
-        let cti_path = self.rp.path("cill/cti");
-        recreate_dir(&cti_path)?;
-        self.rp.save_term_mgr("cill/cti/term.ron")?;
+        self.rp.clear_trace()?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
@@ -169,22 +165,18 @@ impl CIll {
                 .strip_prefix("invariants.")
                 .map(|s| s.to_string())
                 .unwrap_or(name);
-            // let cti_file = cti_path.join(format!("{}.cti", name));
-            let trace_path = cti_path.join(format!("{}.rtrc", name));
-            let (status, trace) = if let Some(cex) = res {
-                self.save_trace(cex, true, &trace_path)?;
-                (
-                    "Not Inductive".red().to_string(),
-                    trace_path.display().to_string(),
-                )
+            let status = if let Some(trace) = res {
+                let trace = self.ts_rst.restore_cex(trace);
+                let trace = self.bb_map.restore_cex(&trace);
+                self.rp.save_trace("cill/linked", &trace, &name)?;
+                "Not Inductive".red().to_string()
             } else {
-                ("Inductive".green().to_string(), "-".to_string())
+                "Inductive".green().to_string()
             };
             results.push(InductiveResult {
                 property: name,
                 result: status,
                 engine: engines[i].clone().unwrap_or("-".to_string()),
-                trace,
             });
         }
 
