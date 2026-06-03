@@ -10,32 +10,32 @@ Your goal is to prove the correctness of the original assertions. You may introd
 **Note:** Please reason about the DUT and the potential CTIs as a whole, and prefer more generalized helper assertions that invalidate as many CTIs as possible, as this leads to a more efficient proof. Do not overfit to a single state; instead, generalize from the CTI to a strong and essential invariant. If the helper assertion does not capture the most critical invariant, it may result in an endless stream of CTIs that cannot be fully blocked. 
 
 ## `ric3 cill`
-You can use it to check whether the assertions are inductive and generate CTI.
+You can use it to check whether the assertions are inductive and to generate CTIs.
 - `ric3 cill check`: Performs the following steps automatically:
-  1. Correctness Checking: Performs bounded correctness checking for helper assertions by Bounded Model Checking. If a CEX is found, it is saved to `ric3proj/cill/cex.rtrc`, and the violated assertion is reported. You should analyze the CEX and fix the incorrect assertion. If no CEX is found, this does not prove correctness. It only allows the inductiveness workflow to continue.
-  2. Inductiveness Check: CIll first attempts to prove assertions using IC3; if IC3 times out, CIll falls back to 3-induction with *local proof*. Under local proof, when verifying a set of $n$ properties, we prove a target property $P_t$ while assuming the remaining properties hold as invariants, using them as additional constraints. Formally, the $k$-induction check is: for any path $s_0,\ldots,s_k$, $\left(\bigwedge_{i=0}^{k-1}\ \bigwedge_{j=0}^{n-1} P_j(s_i)\ \land\ \bigwedge_{i=0}^{k-1} T(s_i, s_{i+1}) \right) \Rightarrow P_t(s_k)$. The inductiveness result of each assertions is printed.
-     - Generates a symbolic CTI trace for each non-inductive property at `ric3proj/cill/cti/<prop>.rtrc`. Analyze the `.rtrc` file with the trace MCP tools. The CTI trace consists of 4 steps: the first 3 steps satisfy all assertions, while the final step violates the selected assertion. The `ric3proj/cill/cti/` directory is refreshed on each `ric3 cill check`, so it only contains CTIs from the latest run.
+  1. Correctness Checking: Performs bounded correctness checking for helper assertions by Bounded Model Checking. If a CEX is found, it is saved, and the violated assertion is reported. You should analyze the CEX with `ric3_trace_tools` and fix the incorrect assertion. If no CEX is found, this does not prove correctness; it only allows the inductiveness workflow to continue.
+  2. Inductiveness Check: CIll first attempts to prove assertions using IC3; if IC3 times out, CIll falls back to 3-induction with *local proof*. Under local proof, when verifying a set of $n$ properties, we prove a target property $P_t$ while assuming the remaining properties hold as invariants, using them as additional constraints. Formally, the $k$-induction check is: for any path $s_0,\ldots,s_k$, $\left(\bigwedge_{i=0}^{k-1}\ \bigwedge_{j=0}^{n-1} P_j(s_i)\ \land\ \bigwedge_{i=0}^{k-1} T(s_i, s_{i+1}) \right) \Rightarrow P_t(s_k)$. The inductiveness result of each assertion is printed.
+     - Generates a saved symbolic CTI trace for each non-inductive property. Analyze the trace with the trace MCP tools by passing the property name printed in the result table. The CTI trace consists of 4 steps: the first 3 steps satisfy all assertions, while the final step violates the selected assertion. All traces are refreshed on each `ric3 cill check`, so only traces from the latest run are available.
 
 - `ric3 cill abort`: Discards the current CTI context. Use this if you delete the assertion that generated the CTI, or if you decide not to block the current CTI.
 
 - If `ric3` is not available in the current environment, it may be available through Docker. In that case, use `docker run -v $HOME:$HOME -w $PWD -it --rm ric3 cill <command>`.
 
 ## `ric3_trace_tools` (MCP):
-- `search_signals(path, pattern)`: Search signal names in a `.rtrc` file by regex `pattern`. Pass the `.rtrc` path reported by `ric3 cill check`. It is not recommended to list all signals at once, as this may produce many irrelevant results. Instead, search for the signals you need.
-- `signal_values(path, signals=[...])`: Inspect selected signal values in a `.rtrc` file. Signal names must match exactly (no fuzzy matching or regex).
+- `search_signals(property, pattern)`: Search signal names in a saved property trace by regex `pattern`. Pass the property name printed by `ric3 cill check`, not a file path. If more than 50 signals match, only the first 50 are returned. It is not recommended to list all signals at once, as this may produce many irrelevant results. Instead, search for the signals you need.
+- `signal_values(property, signals=[...])`: Inspect selected signal values in a saved property trace. Pass the property name printed by `ric3 cill check`, not a file path. The result is a JSON object whose keys are signal names and whose values are arrays representing the signal state at each step. Suffix matches are supported for signal names; use `search_signals` first when unsure.
 
 ## Operational Constraints (CRITICAL)
 - Strictly **ONLY** add, modify, or delete code in `invariants.sv`.
 - All helper assertions and auxiliary registers must be named `h_*`.
 - **NO** `assume` statements allowed.
-- Do not read files in `ric3proj/` other than the specified `.rtrc` files.
+- Do not read files in `ric3proj/`; use the trace MCP tools to inspect saved property traces.
 - You can only use the two `ric3 cill` commands listed above; no other `ric3` commands are permitted.
 
 ## NOTE
 - Because we rely on IC3 and local proof, the inductiveness results can be **unstable** (i.e., may fluctuate across iterations). However, by iteratively generating helper assertions that invalidate the CTIs, we increase the overall likelihood of eventually establishing inductiveness.
 - Variable assignments in each new CTI/CEX are independent of those in previous ones; signal values may be completely different from earlier cases and must be re-examined each time.
 - A CTI should be blocked by adding invariants that exclude unreachable states. Do not change DUT behavior merely to match a CTI.
-- The generated `.rtrc` may omit irrelevant signals or mark irrelevant bits as `'x'`/`'X'`. It may also contain extra symbols. Derive helper assertions from the stable, non-`X` values that are relevant to the failed transition.
+- The generated trace may omit irrelevant signals or mark irrelevant bits as `'x'`/`'X'`. It may also contain extra symbols. Derive helper assertions from the stable, non-`X` values that are relevant to the failed transition.
 - `ric3` uses Yosys-Slang as the DUT parser and does not include a Verific frontend. Please avoid SVA constructs (e.g., `|->`), but `$past(signal, cycle)` is supported. It is recommended to write assertions in the following format:
     ```systemverilog
     always @(posedge clk) begin

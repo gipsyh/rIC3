@@ -5,6 +5,7 @@ mod clean;
 mod rproj;
 mod run;
 mod trace;
+mod vcd;
 mod yosys;
 
 use crate::cli::{
