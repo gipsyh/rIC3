@@ -1,4 +1,9 @@
-use crate::cli::{Ric3Config, rproj::Ric3Proj, verilog::SvModule, yosys::Yosys};
+use crate::cli::{
+    Ric3Config,
+    rproj::Ric3Proj,
+    verilog::{SvModule, sv_type},
+    yosys::Yosys,
+};
 use anyhow::Context;
 use btor::Btor;
 use clap::Subcommand;
@@ -300,13 +305,19 @@ fn write_trace_observer(
     tsym: &TermSymbol,
     expressions: &[String],
     out_path: impl AsRef<Path>,
+    body_dclr: &mut Vec<String>,
 ) -> anyhow::Result<Vec<String>> {
     let mut module = SvModule::new("__ric3_trace_expr");
     for (t, s) in tsym.iter() {
         let sort = t.sort();
         for s in s.iter() {
             if !s.contains(".") {
-                module.add_input(s, sort);
+                if sort.is_array() {
+                    module.add_ext_body(format!("{};", sv_type(sort, s)));
+                    body_dclr.push(s.clone());
+                } else {
+                    module.add_input(s, sort);
+                }
             }
         }
     }
@@ -337,7 +348,9 @@ fn synthesize_trace_observer(
     let expr_dir = rp.path("trace/expr");
     recreate_dir(&expr_dir)?;
     let observer_path = expr_dir.join("observer.sv");
-    let observer_symbols = write_trace_observer(rcfg, core_wsym, expressions, &observer_path)?;
+    let mut body_dclr = Vec::new();
+    let observer_symbols =
+        write_trace_observer(rcfg, core_wsym, expressions, &observer_path, &mut body_dclr)?;
     generate_observer_btor(
         rcfg,
         &[rp.path("cill/shadow.sv"), observer_path.clone()],
@@ -345,7 +358,10 @@ fn synthesize_trace_observer(
     )?;
 
     let mut observer_bf = BtorFrontend::new(Btor::from_file(expr_dir.join("observer.btor")));
-    let (observer_wts, observer_wsym) = observer_bf.wts();
+    let (observer_wts, mut observer_wsym) = observer_bf.wts();
+    for s in body_dclr {
+        observer_wsym.replace_sym(format!("{TRACE_EXPR_MODULE}.{s}"), s);
+    }
 
     let expr_prefix = format!("{TRACE_EXPR_MODULE}.{TRACE_EXPR_PREFIX}");
 
@@ -732,7 +748,7 @@ mod tests {
             prop: Vec::new(),
         };
 
-        write_trace_observer(&rcfg, &sym, &["a + b".to_string()], tmp.path()).unwrap();
+        write_trace_observer(&rcfg, &sym, &["a + b".to_string()], tmp.path(), &mut vec![]).unwrap();
         let observer = std::fs::read_to_string(tmp.path().join("observer.sv")).unwrap();
 
         assert!(observer.contains("wire type(a + b) __ric3_trace_expr_0;"));
