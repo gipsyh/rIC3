@@ -168,9 +168,7 @@ impl CIll {
                 .map(|s| s.to_string())
                 .unwrap_or(name);
             let status = if let Some(trace) = res {
-                let trace = self.ts_rst.restore_cex(trace);
-                let trace = self.bb_map.restore_cex(&trace);
-                self.rp.save_trace("cill/linked", &trace, &name)?;
+                self.save_trace(&trace)?;
                 "Not Inductive".red().to_string()
             } else {
                 "Inductive".green().to_string()

@@ -5,38 +5,19 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     fs::{self},
-    path::Path,
 };
 
 impl CIll {
-    pub fn save_trace(
-        &mut self,
-        cex: &BlCex,
-        _filter_dut: bool,
-        path: &Path,
-    ) -> anyhow::Result<()> {
-        let cex = self.ts_rst.restore_cex(cex);
-        let mut trace = self.bb_map.restore_cex(&cex);
-        // if filter_dut {
-        //     let dut_terms: GHashSet<Term> = self
-        //         .dut_wts
-        //         .input
-        //         .iter()
-        //         .chain(self.dut_wts.latch.iter())
-        //         .cloned()
-        //         .collect();
-        //     let _filtered_cex = trace.filter(|t| dut_terms.contains(t));
-        //     //     let bwit = self
-        //     //         .dut_bf
-        //     //         .wl_certificate(McWlCertificate::SAT(filtered_cex));
-
-        //     trace.enrich(&self.wsym.keys().cloned().collect());
-        //     fs::write(path, ron::to_string(&wsym_trace)?)?;
-        // }
-        trace.enrich(&self.wsym.keys().cloned().collect());
-        self.rp.save_serde_obj(&trace, path)?;
-
-        Ok(())
+    pub fn save_trace(&mut self, trace: &BlCex) -> anyhow::Result<()> {
+        let trace = self.ts_rst.restore_cex(trace);
+        let trace = self.bb_map.restore_cex(&trace);
+        let name = self.wsym.prop[trace.bad_id].clone();
+        let name = name
+            .strip_prefix("invariants.")
+            .map(|s| s.to_string())
+            .unwrap_or(name);
+        // trace.enrich(&self.wsym.keys().cloned().collect());
+        self.rp.save_trace("cill/linked", &trace, &name)
     }
 }
 

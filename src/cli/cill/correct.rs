@@ -52,14 +52,17 @@ impl CIll {
 
         match min_res {
             Some((r, mut bmc)) => {
-                let witness = bmc.cex();
-                self.save_trace(&witness, false, &trace)?;
-                let name = &self.wsym.prop[witness.bad_id];
+                let trace = bmc.cex();
+                self.save_trace(&trace)?;
+                let name = self.wsym.prop[trace.bad_id].clone();
+                let name = name
+                    .strip_prefix("invariants.")
+                    .map(|s| s.to_string())
+                    .unwrap_or(name);
                 println!(
                     "{}",
                     format!(
-                        "A CEX violating {name} was found. Trace generated at {}.",
-                        trace.display()
+                        "Found a CEX that violates {name}. Use the trace tools to inspect the waveform.",
                     )
                     .red()
                 );
