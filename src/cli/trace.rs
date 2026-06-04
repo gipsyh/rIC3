@@ -25,8 +25,8 @@ use rIC3::{
 };
 use regex::Regex;
 use rmcp::{
-    ServerHandler, ServiceExt, handler::server::wrapper::Parameters, schemars, tool, tool_handler,
-    tool_router,
+    ErrorData, ServerHandler, ServiceExt, handler::server::wrapper::Parameters, schemars, tool,
+    tool_handler, tool_router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
@@ -560,10 +560,10 @@ impl TraceMcpServer {
     fn search_signals(
         &self,
         Parameters(SearchSignalsArgs { property, pattern }): Parameters<SearchSignalsArgs>,
-    ) -> Result<rmcp::Json<SearchSignalsOutput>, String> {
+    ) -> Result<rmcp::Json<SearchSignalsOutput>, ErrorData> {
         search_signals_file(property, &pattern)
             .map(|signals| rmcp::Json(SearchSignalsOutput { signals }))
-            .map_err(|err| err.to_string())
+            .map_err(|err| ErrorData::invalid_params(err.to_string(), None))
     }
 
     #[tool(
@@ -572,10 +572,10 @@ impl TraceMcpServer {
     fn signal_values(
         &self,
         Parameters(SignalValuesArgs { property, signals }): Parameters<SignalValuesArgs>,
-    ) -> Result<rmcp::Json<SignalValuesOutput>, String> {
+    ) -> Result<rmcp::Json<SignalValuesOutput>, ErrorData> {
         signal_values_file(property, &signals)
             .map(|values| rmcp::Json(SignalValuesOutput { values }))
-            .map_err(|err| err.to_string())
+            .map_err(|err| ErrorData::invalid_params(err.to_string(), None))
     }
 }
 
