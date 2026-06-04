@@ -34,7 +34,6 @@ use std::{
 };
 
 const SIGNAL_IRRELEVANT: &str = "<IRRELEVANT>";
-const SIGNAL_NOT_FOUND: &str = "<NOT FOUND>";
 const TRACE_EXPR_MODULE: &str = "__ric3_trace_expr";
 const TRACE_EXPR_PREFIX: &str = "__ric3_trace_expr_";
 
@@ -382,6 +381,12 @@ fn synthesize_trace_observer(
         unlinked_symbols.join(",")
     );
 
+    anyhow::ensure!(
+        observer_symbols
+            .iter()
+            .all(|name| linked_wsym.term_of_sym(name).is_some()),
+        "failed to find synthesized trace expression symbols"
+    );
     Ok((linked_wsym, observer_symbols))
 }
 
@@ -454,24 +459,15 @@ pub fn signal_values_file(
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     let (expr_wsym, observer_symbols) =
         synthesize_trace_observer(&rcfg, &rp, &wts, &wsym, &expressions)?;
-    anyhow::ensure!(
-        observer_symbols
-            .iter()
-            .all(|name| expr_wsym.term_of_sym(name).is_some()),
-        "failed to find synthesized trace expression symbols"
-    );
 
     for (expression, observer_symbol) in expressions.into_iter().zip(observer_symbols) {
-        if let Some(term) = expr_wsym.term_of_sym(&observer_symbol) {
-            values.insert(
-                expression,
-                target_values(&trace, &SignalTarget::Bv { term }).with_context(|| {
-                    format!("failed to read synthesized trace expression {observer_symbol}")
-                })?,
-            );
-        } else {
-            values.insert(expression, json!(SIGNAL_NOT_FOUND));
-        }
+        let term = expr_wsym.term_of_sym(&observer_symbol).unwrap();
+        values.insert(
+            expression,
+            target_values(&trace, &SignalTarget::Bv { term }).with_context(|| {
+                format!("failed to read synthesized trace expression {observer_symbol}")
+            })?,
+        );
     }
     Ok(values)
 }
@@ -607,7 +603,7 @@ mod tests {
     ) -> anyhow::Result<BTreeMap<String, JsonValue>> {
         let (mut result, not_found) = resolved_signal_values(cex, sym, signals)?;
         for signal in not_found {
-            result.insert(signal, json!(SIGNAL_NOT_FOUND));
+            result.insert(signal, json!("NOT_FOUND"));
         }
         Ok(result)
     }
@@ -653,7 +649,7 @@ mod tests {
             signal_values(&trace, &sym, &["top.sig".to_string(), "absent".to_string()]).unwrap();
 
         assert_eq!(values.get("top.sig"), Some(&json!(SIGNAL_IRRELEVANT)));
-        assert_eq!(values.get("absent"), Some(&json!(SIGNAL_NOT_FOUND)));
+        assert_eq!(values.get("absent"), Some(&json!("NOT_FOUND")));
     }
 
     #[test]
