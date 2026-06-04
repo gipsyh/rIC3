@@ -1,10 +1,6 @@
 use giputils::hash::GHashMap;
 use logicrs::fol::Sort;
-use rIC3::wltransys::symbol::WlTsSymbol;
-use std::{
-    collections::BTreeMap,
-    fmt::{self, Display},
-};
+use std::fmt::{self, Display};
 
 fn simple_sv_ident(name: &str) -> bool {
     let mut chars = name.chars();
