@@ -46,11 +46,13 @@ fn replacement_for_symbol(
     let monitor_sort = monitor_term.sort();
     let target_sort = target.sort();
     if monitor_sort != target_sort {
-        anyhow::bail!(
-            "symbol type mismatch for {sym}: {:?} and {:?}",
-            monitor_sort,
-            target_sort
-        );
+        if !(target_sort.is_array() && monitor_sort.size() == target_sort.size()) {
+            anyhow::bail!(
+                "symbol type mismatch for {sym}: {:?} and {:?}",
+                monitor_sort,
+                target_sort
+            );
+        }
     }
     Ok(Some(target.clone()))
 }

@@ -2,7 +2,7 @@ use crate::cli::{
     Ric3Config,
     cill::utils::CIllStat,
     rproj::{PropMcInfo, Ric3Proj},
-    verilog::SvModule,
+    verilog::{SvModule, sv_type},
     yosys::Yosys,
 };
 use anyhow::bail;
@@ -121,7 +121,11 @@ fn collect_symbols(root: &mut SvModule, symbols: &BTreeMap<String, Sort>) -> any
             continue;
         };
         let children = root.children_entry(path);
-        children.add_input(signal_name, *sort);
+        if sort.is_array() {
+            children.add_ext_body(format!("{};", sv_type(*sort, signal_name)));
+        } else {
+            children.add_input(signal_name, *sort);
+        }
     }
     Ok(())
 }

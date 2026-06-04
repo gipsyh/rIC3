@@ -16,15 +16,15 @@ fn sv_ident(name: &str) -> String {
     }
 }
 
-fn sv_type(sort: Sort, name: &str) -> String {
+pub fn sv_type(sort: Sort, name: &str) -> String {
     match sort {
         Sort::Bv(1) => format!("logic {name}"),
         Sort::Bv(width) => format!("logic [{}:0] {name}", width - 1),
-        Sort::Array(index, width) => format!(
+        Sort::Array(_, width) => format!(
             "logic [{}:0] {} [{}:0]",
             width - 1,
             name,
-            1usize.checked_shl(index as u32).unwrap() - 1
+            sort.array_depth() - 1
         ),
     }
 }
@@ -114,6 +114,10 @@ impl Display for SvModule {
 
         for child in self.children.values() {
             writeln!(f, "{child}")?;
+        }
+
+        for outside in self.outside.iter() {
+            writeln!(f, "{outside}")?;
         }
 
         Ok(())

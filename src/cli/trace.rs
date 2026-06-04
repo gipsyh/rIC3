@@ -338,7 +338,6 @@ fn synthesize_trace_observer(
     recreate_dir(&expr_dir)?;
     let observer_path = expr_dir.join("observer.sv");
     let observer_symbols = write_trace_observer(rcfg, core_wsym, expressions, &observer_path)?;
-
     generate_observer_btor(
         rcfg,
         &[rp.path("cill/shadow.sv"), observer_path.clone()],
