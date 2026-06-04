@@ -7,10 +7,7 @@ use crate::cli::{
 use anyhow::Context;
 use btor::Btor;
 use clap::Subcommand;
-use giputils::{
-    file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
-    hash::GHashSet,
-};
+use giputils::file::{create_dir_if_not_exists, recreate_dir, remove_if_exists};
 use logicrs::{
     LboolVec,
     fol::{self, Term, TermSymbol, Value as FolValue, term_mgr},
@@ -448,6 +445,7 @@ pub fn signal_values_file(
     let rp = Ric3Proj::new()?;
     let (wts, wsym) = rp.load_wts_of_trace()?;
     let mut trace: WlCex = rp.load_trace(property)?;
+    trace.enrich(&wsym.keys().cloned().collect());
     let (mut values, expressions) = resolved_signal_values(&trace, &wsym, signals)?;
     if expressions.is_empty() {
         return Ok(values);
@@ -456,15 +454,12 @@ pub fn signal_values_file(
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     let (expr_wsym, observer_symbols) =
         synthesize_trace_observer(&rcfg, &rp, &wts, &wsym, &expressions)?;
-    let observe: GHashSet<Term> = observer_symbols
-        .iter()
-        .filter_map(|name| expr_wsym.term_of_sym(name))
-        .collect();
     anyhow::ensure!(
-        observe.len() == observer_symbols.len(),
+        observer_symbols
+            .iter()
+            .all(|name| expr_wsym.term_of_sym(name).is_some()),
         "failed to find synthesized trace expression symbols"
     );
-    trace.enrich(&observe);
 
     for (expression, observer_symbol) in expressions.into_iter().zip(observer_symbols) {
         if let Some(term) = expr_wsym.term_of_sym(&observer_symbol) {
@@ -602,6 +597,7 @@ fn run_mcp_server() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use giputils::hash::GHashSet;
     use logicrs::fol::{BvTermValue, Sort, TermValue};
 
     fn signal_values(
