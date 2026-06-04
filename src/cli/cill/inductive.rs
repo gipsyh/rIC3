@@ -10,7 +10,7 @@ use rIC3::{
 };
 use ratatui::crossterm::style::Stylize;
 use rayon::{ThreadPoolBuilder, prelude::*};
-use std::time::Instant;
+use std::{thread::available_parallelism, time::Instant};
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
@@ -29,7 +29,9 @@ impl CIll {
         let num_prop = self.ts.bad.len();
         // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
         cfg.time_limit = Some(30);
-        let pool = ThreadPoolBuilder::new().num_threads(16).build()?;
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(available_parallelism()?.get())
+            .build()?;
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             pool.install(|| {
                 (0..num_prop)
