@@ -432,7 +432,7 @@ pub fn signal_values_file(
         synthesize_trace_observer(&rcfg, &rp, &wts, &wsym, &expressions)?;
     let observe: GHashSet<Term> = observer_symbols
         .iter()
-        .filter_map(|name| expr_wsym.get_term_by_name(name))
+        .filter_map(|name| expr_wsym.term_of_sym(name))
         .collect();
     anyhow::ensure!(
         observe.len() == observer_symbols.len(),
@@ -441,7 +441,7 @@ pub fn signal_values_file(
     trace.enrich(&observe);
 
     for (expression, observer_symbol) in expressions.into_iter().zip(observer_symbols) {
-        if let Some(term) = expr_wsym.get_term_by_name(&observer_symbol) {
+        if let Some(term) = expr_wsym.term_of_sym(&observer_symbol) {
             values.insert(
                 expression,
                 target_values(&trace, &SignalTarget::Bv { term }).with_context(|| {
@@ -609,7 +609,7 @@ mod tests {
                 FolValue::Array(value) => value.sort(),
             };
             let term = Term::new_var(sort);
-            sym.signal.insert(term.clone(), vec![name.to_string()]);
+            sym.add_symbol(&term, name.to_string());
             for (frame, value) in values.into_iter().enumerate() {
                 cex.state[frame].push(TermValue::new(term.clone(), value));
             }
@@ -752,8 +752,8 @@ mod tests {
             signal: Default::default(),
             prop: Vec::new(),
         };
-        core_wsym.signal.insert(a.clone(), vec!["a".to_string()]);
-        core_wsym.signal.insert(b.clone(), vec!["b".to_string()]);
+        core_wsym.add_symbol(&a, "a".to_string());
+        core_wsym.add_symbol(&b, "b".to_string());
 
         let observer_a = Term::new_var(Sort::Bv(1));
         let observer_b = Term::new_var(Sort::Bv(1));
@@ -768,20 +768,14 @@ mod tests {
             signal: Default::default(),
             prop: Vec::new(),
         };
-        observer_wsym
-            .signal
-            .insert(observer_a, vec!["a".to_string()]);
-        observer_wsym
-            .signal
-            .insert(observer_b, vec!["b".to_string()]);
-        observer_wsym
-            .signal
-            .insert(observer_expr, vec![observer_symbol.clone()]);
+        observer_wsym.add_symbol(&observer_a, "a".to_string());
+        observer_wsym.add_symbol(&observer_b, "b".to_string());
+        observer_wsym.add_symbol(&observer_expr, observer_symbol.clone());
 
         let (_, linked_wsym, unlinked_symbols) =
             link_wts_by_symbol(&core_wts, &core_wsym, observer_wts, observer_wsym).unwrap();
         assert_eq!(unlinked_symbols, vec![observer_symbol.clone()]);
-        let expr_term = linked_wsym.get_term_by_name(&observer_symbol).unwrap();
+        let expr_term = linked_wsym.term_of_sym(&observer_symbol).unwrap();
 
         let mut trace = WlCex::new();
         trace.resize(2);
