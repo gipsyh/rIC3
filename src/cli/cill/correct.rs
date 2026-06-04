@@ -53,8 +53,6 @@ impl CIll {
         match min_res {
             Some((r, mut bmc)) => {
                 let witness = bmc.cex();
-                self.rp.save_term_mgr("cill/term.ron")?;
-                self.rp.save_serde_obj(&self.wsym.signal, "cill/tsym.ron")?;
                 self.save_trace(&witness, false, &trace)?;
                 let name = &self.wsym.prop[witness.bad_id];
                 println!(
