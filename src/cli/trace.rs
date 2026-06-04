@@ -345,7 +345,7 @@ fn synthesize_trace_observer(
         &expr_dir,
     )?;
 
-    let mut observer_bf = BtorFrontend::new(Btor::from_file(observer_path));
+    let mut observer_bf = BtorFrontend::new(Btor::from_file(expr_dir.join("observer.btor")));
     let (observer_wts, observer_wsym) = observer_bf.wts();
 
     let expr_prefix = format!("{TRACE_EXPR_MODULE}.{TRACE_EXPR_PREFIX}");
