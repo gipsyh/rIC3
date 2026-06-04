@@ -68,19 +68,21 @@ impl Ric3Proj {
         let name = name.as_ref();
         let path = format!("trace/{name}.rtrc");
         let full_path = self.path(&path);
+        term_mgr().enable_id_map();
         if !full_path.exists() {
             anyhow::bail!(
                 "trace not found for property: {name} (expected file: {})",
                 full_path.display()
             );
         }
-        self.load_serde_obj(path)
+        let res = self.load_serde_obj(path)?;
+        term_mgr().disable_id_map();
+        Ok(res)
     }
 
     pub fn load_wts_of_trace(&self) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
         let wtsln = read_to_string(self.path("trace/wtsln"))?;
         let res = self.load_wts(wtsln)?;
-        term_mgr().enable_id_map();
         Ok(res)
     }
 }
@@ -757,8 +759,16 @@ mod tests {
             prop: Vec::new(),
         };
 
-        write_trace_observer(&rcfg, &sym, &["a + b".to_string()], tmp.path(), &mut vec![]).unwrap();
-        let observer = std::fs::read_to_string(tmp.path().join("observer.sv")).unwrap();
+        let observer_path = tmp.path().join("observer.sv");
+        write_trace_observer(
+            &rcfg,
+            &sym,
+            &["a + b".to_string()],
+            &observer_path,
+            &mut vec![],
+        )
+        .unwrap();
+        let observer = std::fs::read_to_string(observer_path).unwrap();
 
         assert!(observer.contains("wire type(a + b) __ric3_trace_expr_0;"));
         assert!(!observer.contains("$bits"));
