@@ -65,7 +65,16 @@ impl Ric3Proj {
     }
 
     pub fn load_trace(&self, name: impl AsRef<str>) -> anyhow::Result<WlCex> {
-        self.load_serde_obj(format!("trace/{}.rtrc", name.as_ref()))
+        let name = name.as_ref();
+        let path = format!("trace/{name}.rtrc");
+        let full_path = self.path(&path);
+        if !full_path.exists() {
+            anyhow::bail!(
+                "trace not found for property: {name} (expected file: {})",
+                full_path.display()
+            );
+        }
+        self.load_serde_obj(path)
     }
 
     pub fn load_wts_of_trace(&self) -> anyhow::Result<(WlTransys, WlTsSymbol)> {

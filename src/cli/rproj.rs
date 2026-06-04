@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::Read,
+    io::{ErrorKind, Read},
     path::{Path, PathBuf},
 };
 
@@ -75,7 +75,14 @@ impl Ric3Proj {
     }
 
     pub fn load_serde_obj<D: DeserializeOwned>(&self, path: impl AsRef<Path>) -> anyhow::Result<D> {
-        let s = fs::read_to_string(self.path(path))?;
+        let path = self.path(path);
+        let s = fs::read_to_string(&path).map_err(|err| {
+            if err.kind() == ErrorKind::NotFound {
+                anyhow::anyhow!("project file not found: {}", path.display())
+            } else {
+                err.into()
+            }
+        })?;
         let obj: D = ron::from_str(&s)?;
         Ok(obj)
     }
