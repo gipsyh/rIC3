@@ -138,10 +138,10 @@ impl Ric3Proj {
         Ok(())
     }
 
-    pub fn save_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        term_gc();
-        self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
-    }
+    // pub fn save_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+    //     term_gc();
+    //     self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
+    // }
 
     // pub fn load_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
     //     // term_gc();
