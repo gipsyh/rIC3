@@ -25,7 +25,7 @@ impl CIll {
                     if step == 0 {
                         cfg.end = 5;
                     } else {
-                        cfg.time_limit = Some(15);
+                        cfg.time_limit = Some(if cfg!(debug_assertions) { 5 } else { 20 });
                         cfg.step = step;
                     }
                     let mut bmc = BMC::new(cfg, self.ts.clone());

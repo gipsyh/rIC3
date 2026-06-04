@@ -27,8 +27,11 @@ impl CIll {
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
         let num_prop = self.ts.bad.len();
-        // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
-        cfg.time_limit = Some(30);
+        cfg.time_limit = Some(if cfg!(debug_assertions) {
+            5
+        } else {
+            60 + 3 * self.ts.bad.len() as u64
+        });
         let pool = ThreadPoolBuilder::new()
             .num_threads(available_parallelism()?.get())
             .build()?;

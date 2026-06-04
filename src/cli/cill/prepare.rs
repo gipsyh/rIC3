@@ -77,7 +77,7 @@ fn preprocess(
     cfg.local_proof = true;
     cfg.preproc.preproc = false;
     let num_prop = ts.bad.len();
-    cfg.time_limit = Some(30);
+    cfg.time_limit = Some(if cfg!(debug_assertions) { 3 } else { 30 });
     let pool = ThreadPoolBuilder::new().num_threads(16).build()?;
     let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
         pool.install(|| {
