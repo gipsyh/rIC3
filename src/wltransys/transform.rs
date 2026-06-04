@@ -83,8 +83,9 @@ impl WlTransform for WlInnTermMapTf {
     fn trans_sym(&self, sym: &mut WlTsSymbol) {
         for (k, v) in take(&mut sym.signal) {
             if let Some(t) = self.map.get(&k) {
-                let entry = sym.signal.entry(t.clone()).or_default();
-                entry.extend(v);
+                for v in v {
+                    sym.add_symbol(&t, v);
+                }
             }
         }
     }
@@ -108,8 +109,9 @@ impl WlTransform for WlExtTermMergeTf {
     fn trans_sym(&self, sym: &mut WlTsSymbol) {
         for (k, v) in self.map.iter() {
             if let Some(s) = sym.remove(k) {
-                let ns = sym.entry(v.clone()).or_default();
-                ns.extend(s);
+                for s in s {
+                    sym.add_symbol(v, s);
+                }
             }
         }
     }
@@ -139,7 +141,7 @@ impl WlRemoveTf {
 
 impl WlTransform for WlRemoveTf {
     fn trans_sym(&self, sym: &mut WlTsSymbol) {
-        sym.signal.retain(|term, _| !self.removed.contains(term));
+        sym.retain(|term| !self.removed.contains(term));
     }
 
     // No action is needed for inv cert because the removed terms are irrelevant to the property.
@@ -157,7 +159,7 @@ impl WlKeepTf {
 
 impl WlTransform for WlKeepTf {
     fn trans_sym(&self, sym: &mut WlTsSymbol) {
-        sym.signal.retain(|term, _| self.keep.contains(term));
+        sym.retain(|term| self.keep.contains(term));
     }
 
     // No action is needed for inv cert because the removed terms are irrelevant to the property.
