@@ -6,6 +6,7 @@ mod rproj;
 mod run;
 mod trace;
 mod vcd;
+mod verilog;
 mod yosys;
 
 use crate::cli::{
