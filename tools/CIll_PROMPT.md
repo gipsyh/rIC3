@@ -22,7 +22,7 @@ You can use it to check whether the assertions are inductive and to generate CTI
 
 ## `ric3_trace_tools` (MCP):
 - `search_signals(property, pattern)`: Search signal names in a saved property trace by regex `pattern`. Pass the property name printed by `ric3 cill check`, not a file path. If more than 50 signals match, only the first 50 are returned. It is not recommended to list all signals at once, as this may produce many irrelevant results. Instead, search for the signals you need.
-- `signal_values(property, signals=[...])`: Inspect selected signal values in a saved property trace. Pass the property name printed by `ric3 cill check`, not a file path. The result is a JSON object whose keys are signal names and whose values are arrays representing the signal state at each step. Suffix matches are supported for signal names; use `search_signals` first when unsure.
+- `signal_values(property, signals=[...])`: Inspect selected signal values or Verilog expression values in a saved property trace. Pass the property name printed by `ric3 cill check`, not a file path. Each entry in `signals` may be either an exact signal name or a Verilog expression over trace-visible DUT signals, e.g. `counter + 1`, or `array[idx]`. Array signals cannot be inspected directly; include an index in the expression. The result is a JSON object whose keys are the requested signal names or expressions, and whose values are arrays representing the value at each step. Use `search_signals` first when unsure about signal names.
 
 ## Operational Constraints (CRITICAL)
 - Strictly **ONLY** add, modify, or delete code in `invariants.sv`.
