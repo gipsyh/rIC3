@@ -319,7 +319,7 @@ pub fn signal_values_file(
         synthesize_trace_observer(&rcfg, &rp, &wts, &wsym, &expressions)?;
 
     trace.enrich(&expr_wsym.keys().cloned().collect());
-    assert!(resolved_signal_values(&trace, &wsym, &observer_symbols, &mut values)?.is_empty());
+    assert!(resolved_signal_values(&trace, &expr_wsym, &observer_symbols, &mut values)?.is_empty());
 
     for (expression, observer_symbol) in expressions.into_iter().zip(observer_symbols) {
         let res = values.remove(&observer_symbol).unwrap();
