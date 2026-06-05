@@ -53,7 +53,8 @@ impl CIll {
                                     IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
                                 let res = ic3.check();
                                 let inv = ic3.invariant();
-                                (matches!(res, McResult::UNSAT), inv, lp as u32 + 1)
+                                let res = matches!(res, McResult::UNSAT);
+                                (res, inv, res as u32 * (lp as u32 + 1))
                             })
                             .collect();
                         // let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
