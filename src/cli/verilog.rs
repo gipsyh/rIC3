@@ -71,8 +71,10 @@ impl SvModule {
     ) -> &mut SvModule {
         let mut module = self;
         let path: Vec<_> = path.into_iter().map(|s| s.as_ref().to_string()).collect();
-        let full_name = path.join("_");
+        let mut full_name = Vec::new();
         for name in path.iter() {
+            full_name.push(name.clone());
+            let full_name = full_name.join("_");
             module = module
                 .children
                 .entry(name.clone())
