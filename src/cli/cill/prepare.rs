@@ -48,6 +48,11 @@ pub fn cill_prepare(rcfg: &Ric3Config, rp: &Ric3Proj) -> anyhow::Result<()> {
     write_shadow(&rcfg.dut.top, &symbols, &cill_dir)?;
 
     rp.save_wts(&wts, &wsym, "wts")?;
+
+    let (mut ts, bbmap) = wts.bitblast_to_ts();
+    ts.simplify(&mut Restore::new(&ts));
+    rp.save_ts(&ts, Some((&bbmap, "wts")), "ts")?;
+
     CIllStat::init(&rp)?;
     Ok(())
 }

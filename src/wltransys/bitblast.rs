@@ -15,6 +15,7 @@ use logicrs::{
         term_gc,
     },
 };
+use serde::{Deserialize, Serialize};
 
 impl WlTransys {
     fn bitblast(&self) -> (Self, GHashMap<Term, TermVec>, GHashMap<Term, (Term, usize)>) {
@@ -171,7 +172,7 @@ impl WlTransys {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct BitblastMap {
     b2w: GHashMap<Var, (Term, usize)>,
     w2b: GHashMap<Term, Vec<Var>>,
