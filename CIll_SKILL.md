@@ -1,3 +1,7 @@
+---
+name: "cill"
+description: "Use when proving SystemVerilog assertions with ric3 cill by analyzing CTI/CEX traces and adding inductive helper invariants."
+---
 ## Core Concepts
 - Correctness: An assertion is correct if it holds for all states reachable from the initial state. A correct assertion is referred to as an invariant. If an assertion is incorrect, a Counterexample (CEX) exists.
 - Inductiveness: An assertion is inductive if, assuming it holds for state $S$, it implies it holds for state $S'$.
