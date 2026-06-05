@@ -40,6 +40,9 @@ impl WlTransys {
         for bad in self.bad.iter_mut() {
             *bad = bad.cached_apply(&r, &mut map);
         }
+        for output in self.output.iter_mut() {
+            *output = output.cached_apply(&r, &mut map);
+        }
         for constraint in self.constraint.iter_mut() {
             *constraint = constraint.cached_apply(&r, &mut map);
         }
@@ -180,6 +183,7 @@ impl WlTsSimpPass for CoiPass {
             .constraint
             .iter()
             .chain(wts.bad.iter())
+            .chain(wts.output.iter())
             .chain(wts.justice.iter())
             .chain(ctx.keep.iter())
             .cloned()
@@ -254,6 +258,9 @@ impl WlTsSimpPass for InnTermSimpPass {
             .retain(|c| !c.try_bool_const().is_some_and(|f| f));
         for b in wts.bad.iter_mut() {
             *b = b.simplify_with_ctx(&fol_ctx, &mut map);
+        }
+        for o in wts.output.iter_mut() {
+            *o = o.simplify_with_ctx(&fol_ctx, &mut map);
         }
         for j in wts.justice.iter_mut() {
             *j = j.simplify_with_ctx(&fol_ctx, &mut map);

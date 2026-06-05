@@ -23,6 +23,7 @@ impl WlTransysUnroll {
             .iter()
             .chain(ts.latch.iter())
             .chain(ts.bad.iter())
+            .chain(ts.output.iter())
             .chain(ts.init.values())
             .chain(ts.next.values())
             .chain(ts.constraint.iter())

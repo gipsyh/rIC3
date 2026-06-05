@@ -25,7 +25,7 @@ impl CIll {
                     if step == 0 {
                         cfg.end = 5;
                     } else {
-                        cfg.time_limit = Some(15);
+                        cfg.time_limit = Some(if cfg!(debug_assertions) { 5 } else { 20 });
                         cfg.step = step;
                     }
                     let mut bmc = BMC::new(cfg, self.ts.clone());
@@ -39,8 +39,12 @@ impl CIll {
             .into_iter()
             .min_by_key(|(r, _)| r.into_sat().unwrap());
 
-        let vcd = self.rp.path("cill/cex.vcd");
-        remove_if_exists(&vcd)?;
+        let trace = self.rp.path("cill/cex.rtrc");
+        let term = self.rp.path("cill/term.ron");
+        let tsym = self.rp.path("cill/tsym.ron");
+        remove_if_exists(&trace)?;
+        remove_if_exists(&term)?;
+        remove_if_exists(&tsym)?;
 
         let mut stat = CIllStat::load(&self.rp)?;
         stat.bmc_time += TimeDelta::from_std(bmc_start.elapsed())?;
@@ -48,14 +52,17 @@ impl CIll {
 
         match min_res {
             Some((r, mut bmc)) => {
-                let witness = bmc.cex();
-                self.save_trace(&witness, false, None, &vcd)?;
-                let name = &self.wsym.prop[witness.bad_id];
+                let trace = bmc.cex();
+                self.save_trace(&trace)?;
+                let name = self.wsym.prop[trace.bad_id].clone();
+                let name = name
+                    .strip_prefix("invariants.")
+                    .map(|s| s.to_string())
+                    .unwrap_or(name);
                 println!(
                     "{}",
                     format!(
-                        "A CEX violating {name} was found. VCD generated at {}.",
-                        vcd.display()
+                        "Found a CEX that violates {name}. Use the trace tools to inspect the waveform.",
                     )
                     .red()
                 );

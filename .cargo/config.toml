@@ -1,0 +1,2 @@
+[build]
+rustflags = ["-C", "link-args=-Wl,-rpath,/home/linuxbrew/.linuxbrew/lib"]

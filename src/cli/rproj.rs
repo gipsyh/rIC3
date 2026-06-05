@@ -1,13 +1,18 @@
 use giputils::{
-    file::{create_dir_if_not_exists, remove_if_exists},
+    file::{create_dir_if_not_exists, recreate_dir, remove_if_exists},
     hash::GHashMap,
 };
-use rIC3::{McResult, config::EngineConfig};
+use logicrs::fol::{TermManager, set_term_mgr, term_gc, term_mgr};
+use rIC3::{
+    McResult,
+    config::EngineConfig,
+    wltransys::{WlTransys, symbol::WlTsSymbol},
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::Read,
+    io::{ErrorKind, Read},
     path::{Path, PathBuf},
 };
 
@@ -70,9 +75,16 @@ impl Ric3Proj {
     }
 
     pub fn load_serde_obj<D: DeserializeOwned>(&self, path: impl AsRef<Path>) -> anyhow::Result<D> {
-        let s = fs::read_to_string(self.path(path))?;
-        let inv: D = ron::from_str(&s)?;
-        Ok(inv)
+        let path = self.path(path);
+        let s = fs::read_to_string(&path).map_err(|err| {
+            if err.kind() == ErrorKind::NotFound {
+                anyhow::anyhow!("project file not found: {}", path.display())
+            } else {
+                err.into()
+            }
+        })?;
+        let obj: D = ron::from_str(&s)?;
+        Ok(obj)
     }
 
     pub fn clear_entry(&mut self, p: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -124,6 +136,42 @@ impl Ric3Proj {
         let cache = ron::to_string(&res)?;
         fs::write(self.path("res/res.ron"), cache)?;
         Ok(())
+    }
+
+    // pub fn save_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+    //     term_gc();
+    //     self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
+    // }
+
+    // pub fn load_term_mgr(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+    //     // term_gc();
+    //     // self.save_serde_obj(term_mgr(), self.path(path.as_ref()))
+    // }
+
+    pub fn save_wts(
+        &self,
+        wts: &WlTransys,
+        wsym: &WlTsSymbol,
+        path: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        recreate_dir(&self.path(path.as_ref()))?;
+        term_gc();
+        self.save_serde_obj(term_mgr(), path.as_ref().join("term.ron"))?;
+        self.save_serde_obj(&wts, path.as_ref().join("wts.ron"))?;
+        self.save_serde_obj(wsym, path.as_ref().join("wsym.ron"))?;
+        Ok(())
+    }
+
+    pub fn load_wts(&self, path: impl AsRef<Path>) -> anyhow::Result<(WlTransys, WlTsSymbol)> {
+        term_gc();
+        assert!(term_mgr().is_empty());
+        let tm: TermManager = self.load_serde_obj(path.as_ref().join("term.ron"))?;
+        set_term_mgr(tm);
+        term_mgr().enable_id_map();
+        let wts: WlTransys = self.load_serde_obj(path.as_ref().join("wts.ron"))?;
+        let wsym: WlTsSymbol = self.load_serde_obj(path.as_ref().join("wsym.ron"))?;
+        term_mgr().disable_id_map();
+        Ok((wts, wsym))
     }
 }
 

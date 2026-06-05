@@ -1,9 +1,10 @@
 use crate::wltransys::WlTransys;
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{self, BvTermValue, Term, TermValue};
+use logicrs::fol::{self, BvTermValue, Term, TermValue, Value};
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlCex {
     pub input: Vec<Vec<BvTermValue>>,
     pub state: Vec<Vec<TermValue>>,
@@ -65,6 +66,28 @@ impl WlCex {
                 .collect(),
             bad_id: self.bad_id,
         }
+    }
+
+    pub fn term_values(&self, term: &Term) -> Vec<Value> {
+        let mut values = Vec::new();
+        for t in 0..self.len() {
+            if let Some(value) = self.state[t]
+                .iter()
+                .find(|value| value.t() == term)
+                .map(|value| value.v())
+            {
+                values.push(value.clone());
+            } else if let Some(value) = self.input[t]
+                .iter()
+                .find(|value| value.t() == term)
+                .map(|value| value.v())
+            {
+                values.push(Value::Bv(value.clone()));
+            } else {
+                values.push(Value::default_from(term.sort()));
+            }
+        }
+        values
     }
 }
 

@@ -2,21 +2,24 @@ pub mod bitblast;
 pub mod cert;
 mod simplify;
 pub mod symbol;
+mod test;
 pub mod transform;
 pub mod unroll;
 
 use crate::wltransys::cert::Restore;
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{FolOp, Sort, Term};
+use serde::{Deserialize, Serialize};
 use std::mem::take;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlTransys {
     pub input: Vec<Term>,
     pub latch: Vec<Term>,
     pub init: GHashMap<Term, Term>,
     pub next: GHashMap<Term, Term>,
     pub bad: Vec<Term>,
+    pub output: Vec<Term>,
     pub constraint: Vec<Term>,
     pub justice: Vec<Term>,
 }
@@ -25,6 +28,7 @@ impl WlTransys {
     pub fn print_info(&self) {
         println!("num input: {}", self.input.len());
         println!("num latch: {}", self.latch.len());
+        println!("num output: {}", self.output.len());
         println!("num constraint: {}", self.constraint.len());
     }
 

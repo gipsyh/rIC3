@@ -29,6 +29,7 @@ impl Yosys {
     ) -> anyhow::Result<()> {
         let cmds = self.commands.join(" ; ");
         let mut cmd = Command::new("yosys");
+        cmd.arg("-q");
         for p in plugin {
             cmd.args(["-m", &p]);
         }

@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::{file::recreate_dir, logger::with_log_level};
+use giputils::logger::with_log_level;
 use log::LevelFilter;
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
@@ -10,7 +10,7 @@ use rIC3::{
 };
 use ratatui::crossterm::style::Stylize;
 use rayon::{ThreadPoolBuilder, prelude::*};
-use std::time::Instant;
+use std::{thread::available_parallelism, time::Instant};
 use tabled::{
     Table, Tabled,
     settings::{Format, Modify, Style, object::Rows},
@@ -27,15 +27,20 @@ impl CIll {
         cfg.preproc.scorr = false;
         cfg.preproc.frts = false;
         let num_prop = self.ts.bad.len();
-        // cfg.time_limit = Some(60 + 6 * self.ts.bad.len() as u64);
-        cfg.time_limit = Some(30);
-        let pool = ThreadPoolBuilder::new().num_threads(16).build()?;
+        cfg.time_limit = Some(if cfg!(debug_assertions) {
+            5
+        } else {
+            60 + 3 * self.ts.bad.len() as u64
+        });
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(available_parallelism()?.get())
+            .build()?;
         let ic3_results: Vec<_> = with_log_level(LevelFilter::Warn, || {
             pool.install(|| {
                 (0..num_prop)
                     .into_par_iter()
                     .map(|i| {
-                        let ic3res: Vec<_> = [true, false]
+                        let ic3res: Vec<_> = [true]
                             .into_par_iter()
                             .map(|lp| {
                                 let mut cfg = cfg.clone();
@@ -48,14 +53,15 @@ impl CIll {
                                     IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
                                 let res = ic3.check();
                                 let inv = ic3.invariant();
-                                (matches!(res, McResult::UNSAT), inv, lp as u32 + 1)
+                                let res = matches!(res, McResult::UNSAT);
+                                (res, inv, res as u32 * (lp as u32 + 1))
                             })
                             .collect();
-                        let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
-                        si.extend(ii);
-                        (sr || ir, si, se + ie)
-                        // let [(sr, si, se)] = ic3res.try_into().unwrap();
-                        // (sr, si, se)
+                        // let [(sr, mut si, se), (ir, ii, ie)] = ic3res.try_into().unwrap();
+                        // si.extend(ii);
+                        // (sr || ir, si, se + ie)
+                        let [(sr, si, se)] = ic3res.try_into().unwrap();
+                        (sr, si, se)
                     })
                     .collect()
             })
@@ -156,11 +162,8 @@ impl CIll {
             result: String,
             #[tabled(rename = "Engine")]
             engine: String,
-            #[tabled(rename = "VCD")]
-            vcd: String,
         }
-        let cti_path = self.rp.path("cill/cti");
-        recreate_dir(&cti_path)?;
+        self.rp.clear_trace()?;
         let mut results = Vec::new();
         for (i, res) in res.iter().enumerate() {
             let name = self.wsym.prop[i].clone();
@@ -168,22 +171,16 @@ impl CIll {
                 .strip_prefix("invariants.")
                 .map(|s| s.to_string())
                 .unwrap_or(name);
-            let cti_file = cti_path.join(format!("{}.cti", name));
-            let vcd_path = cti_path.join(format!("{}.vcd", name));
-            let (status, vcd) = if let Some(cex) = res {
-                self.save_trace(cex, true, Some(&cti_file), &vcd_path)?;
-                (
-                    "Not Inductive".red().to_string(),
-                    vcd_path.display().to_string(),
-                )
+            let status = if let Some(trace) = res {
+                self.save_trace(&trace)?;
+                "Not Inductive".red().to_string()
             } else {
-                ("Inductive".green().to_string(), "-".to_string())
+                "Inductive".green().to_string()
             };
             results.push(InductiveResult {
                 property: name,
                 result: status,
                 engine: engines[i].clone().unwrap_or("-".to_string()),
-                vcd,
             });
         }
 

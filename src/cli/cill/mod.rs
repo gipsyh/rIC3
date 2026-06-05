@@ -6,7 +6,7 @@ mod kind;
 mod prepare;
 mod utils;
 
-use super::{Ric3Config, cache::Ric3Proj};
+use super::{Ric3Config, rproj::Ric3Proj};
 use crate::{
     cli::cill::{
         candinv::{link_candinv, synthesis_candinv},
@@ -15,12 +15,10 @@ use crate::{
     logger_init,
 };
 use anyhow::bail;
-use btor::Btor;
 use clap::Subcommand;
 use giputils::{file::remove_if_exists, logger::with_log_level};
 use log::LevelFilter;
 use rIC3::{
-    frontend::{Frontend, btor::BtorFrontend},
     transys::{Transys, certify::Restore},
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
@@ -89,7 +87,7 @@ pub struct CIll {
     ts: Transys,
     bb_map: BitblastMap,
     ts_rst: Restore,
-    dut_bf: BtorFrontend,
+    #[allow(unused)]
     dut_wts: WlTransys,
     #[allow(unused)]
     dut_wsym: WlTsSymbol,
@@ -97,15 +95,12 @@ pub struct CIll {
 
 impl CIll {
     pub fn new(rcfg: Ric3Config, rp: Ric3Proj) -> anyhow::Result<Self> {
-        let btor = Btor::from_file(rp.path("wts/wts.btor"));
-        let mut dut_bf = BtorFrontend::new(btor);
-        let (dut_wts, dut_wsym) = dut_bf.wts();
-
+        let (dut_wts, dut_wsym) = rp.load_wts("wts")?;
         let mut candinv_bf = synthesis_candinv(&rcfg, &rp)?;
         let (wts, wsym) = link_candinv(&dut_wts, &dut_wsym, &mut candinv_bf)?;
         rp.remove_unused_cti(&wsym.prop);
-        wts.to_btor_with_sym(&wsym)
-            .to_file(rp.path("cill/candinv/linked.btor"));
+
+        rp.save_wts(&wts, &wsym, "cill/linked")?;
 
         let (mut ts, bb_map) = wts.bitblast_to_ts();
         let ots = ts.clone();
@@ -114,7 +109,6 @@ impl CIll {
         assert!(!ts.has_gate_init());
         Ok(Self {
             rp,
-            dut_bf,
             dut_wts,
             dut_wsym,
             wsym,

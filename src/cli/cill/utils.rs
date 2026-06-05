@@ -1,56 +1,23 @@
-use crate::cli::{cache::Ric3Proj, cill::CIll, vcd::wlwitness_vcd};
+use crate::cli::{cill::CIll, rproj::Ric3Proj};
 use chrono::{DateTime, Duration, Local};
-use giputils::hash::GHashSet;
-use logicrs::fol::Term;
-use rIC3::{McWlCertificate, frontend::Frontend, transys::certify::BlCex};
+use rIC3::transys::certify::BlCex;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
-    fs::{self, File},
-    io::BufWriter,
-    path::Path,
+    fs::{self},
 };
 
 impl CIll {
-    pub fn save_trace(
-        &mut self,
-        cex: &BlCex,
-        filter_dut: bool,
-        p: Option<&Path>,
-        vcd: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let cex = self.ts_rst.restore_cex(cex);
-        let mut cex = self.bb_map.restore_cex(&cex);
-        if filter_dut {
-            let dut_terms: GHashSet<Term> = self
-                .dut_wts
-                .input
-                .iter()
-                .chain(self.dut_wts.latch.iter())
-                .cloned()
-                .collect();
-            let filtered_cex = cex.filter(|t| dut_terms.contains(t));
-            if let Some(p) = p {
-                let bwit = self
-                    .dut_bf
-                    .wl_certificate(McWlCertificate::SAT(filtered_cex));
-                fs::write(&p, format!("{}", bwit))?;
-            }
-
-            let vcd_file = BufWriter::new(File::create(&vcd)?);
-            cex.enrich(&self.wsym.keys().cloned().collect());
-            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
-        } else {
-            if let Some(_) = p {
-                todo!();
-            }
-
-            let vcd_file = BufWriter::new(File::create(&vcd)?);
-            cex.enrich(&self.wsym.keys().cloned().collect());
-            wlwitness_vcd(&cex, &self.wsym, vcd_file, "")?;
-        }
-
-        Ok(())
+    pub fn save_trace(&mut self, trace: &BlCex) -> anyhow::Result<()> {
+        let trace = self.ts_rst.restore_cex(trace);
+        let trace = self.bb_map.restore_cex(&trace);
+        let name = self.wsym.prop[trace.bad_id].clone();
+        let name = name
+            .strip_prefix("invariants.")
+            .map(|s| s.to_string())
+            .unwrap_or(name);
+        // trace.enrich(&self.wsym.keys().cloned().collect());
+        self.rp.save_trace("cill/linked", &trace, &name)
     }
 }
 

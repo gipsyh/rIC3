@@ -1,16 +1,19 @@
 mod build;
-mod cache;
 mod check;
 mod cill;
 mod clean;
+mod rproj;
 mod run;
+mod trace;
 mod vcd;
+mod verilog;
 mod yosys;
 
 use crate::cli::{
-    cache::DutHash,
     check::CheckConfig,
     cill::{CIllCommands, cill},
+    rproj::DutHash,
+    trace::{TraceCommands, trace},
 };
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -64,6 +67,12 @@ pub enum Commands {
         #[command(subcommand)]
         cmd: CIllCommands,
     },
+
+    /// Inspect Traces (CounterExamples or CTIs).
+    Trace {
+        #[command(subcommand)]
+        cmd: TraceCommands,
+    },
 }
 
 pub fn cli_main() -> anyhow::Result<()> {
@@ -74,6 +83,7 @@ pub fn cli_main() -> anyhow::Result<()> {
         Commands::Check { chk, cfg } => check::check(chk, cfg),
         Commands::Clean => clean::clean(),
         Commands::Cill { cmd } => cill(cmd),
+        Commands::Trace { cmd } => trace(cmd),
     }
 }
 
