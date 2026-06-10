@@ -273,10 +273,9 @@ impl IC3 {
         if po.frame as f64 > 0.7 * level as f64 && pushing_power > 0.0 {
             bonus += 0.1;
         }
-        let reward = (size_reduction_ratio * 0.35 + push_quality * 0.45
-            + generalization_quality
-            + bonus)
-            .clamp(-0.5, 2.0);
+        let reward =
+            (size_reduction_ratio * 0.35 + push_quality * 0.45 + generalization_quality + bonus)
+                .clamp(-0.5, 2.0);
         debug!("MAB arm {arm} got reward {reward:.2}");
         let ctx = self.mab_context_vector(po);
         self.mab.update(arm, &ctx, reward);
