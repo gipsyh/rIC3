@@ -36,8 +36,13 @@ impl IC3 {
             self.add_obligation(po.clone());
             return self.add_lemma(po.frame - 1, po.state.as_litvec().clone(), false, Some(po));
         };
+        let original_cube_size = mic.len();
         mic = self.mic(po.frame, mic, &[], mic_type);
+        let generalized_cube_size = mic.len();
         let (frame, mic) = self.push_lemma(po.frame, mic);
+        if self.cfg.mab {
+            self.mab_feedback(&po, original_cube_size, generalized_cube_size, frame);
+        }
         self.statistic.avg_po_cube_len += po.state.len();
         po.push_to(frame);
         self.add_obligation(po.clone());
@@ -127,7 +132,9 @@ impl IC3 {
             self.statistic.block.blocked_time += blocked_start.elapsed();
             if blocked {
                 noc += 1;
-                let mic_type = if self.cfg.dynamic {
+                let mic_type = if self.cfg.mab {
+                    self.mab_choose_mic_type(&po)
+                } else if self.cfg.dynamic {
                     if let Some(mut n) = po.next.as_mut() {
                         let mut act = n.act;
                         for _ in 0..2 {

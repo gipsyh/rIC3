@@ -28,6 +28,7 @@ mod auxv;
 mod block;
 mod frame;
 mod localabs;
+mod mab;
 mod mic;
 mod predprop;
 mod proofoblig;
@@ -47,6 +48,18 @@ pub struct IC3Config {
     /// dynamic generalization
     #[arg(long = "dynamic", default_value_t = false)]
     pub dynamic: bool,
+
+    /// contextual-MAB (LinUCB) adaptive generalization (A-IC3)
+    #[arg(long = "mab", default_value_t = false)]
+    pub mab: bool,
+
+    /// LinUCB exploration parameter alpha
+    #[arg(long = "mab-alpha", default_value_t = 1.0)]
+    pub mab_alpha: f64,
+
+    /// LinUCB regularization parameter lambda
+    #[arg(long = "mab-lambda", default_value_t = 0.1)]
+    pub mab_lambda: f64,
 
     /// counterexample to generalization
     #[arg(long = "ctg", action = ArgAction::Set, default_value_t = true)]
@@ -118,6 +131,10 @@ impl IC3Config {
             error!("cannot enable both dynamic and drop-po");
             panic!();
         }
+        if self.mab && self.drop_po {
+            error!("cannot enable both mab and drop-po");
+            panic!();
+        }
         if self.inn {
             let pre = "cannot enable both inn and";
             if self.abs_cst || self.abs_trans {
@@ -165,6 +182,7 @@ pub struct IC3 {
     rst: Restore,
     auxiliary_var: Vec<Var>,
     predprop: Option<PredProp>,
+    mab: mab::CtxMab,
 
     rng: StdRng,
     filog: IntervalLogger,
@@ -240,6 +258,7 @@ impl IC3 {
         let inf_solver = TransysSolver::new(&tsctx);
         let lift = TsLift::new(TransysUnroll::new(&ts));
         let localabs = LocalAbs::new(&ts, &cfg);
+        let mab = mab::CtxMab::new(cfg.mab_alpha, cfg.mab_lambda);
         Self {
             cfg,
             ts,
@@ -258,6 +277,7 @@ impl IC3 {
             ots,
             rst,
             predprop,
+            mab,
             rng,
             filog: Default::default(),
             tracer: Tracer::new(),
@@ -354,6 +374,9 @@ impl Engine for IC3 {
 
     fn statistic(&mut self) {
         self.statistic.num_auxiliary_var = self.auxiliary_var.len();
+        if self.cfg.mab {
+            info!("{}", self.mab.statistic());
+        }
         info!("obligations: {}", self.obligations.statistic());
         info!("{}", self.frame.statistic(false));
         let mut statistic = SolverStatistic::default();
