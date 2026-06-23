@@ -18,10 +18,13 @@ use ratatui::{
 use std::io::{self, IsTerminal, Write};
 use std::os::fd::AsFd;
 use std::sync::{
-    Arc, LazyLock, Mutex,
+    Arc, Condvar, LazyLock, Mutex, Weak,
     atomic::{AtomicUsize, Ordering},
 };
+use std::thread;
 use std::time::{Duration, Instant};
+
+const UI_REFRESH_INTERVAL: Duration = Duration::from_millis(250);
 
 pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
@@ -35,6 +38,8 @@ pub struct UiRendererInner {
     level: usize,
     custom_lines: Vec<Line<'static>>,
     finished: bool,
+    /// Set by `finish` and consumed by the render thread to draw the final frame.
+    pending_finish: Option<McResult>,
 }
 
 impl UiRendererInner {
@@ -176,6 +181,7 @@ fn format_status_line(
         Span::raw(time.clone()).white().bold(),
     ];
     let time_compact = vec![Span::raw(time).white().bold()];
+    let memory_groups = memory_stats().map(memory_status_groups);
 
     let make_name_group = |name_width| {
         vec![
@@ -183,6 +189,42 @@ fn format_status_line(
             Span::raw(compact_name(name, name_width)).magenta().bold(),
         ]
     };
+
+    if let Some((memory_full, memory_compact)) = memory_groups {
+        if w >= 68 {
+            let groups = fit_status_groups(
+                w,
+                vec![
+                    make_name_group(name.chars().count()),
+                    level_full.clone(),
+                    time_full.clone(),
+                    memory_full,
+                    vec![result_span.clone()],
+                ],
+                0,
+            );
+            if let Some(groups) = groups {
+                return spaced_status_line(groups, w);
+            }
+        }
+
+        if w >= 42 {
+            let groups = fit_status_groups(
+                w,
+                vec![
+                    make_name_group(name.chars().count()),
+                    level_compact.clone(),
+                    time_compact.clone(),
+                    memory_compact,
+                    vec![result_span.clone()],
+                ],
+                0,
+            );
+            if let Some(groups) = groups {
+                return spaced_status_line(groups, w);
+            }
+        }
+    }
 
     if w >= 68 {
         let groups = fit_status_groups(
@@ -328,6 +370,71 @@ fn compact_name(name: &str, max_chars: usize) -> String {
     }
 }
 
+#[derive(Clone, Copy)]
+struct MemoryStats {
+    rss_kib: u64,
+}
+
+fn memory_stats() -> Option<MemoryStats> {
+    #[cfg(target_os = "linux")]
+    {
+        let status = std::fs::read_to_string("/proc/self/status").ok()?;
+        let mut rss_kib = None;
+
+        for line in status.lines() {
+            if let Some(value) = line.strip_prefix("VmRSS:") {
+                rss_kib = parse_status_kib(value);
+            }
+        }
+
+        let rss_kib = rss_kib?;
+        Some(MemoryStats { rss_kib })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+fn parse_status_kib(value: &str) -> Option<u64> {
+    value.split_whitespace().next()?.parse().ok()
+}
+
+fn memory_status_groups(stats: MemoryStats) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
+    let rss = format_kib(stats.rss_kib);
+    (
+        vec![
+            Span::raw("Mem ").dark_gray(),
+            Span::raw(rss.clone()).white().bold(),
+        ],
+        vec![Span::raw(format!("M {rss}")).white().bold()],
+    )
+}
+
+fn format_kib(kib: u64) -> String {
+    const KIB_PER_MIB: u64 = 1024;
+    const KIB_PER_GIB: u64 = 1024 * 1024;
+
+    if kib < KIB_PER_MIB {
+        format!("{kib}KiB")
+    } else if kib < KIB_PER_GIB {
+        let mib = kib as f64 / KIB_PER_MIB as f64;
+        if mib < 10.0 {
+            format!("{mib:.1}MiB")
+        } else {
+            format!("{mib:.0}MiB")
+        }
+    } else {
+        let gib = kib as f64 / KIB_PER_GIB as f64;
+        if gib < 10.0 {
+            format!("{gib:.2}GiB")
+        } else {
+            format!("{gib:.1}GiB")
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct TerminalInputGuard {
     active: bool,
@@ -447,6 +554,9 @@ impl Drop for UiRendererInner {
 #[derive(Clone)]
 pub struct UiRenderer {
     inner: Arc<Mutex<UiRendererInner>>,
+    /// Wakes the render thread early for a terminal transition (`finish`/`shutdown`).
+    notify: Arc<Condvar>,
+    handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
 }
 
 impl UiRenderer {
@@ -462,25 +572,36 @@ impl UiRenderer {
         // Hide cursor initially so it doesn't flicker/show in the inline area
         let cursor_hidden = terminal.hide_cursor().is_ok();
 
-        let renderer = Self {
-            inner: Arc::new(Mutex::new(UiRendererInner {
-                terminal,
-                input_mode,
-                cursor_hidden,
-                height,
-                spinner_tick: 0,
-                last_update: Instant::now(),
-                start_time: Instant::now(),
-                name: name.to_string(),
-                level: 0,
-                custom_lines: Vec::new(),
-                finished: false,
-            })),
-        };
+        let inner = Arc::new(Mutex::new(UiRendererInner {
+            terminal,
+            input_mode,
+            cursor_hidden,
+            height,
+            spinner_tick: 0,
+            last_update: Instant::now(),
+            start_time: Instant::now(),
+            name: name.to_string(),
+            level: 0,
+            custom_lines: Vec::new(),
+            finished: false,
+            pending_finish: None,
+        }));
 
-        Some(renderer)
+        let notify = Arc::new(Condvar::new());
+        let render_inner = Arc::downgrade(&inner);
+        let render_notify = Arc::downgrade(&notify);
+        let handle = thread::spawn(move || run_render_loop(render_inner, render_notify));
+
+        Some(Self {
+            inner,
+            notify,
+            handle: Arc::new(Mutex::new(Some(handle))),
+        })
     }
 
+    /// Push new lines to be rendered. Only updates shared state; the render
+    /// thread picks them up on its next interval tick. No signal is sent —
+    /// rendering is purely timer-driven.
     #[inline]
     pub fn render(&self, lines: Vec<Line<'static>>) {
         let mut inner = self.inner.lock().unwrap();
@@ -488,34 +609,98 @@ impl UiRenderer {
             return;
         }
         inner.custom_lines = lines;
-        let level = inner.level;
-        inner.draw(false, McResult::Unknown(Some(level)));
     }
 
+    /// Tear down the terminal without a final draw and stop the render thread.
     pub fn shutdown(&self) {
-        match self.inner.lock() {
-            Ok(mut inner) => {
-                inner.finished = true;
-                inner.cleanup_terminal();
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if inner.finished {
+                return;
             }
-            Err(_) => restore_terminal_direct(),
+            inner.finished = true;
+        }
+        self.notify.notify_one();
+        self.join_render_thread();
+    }
+
+    /// Render the final frame for `result` and tear down the terminal. Blocks
+    /// until the render thread has drawn the frame, so callers can safely emit
+    /// further output afterwards.
+    pub fn finish(&self, result: McResult) {
+        self.finish_with(result);
+    }
+
+    fn finish_with(&self, result: McResult) {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if inner.finished {
+                return;
+            }
+            inner.pending_finish = Some(result);
+        }
+        self.notify.notify_one();
+        self.join_render_thread();
+    }
+
+    fn join_render_thread(&self) {
+        let handle = self.handle.lock().unwrap().take();
+        if let Some(handle) = handle {
+            let _ = handle.join();
+        } else {
+            // Another clone owns the join; wait for it to finish so the
+            // terminal is restored before this caller returns.
+            while !self.inner.lock().unwrap().finished {
+                thread::sleep(Duration::from_millis(2));
+            }
         }
     }
+}
 
-    pub fn finish(&self, result: McResult) {
-        match self.inner.lock() {
-            Ok(mut inner) => {
-                if inner.finished {
-                    return;
-                }
+/// The render thread owns every `terminal.draw` call. It is purely
+/// timer-driven: every `UI_REFRESH_INTERVAL` it redraws the current shared
+/// state, so elapsed time, memory usage and the latest `custom_lines` update
+/// regardless of engine activity. Engine methods only mutate shared state and
+/// never wake the thread; only terminal transitions (`finish`/`shutdown`) wake
+/// it early via the condvar.
+///
+/// The thread holds `Weak` references so it stops on its own once every
+/// `UiRenderer` clone is dropped (e.g. without an explicit `finish`).
+fn run_render_loop(inner: Weak<Mutex<UiRendererInner>>, notify: Weak<Condvar>) {
+    loop {
+        let Some(inner_arc) = inner.upgrade() else {
+            break;
+        };
+        let Some(notify_arc) = notify.upgrade() else {
+            break;
+        };
+        let mut inner = inner_arc.lock().unwrap();
+
+        // Terminal transitions take priority over the periodic refresh.
+        if let Some(result) = inner.pending_finish.take() {
+            if !inner.finished {
                 if let McResult::Unknown(Some(k)) = result {
                     inner.level = k;
                 }
                 inner.draw(true, result);
                 inner.finished = true;
             }
-            Err(_) => restore_terminal_direct(),
+            break;
         }
+        if inner.finished {
+            inner.cleanup_terminal();
+            break;
+        }
+
+        // Periodic refresh: redraw current state so time/memory/custom lines
+        // update every interval independent of engine activity.
+        let level = inner.level;
+        inner.draw(false, McResult::Unknown(Some(level)));
+
+        // Wait for the next interval, or wake early for a terminal transition.
+        // The lock is released while waiting, so the engine can update state.
+        let (guard, _) = notify_arc.wait_timeout(inner, UI_REFRESH_INTERVAL).unwrap();
+        drop(guard);
     }
 }
 
@@ -525,18 +710,20 @@ impl TracerIf for UiRenderer {}
 impl StateTracerIf for UiRenderer {
     #[inline]
     fn trace_state(&mut self, _prop: Option<usize>, res: McResult) {
-        let mut inner = self.inner.lock().unwrap();
-        if inner.finished {
-            return;
-        }
         match res {
+            // Progress update: record the new level. The render thread draws it
+            // on its next interval tick — no explicit wake is sent.
             McResult::Unknown(Some(k)) => {
+                let mut inner = self.inner.lock().unwrap();
+                if inner.finished {
+                    return;
+                }
                 inner.level = k;
-                inner.draw(false, res);
             }
+            // Terminal result: draw the final frame on the render thread and
+            // block until it is done.
             McResult::UNSAT | McResult::SAT(_) | McResult::Unknown(None) => {
-                inner.draw(true, res);
-                inner.finished = true;
+                self.finish_with(res);
             }
         }
     }
