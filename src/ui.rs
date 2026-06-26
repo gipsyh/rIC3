@@ -376,29 +376,12 @@ struct MemoryStats {
 }
 
 fn memory_stats() -> Option<MemoryStats> {
-    #[cfg(target_os = "linux")]
-    {
-        let status = std::fs::read_to_string("/proc/self/status").ok()?;
-        let mut rss_kib = None;
-
-        for line in status.lines() {
-            if let Some(value) = line.strip_prefix("VmRSS:") {
-                rss_kib = parse_status_kib(value);
-            }
-        }
-
-        let rss_kib = rss_kib?;
-        Some(MemoryStats { rss_kib })
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        None
-    }
-}
-
-fn parse_status_kib(value: &str) -> Option<u64> {
-    value.split_whitespace().next()?.parse().ok()
+    let stats = memory_stats::memory_stats()?;
+    // `physical_mem` is the resident set size in bytes; convert to KiB to match
+    // the units expected by `format_kib`.
+    let rss_kib = stats.physical_mem / 1024;
+    let rss_kib = u64::try_from(rss_kib).unwrap_or(u64::MAX);
+    Some(MemoryStats { rss_kib })
 }
 
 fn memory_status_groups(stats: MemoryStats) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
