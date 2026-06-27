@@ -1,3 +1,4 @@
+use giputils::grc::Grc;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -25,7 +26,7 @@ impl CIllKind {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         assert!(!ts.has_gate_init());
-        let mut uts = TransysUnroll::new(&ts);
+        let mut uts = TransysUnroll::new(&Grc::new(ts));
         uts.enable_simple_path();
         let solver: Box<dyn Satif> = Box::new(kissat::Kissat::new());
         Self {

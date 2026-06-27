@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::TerminateCtrl;
+use giputils::{TerminateCtrl, grc::Grc};
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
@@ -109,7 +109,7 @@ impl Kind {
             // keep bad literals
             ts.compress_bads();
         }
-        let mut uts = TransysUnroll::new(&ts);
+        let mut uts = TransysUnroll::new(&Grc::new(ts));
         if cfg.simple_path {
             uts.enable_simple_path();
         }

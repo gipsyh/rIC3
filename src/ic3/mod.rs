@@ -165,7 +165,7 @@ impl IC3Config {
 
 pub struct IC3 {
     cfg: IC3Config,
-    ts: Transys,
+    ts: Grc<Transys>,
     #[allow(unused)]
     symbols: VarSymbols,
     tsctx: Grc<TransysCtx>,
@@ -245,7 +245,7 @@ impl IC3 {
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
-        let mut uts = TransysUnroll::new(&ts);
+        let mut uts = TransysUnroll::new(&Grc::new(ts.clone()));
         uts.unroll();
         let ts_top_lv = ts.rel.level();
         if cfg.inn {
@@ -254,6 +254,7 @@ impl IC3 {
         let predprop = cfg
             .pred_prop
             .then(|| PredProp::new(uts, cfg.local_proof.then(|| cfg.prop.unwrap())));
+        let ts = Grc::new(ts);
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);

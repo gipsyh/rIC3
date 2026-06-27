@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::TerminateCtrl;
+use giputils::{TerminateCtrl, grc::Grc};
 use log::info;
 use logicrs::{LitVec, satif::Satif};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
@@ -91,6 +91,7 @@ impl BMC {
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
+        let ts = Grc::new(ts);
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if cfg.kissat {
             Box::new(kissat::Kissat::new())

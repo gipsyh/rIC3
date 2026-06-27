@@ -1,12 +1,12 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::BlCex;
-use giputils::hash::GHashMap;
+use giputils::{grc::Grc, hash::GHashMap};
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct TransysUnroll<T: TransysIf> {
-    pub ts: T,
+    pub ts: Grc<T>,
     pub num_unroll: usize,
     pub max_var: Var,
     next_map: LitMap<Vec<Lit>>,
@@ -26,10 +26,7 @@ impl<T: TransysIf> Deref for TransysUnroll<T> {
 }
 
 impl<T: TransysIf> TransysUnroll<T> {
-    pub fn new(ts: &T) -> Self
-    where
-        T: Clone,
-    {
+    pub fn new(ts: &Grc<T>) -> Self {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
         next_map.reserve(ts.max_var());
         for v in VarRange::new_inclusive(Var::CONST, ts.max_var()) {
@@ -256,7 +253,7 @@ impl<T: TransysIf> TransysUnroll<T> {
 impl TransysUnroll<Transys> {
     pub fn compile(&self) -> Transys {
         if self.num_unroll == 0 {
-            return self.ts.clone();
+            return self.ts.deref().clone();
         }
         let mut input = Vec::new();
         let mut constraint = LitVec::new();
