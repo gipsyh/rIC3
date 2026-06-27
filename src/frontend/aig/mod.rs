@@ -117,7 +117,6 @@ fn aig_symbols(aig: &Aig) -> VarSymbols {
 }
 
 pub struct AigFrontend {
-    ots: Transys,
     ts: Transys,
     ts_symbols: VarSymbols,
 }
@@ -152,18 +151,13 @@ impl AigFrontend {
             warn!("fairness constraints are ignored when solving the safety property");
             aig.fairness.clear();
         }
-        let ots = Transys::from_aig(&aig, true);
         let ts_symbols = aig_symbols(&aig);
         let ts = Transys::from_aig(&aig, true);
-        Self {
-            ots,
-            ts,
-            ts_symbols,
-        }
+        Self { ts, ts_symbols }
     }
 
     pub fn is_safety(&self) -> bool {
-        if !self.ots.bad.is_empty() {
+        if !self.ts.bad.is_empty() {
             true
         } else {
             assert!(!self.ts.justice.is_empty());
@@ -178,7 +172,7 @@ impl Frontend for AigFrontend {
     }
 
     fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
-        let leaf: GHashSet<Var> = self.ots.input().chain(self.ots.latch()).collect();
+        let leaf: GHashSet<Var> = self.ts.input().chain(self.ts.latch()).collect();
         match cert {
             McBlCertificate::UNSAT(proof) => {
                 if !self.is_safety() {
@@ -211,7 +205,7 @@ impl Frontend for AigFrontend {
                 } else {
                     res.push("j0".to_string());
                 }
-                cex.exact_init_state(&self.ots);
+                cex.exact_init_state(&self.ts);
                 let mut line = String::new();
                 let mut lbstate = Vec::new();
                 for l in cex.state[0].iter() {
@@ -229,7 +223,7 @@ impl Frontend for AigFrontend {
                         GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
                     let mut line = String::new();
                     let mut input = Vec::new();
-                    for l in self.ots.input.iter() {
+                    for l in self.ts.input.iter() {
                         let r = if let Some(r) = map.get(l) { *r } else { true };
                         line.push(if r { '1' } else { '0' });
                         input.push(Lbool::from(r));
