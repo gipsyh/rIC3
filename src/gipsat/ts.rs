@@ -2,7 +2,7 @@ use crate::{
     gipsat::{DagCnfSolver, SolverStatistic},
     transys::{TransysCtx, TransysIf},
 };
-use giputils::grc::Grc;
+use giputils::ptr::Grc;
 use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 #[derive(Clone)]

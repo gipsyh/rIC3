@@ -1,6 +1,6 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::BlCex;
-use giputils::{grc::Grc, hash::GHashMap};
+use giputils::{hash::GHashMap, ptr::Grc};
 use logicrs::{Lit, LitMap, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use std::ops::Deref;
 

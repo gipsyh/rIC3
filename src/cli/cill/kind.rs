@@ -1,4 +1,4 @@
-use giputils::grc::Grc;
+use giputils::ptr::Grc;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
     BlEngine, Engine, McResult,

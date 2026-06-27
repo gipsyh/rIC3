@@ -5,8 +5,8 @@ use crate::{
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
 use giputils::{
-    grc::Grc,
     hash::{GHashMap, GHashSet},
+    ptr::Grc,
 };
 use log::{debug, info};
 use logicrs::{LitVec, Var, satif::Satif};

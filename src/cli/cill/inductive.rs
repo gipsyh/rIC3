@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::{grc::Grc, logger::with_log_level};
+use giputils::{logger::with_log_level, ptr::Grc};
 use log::LevelFilter;
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{

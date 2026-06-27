@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::{TerminateCtrl, grc::Grc};
+use giputils::{TerminateCtrl, ptr::Grc};
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};

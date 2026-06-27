@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::{TerminateCtrl, grc::Grc};
+use giputils::{TerminateCtrl, ptr::Grc};
 use log::info;
 use logicrs::{LitVec, satif::Satif};
 use rand::{RngExt, SeedableRng, rngs::StdRng};

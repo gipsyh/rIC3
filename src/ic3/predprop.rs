@@ -3,7 +3,7 @@ use crate::{
     ic3::{IC3, proofoblig::ProofObligation},
     transys::{Transys, lift::TsLift, unroll::TransysUnroll},
 };
-use giputils::grc::Grc;
+use giputils::ptr::Grc;
 use log::info;
 use logicrs::{Lit, LitOrdVec, LitVec, satif::Satif};
 use rand::seq::SliceRandom;

@@ -1,5 +1,5 @@
 use crate::{ic3::IC3, transys::TransysIf};
-use giputils::{grc::Grc, hash::GHashSet};
+use giputils::{hash::GHashSet, ptr::Grc};
 use logicrs::{DagCnf, Var};
 
 impl IC3 {

@@ -14,7 +14,7 @@ use crate::{
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
 use frame::Frames;
-use giputils::{TerminateCtrl, grc::Grc, logger::IntervalLogger};
+use giputils::{TerminateCtrl, logger::IntervalLogger, ptr::Grc};
 use log::{Level, debug, error, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarMap, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};

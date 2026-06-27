@@ -2,7 +2,7 @@ use crate::{
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
-use giputils::{grc::Grc, hash::GHashMap};
+use giputils::{hash::GHashMap, ptr::Grc};
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
