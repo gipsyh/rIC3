@@ -4,9 +4,9 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
-use giputils::hash::GHashMap;
+use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, error, warn};
-use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols, VarVMap};
+use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols};
 use std::{fmt::Display, path::Path, process::Command};
 
 impl From<&Transys> for Aig {
@@ -96,12 +96,6 @@ impl Transys {
     }
 }
 
-fn aig_preprocess(aig: &Aig) -> (Aig, VarVMap) {
-    let (mut aig, restore) = aig.coi_refine();
-    aig.constraints.retain(|e| !e.is_constant(true));
-    (aig, restore)
-}
-
 fn aig_symbols(aig: &Aig) -> VarSymbols {
     let mut symbol = VarSymbols::new();
     for &x in aig.inputs.iter().chain(aig.latchs.iter().map(|l| &l.input)) {
@@ -127,7 +121,6 @@ pub struct AigFrontend {
     ots: Transys,
     ts: Transys,
     ts_symbols: VarSymbols,
-    rst: VarVMap,
 }
 
 impl AigFrontend {
@@ -161,17 +154,13 @@ impl AigFrontend {
             aig.fairness.clear();
         }
         let ots = Transys::from_aig(&aig, true);
-        let osymbols = aig_symbols(&aig);
-        let (aig, rst) = aig_preprocess(&aig);
-        let inv_rst = rst.inverse();
-        let ts_symbols = osymbols.map_var(inv_rst.try_map_fn());
+        let ts_symbols = aig_symbols(&aig);
         let ts = Transys::from_aig(&aig, true);
         Self {
             oaig,
             ots,
             ts,
             ts_symbols,
-            rst,
         }
     }
 
@@ -191,6 +180,7 @@ impl Frontend for AigFrontend {
     }
 
     fn bl_certificate(&mut self, cert: McBlCertificate) -> Box<dyn Display> {
+        let leaf: GHashSet<Var> = self.ots.input().chain(self.ots.latch()).collect();
         match cert {
             McBlCertificate::UNSAT(proof) => {
                 if !self.is_safety() {
@@ -203,20 +193,20 @@ impl Frontend for AigFrontend {
                 certifaiger = certifaiger.reencode();
                 certifaiger.symbols.clear();
                 for (i, v) in proof.proof.input().enumerate() {
-                    if let Some(r) = self.rst.get(&v) {
-                        certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (**r) * 2));
+                    if leaf.contains(&v) {
+                        certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (*v) * 2));
                     }
                 }
                 for (i, v) in proof.proof.latch().enumerate() {
-                    if let Some(r) = self.rst.get(&v) {
+                    if leaf.contains(&v) {
                         certifaiger
-                            .set_symbol(certifaiger.latchs[i].input, &format!("= {}", (**r) * 2));
+                            .set_symbol(certifaiger.latchs[i].input, &format!("= {}", (*v) * 2));
                     }
                 }
                 Box::new(certifaiger)
             }
             McBlCertificate::SAT(bl_cex) => {
-                let mut cex = bl_cex.filter_map_var(|v: Var| self.rst.get(&v).copied());
+                let mut cex = bl_cex.filter(|v| leaf.contains(&v.var()));
                 let mut res = vec!["1".to_string()];
                 if self.is_safety() {
                     res.push(format!("b{}", bl_cex.bad_id));

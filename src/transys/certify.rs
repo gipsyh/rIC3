@@ -56,6 +56,16 @@ impl BlCex {
         }
     }
 
+    pub fn filter(&self, f: impl Fn(Lit) -> bool) -> Self {
+        let input = self.input.iter().map(|w| w.filter(&f)).collect();
+        let state = self.state.iter().map(|w| w.filter(&f)).collect();
+        Self {
+            input,
+            state,
+            bad_id: self.bad_id,
+        }
+    }
+
     pub fn filter_map(&self, f: impl Fn(Lit) -> Option<Lit>) -> Self {
         let input = self.input.iter().map(|w| w.filter_map(&f)).collect();
         let state = self.state.iter().map(|w| w.filter_map(&f)).collect();
