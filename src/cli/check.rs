@@ -91,12 +91,13 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         drop(tmp_cert);
         return Ok(());
     }
+
+    let tui = chk.ui.then(|| UiRenderer::new(cfg.as_ref())).flatten();
     let mut frontend = frontend_from_model(&chk.model)?;
     let res = if cfg.is_wl() {
         let (wts, _symbols) = frontend.wts();
         let mut engine = create_wl_engine(cfg.clone(), wts);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        let tui = chk.ui.then(|| UiRenderer::new(cfg.as_ref())).flatten();
         if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
@@ -121,7 +122,6 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         info!("origin ts has {}", ts.statistic());
         let mut engine = create_bl_engine(cfg.clone(), ts, symbols);
         engine.add_tracer(Box::new(LogTracer::new(cfg.as_ref())));
-        let tui = chk.ui.then(|| UiRenderer::new(cfg.as_ref())).flatten();
         if let Some(tui) = tui.clone() {
             engine.add_tracer(Box::new(tui.clone()));
             engine.set_ui(tui);
