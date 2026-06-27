@@ -234,6 +234,27 @@ impl Transys {
         let bad = take(&mut self.bad);
         self.bad = LitVec::from(self.rel.new_or(bad));
     }
+
+    /// Estimate the heap memory (in bytes) held by this transition system,
+    /// based on the allocated capacities of the underlying containers. The
+    /// dominant component is `rel` (the `DagCnf` relation); the rest covers the
+    /// input/latch vectors, the next/init maps, and the bad/constraint lits.
+    /// The stack footprint of the struct itself is not included.
+    pub fn mem_usage(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += self.input.capacity() * std::mem::size_of::<Var>();
+        bytes += self.latch.capacity() * std::mem::size_of::<Var>();
+        // `GHashMap` wraps `std::HashMap`; `capacity()` is the number of slots
+        // allocated. Each slot holds a `(Var, Lit)` entry plus a control byte.
+        bytes +=
+            self.next.capacity() * (std::mem::size_of::<Var>() + std::mem::size_of::<Lit>() + 1);
+        bytes +=
+            self.init.capacity() * (std::mem::size_of::<Var>() + std::mem::size_of::<Lit>() + 1);
+        bytes += self.bad.capacity() * std::mem::size_of::<Lit>();
+        bytes += self.constraint.capacity() * std::mem::size_of::<Lit>();
+        bytes += self.rel.mem_usage();
+        bytes
+    }
 }
 
 impl Display for Transys {

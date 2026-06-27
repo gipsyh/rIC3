@@ -273,12 +273,10 @@ impl UfAbstractor {
 }
 
 fn should_abstract(op: FolOp) -> bool {
-    op == FolOp::Mul
-        || op == FolOp::Udiv
-        || op == FolOp::Urem
-        || op == FolOp::Sdiv
-        || op == FolOp::Srem
-        || op == FolOp::Smod
+    matches!(
+        op,
+        FolOp::Mul | FolOp::Udiv | FolOp::Urem | FolOp::Sdiv | FolOp::Srem | FolOp::Smod
+    )
 }
 
 fn same_signature(lhs: &UfApp, rhs: &UfApp) -> bool {

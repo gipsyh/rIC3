@@ -64,11 +64,7 @@ impl BitOr for McResult {
             (UNSAT, _) | (_, UNSAT) => UNSAT,
             (SAT(a), SAT(b)) => SAT(a.max(b)),
             (SAT(a), Unknown(_)) | (Unknown(_), SAT(a)) => SAT(a),
-            (Unknown(a), Unknown(b)) => Unknown(match (a, b) {
-                (Some(x), Some(y)) => Some(x.max(y)),
-                (Some(x), None) | (None, Some(x)) => Some(x),
-                (None, None) => None,
-            }),
+            (Unknown(a), Unknown(b)) => Unknown(a.max(b)),
         }
     }
 }

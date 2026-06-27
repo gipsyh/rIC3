@@ -127,8 +127,8 @@ impl Activity {
         let act = unsafe { &mut *(self as *mut Activity) };
         if self.bucket_heap.pos[var].is_none() {
             self.bucket_heap.push(var, act);
-            let b = self.bucket_table.len() - 1;
-            let b = size_of_val(&b) as u32 * 8 - b.leading_zeros();
+            let last = self.bucket_table.len() - 1;
+            let b = usize::BITS - last.leading_zeros();
             *self.bucket_table.last_mut().unwrap() = b;
             self.bucket_table.push(b + 1);
         }

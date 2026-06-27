@@ -90,7 +90,7 @@ impl PolyNexus {
             tracer: Tracer::new(),
             ctrl: Arc::new(EngineCtrl::new()),
             results,
-            certs: (0..num_props).map(|_| None).collect(),
+            certs: vec![None; num_props],
         }
     }
 

@@ -18,6 +18,8 @@ const STATE_WIDTH: usize = 10;
 const BOUND_WIDTH: usize = 10;
 const TIME_WIDTH: usize = 10;
 const COLUMN_GAPS: usize = 4;
+/// Width reserved for the id/state/bound/time columns, their gaps, and table borders.
+const RESERVED_NON_PROP_WIDTH: usize = 42;
 const MIN_PROPERTY_WIDTH: usize = 1;
 const DEFAULT_PLAIN_WIDTH: usize = 80;
 
@@ -236,7 +238,7 @@ impl Drop for RunTerminal {
 fn draw_run_table(f: &mut Frame<'_>, props: &[PropMcState], tick: usize) {
     let size = f.area();
     let term_width = size.width as usize;
-    let prop_width = term_width.saturating_sub(42).max(1);
+    let prop_width = term_width.saturating_sub(RESERVED_NON_PROP_WIDTH).max(1);
     let mut table_area = size;
     table_area.height = table_area.height.saturating_sub(1);
 

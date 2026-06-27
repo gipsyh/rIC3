@@ -80,7 +80,7 @@ impl<T: TransysIf> TransysUnroll<T> {
         assert!(self.num_unroll == 0);
         let mut rel = LitVvec::new();
         for c in self.ts.constraint() {
-            let cc = self.opt.get(&c.var()).copied().unwrap_or({
+            let cc = self.opt.get(&c.var()).copied().unwrap_or_else(|| {
                 self.max_var += 1;
                 self.opt.insert(c.var(), self.max_var);
                 self.max_var

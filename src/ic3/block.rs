@@ -1,5 +1,6 @@
 use crate::ic3::{
     IC3,
+    mab::branch_act,
     mic::{DropVarParameter, MicType},
     proofoblig::ProofObligation,
 };
@@ -100,11 +101,10 @@ impl IC3 {
                     self.add_obligation(po.clone());
                     if self.check_cex_by_bmc(po.depth) {
                         return BlockResult::Failure(po.depth);
-                    } else {
-                        self.obligations.clear();
-                        self.frame.clear_po();
-                        continue;
                     }
+                    self.obligations.clear();
+                    self.frame.clear_po();
+                    continue;
                 } else if po.frame > 0 {
                     let lemma = po.state.as_litvec();
                     debug_assert!(!self.solvers[0].solve(lemma));
@@ -135,16 +135,7 @@ impl IC3 {
                 let mic_type = if self.cfg.mab {
                     self.mab_choose_mic_type(&po)
                 } else if self.cfg.dynamic {
-                    if let Some(mut n) = po.next.as_mut() {
-                        let mut act = n.act;
-                        for _ in 0..2 {
-                            if let Some(nn) = n.next.as_mut() {
-                                n = nn;
-                                act = act.max(n.act);
-                            } else {
-                                break;
-                            }
-                        }
+                    if let Some(act) = branch_act(&po) {
                         const CTG_THRESHOLD: f64 = 10.0;
                         const EXCTG_THRESHOLD: f64 = 40.0;
                         let (limit, max, level) = match act {
@@ -158,7 +149,7 @@ impl IC3 {
                                 (1, max, 1)
                             }
                             ..CTG_THRESHOLD => (0, 0, 0),
-                            _ => panic!(),
+                            _ => panic!("unreachable activity range (act={act}), possibly NaN"),
                         };
                         let p = DropVarParameter::new(limit, max, level);
                         MicType::DropVar(p)

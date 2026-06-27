@@ -6,7 +6,8 @@ use logicrs::fol::{TermManager, set_term_mgr, term_gc, term_mgr};
 use rIC3::{
     McResult,
     config::EngineConfig,
-    wltransys::{WlTransys, symbol::WlTsSymbol},
+    transys::Transys,
+    wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -172,6 +173,25 @@ impl Ric3Proj {
         let wsym: WlTsSymbol = self.load_serde_obj(path.as_ref().join("wsym.ron"))?;
         term_mgr().disable_id_map();
         Ok((wts, wsym))
+    }
+
+    /// wts: Option<BitblastMap, Path link of wts>
+    pub fn save_ts(
+        &self,
+        ts: &Transys,
+        wts: Option<(&BitblastMap, impl AsRef<Path>)>,
+        path: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let path = path.as_ref();
+        recreate_dir(&self.path(path))?;
+        self.save_serde_obj(&ts, path.join("ts.ron"))?;
+        if let Some((bbmap, wts_path)) = wts {
+            let wts_path = wts_path.as_ref();
+            let wtsln_path = self.path(path.join("wtsln"));
+            fs::write(&wtsln_path, wts_path.to_string_lossy().as_bytes())?;
+            self.save_serde_obj(bbmap, path.join("bbmap.ron"))?;
+        }
+        Ok(())
     }
 }
 

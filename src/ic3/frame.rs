@@ -211,19 +211,21 @@ impl Frames {
 
     #[inline]
     pub fn statistic(&self, compact: bool) -> String {
+        const COMPACT_FRAME_LIMIT: usize = 50;
         let mut s = String::new();
         let total = self.frames.len() + 1;
-        s.write_fmt(format_args!("frames [{total}]: ")).unwrap();
-        let frames_iter: Box<dyn Iterator<Item = &Frame>> = if compact && total > 50 {
-            s.push_str("... ");
-            Box::new(self.frames.iter().skip(total - 50))
-        } else {
-            Box::new(self.frames.iter())
-        };
+        write!(s, "frames [{total}]: ").unwrap();
+        let frames_iter: Box<dyn Iterator<Item = &Frame>> =
+            if compact && total > COMPACT_FRAME_LIMIT {
+                s.push_str("... ");
+                Box::new(self.frames.iter().skip(total - COMPACT_FRAME_LIMIT))
+            } else {
+                Box::new(self.frames.iter())
+            };
         for f in frames_iter {
-            s.write_fmt(format_args!("{} ", f.len())).unwrap();
+            write!(s, "{} ", f.len()).unwrap();
         }
-        s.write_fmt(format_args!("{} ", self.inf.len())).unwrap();
+        write!(s, "{} ", self.inf.len()).unwrap();
         s
     }
 }
@@ -248,7 +250,7 @@ impl IC3 {
     ) -> bool {
         let lemma = LitOrdVec::new(lemma);
         if frame == 0 {
-            assert!(self.frame.len() == 1);
+            assert_eq!(self.frame.len(), 1);
             if self.level() == frame
                 && let Some(predprop) = self.predprop.as_mut()
             {
@@ -326,7 +328,7 @@ impl IC3 {
         let lastf = self.frame.frames.last_mut().unwrap();
         let olen = lastf.len();
         lastf.retain(|l| !l.eq(&lemma));
-        assert!(lastf.len() + 1 == olen);
+        assert_eq!(lastf.len() + 1, olen);
         let clause = !lemma.as_litvec();
         self.inf_solver.add_clause(&clause);
         self.frame.inf.push(FrameLemma::new(lemma, None, None));
@@ -355,24 +357,4 @@ impl IC3 {
                 .collect()
         }
     }
-
-    // pub fn remove_lemma(&mut self, frame: usize, lemmas: Vec<LitVec>) {
-    //     let lemmas: GHashSet<LitOrdVec> = GHashSet::from_iter(lemmas.into_iter().map(LitOrdVec::new));
-    //     for i in (1..=frame).rev() {
-    //         let mut j = 0;
-    //         while j < self.frame[i].len() {
-    //             if let Some(po) = &mut self.frame[i][j].po {
-    //                 po.removed = true;
-    //             }
-    //             if lemmas.contains(&self.frame[i][j]) {
-    //                 for s in self.solvers[..=frame].iter_mut() {
-    //                     s.remove_lemma(&self.frame[i][j]);
-    //                 }
-    //                 self.frame[i].swap_remove(j);
-    //             } else {
-    //                 j += 1;
-    //             }
-    //         }
-    //     }
-    // }
 }

@@ -130,7 +130,7 @@ impl Transys {
             ts.coi_refine(&mut rst);
             if cfg.bve {
                 let frozens = ts.frozens();
-                ts.rel = self.rel.simplify(frozens.iter().copied());
+                ts.rel = ts.rel.simplify(frozens.iter().copied());
                 ts.coi_refine(&mut rst);
             }
             ts.constraint.retain(|l| !l.is_constant(true));

@@ -185,12 +185,8 @@ impl BlProof {
     }
 
     pub fn merge(&mut self, other: &Self, ts: &Transys) {
-        self.proof.merge(
-            &other.proof,
-            |v| {
-                if v <= ts.max_var() { Some(v) } else { None }
-            },
-        );
+        self.proof
+            .merge(&other.proof, |v| (v <= ts.max_var()).then_some(v));
     }
 }
 

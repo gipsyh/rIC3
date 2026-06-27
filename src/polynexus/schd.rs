@@ -18,15 +18,9 @@ impl Scheduler {
     }
 
     pub fn pick(&mut self) -> Option<(usize, IC3Config)> {
-        let mut best = None;
-        let mut min_preset = self.configs.len();
-        for p in 0..self.num_props {
-            if !self.resolved[p] && self.config_counter[p] < min_preset {
-                min_preset = self.config_counter[p];
-                best = Some(p);
-            }
-        }
-        let prop = best?;
+        let prop = (0..self.num_props)
+            .filter(|&p| !self.resolved[p])
+            .min_by_key(|&p| self.config_counter[p])?;
         let idx = self.config_counter[prop];
         self.config_counter[prop] += 1;
         let num_configs = self.configs.len();
@@ -40,12 +34,10 @@ impl Scheduler {
     }
 
     pub fn resolve(&mut self, prop: usize) {
-        if !self.resolved[prop] {
-            self.resolved[prop] = true;
-        }
+        self.resolved[prop] = true;
     }
 
     pub fn all_resolved(&self) -> bool {
-        self.resolved.iter().all(|x| *x)
+        self.resolved.iter().all(|&x| x)
     }
 }
