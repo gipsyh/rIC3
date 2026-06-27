@@ -251,7 +251,7 @@ impl IC3 {
         }
         let predprop = cfg
             .pred_prop
-            .then(|| PredProp::new(uts.clone(), cfg.local_proof.then(|| cfg.prop.unwrap())));
+            .then(|| PredProp::new(uts, cfg.local_proof.then(|| cfg.prop.unwrap())));
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
         let frame = Frames::new(&tsctx);

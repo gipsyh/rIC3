@@ -117,7 +117,6 @@ fn aig_symbols(aig: &Aig) -> VarSymbols {
 }
 
 pub struct AigFrontend {
-    oaig: Aig,
     ots: Transys,
     ts: Transys,
     ts_symbols: VarSymbols,
@@ -157,7 +156,6 @@ impl AigFrontend {
         let ts_symbols = aig_symbols(&aig);
         let ts = Transys::from_aig(&aig, true);
         Self {
-            oaig,
             ots,
             ts,
             ts_symbols,
@@ -165,7 +163,7 @@ impl AigFrontend {
     }
 
     pub fn is_safety(&self) -> bool {
-        if !self.oaig.bads.is_empty() {
+        if !self.ots.bad.is_empty() {
             true
         } else {
             assert!(!self.ts.justice.is_empty());
@@ -231,12 +229,8 @@ impl Frontend for AigFrontend {
                         GHashMap::from_iter(c.iter().map(|l| (l.var(), l.polarity())));
                     let mut line = String::new();
                     let mut input = Vec::new();
-                    for l in self.oaig.inputs.iter() {
-                        let r = if let Some(r) = map.get(&Var::new(*l)) {
-                            *r
-                        } else {
-                            true
-                        };
+                    for l in self.ots.input.iter() {
+                        let r = if let Some(r) = map.get(l) { *r } else { true };
                         line.push(if r { '1' } else { '0' });
                         input.push(Lbool::from(r));
                     }
