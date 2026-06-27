@@ -81,7 +81,7 @@ impl DerefMut for Domain {
 impl DagCnfSolver {
     #[inline]
     pub fn add_domain(&mut self, var: Var, deps: bool) {
-        assert!(self.highest_level() == 0);
+        assert_eq!(self.highest_level(), 0);
         if !self.value.v(var.lit()).is_none() {
             return;
         }
@@ -125,7 +125,7 @@ impl DagCnfSolver {
 
     #[inline]
     pub fn push_to_vsids(&mut self) {
-        assert!(self.highest_level() == 0);
+        assert_eq!(self.highest_level(), 0);
         let mut now = 0;
         while now < self.domain.fixed {
             let d = self.domain.domain[now];

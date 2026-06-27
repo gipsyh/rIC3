@@ -135,13 +135,12 @@ impl Ric3Config {
     }
 
     fn reset(&self) -> Option<(String, bool)> {
-        let reset = self.dut.reset.clone()?;
-        Some(if reset.starts_with("!") {
-            let reset = reset.strip_prefix("!").unwrap();
-            (reset.to_string(), false)
-        } else {
-            (reset.to_string(), true)
-        })
+        let reset = self.dut.reset.as_ref()?;
+        let (reset, polarity) = match reset.strip_prefix('!') {
+            Some(r) => (r.to_owned(), false),
+            None => (reset.to_owned(), true),
+        };
+        Some((reset, polarity))
     }
 }
 

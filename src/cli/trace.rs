@@ -36,6 +36,7 @@ use std::{
 const SIGNAL_IRRELEVANT: &str = "<IRRELEVANT>";
 const TRACE_EXPR_MODULE: &str = "__ric3_trace_expr";
 const TRACE_EXPR_PREFIX: &str = "__ric3_trace_expr_";
+const MAX_SIGNAL_RESULTS: usize = 50;
 
 impl Ric3Proj {
     pub fn clear_trace(&self) -> anyhow::Result<()> {
@@ -88,12 +89,13 @@ fn search_signals(_cex: &WlCex, sym: &WlTsSymbol, pattern: &str) -> anyhow::Resu
     let mut targets: Vec<_> = sym.symbols().cloned().collect();
     targets.retain(|signal| regex.is_match(signal));
 
-    if targets.len() > 50 {
+    if targets.len() > MAX_SIGNAL_RESULTS {
         let mut out = vec![format!(
-            "Too many signals matched ({}), only showing first 50.",
-            targets.len()
+            "Too many signals matched ({}), only showing first {}.",
+            targets.len(),
+            MAX_SIGNAL_RESULTS
         )];
-        out.extend(targets.into_iter().take(50));
+        out.extend(targets.into_iter().take(MAX_SIGNAL_RESULTS));
         Ok(out)
     } else {
         Ok(targets)
@@ -195,7 +197,7 @@ fn write_trace_observer(
         "bind {} {} {} (.*);\n",
         &rcfg.dut.top, TRACE_EXPR_MODULE, TRACE_EXPR_MODULE
     ));
-    let content = format!("{}", module);
+    let content = module.to_string();
     fs::write(out_path.as_ref(), content)?;
     Ok(observer_symbols)
 }

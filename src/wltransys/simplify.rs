@@ -196,7 +196,7 @@ impl WlTsSimpPass for CoiPass {
                 queue.push(l.clone());
             }
         }
-        let mut touch: GHashSet<Term> = GHashSet::from_iter(queue.iter().cloned());
+        let mut touch: GHashSet<Term> = queue.iter().cloned().collect();
         while let Some(t) = queue.pop() {
             match &t.deref() {
                 TermType::Const(_) => (),
@@ -216,16 +216,8 @@ impl WlTsSimpPass for CoiPass {
                 }
             };
         }
-        for x in take(&mut wts.input) {
-            if touch.contains(&x) {
-                wts.input.push(x);
-            }
-        }
-        for x in take(&mut wts.latch) {
-            if touch.contains(&x) {
-                wts.latch.push(x);
-            }
-        }
+        wts.input.retain(|x| touch.contains(x));
+        wts.latch.retain(|x| touch.contains(x));
         wts.init.retain(|k, _| touch.contains(k));
         wts.next.retain(|k, _| touch.contains(k));
         Some(WlKeepTf::new(touch))

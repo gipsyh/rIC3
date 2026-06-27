@@ -327,7 +327,7 @@ impl BlEngine for Kind {
         }
         bads.push(!aux_latchs[0]);
         proof.bad = LitVec::from(proof.rel.new_or(bads));
-        assert!(proof.input.len() + proof.latch.len() == sum + k);
+        assert_eq!(proof.input.len() + proof.latch.len(), sum + k);
         BlProof { proof }
     }
 

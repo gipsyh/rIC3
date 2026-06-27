@@ -64,9 +64,8 @@ pub(crate) struct PropMcState {
 
 impl PropMcState {
     pub(crate) fn default_from_wts(wts: &WlTransys, symbols: &WlTsSymbol) -> Vec<Self> {
-        let mut mc = Vec::new();
-        for id in 0..wts.bad.len() {
-            mc.push(PropMcState {
+        (0..wts.bad.len())
+            .map(|id| PropMcState {
                 id,
                 prop: PropMcInfo {
                     name: symbols.prop[id].clone(),
@@ -76,9 +75,8 @@ impl PropMcState {
                 state: McStatus::Wait,
                 start_time: None,
                 time: Duration::ZERO,
-            });
-        }
-        mc
+            })
+            .collect()
     }
 
     pub(crate) fn from_cached_res(
@@ -269,7 +267,7 @@ impl Run {
             let prop_id = cex.bad_id;
             let cex = self.btorfe.bl_certificate(McBlCertificate::SAT(cex));
             let wit_path = self.ric3_proj.path(format!("res/p{prop_id}.wit"));
-            let wit = format!("{cex}");
+            let wit = cex.to_string();
             fs::write(&wit_path, &wit)?;
 
             let mut cex = self.btorfe.deserialize_wl_unsafe_certificate(wit);

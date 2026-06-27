@@ -210,15 +210,17 @@ impl IC3 {
             for init in self.tsctx.init.clone() {
                 self.add_lemma(0, !init, true, None);
             }
-            let mut init = LitVec::new();
-            for l in self.tsctx.latch.iter() {
-                if self.tsctx.init_map[*l].is_none()
-                    && let Some(v) = self.solvers[0].sat_value(l.lit())
-                {
-                    let l = l.lit().not_if(!v);
-                    init.push(l);
-                }
-            }
+            let init: LitVec = self
+                .tsctx
+                .latch
+                .iter()
+                .filter(|l| self.tsctx.init_map[**l].is_none())
+                .filter_map(|l| {
+                    self.solvers[0]
+                        .sat_value(l.lit())
+                        .map(|v| l.lit().not_if(!v))
+                })
+                .collect();
             for i in init {
                 self.ts.add_init(i.var(), Lit::constant(i.polarity()));
                 self.tsctx.add_init(i.var(), Lit::constant(i.polarity()));
@@ -307,26 +309,21 @@ impl Engine for IC3 {
             let start = Instant::now();
             debug!("blocking phase begin");
             loop {
-                match self.block(None) {
-                    BlockResult::Failure(depth) => {
-                        self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_state(None, McResult::SAT(depth));
-                        self.finish_progress(McResult::SAT(depth));
-                        return McResult::SAT(depth);
-                    }
-                    BlockResult::Proved => {
-                        self.statistic.block.overall_time += start.elapsed();
-                        self.tracer.trace_state(None, McResult::UNSAT);
-                        self.finish_progress(McResult::UNSAT);
-                        return McResult::UNSAT;
-                    }
+                let terminal = match self.block(None) {
+                    BlockResult::Failure(depth) => Some(McResult::SAT(depth)),
+                    BlockResult::Proved => Some(McResult::UNSAT),
                     BlockResult::OverallTimeLimitExceeded => {
-                        self.statistic.block.overall_time += start.elapsed();
-                        let result = McResult::Unknown(Some(self.level()));
-                        self.finish_progress(result);
-                        return result;
+                        Some(McResult::Unknown(Some(self.level())))
                     }
-                    _ => (),
+                    _ => None,
+                };
+                if let Some(result) = terminal {
+                    self.statistic.block.overall_time += start.elapsed();
+                    if !matches!(result, McResult::Unknown(_)) {
+                        self.tracer.trace_state(None, result);
+                    }
+                    self.finish_progress(result);
+                    return result;
                 }
                 if let Some((bad, inputs)) = self.get_bad() {
                     debug!("bad state found in frame {}", self.level());
@@ -379,10 +376,13 @@ impl Engine for IC3 {
         }
         info!("obligations: {}", self.obligations.statistic());
         info!("{}", self.frame.statistic(false));
-        let mut statistic = SolverStatistic::default();
-        for s in self.solvers.iter() {
-            statistic += *s.statistic();
-        }
+        let statistic = self
+            .solvers
+            .iter()
+            .fold(SolverStatistic::default(), |mut acc, s| {
+                acc += *s.statistic();
+                acc
+            });
         info!("{statistic:#?}");
         info!("{:#?}", self.statistic);
     }
@@ -411,10 +411,10 @@ impl BlEngine for IC3 {
             .map(|l| LitVec::from_iter(l.iter().map(|l| self.rst.restore(*l))))
             .collect();
         invariants.extend(self.rst.eq_invariant());
-        let mut certifaiger_dnf = vec![];
-        for cube in invariants {
-            certifaiger_dnf.push(proof.rel.new_and(cube));
-        }
+        let certifaiger_dnf: Vec<_> = invariants
+            .into_iter()
+            .map(|c| proof.rel.new_and(c))
+            .collect();
         let invariants = proof.rel.new_or(certifaiger_dnf);
         let bad = proof.rel.new_or(proof.bad);
         proof.bad = LitVec::from(proof.rel.new_or([invariants, bad]));

@@ -94,12 +94,11 @@ impl DagCnfSolver {
                     debug_assert!(btl == 0);
                     self.assign(learnt[0], CREF_NONE);
                 } else {
-                    let mut kind = ClauseKind::Learnt;
-                    for l in learnt.iter() {
-                        if self.constrain_act == l.var() {
-                            kind = ClauseKind::Temporary;
-                        }
-                    }
+                    let kind = if learnt.iter().any(|l| self.constrain_act == l.var()) {
+                        ClauseKind::Temporary
+                    } else {
+                        ClauseKind::Learnt
+                    };
                     let learnt_id = self.attach_clause(&learnt, kind);
                     self.cdb.bump(learnt_id);
                     let assign = self.cdb.get(learnt_id)[0];

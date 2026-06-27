@@ -50,9 +50,6 @@ pub struct PortfolioConfig {
     /// share lemma
     #[arg(long = "share-lemma")]
     pub share_lemma: bool,
-    // /// woker memory limit in GB
-    // #[arg(long = "worker-mem-limit", default_value_t = 16)]
-    // pub wmem_limit: usize,
 }
 
 impl_config_deref!(PortfolioConfig);
@@ -266,8 +263,7 @@ impl Portfolio {
             match waitpid(None, Some(WaitPidFlag::WNOHANG)) {
                 Ok(WaitStatus::StillAlive) => break,
                 Ok(WaitStatus::Exited(pid, code)) => {
-                    let worker_idx = self.running[&pid];
-                    self.running.remove(&pid);
+                    let worker_idx = self.running.remove(&pid).unwrap();
                     if code == 0 {
                         while self.winner_idx.is_none() {
                             self.poll_state_traces();
@@ -319,7 +315,7 @@ impl Portfolio {
 impl Engine for Portfolio {
     fn check(&mut self) -> McResult {
         let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
-        for worker_idx in 0..self.engines.len() {
+        for (worker_idx, worker) in self.engines.iter_mut().enumerate() {
             let (state_tx, state_rx) = ipc::channel().unwrap();
             let (lemma_send, lemma_recv) = if self.cfg.share_lemma {
                 let (lemma_send, lemma_recv) = ipc::channel().unwrap();
@@ -327,7 +323,6 @@ impl Engine for Portfolio {
             } else {
                 (None, None)
             };
-            let worker = &mut self.engines[worker_idx];
             match fork::fork().unwrap() {
                 fork::Fork::Parent(child) => {
                     let state_trace_id = self.st_recv.add(state_rx).unwrap();

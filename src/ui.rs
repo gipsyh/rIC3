@@ -25,6 +25,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const UI_REFRESH_INTERVAL: Duration = Duration::from_millis(250);
+const SPINNER_REFRESH: Duration = Duration::from_millis(80);
 
 pub struct UiRendererInner {
     terminal: Terminal<CrosstermBackend<std::io::Stderr>>,
@@ -87,7 +88,7 @@ impl UiRendererInner {
             None
         } else {
             let now = Instant::now();
-            if now.duration_since(self.last_update) >= Duration::from_millis(80) {
+            if now.duration_since(self.last_update) >= SPINNER_REFRESH {
                 self.spinner_tick = self.spinner_tick.wrapping_add(1);
                 self.last_update = now;
             }
@@ -146,15 +147,10 @@ fn format_status_line(
     running_icon: Option<&'static str>,
     width: u16,
 ) -> Line<'static> {
-    let result_label = match result {
-        McResult::UNSAT => "UNSAT".to_string(),
-        McResult::SAT(d) => format!("SAT({d})"),
-        McResult::Unknown(_) => "UNKNOWN".to_string(),
-    };
-    let result_color = match result {
-        McResult::UNSAT => Color::Green,
-        McResult::SAT(_) => Color::Red,
-        McResult::Unknown(_) => Color::Yellow,
+    let (result_label, result_color) = match result {
+        McResult::UNSAT => ("UNSAT".to_string(), Color::Green),
+        McResult::SAT(d) => (format!("SAT({d})"), Color::Red),
+        McResult::Unknown(_) => ("UNKNOWN".to_string(), Color::Yellow),
     };
     let result_style = Style::default().fg(result_color).bold();
     let icon = if finish {

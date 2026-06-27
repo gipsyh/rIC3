@@ -160,22 +160,6 @@ impl DagCnfSolver {
         self.eqc.add_eq(x, y);
     }
 
-    // #[allow(unused)]
-    // pub fn lemmas(&mut self) -> Vec<LitOrdVec> {
-    //     self.reset();
-    //     let mut lemmas = Vec::new();
-    //     for t in self.trail.iter() {
-    //         if self.dc.is_latch(t.var()) {
-    //             lemmas.push(LitOrdVec::new(LitVec::from([!*t])));
-    //         }
-    //     }
-    //     for l in self.cdb.lemmas.iter() {
-    //         let lemma = LitVec::from_iter(self.cdb.get(*l).slice().iter().map(|l| !*l));
-    //         lemmas.push(LitOrdVec::new(lemma));
-    //     }
-    //     lemmas
-    // }
-
     fn reset(&mut self) {
         self.backtrack(0, false);
         self.clean_temporary();
@@ -248,12 +232,7 @@ impl DagCnfSolver {
             assumption = LitVec::new();
             assumption.push(self.constrain_act.lit());
             assumption.extend_from_slice(assump);
-            let mut cc = Vec::new();
-            for c in constraint.iter() {
-                for l in c.iter() {
-                    cc.push(*l);
-                }
-            }
+            let cc: Vec<Lit> = constraint.iter().flatten().copied().collect();
             if !self.new_round(
                 domain.chain(assump.iter().chain(cc.iter()).map(|l| l.var())),
                 constraint,

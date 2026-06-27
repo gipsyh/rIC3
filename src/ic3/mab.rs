@@ -105,7 +105,7 @@ impl CtxMab {
 
 /// Max activity along the successor chain of the po (up to 3 hops), used by
 /// the dynamic arms to gauge the difficulty of blocking the current CTI.
-fn branch_act(po: &ProofObligation) -> Option<f64> {
+pub(super) fn branch_act(po: &ProofObligation) -> Option<f64> {
     let mut n = po.next.as_ref()?;
     let mut act = n.act;
     for _ in 0..2 {
