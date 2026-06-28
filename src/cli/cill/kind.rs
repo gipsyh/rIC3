@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -11,7 +13,7 @@ use rIC3::{
 pub struct CIllKind {
     prop: usize,
     uts: TransysUnroll<Transys>,
-    _ts: Transys,
+    _ts: Box<Transys>,
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
@@ -25,8 +27,9 @@ impl CIllKind {
     pub fn new(prop: usize, ts: Transys, local_cst: LitVvec, wit_assume: Option<BlCex>) -> Self {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
+        let ts = Box::new(ts);
         assert!(!ts.has_gate_init());
-        let mut uts = TransysUnroll::new(&ts);
+        let mut uts = TransysUnroll::new(ts.deref());
         uts.enable_simple_path();
         let solver: Box<dyn Satif> = Box::new(kissat::Kissat::new());
         Self {

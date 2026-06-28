@@ -11,7 +11,10 @@ use giputils::TerminateCtrl;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct KindConfig {
@@ -67,7 +70,7 @@ pub struct Kind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     ots: Transys,
-    _ts: NoDepTransys,
+    _ts: Box<NoDepTransys>,
     rst: Restore,
     tracer: Tracer,
     ctrl: Arc<KindCtrl>,
@@ -110,7 +113,8 @@ impl Kind {
             // keep bad literals
             ts.compress_bads();
         }
-        let mut uts = TransysUnroll::new(&ts);
+        let ts = Box::new(ts);
+        let mut uts = TransysUnroll::new(ts.deref());
         if cfg.simple_path {
             uts.enable_simple_path();
         }

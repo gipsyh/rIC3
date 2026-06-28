@@ -13,6 +13,7 @@ use logicrs::{LitVec, satif::Satif};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use std::{
+    ops::Deref,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -50,7 +51,7 @@ impl Default for BMCConfig {
 
 pub struct BMC {
     ots: Transys,
-    _ts: NoDepTransys,
+    _ts: Box<NoDepTransys>,
     uts: TransysUnroll<NoDepTransys>,
     cfg: BMCConfig,
     solver: Box<dyn Satif>,
@@ -92,7 +93,8 @@ impl BMC {
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
-        let uts = TransysUnroll::new(&ts);
+        let ts = Box::new(ts);
+        let uts = TransysUnroll::new(ts.deref());
         let mut solver: Box<dyn Satif> = if cfg.kissat {
             Box::new(kissat::Kissat::new())
         } else {
