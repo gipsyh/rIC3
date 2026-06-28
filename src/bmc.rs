@@ -50,6 +50,7 @@ impl Default for BMCConfig {
 
 pub struct BMC {
     ots: Transys,
+    _ts: NoDepTransys,
     uts: TransysUnroll<NoDepTransys>,
     cfg: BMCConfig,
     solver: Box<dyn Satif>,
@@ -107,6 +108,7 @@ impl BMC {
         };
         Self {
             ots,
+            _ts: ts,
             uts,
             step,
             cfg,

@@ -6,15 +6,16 @@ use giputils::hash::GHashSet;
 use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub struct TsLift {
-    ts: TransysUnroll<Transys>,
+    _ts: Box<Transys>,
+    uts: TransysUnroll<Transys>,
     slv: DagCnfSolver,
 }
 
 impl TsLift {
-    pub fn new(ts: TransysUnroll<Transys>) -> Self {
-        let tsc = ts.compile();
-        let slv = DagCnfSolver::new(&tsc.rel);
-        Self { ts, slv }
+    pub fn new(uts: TransysUnroll<Transys>) -> Self {
+        let ts = Box::new(uts.compile());
+        let slv = DagCnfSolver::new(&ts.rel);
+        Self { _ts: ts, uts, slv }
     }
 
     pub fn lift(
@@ -23,7 +24,7 @@ impl TsLift {
         target: impl IntoIterator<Item = impl AsRef<Lit>>,
         order: impl FnMut(usize, &mut [Lit]) -> bool,
     ) -> (LitVec, Vec<LitVec>) {
-        self.complex_lift(satif, self.ts.latch.clone(), target, order)
+        self.complex_lift(satif, self.uts.latch.clone(), target, order)
     }
 
     pub fn complex_lift(
@@ -41,10 +42,10 @@ impl TsLift {
         let in_cls: GHashSet<Var> = GHashSet::from_iter(cls.iter().map(|l| l.var()));
         let mut inputs = Vec::new();
         let mut inputs_flatten = LitVec::new();
-        for k in 0..=self.ts.num_unroll {
+        for k in 0..=self.uts.num_unroll {
             let mut input = LitVec::new();
-            for i in self.ts.input() {
-                let lit = self.ts.lit_next(i.lit(), k);
+            for i in self.uts.input() {
+                let lit = self.uts.lit_next(i.lit(), k);
                 if let Some(v) = satif.sat_value(lit) {
                     input.push(i.lit().not_if(!v));
                     inputs_flatten.push(lit.not_if(!v));

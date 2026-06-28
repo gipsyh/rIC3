@@ -67,6 +67,7 @@ pub struct Kind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     ots: Transys,
+    _ts: NoDepTransys,
     rst: Restore,
     tracer: Tracer,
     ctrl: Arc<KindCtrl>,
@@ -122,6 +123,7 @@ impl Kind {
             slv_trans_k: 0,
             slv_bad_k: 0,
             ots,
+            _ts: ts,
             rst,
             tracer: Tracer::new(),
             ctrl: Arc::new(KindCtrl {

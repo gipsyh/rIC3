@@ -16,6 +16,7 @@ use cdb::{CREF_NONE, CRef, ClauseDB};
 use domain::Domain;
 use giputils::bitvec::BitVec;
 use giputils::gvec::Gvec;
+use giputils::ptr::Gptr;
 use logicrs::satif::Satif;
 use logicrs::{DagCnf, Lbool, VarAssign, VarRange};
 use logicrs::{Lit, LitSet, LitVec, Var, VarMap};
@@ -49,7 +50,7 @@ pub struct DagCnfSolver {
     temporary_domain: bool,
     prepared_vsids: bool,
     constrain_act: Var,
-    dc: DagCnf,
+    dc: Gptr<DagCnf>,
     trivial_unsat: bool,
     mark: LitSet,
     rng: SmallRng,
@@ -76,7 +77,7 @@ impl DagCnfSolver {
     pub fn new(dc: &DagCnf) -> Self {
         let constrain_act = Var::CONST;
         let mut solver = Self {
-            dc: dc.clone(),
+            dc: Gptr::new(dc),
             cdb: Default::default(),
             watchers: Default::default(),
             value: VarAssign::new_with(constrain_act),

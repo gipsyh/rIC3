@@ -11,6 +11,7 @@ use rIC3::{
 pub struct CIllKind {
     prop: usize,
     uts: TransysUnroll<Transys>,
+    _ts: Transys,
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
@@ -31,6 +32,7 @@ impl CIllKind {
         Self {
             prop,
             uts,
+            _ts: ts,
             solver,
             slv_trans_k: 0,
             slv_bad_k: 0,

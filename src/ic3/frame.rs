@@ -1,7 +1,7 @@
 use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::TransysCtx;
-use giputils::grc::Grc;
 use giputils::hash::GHashSet;
+use giputils::ptr::Grc;
 use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
 use std::{
     fmt::Write,

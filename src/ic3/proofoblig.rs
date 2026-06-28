@@ -1,5 +1,5 @@
 use super::IC3;
-use giputils::grc::Grc;
+use giputils::ptr::Grc;
 use log::trace;
 use logicrs::{LitOrdVec, LitVec};
 use std::cmp::Ordering;
