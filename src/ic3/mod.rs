@@ -245,15 +245,19 @@ impl IC3 {
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
-        let mut uts = TransysUnroll::new(&ts);
-        uts.unroll();
         let ts_top_lv = ts.rel.level();
+        let mut uts = None::<TransysUnroll<_>>;
         if cfg.inn {
-            ts = uts.internal_signals();
+            let mut u = TransysUnroll::new(&ts);
+            u.unroll();
+            ts = u.internal_signals();
+        } else if cfg.pred_prop {
+            uts = Some(TransysUnroll::new(&ts));
+            uts.as_mut().unwrap().unroll();
         }
         let predprop = cfg
             .pred_prop
-            .then(|| PredProp::new(uts, cfg.local_proof.then(|| cfg.prop.unwrap())));
+            .then(|| PredProp::new(uts.unwrap(), cfg.local_proof.then(|| cfg.prop.unwrap())));
         let ts = Grc::new(ts);
         let tsctx = Grc::new(ts.ctx());
         let activity = Activity::new(&tsctx);
