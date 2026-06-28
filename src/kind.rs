@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::{TerminateCtrl, ptr::Grc};
+use giputils::TerminateCtrl;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
@@ -67,6 +67,7 @@ pub struct Kind {
     slv_trans_k: usize,
     slv_bad_k: usize,
     ots: Transys,
+    _ts: NoDepTransys,
     rst: Restore,
     tracer: Tracer,
     ctrl: Arc<KindCtrl>,
@@ -109,7 +110,7 @@ impl Kind {
             // keep bad literals
             ts.compress_bads();
         }
-        let mut uts = TransysUnroll::new(&Grc::new(ts));
+        let mut uts = TransysUnroll::new(&ts);
         if cfg.simple_path {
             uts.enable_simple_path();
         }
@@ -122,6 +123,7 @@ impl Kind {
             slv_trans_k: 0,
             slv_bad_k: 0,
             ots,
+            _ts: ts,
             rst,
             tracer: Tracer::new(),
             ctrl: Arc::new(KindCtrl {

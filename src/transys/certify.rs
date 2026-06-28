@@ -2,7 +2,7 @@ use crate::{
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
-use giputils::{hash::GHashMap, ptr::Grc};
+use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -107,7 +107,7 @@ impl BlCex {
     }
 
     pub fn exact_state(&mut self, ts: &Transys, init: bool) {
-        let mut uts = TransysUnroll::new(&Grc::new(ts.clone()));
+        let mut uts = TransysUnroll::new(ts);
         uts.unroll_to(self.len() - 1);
         let mut solver = cadical::CaDiCaL::new();
         if init {

@@ -245,7 +245,7 @@ impl IC3 {
         let statistic = Statistic::default();
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
-        let mut uts = TransysUnroll::new(&Grc::new(ts.clone()));
+        let mut uts = TransysUnroll::new(&ts);
         uts.unroll();
         let ts_top_lv = ts.rel.level();
         if cfg.inn {

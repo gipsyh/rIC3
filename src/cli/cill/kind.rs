@@ -1,4 +1,3 @@
-use giputils::ptr::Grc;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
     BlEngine, Engine, McResult,
@@ -12,6 +11,7 @@ use rIC3::{
 pub struct CIllKind {
     prop: usize,
     uts: TransysUnroll<Transys>,
+    _ts: Transys,
     solver: Box<dyn Satif>,
     slv_trans_k: usize,
     slv_bad_k: usize,
@@ -26,12 +26,13 @@ impl CIllKind {
         let ots = ts.clone();
         let rst = Restore::new(&ts);
         assert!(!ts.has_gate_init());
-        let mut uts = TransysUnroll::new(&Grc::new(ts));
+        let mut uts = TransysUnroll::new(&ts);
         uts.enable_simple_path();
         let solver: Box<dyn Satif> = Box::new(kissat::Kissat::new());
         Self {
             prop,
             uts,
+            _ts: ts,
             solver,
             slv_trans_k: 0,
             slv_bad_k: 0,

@@ -7,7 +7,7 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
-use giputils::{TerminateCtrl, ptr::Grc};
+use giputils::TerminateCtrl;
 use log::info;
 use logicrs::{LitVec, satif::Satif};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
@@ -50,6 +50,7 @@ impl Default for BMCConfig {
 
 pub struct BMC {
     ots: Transys,
+    _ts: NoDepTransys,
     uts: TransysUnroll<NoDepTransys>,
     cfg: BMCConfig,
     solver: Box<dyn Satif>,
@@ -91,7 +92,6 @@ impl BMC {
         if cfg.preproc.preproc {
             ts.simplify(&mut rst);
         }
-        let ts = Grc::new(ts);
         let uts = TransysUnroll::new(&ts);
         let mut solver: Box<dyn Satif> = if cfg.kissat {
             Box::new(kissat::Kissat::new())
@@ -108,6 +108,7 @@ impl BMC {
         };
         Self {
             ots,
+            _ts: ts,
             uts,
             step,
             cfg,

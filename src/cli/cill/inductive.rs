@@ -1,6 +1,6 @@
 use crate::cli::cill::{CIll, kind::CIllKind, utils::CIllStat};
 use chrono::TimeDelta;
-use giputils::{logger::with_log_level, ptr::Grc};
+use giputils::logger::with_log_level;
 use log::LevelFilter;
 use logicrs::{LitVvec, VarSymbols};
 use rIC3::{
@@ -79,7 +79,7 @@ impl CIll {
             invariants.extend(inv);
         }
         invariants.subsume_simplify();
-        let mut uts = TransysUnroll::new(&Grc::new(self.ts.clone()));
+        let mut uts = TransysUnroll::new(&self.ts);
         uts.unroll();
         let kind_results: Vec<_> = with_log_level(LevelFilter::Error, || {
             results

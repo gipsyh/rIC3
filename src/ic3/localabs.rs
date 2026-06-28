@@ -4,10 +4,7 @@ use crate::{
     ic3::IC3Config,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
-use giputils::{
-    hash::{GHashMap, GHashSet},
-    ptr::Grc,
-};
+use giputils::hash::{GHashMap, GHashSet};
 use log::{debug, info};
 use logicrs::{LitVec, Var, satif::Satif};
 use rand::seq::SliceRandom;
@@ -23,7 +20,7 @@ pub struct LocalAbs {
 }
 
 impl LocalAbs {
-    pub fn new(ts: &Grc<Transys>, cfg: &IC3Config) -> Self {
+    pub fn new(ts: &Transys, cfg: &IC3Config) -> Self {
         let mut refine = GHashSet::new();
         refine.insert(Var::CONST);
         refine.extend(ts.bad.iter().map(|l| l.var()));
