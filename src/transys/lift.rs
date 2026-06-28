@@ -6,14 +6,14 @@ use giputils::hash::GHashSet;
 use logicrs::{Lit, LitVec, Var, satif::Satif};
 
 pub struct TsLift {
-    _ts: Transys,
+    _ts: Box<Transys>,
     uts: TransysUnroll<Transys>,
     slv: DagCnfSolver,
 }
 
 impl TsLift {
     pub fn new(uts: TransysUnroll<Transys>) -> Self {
-        let ts = uts.compile();
+        let ts = Box::new(uts.compile());
         let slv = DagCnfSolver::new(&ts.rel);
         Self { _ts: ts, uts, slv }
     }
