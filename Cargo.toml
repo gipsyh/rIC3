@@ -47,7 +47,7 @@ fork = "0.8.0"
 ipc-channel = "0.22.0"
 intertrait = "0.2.2"
 linkme = "0.2.10"
-rmcp = { version = "1.7.0", features = ["transport-io"] }
+rmcp = { version = "2.0.0", features = ["transport-io"] }
 tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
     "macros",
