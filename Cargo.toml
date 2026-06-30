@@ -46,7 +46,7 @@ rayon = "1.10.0"
 fork = "0.8.0"
 ipc-channel = "0.22.0"
 intertrait = "0.2.2"
-linkme = "0.2.10"
+linkme = "0.3.36"
 rmcp = { version = "1.7.0", features = ["transport-io"] }
 tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
