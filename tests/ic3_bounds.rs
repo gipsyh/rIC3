@@ -45,8 +45,48 @@ fn run_cli(bad: u8, args: &[&str]) -> String {
 }
 
 #[test]
+fn ic3_reports_reached_bound_without_proof() {
+    let stdout = run_cli(3, &["ic3", "--end", "2"]);
+    assert!(stdout.ends_with("UNKNOWN\n"), "{stdout}");
+    assert!(
+        stdout.contains("IC3 reached bound 2, stopping search"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("proved the property"), "{stdout}");
+    let progress: Vec<_> = stdout
+        .lines()
+        .filter_map(|line| line.split_once("IC3 found no counterexample "))
+        .map(|(_, rest)| rest)
+        .collect();
+    assert_eq!(
+        progress,
+        ["up to depth 0", "up to depth 1", "up to depth 2"],
+        "{stdout}"
+    );
+}
+
+#[test]
+fn ic3_keeps_counterexamples_found_beyond_the_bound() {
+    // Obligations may hit a counterexample deeper than --end before the bound completes.
+    let stdout = run_cli(127, &["--cex", "ic3", "--end", "99"]);
+    assert!(
+        stdout.contains("IC3 found a counterexample at depth 127"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("\nSAT\n"), "{stdout}");
+    assert!(!stdout.contains("reached bound"), "{stdout}");
+}
+
+#[test]
+fn ic3_time_limit_zero_completes_no_depth() {
+    let stdout = run_cli(0, &["ic3", "--end", "0", "--time-limit", "0"]);
+    assert!(stdout.ends_with("UNKNOWN\n"), "{stdout}");
+    assert!(!stdout.contains("found no counterexample"), "{stdout}");
+}
+
+#[test]
 fn unknown_does_not_request_a_certificate() {
-    for engine_args in [&["bmc", "--end", "2"]] {
+    for engine_args in [&["ic3", "--end", "2"], &["bmc", "--end", "2"]] {
         let run = |prefix: &[&str]| run_cli(3, &[prefix, engine_args].concat());
         // With --cex, UNKNOWN prints "2" in place of a witness.
         for (option, expected) in [("--cex", "UNKNOWN\n2\n"), ("--certify", "UNKNOWN\n")] {
