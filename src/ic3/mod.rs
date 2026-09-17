@@ -192,6 +192,15 @@ pub struct IC3 {
 }
 
 impl IC3 {
+    /// Terminated via `ctrl` or past `cfg.time_limit`.
+    fn is_interrupted(&self) -> bool {
+        self.ctrl.is_terminated()
+            || self
+                .cfg
+                .time_limit
+                .is_some_and(|limit| self.statistic.time.time().as_secs() >= limit)
+    }
+
     #[inline]
     pub fn level(&self) -> usize {
         self.solvers.len() - 1
