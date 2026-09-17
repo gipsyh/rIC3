@@ -111,7 +111,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             }
             exit(130);
         }
-        if let Some(cert_path) = &chk.cert {
+        if let Some(cert_path) = &chk.cert
+            && !res.is_unknown()
+        {
             let cert = engine.certificate(res);
             let cert = frontend.wl_certificate(cert);
             fs::write(cert_path, format!("{cert}")).unwrap();
@@ -135,7 +137,9 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
             }
             exit(130);
         }
-        if let Some(cert_path) = &chk.cert {
+        if let Some(cert_path) = &chk.cert
+            && !res.is_unknown()
+        {
             let cert = engine.certificate(res);
             let cert = frontend.bl_certificate(cert);
             fs::write(cert_path, format!("{cert}")).unwrap();
@@ -143,7 +147,7 @@ pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
         res
     };
     report_res(&chk, res);
-    if chk.certify {
+    if chk.certify && !res.is_unknown() {
         assert!(certificate_check(&chk.model, chk.cert.as_ref().unwrap()));
     }
     drop(tmp_cert);
