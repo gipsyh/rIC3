@@ -4,7 +4,10 @@ use crate::{
     transys::{Transys, TransysIf},
 };
 use aig::{Aig, AigEdge};
-use giputils::hash::{GHashMap, GHashSet};
+use giputils::{
+    gvec::Gvec,
+    hash::{GHashMap, GHashSet},
+};
 use log::{debug, error, warn};
 use logicrs::{Lbool, Lit, LitVec, Var, VarSymbols};
 use std::{fmt::Display, path::Path, process::Command};
@@ -94,31 +97,55 @@ impl Transys {
             rel,
         }
     }
-}
 
-fn aig_symbols(aig: &Aig) -> VarSymbols {
-    let mut symbol = VarSymbols::new();
-    for &x in aig.inputs.iter().chain(aig.latchs.iter().map(|l| &l.input)) {
-        if let Some(s) = aig.symbols.get(&x) {
-            for s in s.split(' ') {
-                let mut rs = s;
-                let mut idx = 0;
-                if s.ends_with(']')
-                    && let Some(start) = s.rfind('[')
-                {
-                    idx = s[start + 1..s.len() - 1].parse::<usize>().unwrap();
-                    rs = &s[..start];
-                }
-                symbol.insert(x, rs.to_string(), idx);
+    fn from_aig_compact(aig: &Aig) -> (Transys, Gvec<Var>) {
+        let (rel, map) = aig.cnf_compact();
+        let map_var = |v: Var| {
+            let mapped = map[*v];
+            assert!(v.is_constant() || !mapped.is_constant());
+            mapped
+        };
+        let map_lit = |e: AigEdge| Lit::from(e).map_var(map_var);
+        let input = aig.inputs.iter().copied().map(map_var).collect();
+        let mut latch = Vec::with_capacity(aig.latchs.len());
+        let mut next = GHashMap::new();
+        let mut init = GHashMap::new();
+        for l in &aig.latchs {
+            let v = map_var(l.input);
+            latch.push(v);
+            next.insert(v, map_lit(l.next));
+            if let Some(i) = l.init {
+                init.insert(v, map_lit(i));
             }
         }
+        let bad = aig.bads.iter().copied().map(map_lit).collect();
+        let constraint = aig.constraints.iter().copied().map(map_lit).collect();
+        let mut justice: LitVec = aig
+            .justice
+            .first()
+            .map(|j| j.iter().copied().map(map_lit).collect())
+            .unwrap_or_default();
+        justice.extend(aig.fairness.iter().copied().map(map_lit));
+        (
+            Transys {
+                input,
+                latch,
+                next,
+                init,
+                bad,
+                constraint,
+                justice,
+                rel,
+            },
+            map,
+        )
     }
-    symbol
 }
 
 pub struct AigFrontend {
     ts: Transys,
     ts_symbols: VarSymbols,
+    original_vars: Vec<Var>,
 }
 
 impl AigFrontend {
@@ -149,9 +176,19 @@ impl AigFrontend {
             warn!("fairness constraints are ignored when solving the safety property");
             aig.fairness.clear();
         }
-        let ts_symbols = aig_symbols(&aig);
-        let ts = Transys::from_aig(&aig, true);
-        Self { ts, ts_symbols }
+        let (ts, map) = Transys::from_aig_compact(&aig);
+        let ts_symbols = VarSymbols::new();
+        let mut original_vars = vec![Var::CONST; ts.rel.num_var()];
+        for (old, &new) in map.iter().enumerate() {
+            if !new.is_constant() {
+                original_vars[usize::from(new)] = Var::new(old);
+            }
+        }
+        Self {
+            ts,
+            ts_symbols,
+            original_vars,
+        }
     }
 
     pub fn is_safety(&self) -> bool {
@@ -184,13 +221,18 @@ impl Frontend for AigFrontend {
                 certifaiger.symbols.clear();
                 for (i, v) in proof.proof.input().enumerate() {
                     if leaf.contains(&v) {
-                        certifaiger.set_symbol(certifaiger.inputs[i], &format!("= {}", (*v) * 2));
+                        let original = self.original_vars[usize::from(v)];
+                        certifaiger
+                            .set_symbol(certifaiger.inputs[i], &format!("= {}", *original * 2));
                     }
                 }
                 for (i, v) in proof.proof.latch().enumerate() {
                     if leaf.contains(&v) {
-                        certifaiger
-                            .set_symbol(certifaiger.latchs[i].input, &format!("= {}", (*v) * 2));
+                        let original = self.original_vars[usize::from(v)];
+                        certifaiger.set_symbol(
+                            certifaiger.latchs[i].input,
+                            &format!("= {}", *original * 2),
+                        );
                     }
                 }
                 Box::new(certifaiger)
