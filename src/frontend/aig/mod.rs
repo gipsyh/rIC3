@@ -122,24 +122,22 @@ pub struct AigFrontend {
 }
 
 impl AigFrontend {
-    pub fn new(aig: Aig) -> Self {
-        let mut oaig = aig;
-        if !oaig.outputs.is_empty() {
-            if oaig.bads.is_empty() {
-                oaig.bads = std::mem::take(&mut oaig.outputs);
+    pub fn new(mut aig: Aig) -> Self {
+        if !aig.outputs.is_empty() {
+            if aig.bads.is_empty() {
+                aig.bads = std::mem::take(&mut aig.outputs);
                 warn!(
                     "property not found, moved {} outputs to bad properties",
-                    oaig.bads.len()
+                    aig.bads.len()
                 );
             } else {
                 warn!("outputs in aiger are ignored");
-                oaig.outputs.clear();
+                aig.outputs.clear();
             }
-        } else if oaig.bads.is_empty() {
+        } else if aig.bads.is_empty() {
             warn!("empty property in aiger");
-            oaig.bads.push(AigEdge::constant(false));
+            aig.bads.push(AigEdge::constant(false));
         }
-        let mut aig = oaig.clone();
         if !aig.justice.is_empty() {
             if !aig.bads.is_empty() {
                 error!(
