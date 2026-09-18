@@ -13,14 +13,14 @@ impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
         let mut aig = Aig::new();
         let mut map = GHashMap::new();
-        map.insert(Var::CONST, AigEdge::from_lit(Var::CONST.lit()));
+        map.insert(Var::CONST, AigEdge::from(Var::CONST));
         for i in ts.input.iter() {
             let t = aig.new_input();
-            map.insert(*i, AigEdge::new(t, false));
+            map.insert(*i, AigEdge::from(t));
         }
         for &f in ts.latch.iter() {
             let t = aig.new_leaf_node();
-            map.insert(f, AigEdge::new(t, false));
+            map.insert(f, AigEdge::from(t));
         }
         for (v, rel) in ts.rel.iter() {
             if ts.rel.has_rel(v) && !v.is_constant() {
@@ -45,7 +45,7 @@ impl From<&Transys> for Aig {
         for l in ts.latch.iter() {
             let next = map_lit(ts.next[l]);
             let init = ts.init.get(l).map(|&l| map_lit(l));
-            aig.add_latch(map[l].node_id(), next, init);
+            aig.add_latch(Lit::from(map[l]).var(), next, init);
         }
         for &b in ts.bad.iter() {
             aig.bads.push(map_lit(b));
@@ -62,26 +62,26 @@ impl From<&Transys> for Aig {
 
 impl Transys {
     pub fn from_aig(aig: &Aig, compact: bool) -> Transys {
-        let input: Vec<Var> = aig.inputs.iter().map(|x| Var::new(*x)).collect();
+        let input: Vec<Var> = aig.inputs.clone();
         let mut latch = Vec::new();
         let mut next = GHashMap::new();
         let mut init = GHashMap::new();
         for l in aig.latchs.iter() {
-            let lv = Var::from(l.input);
+            let lv = l.input;
             latch.push(lv);
-            next.insert(lv, l.next.to_lit());
+            next.insert(lv, l.next.into());
             if let Some(i) = l.init {
-                init.insert(lv, i.to_lit());
+                init.insert(lv, i.into());
             }
         }
-        let bad = aig.bads.iter().map(|c| c.to_lit()).collect();
-        let constraint: LitVec = aig.constraints.iter().map(|c| c.to_lit()).collect();
+        let bad = aig.bads.iter().map(|c| (*c).into()).collect();
+        let constraint: LitVec = aig.constraints.iter().map(|c| (*c).into()).collect();
         let mut justice: LitVec = aig
             .justice
             .first()
-            .map(|j| j.iter().map(|e| e.to_lit()).collect())
+            .map(|j| j.iter().map(|e| (*e).into()).collect())
             .unwrap_or_default();
-        justice.extend(aig.fairness.iter().map(|f| f.to_lit()));
+        justice.extend(aig.fairness.iter().map(|f| Lit::from(*f)));
         let rel = aig.cnf(compact);
         Transys {
             input,
@@ -109,7 +109,7 @@ fn aig_symbols(aig: &Aig) -> VarSymbols {
                     idx = s[start + 1..s.len() - 1].parse::<usize>().unwrap();
                     rs = &s[..start];
                 }
-                symbol.insert(Var::from(x), rs.to_string(), idx);
+                symbol.insert(x, rs.to_string(), idx);
             }
         }
     }
