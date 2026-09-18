@@ -4,7 +4,6 @@ use crate::ic3::{
     mic::{DropVarParameter, MicType},
     proofoblig::ProofObligation,
 };
-use giputils::TerminateCtrl;
 use log::{debug, info};
 use logicrs::{LitOrdVec, LitVec, satif::Satif};
 use std::time::Instant;
@@ -78,7 +77,14 @@ impl IC3 {
 
     pub fn block(&mut self, limit: Option<f64>) -> BlockResult {
         let mut noc = 0;
-        while let Some(mut po) = self.obligations.pop(self.level()) {
+        loop {
+            // Checked before popping so an empty queue still observes an interrupt.
+            if self.is_interrupted() {
+                return BlockResult::OverallTimeLimitExceeded;
+            }
+            let Some(mut po) = self.obligations.pop(self.level()) else {
+                return BlockResult::Success;
+            };
             self.render_progress();
             if po.removed {
                 continue;
@@ -87,14 +93,6 @@ impl IC3 {
                 && noc as f64 > limit
             {
                 return BlockResult::BlockLimitExceeded;
-            }
-            if self.ctrl.is_terminated() {
-                return BlockResult::OverallTimeLimitExceeded;
-            }
-            if let Some(limit) = self.cfg.time_limit
-                && self.statistic.time.time().as_secs() > limit
-            {
-                return BlockResult::OverallTimeLimitExceeded;
             }
             if self.tsctx.cube_subsume_init(&po.state) {
                 if self.cfg.abs_cst || self.cfg.abs_trans {
@@ -175,7 +173,6 @@ impl IC3 {
                 self.add_obligation(po);
             }
         }
-        BlockResult::Success
     }
 
     #[allow(unused)]
