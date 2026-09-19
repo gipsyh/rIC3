@@ -114,7 +114,7 @@ impl Transys {
     pub fn simplify(&mut self, rst: &mut Restore) {
         self.coi_refine(rst);
         let frozens = self.frozens();
-        self.rel = self.rel.simplify(frozens.iter().copied());
+        self.rel = std::mem::take(&mut self.rel).simplify(frozens.iter().copied());
         self.coi_refine(rst);
         self.constraint.retain(|l| !l.is_constant(true));
         self.constraint.sort();
@@ -124,30 +124,32 @@ impl Transys {
 }
 
 impl Transys {
-    pub fn preproc(&self, cfg: &PreprocConfig, mut rst: Restore) -> (Self, Restore) {
-        let mut ts = self.clone();
+    /// Preprocess the transition system in place. Takes `self` by value so the
+    /// original copy is released as we go, instead of being cloned and then
+    /// kept alive alongside the clone for the whole preprocessing pass.
+    pub fn preproc(mut self, cfg: &PreprocConfig, mut rst: Restore) -> (Self, Restore) {
         if cfg.preproc {
-            ts.coi_refine(&mut rst);
+            self.coi_refine(&mut rst);
             if cfg.bve {
-                let frozens = ts.frozens();
-                ts.rel = ts.rel.simplify(frozens.iter().copied());
-                ts.coi_refine(&mut rst);
+                let frozens = self.frozens();
+                self.rel = std::mem::take(&mut self.rel).simplify(frozens.iter().copied());
+                self.coi_refine(&mut rst);
             }
-            ts.constraint.retain(|l| !l.is_constant(true));
-            ts.constraint.sort();
-            ts.constraint.dedup();
-            ts.rearrange(&mut rst);
-            info!("trivial simplified ts: {}", ts.statistic());
-            if cfg.scorr {
-                let scorr = Scorr::new(ts, cfg, rst);
-                (ts, rst) = scorr.scorr();
-            }
-            if cfg.frts {
-                let frts = FrTs::new(ts, cfg, rst);
-                (ts, rst) = frts.fr();
-            }
+            self.constraint.retain(|l| !l.is_constant(true));
+            self.constraint.sort();
+            self.constraint.dedup();
+            self.rearrange(&mut rst);
+            info!("trivial simplified ts: {}", self.statistic());
         }
-        info!("preprocessed ts has {}", ts.statistic());
-        (ts, rst)
+        if cfg.preproc && cfg.scorr {
+            let scorr = Scorr::new(self, cfg, rst);
+            (self, rst) = scorr.scorr();
+        }
+        if cfg.preproc && cfg.frts {
+            let frts = FrTs::new(self, cfg, rst);
+            (self, rst) = frts.fr();
+        }
+        info!("preprocessed ts has {}", self.statistic());
+        (self, rst)
     }
 }

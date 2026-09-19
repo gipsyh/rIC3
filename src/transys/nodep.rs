@@ -28,6 +28,7 @@ impl NoDepTransys {
         for c in self.trans() {
             simp_solver.add_clause(c);
         }
+        self.rel.set_cls(Vec::new());
         let mut frozens = vec![Var::CONST];
         frozens.extend(self.bad.iter().map(|l| l.var()));
         frozens.extend(self.input.iter().chain(self.latch.iter()).copied());
@@ -47,6 +48,7 @@ impl NoDepTransys {
             println!("warning: model trans simplified with unsat");
         }
         let mut trans = simp_solver.clauses();
+        drop(simp_solver);
         trans.push(LitVec::from([Lit::constant(true)]));
         self.rel.set_cls(trans);
         let domain_map = self.rel.rearrange(frozens);
