@@ -176,6 +176,7 @@ impl AigFrontend {
             warn!("fairness constraints are ignored when solving the safety property");
             aig.fairness.clear();
         }
+        aig.simplify_combinational();
         let (ts, map) = Transys::from_aig_compact(&aig);
         let ts_symbols = VarSymbols::new();
         let mut original_vars = vec![Var::CONST; ts.rel.num_var()];
