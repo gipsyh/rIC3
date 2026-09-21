@@ -50,7 +50,6 @@ impl Default for BMCConfig {
 }
 
 pub struct BMC {
-    ots: Transys,
     _ts: Box<NoDepTransys>,
     uts: TransysUnroll<NoDepTransys>,
     cfg: BMCConfig,
@@ -83,16 +82,15 @@ impl TerminateCtrl for BmcCtrl {
 
 impl BMC {
     pub fn new(cfg: BMCConfig, mut ts: Transys) -> Self {
-        let ots = ts.clone();
         ts.compress_bads();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
-        if cfg.preproc.preproc {
-            ts.simplify(&mut rst);
-        }
+        // if cfg.preproc.preproc {
+        //     ts.simplify(&mut rst);
+        // }
         let ts = Box::new(ts);
         let uts = TransysUnroll::new(ts.deref());
         let mut solver: Box<dyn Satif> = if cfg.kissat {
@@ -109,7 +107,6 @@ impl BMC {
             cfg.step as usize
         };
         Self {
-            ots,
             _ts: ts,
             uts,
             step,
@@ -243,7 +240,6 @@ impl BlEngine for BMC {
         for s in cex.state.iter_mut() {
             *s = self.rst.restore_eq_state(s);
         }
-        cex.exact_state(&self.ots, true);
         cex
     }
 }
