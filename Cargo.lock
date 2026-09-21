@@ -1058,6 +1058,7 @@ name = "giputils"
 version = "0.3.6"
 dependencies = [
  "ahash",
+ "libc",
  "log",
  "rand 0.10.2",
  "serde",
