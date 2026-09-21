@@ -167,9 +167,9 @@ impl BlEngine for CIllKind {
             let aux = proof.new_var().lit();
             aux_latchs.push(aux);
             let (next, init) = if i == 0 {
-                (aux, Some(Lit::constant(true)))
+                (aux, Some(Lit::TRUE))
             } else {
-                (aux_latchs[i - 1], Some(Lit::constant(false)))
+                (aux_latchs[i - 1], Some(Lit::FALSE))
             };
             proof.add_latch(aux.var(), init, next);
         }

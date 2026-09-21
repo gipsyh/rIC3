@@ -139,7 +139,7 @@ impl<T: TransysIf> TransysUnroll<T> {
     }
 
     pub fn unroll(&mut self) {
-        let false_lit = Lit::constant(false);
+        let false_lit = Lit::FALSE;
         self.next_map[false_lit].push(false_lit);
         self.next_map[!false_lit].push(!false_lit);
         if self.connect.is_none() {

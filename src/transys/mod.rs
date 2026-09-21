@@ -223,7 +223,7 @@ impl Transys {
 
     pub fn add_init_var(&mut self) -> Var {
         let iv = self.new_var();
-        self.add_latch(iv, Some(Lit::constant(true)), Lit::constant(false));
+        self.add_latch(iv, Some(Lit::TRUE), Lit::FALSE);
         iv
     }
 

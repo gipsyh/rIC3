@@ -48,7 +48,7 @@ impl NoDepTransys {
         }
         let mut trans = simp_solver.clauses();
         drop(simp_solver);
-        trans.push(LitVec::from([Lit::constant(true)]));
+        trans.push(LitVec::from([Lit::TRUE]));
         self.rel.set_cls(trans);
         let domain_map = self.rel.rearrange(frozens);
         let map_lit = |l: &Lit| Lit::new(domain_map[l.var()], l.polarity());

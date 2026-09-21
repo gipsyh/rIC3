@@ -10,8 +10,8 @@ fn counter(bad: usize) -> Transys {
     let lo = ts.new_var();
     let hi = ts.new_var();
     let next_hi = ts.rel.new_xor(lo.lit(), hi.lit());
-    ts.add_latch(lo, Some(Lit::constant(false)), !lo.lit());
-    ts.add_latch(hi, Some(Lit::constant(false)), next_hi);
+    ts.add_latch(lo, Some(Lit::FALSE), !lo.lit());
+    ts.add_latch(hi, Some(Lit::FALSE), next_hi);
     let is_bad = ts.rel.new_and([
         lo.lit().not_if((bad & 1) == 0),
         hi.lit().not_if((bad & 2) == 0),
@@ -24,7 +24,7 @@ fn counter(bad: usize) -> Transys {
 fn stuck_latch() -> Transys {
     let mut ts = Transys::new();
     let latch = ts.new_var();
-    ts.add_latch(latch, Some(Lit::constant(false)), latch.lit());
+    ts.add_latch(latch, Some(Lit::FALSE), latch.lit());
     ts.bad.push(latch.lit());
     ts
 }

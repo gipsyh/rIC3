@@ -46,8 +46,8 @@ impl Default for Eqc {
     fn default() -> Self {
         let mut eq = LitMap::new();
         eq.reserve(Var::CONST);
-        eq[Lit::constant(true)] = Lit::constant(true);
-        eq[Lit::constant(false)] = Lit::constant(false);
+        eq[Lit::TRUE] = Lit::TRUE;
+        eq[Lit::FALSE] = Lit::FALSE;
         Self { eq }
     }
 }

@@ -85,7 +85,7 @@ impl Scorr {
             }
         }
         let mut cand: GHashMap<BitVec, LitVec> = GHashMap::new();
-        cand.insert(rt[Var::CONST].clone(), LitVec::from([Lit::constant(false)]));
+        cand.insert(rt[Var::CONST].clone(), LitVec::from([Lit::FALSE]));
         for &v in latch.iter() {
             let l = v.lit();
             if let Some(c) = cand.get_mut(&rt[v]) {

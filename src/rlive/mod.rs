@@ -140,10 +140,10 @@ impl Rlive {
         }
         assert!(ts.justice.len() == 1);
         let base_var = ts.new_var();
-        ts.add_latch(base_var, Some(Lit::constant(false)), Lit::constant(true));
+        ts.add_latch(base_var, Some(Lit::FALSE), Lit::TRUE);
         let mut rts = ts.clone();
         rts.init.clear();
-        rts.add_init(base_var, Lit::constant(false));
+        rts.add_init(base_var, Lit::FALSE);
         rts.bad = take(&mut rts.justice);
         let bvc = rts.rel.new_imply(!base_var.lit(), rts.bad[0]);
         rts.constraint.push(bvc);
