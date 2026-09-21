@@ -176,13 +176,17 @@ impl AigFrontend {
             warn!("fairness constraints are ignored when solving the safety property");
             aig.fairness.clear();
         }
-        aig.simplify_combinational();
+        aig.comb_simplify();
+        let (aig, coi_map) = aig.coi_simplify();
         let (ts, map) = Transys::from_aig_compact(&aig);
         let ts_symbols = VarSymbols::new();
         let mut original_vars = vec![Var::CONST; ts.rel.num_var()];
-        for (old, &new) in map.iter().enumerate() {
-            if !new.is_constant() {
-                original_vars[usize::from(new)] = Var::new(old);
+        for (original, &refined) in coi_map.iter().enumerate() {
+            if !refined.is_none() {
+                let new = map[*refined];
+                if !new.is_constant() {
+                    original_vars[usize::from(new)] = Var::new(original);
+                }
             }
         }
         Self {
