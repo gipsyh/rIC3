@@ -24,11 +24,10 @@ impl NoDepTransys {
 
     pub fn simplify(&mut self, rst: &mut Restore) {
         let mut simp_solver = cadical::CaDiCaL::new();
-        simp_solver.new_var_to(self.max_var());
-        for c in self.trans() {
-            simp_solver.add_clause(c);
+        simp_solver.reserve(self.max_var());
+        for c in self.rel.take_clauses() {
+            simp_solver.add_clause(&c);
         }
-        self.rel.set_cls(Vec::new());
         let mut frozens = vec![Var::CONST];
         frozens.extend(self.bad.iter().map(|l| l.var()));
         frozens.extend(self.input.iter().chain(self.latch.iter()).copied());
@@ -130,7 +129,7 @@ impl Transys {
             init: self.init,
             bad: self.bad,
             constraint: self.constraint,
-            rel: self.rel.lower(),
+            rel: self.rel.into_cnf(),
         }
     }
 }
