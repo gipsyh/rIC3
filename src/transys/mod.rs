@@ -97,13 +97,20 @@ pub trait TransysIf {
 
     #[inline]
     fn statistic(&self) -> String {
+        let mut num_cls = 0;
+        let mut num_lits = 0;
+        for cls in self.trans() {
+            num_cls += 1;
+            num_lits += cls.len();
+        }
         format!(
-            "{} vars, {} inputs, {} latches, {} clauses, {} constraints",
+            "{} vars, {} inputs, {} latches, {} constraints, {} clauses and {} lits in cnf",
             self.max_var(),
             self.input().count(),
             self.latch().count(),
-            self.trans().count(),
             self.constraint().count(),
+            num_cls,
+            num_lits
         )
     }
 
