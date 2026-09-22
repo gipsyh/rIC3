@@ -85,7 +85,7 @@ impl BMC {
         ts.compress_bads();
         let mut rng = StdRng::seed_from_u64(cfg.rseed);
         let rst = Restore::new(&ts);
-        let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
+        let (ts, rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts.remove_dep();
         ts.assert_constraint();
         // if cfg.preproc.preproc {
