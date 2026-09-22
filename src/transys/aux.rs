@@ -12,7 +12,7 @@ impl Transys {
         for v in vars {
             let n = self.rel.new_var();
             next.insert(v, n);
-            let mut ncls = Vec::new();
+            let mut ncls: Vec<logicrs::LitVec> = Vec::new();
             for cls in self.rel[n].iter() {
                 ncls.push(
                     cls.iter()

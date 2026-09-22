@@ -19,7 +19,7 @@ impl Transys {
             let pivot: Vec<_> = rel[x]
                 .iter()
                 .map(|c| {
-                    let mut c = c.clone();
+                    let mut c = LitVec::from(c);
                     let p = c.pop().unwrap();
                     (LitOrdVec::new(c), p)
                 })
@@ -31,10 +31,10 @@ impl Transys {
                 let mut refactor = LitVvec::new();
                 for r in rel[y].iter() {
                     if !r.iter().any(|l| dep[x].contains(&l.var())) {
-                        refactor.push(r.clone());
+                        refactor.push(LitVec::from(r));
                         continue;
                     }
-                    let r_ov = LitOrdVec::new(r.clone());
+                    let r_ov = LitOrdVec::new(LitVec::from(r));
                     let Some((c, p)) = pivot.iter().find(|(c, _)| c.subsume(&r_ov)) else {
                         continue 'yl;
                     };

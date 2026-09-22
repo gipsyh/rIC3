@@ -14,7 +14,7 @@ pub mod unroll;
 
 pub use ctx::*;
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::{DagCnf, Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
+use logicrs::{DagCnf, Lit, LitFixedVec, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -47,7 +47,7 @@ pub trait TransysIf {
 
     fn constraint(&self) -> impl Iterator<Item = Lit>;
 
-    fn trans(&self) -> impl Iterator<Item = &LitVec>;
+    fn trans(&self) -> impl Iterator<Item = &LitFixedVec>;
 
     #[inline]
     fn var_next(&self, var: Var) -> Var {
@@ -174,7 +174,7 @@ impl TransysIf for Transys {
     }
 
     #[inline]
-    fn trans(&self) -> impl Iterator<Item = &LitVec> {
+    fn trans(&self) -> impl Iterator<Item = &LitFixedVec> {
         self.rel.clause()
     }
 

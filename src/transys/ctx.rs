@@ -1,5 +1,5 @@
 use super::{Transys, TransysIf};
-use logicrs::{DagCnf, Lit, LitMap, LitVec, LitVvec, Var, VarMap};
+use logicrs::{DagCnf, Lit, LitFixedVec, LitMap, LitVec, LitVvec, Var, VarMap};
 
 #[derive(Clone, Debug)]
 pub struct TransysCtx {
@@ -61,7 +61,7 @@ impl TransysIf for TransysCtx {
     }
 
     #[inline]
-    fn trans(&self) -> impl Iterator<Item = &LitVec> {
+    fn trans(&self) -> impl Iterator<Item = &LitFixedVec> {
         self.rel.clause()
     }
 

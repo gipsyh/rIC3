@@ -1415,6 +1415,7 @@ dependencies = [
  "giputils",
  "inventory",
  "lazy_static",
+ "libc",
  "log",
  "rand 0.10.2",
  "serde",

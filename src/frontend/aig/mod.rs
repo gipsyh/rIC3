@@ -242,15 +242,15 @@ impl Frontend for AigFrontend {
                 }
                 Box::new(certifaiger)
             }
-            McBlCertificate::SAT(bl_cex) => {
-                let mut cex = bl_cex.filter(|v| leaf.contains(&v.var()));
+            McBlCertificate::SAT(mut bl_cex) => {
+                bl_cex.exact_state(&self.ts, true);
+                let cex = bl_cex.filter(|v| leaf.contains(&v.var()));
                 let mut res = vec!["1".to_string()];
                 if self.is_safety() {
                     res.push(format!("b{}", bl_cex.bad_id));
                 } else {
                     res.push("j0".to_string());
                 }
-                cex.exact_init_state(&self.ts);
                 let mut line = String::new();
                 let mut lbstate = Vec::new();
                 for l in cex.state[0].iter() {

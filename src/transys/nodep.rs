@@ -1,7 +1,7 @@
 use super::{Transys, TransysIf};
 use crate::transys::certify::Restore;
 use giputils::hash::GHashMap;
-use logicrs::{Cnf, Lit, LitVec, Var, satif::Satif};
+use logicrs::{Cnf, Lit, LitFixedVec, LitVec, Var, satif::Satif};
 use std::mem::take;
 
 #[derive(Default, Debug, Clone)]
@@ -115,7 +115,7 @@ impl TransysIf for NoDepTransys {
     }
 
     #[inline]
-    fn trans(&self) -> impl Iterator<Item = &LitVec> {
+    fn trans(&self) -> impl Iterator<Item = &LitFixedVec> {
         self.rel.iter()
     }
 }

@@ -3,7 +3,7 @@ mod array;
 use super::Frontend;
 use crate::{
     McBlCertificate, McWlCertificate,
-    transys::{self as bl},
+    transys::{self as bl, Transys},
     wltransys::{
         WlTransys,
         bitblast::BitblastMap,
@@ -88,6 +88,7 @@ pub struct BtorFrontend {
     no_next: GHashSet<Term>,
     rst: Restore,
     tf: WlTransformStack,
+    ts: Option<Transys>,
     bb_rst: Option<BitblastMap>,
 }
 
@@ -112,6 +113,7 @@ impl BtorFrontend {
             no_next,
             rst,
             tf: WlTransformStack::new(),
+            ts: None,
             bb_rst: None,
         }
     }
@@ -221,6 +223,7 @@ impl Frontend for BtorFrontend {
         // panic!();
         let (ts, bb_rst) = wts.bitblast_to_ts();
         self.bb_rst = Some(bb_rst);
+        self.ts = Some(ts.clone());
         (ts, VarSymbols::new())
     }
 
@@ -242,7 +245,8 @@ impl Frontend for BtorFrontend {
                     .restore_proof(&self.wts, &bl_proof);
                 self.wl_safe_certificate(wl_proof)
             }
-            McBlCertificate::SAT(bl_cex) => {
+            McBlCertificate::SAT(mut bl_cex) => {
+                bl_cex.exact_state(self.ts.as_ref().unwrap(), true);
                 let wl_cex = self.bb_rst.as_ref().unwrap().restore_cex(&bl_cex);
                 self.wl_unsafe_certificate(wl_cex)
             }
