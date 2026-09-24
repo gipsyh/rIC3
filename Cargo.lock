@@ -1201,7 +1201,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f00fc6ef7d878dfcf59d9e556ef1b368d7f55b9da5813ed481a3573eef485a01"
 dependencies = [
  "intertrait-macros",
- "linkme",
+ "linkme 0.2.10",
  "once_cell",
 ]
 
@@ -1364,7 +1364,16 @@ version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd4ad156b9934dc21cad96fd17278a7cb6f30a5657a9d976cd7b71d6d49c02c"
 dependencies = [
- "linkme-impl",
+ "linkme-impl 0.2.10",
+]
+
+[[package]]
+name = "linkme"
+version = "0.3.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3045e122bd98aef8ec3ad58ce84f0791f64e70163d1a02710af4aa11a4d54cc5"
+dependencies = [
+ "linkme-impl 0.3.37",
 ]
 
 [[package]]
@@ -1376,6 +1385,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77060ebe535362c3da75682cd17b0431017b6e7c5661e714fc69a7ad017d1301"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -1945,7 +1965,7 @@ dependencies = [
  "giputils",
  "intertrait",
  "ipc-channel",
- "linkme",
+ "linkme 0.3.37",
  "log",
  "logicrs",
  "memory-stats",
