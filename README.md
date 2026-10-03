@@ -9,6 +9,8 @@
 rIC3 supports LLM-accelerated model checking through invariant generation. For details, see the paper [CIll: CTI-Guided Invariant Generation via LLMs for Model Checking](https://arxiv.org/abs/2602.23389).
 The prompt and VCD inspection MCP tools are located under the `tools` directory. For a concrete example, see https://github.com/gipsyh/cill-exp
 
+The `master` branch of CIll is an actively developed version and highly unstable; development has been put on hold due to time constraints. [cill-exp](https://github.com/gipsyh/cill-exp) contains the link of relatively stable version.
+
 <p align="center">
 	<img width="500" height="auto" src="./images/CIll.svg" style="display:inline-block;">
 </p>
