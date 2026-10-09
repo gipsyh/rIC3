@@ -3,7 +3,7 @@ use crate::{
     McBlCertificate,
     transys::{Transys, TransysIf},
 };
-use aig::{Aig, AigEdge};
+use aig::Aig;
 use giputils::{
     gvec::Gvec,
     hash::{GHashMap, GHashSet},
@@ -16,14 +16,14 @@ impl From<&Transys> for Aig {
     fn from(ts: &Transys) -> Self {
         let mut aig = Aig::new();
         let mut map = GHashMap::new();
-        map.insert(Var::CONST, AigEdge::from(Var::CONST));
+        map.insert(Var::CONST, Lit::from(Var::CONST));
         for i in ts.input.iter() {
             let t = aig.new_input();
-            map.insert(*i, AigEdge::from(t));
+            map.insert(*i, Lit::from(t));
         }
         for &f in ts.latch.iter() {
             let t = aig.new_leaf_node();
-            map.insert(f, AigEdge::from(t));
+            map.insert(f, Lit::from(t));
         }
         for (v, rel) in ts.rel.iter() {
             if ts.rel.has_rel(v) && !v.is_constant() {
@@ -48,7 +48,7 @@ impl From<&Transys> for Aig {
         for l in ts.latch.iter() {
             let next = map_lit(ts.next[l]);
             let init = ts.init.get(l).map(|&l| map_lit(l));
-            aig.add_latch(Lit::from(map[l]).var(), next, init);
+            aig.add_latch(map[l].var(), next, init);
         }
         for &b in ts.bad.iter() {
             aig.bads.push(map_lit(b));
@@ -72,19 +72,19 @@ impl Transys {
         for l in aig.latchs.iter() {
             let lv = l.input;
             latch.push(lv);
-            next.insert(lv, l.next.into());
+            next.insert(lv, l.next);
             if let Some(i) = l.init {
-                init.insert(lv, i.into());
+                init.insert(lv, i);
             }
         }
-        let bad = aig.bads.iter().map(|c| (*c).into()).collect();
-        let constraint: LitVec = aig.constraints.iter().map(|c| (*c).into()).collect();
+        let bad = aig.bads.iter().copied().collect();
+        let constraint: LitVec = aig.constraints.iter().copied().collect();
         let mut justice: LitVec = aig
             .justice
             .first()
-            .map(|j| j.iter().map(|e| (*e).into()).collect())
+            .map(|j| j.iter().copied().collect())
             .unwrap_or_default();
-        justice.extend(aig.fairness.iter().map(|f| Lit::from(*f)));
+        justice.extend(aig.fairness.iter().copied());
         let rel = aig.cnf(compact);
         Transys {
             input,
@@ -105,7 +105,7 @@ impl Transys {
             assert!(v.is_constant() || !mapped.is_constant());
             mapped
         };
-        let map_lit = |e: AigEdge| Lit::from(e).map_var(map_var);
+        let map_lit = |e: Lit| e.map_var(map_var);
         let input = aig.inputs.iter().copied().map(map_var).collect();
         let mut latch = Vec::with_capacity(aig.latchs.len());
         let mut next = GHashMap::new();
@@ -163,7 +163,7 @@ impl AigFrontend {
             }
         } else if aig.bads.is_empty() {
             warn!("empty property in aiger");
-            aig.bads.push(AigEdge::constant(false));
+            aig.bads.push(Lit::constant(false));
         }
         if !aig.justice.is_empty() {
             if !aig.bads.is_empty() {

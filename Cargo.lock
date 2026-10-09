@@ -28,9 +28,7 @@ dependencies = [
 name = "aig"
 version = "0.4.6"
 dependencies = [
- "cc",
  "giputils",
- "libc",
  "logicrs",
  "serde",
 ]
