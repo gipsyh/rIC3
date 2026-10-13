@@ -327,7 +327,7 @@ impl IC3 {
     pub fn invariant(&mut self) -> Vec<LitVec> {
         self.inner_invariant()
             .iter()
-            .map(|l| l.map_var(|l| self.rst.restore_var(l)))
+            .map(|l| l.filter_map(|l| self.rst.try_restore(l)))
             .collect()
     }
 }
