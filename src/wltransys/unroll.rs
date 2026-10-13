@@ -3,7 +3,7 @@ use bitwuzla::Bitwuzla;
 use giputils::hash::GHashMap;
 use logicrs::{
     LboolVec,
-    fol::{self, BvTermValue, Term, TermValue},
+    fol::{self, Term, TermValue},
 };
 
 #[derive(Clone)]
@@ -99,7 +99,10 @@ impl WlTransysUnroll {
             for i in self.ts.input.iter() {
                 let ni = self.next(i, k);
                 if let Some(val) = slv.sat_value(&ni) {
-                    w.push(BvTermValue::new(i.clone(), LboolVec::from(val)));
+                    w.push(TermValue::new(
+                        i.clone(),
+                        fol::Value::Bv(LboolVec::from(val)),
+                    ));
                 }
             }
             cex.input.push(w);

@@ -5,7 +5,7 @@ use crate::wltransys::{
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::{
     LboolVec,
-    fol::{BvTermValue, Term},
+    fol::{Term, TermValue, Value},
 };
 use std::{mem::take, vec::IntoIter};
 
@@ -121,7 +121,7 @@ impl WlTransform for WlExtTermMergeTf {
             for (k, v) in self.map.iter() {
                 let v = v.try_bv_const().unwrap();
                 let v = LboolVec::from(v.clone());
-                input.push(BvTermValue::new(k.clone(), v));
+                input.push(TermValue::new(k.clone(), Value::Bv(v)));
             }
         }
     }

@@ -128,12 +128,7 @@ pub fn wlwitness_vcd(
 
     let mut present_terms = GHashSet::default();
     let mut array_indices = GHashMap::<Term, GHashSet<usize>>::default();
-    for frame in &cex.input {
-        for tv in frame {
-            present_terms.insert(tv.t().clone());
-        }
-    }
-    for frame in &cex.state {
+    for frame in cex.input.iter().chain(cex.state.iter()) {
         for tv in frame {
             present_terms.insert(tv.t().clone());
             if let FolValue::Array(array) = tv.v() {
@@ -186,10 +181,7 @@ pub fn wlwitness_vcd(
 
         let mut frame_values = GHashMap::default();
 
-        for tv in &cex.input[t] {
-            frame_values.insert(tv.t().clone(), FolValue::Bv(tv.v().clone()));
-        }
-        for tv in &cex.state[t] {
+        for tv in cex.input[t].iter().chain(cex.state[t].iter()) {
             frame_values.insert(tv.t().clone(), tv.v().clone());
         }
         for (term, targets) in term_ids.iter() {

@@ -1,12 +1,12 @@
 use crate::wltransys::WlTransys;
 use giputils::hash::{GHashMap, GHashSet};
-use logicrs::fol::{self, BvTermValue, Term, TermValue, Value};
+use logicrs::fol::{Term, TermValue, Value};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlCex {
-    pub input: Vec<Vec<BvTermValue>>,
+    pub input: Vec<Vec<TermValue>>,
     pub state: Vec<Vec<TermValue>>,
     pub bad_id: usize,
 }
@@ -32,11 +32,7 @@ impl WlCex {
         for k in (0..self.len()).rev() {
             let mut val = GHashMap::new();
             let mut has = GHashSet::new();
-            for v in self.input[k].iter() {
-                val.insert(v.t().clone(), fol::Value::Bv(v.v().clone()));
-                has.insert(v.t().clone());
-            }
-            for v in self.state[k].iter() {
+            for v in self.input[k].iter().chain(self.state[k].iter()) {
                 val.insert(v.t().clone(), v.v().clone());
                 has.insert(v.t().clone());
             }
@@ -73,16 +69,11 @@ impl WlCex {
         for t in 0..self.len() {
             if let Some(value) = self.state[t]
                 .iter()
+                .chain(self.input[t].iter())
                 .find(|value| value.t() == term)
                 .map(|value| value.v())
             {
                 values.push(value.clone());
-            } else if let Some(value) = self.input[t]
-                .iter()
-                .find(|value| value.t() == term)
-                .map(|value| value.v())
-            {
-                values.push(Value::Bv(value.clone()));
             } else {
                 values.push(Value::default_from(term.sort()));
             }
