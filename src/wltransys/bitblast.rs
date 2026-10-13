@@ -271,12 +271,7 @@ impl BitblastMap {
         let mut res = WlCex::new();
         res.bad_id = cex.bad_id;
         for t in 0..cex.len() {
-            res.input.push(
-                self.restore_lits(&cex.input[t])
-                    .into_iter()
-                    .map(|t| t.into_bv())
-                    .collect(),
-            );
+            res.input.push(self.restore_lits(&cex.input[t]));
             res.state.push(self.restore_lits(&cex.state[t]));
         }
         res
@@ -286,16 +281,16 @@ impl BitblastMap {
         let mut res = BlCex::new();
         res.bad_id = cex.bad_id;
         for t in 0..cex.len() {
-            let lv: LitVec = cex.input[t]
-                .iter()
-                .flat_map(|t| self.map_value(t.t(), &Value::Bv(t.v().clone())))
-                .collect();
-            res.input.push(lv);
-            let lv: LitVec = cex.state[t]
-                .iter()
-                .flat_map(|t| self.map_value(t.t(), t.v()))
-                .collect();
-            res.state.push(lv);
+            for (res, cex) in [
+                (&mut res.input, &cex.input[t]),
+                (&mut res.state, &cex.state[t]),
+            ] {
+                let lv: LitVec = cex
+                    .iter()
+                    .flat_map(|t| self.map_value(t.t(), t.v()))
+                    .collect();
+                res.push(lv);
+            }
         }
         res
     }
