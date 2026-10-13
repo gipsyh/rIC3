@@ -269,7 +269,7 @@ impl BtorFrontend {
         self.tf.inv_trans_proof(&mut proof);
         let mut btor = self.owts.clone();
         for l in proof.input.iter() {
-            if !self.idmap.contains_key(l) {
+            if !self.idmap.contains_key(l) && !self.rst.is_free_next(l) {
                 btor.input.push(l.clone());
             }
         }
@@ -291,6 +291,9 @@ impl BtorFrontend {
             }
             let input = take(&mut cex.input[i]);
             for tv in input {
+                if self.rst.is_free_next(tv.t()) {
+                    continue;
+                }
                 if self.no_next.contains(tv.t()) {
                     cex.state[i].push(tv);
                 } else {

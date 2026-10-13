@@ -58,11 +58,22 @@ impl WlTransys {
         self.next.insert(latch, next);
     }
 
+    /// A latch without `next` is free in every frame. A bit-vector latch becomes an input;
+    /// its `init` is kept by the constraint `iv -> (l == init)` where `iv` holds only in
+    /// the initial frame. An array latch with an `init` stays a latch whose `next` is a
+    /// fresh input: a bit-vector `init` of an array is a constant array (every element
+    /// equals it), which `eq` does not express but the bitblaster replicates.
     pub fn remove_no_next_latch(&mut self, rst: &mut Restore) -> GHashSet<Term> {
         let mut no_next = GHashSet::new();
         for l in take(&mut self.latch) {
             if self.next.contains_key(&l) {
                 self.latch.push(l.clone());
+            } else if l.sort().is_array() && self.init.contains_key(&l) {
+                let free = Term::new_var(l.sort());
+                rst.add_free_next(free.clone());
+                self.input.push(free.clone());
+                self.next.insert(l.clone(), free);
+                self.latch.push(l);
             } else {
                 if let Some(init) = self.init.get(&l).cloned() {
                     if rst.init_var().is_none() {

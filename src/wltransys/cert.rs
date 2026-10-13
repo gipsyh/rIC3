@@ -106,6 +106,8 @@ impl DerefMut for WlProof {
 #[derive(Clone, Default)]
 pub struct Restore {
     init_var: Option<Term>,
+    /// inputs that stand in for the `next` of latches without one
+    free_next: GHashSet<Term>,
 }
 
 impl Restore {
@@ -120,5 +122,13 @@ impl Restore {
     pub fn set_init_var(&mut self, iv: Term) {
         assert!(self.init_var.is_none());
         self.init_var = Some(iv);
+    }
+
+    pub fn add_free_next(&mut self, free: Term) {
+        assert!(self.free_next.insert(free));
+    }
+
+    pub fn is_free_next(&self, t: &Term) -> bool {
+        self.free_next.contains(t)
     }
 }
