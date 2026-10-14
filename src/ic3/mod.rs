@@ -330,6 +330,12 @@ impl IC3 {
             .map(|l| l.filter_map(|l| self.rst.try_restore(l)))
             .collect()
     }
+
+    /// Replaces the termination control, so that an engine wrapping several IC3
+    /// instances can stop any of them through one handle.
+    pub fn set_ctrl(&mut self, ctrl: Arc<EngineCtrl>) {
+        self.ctrl = ctrl;
+    }
 }
 
 impl Engine for IC3 {
