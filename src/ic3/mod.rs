@@ -92,9 +92,10 @@ pub struct IC3Config {
     #[arg(long = "abs-trans", default_value_t = false)]
     pub abs_trans: bool,
 
-    /// dropping proof-obligation
+    /// dropping proof-obligation (off by default with dynamic or mab)
     #[arg(
         long = "drop-po", action = ArgAction::Set, default_value_t = true,
+        default_value_ifs([("dynamic", "true", "false"), ("mab", "true", "false")]),
     )]
     pub drop_po: bool,
 
@@ -329,6 +330,12 @@ impl IC3 {
             .iter()
             .map(|l| l.filter_map(|l| self.rst.try_restore(l)))
             .collect()
+    }
+
+    /// Replaces the termination control, so that an engine wrapping several IC3
+    /// instances can stop any of them through one handle.
+    pub fn set_ctrl(&mut self, ctrl: Arc<EngineCtrl>) {
+        self.ctrl = ctrl;
     }
 }
 

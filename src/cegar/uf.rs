@@ -110,6 +110,10 @@ impl CegarAbstractor for Uf {
         None
     }
 
+    fn concrete_wts(self: Box<Self>) -> WlTransys {
+        self.origin
+    }
+
     fn proof(&self, proof: WlProof) -> WlProof {
         self.substitute_outputs(proof)
     }

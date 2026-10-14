@@ -7,13 +7,15 @@ use crate::{
     ic3::{IC3, IC3Config},
     impl_config_deref,
     tracer::{Tracer, TracerIf},
+    utils::EngineCtrl,
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use clap::Args;
 use giputils::TerminateCtrl;
+use log::info;
 use logicrs::VarSymbols;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct CegarConfig {
@@ -28,6 +30,8 @@ pub struct Cegar {
     abstractor: Option<Box<dyn CegarAbstractor>>,
     model: ActiveModel,
     tracer: Tracer,
+    ctrl: Arc<EngineCtrl>,
+    start: Instant,
 }
 
 struct ActiveModel {
@@ -40,20 +44,36 @@ impl Cegar {
     pub fn new(cfg: CegarConfig, wts: WlTransys) -> Self {
         let mut abstractor: Box<dyn CegarAbstractor> = Box::new(Uf::new(wts));
         let abstract_wts = abstractor.abstract_wts();
-        let model = Self::build_model(&cfg, abstract_wts);
+        let ctrl = Arc::new(EngineCtrl::new());
+        let start = Instant::now();
+        let model = Self::build_model(&cfg, abstract_wts, &ctrl, start);
         Self {
             cfg,
             abstractor: Some(abstractor),
             model,
             tracer: Tracer::new(),
+            ctrl,
+            start,
         }
     }
 
-    fn build_model(cfg: &CegarConfig, wts: WlTransys) -> ActiveModel {
+    /// Builds the IC3 instance for `wts`. Every instance shares the engine's termination
+    /// control and gets the time budget that is left since the engine was created.
+    fn build_model(
+        cfg: &CegarConfig,
+        wts: WlTransys,
+        ctrl: &Arc<EngineCtrl>,
+        start: Instant,
+    ) -> ActiveModel {
         let (ts, bb_map) = wts.bitblast_to_ts();
         let mut ic3_cfg = IC3Config::default();
         ic3_cfg.base = cfg.base.clone();
-        let ic3 = IC3::new(ic3_cfg, ts, VarSymbols::new());
+        ic3_cfg.base.time_limit = cfg
+            .base
+            .time_limit
+            .map(|limit| limit.saturating_sub(start.elapsed().as_secs()));
+        let mut ic3 = IC3::new(ic3_cfg, ts, VarSymbols::new());
+        ic3.set_ctrl(ctrl.clone());
         ActiveModel { ic3, wts, bb_map }
     }
 }
@@ -68,11 +88,21 @@ impl Engine for Cegar {
             }
             let bl_cex = self.model.ic3.cex();
             let cex = self.model.bb_map.restore_cex(&bl_cex);
-            if let Some(refined_wts) = self.abstractor.as_mut().unwrap().refine(&cex) {
-                self.model = Self::build_model(&self.cfg, refined_wts);
-            } else {
-                self.abstractor = None;
-            }
+            let mut abstractor = self.abstractor.take().unwrap();
+            let wts = match abstractor.refine(&cex) {
+                Some(refined_wts) => {
+                    self.abstractor = Some(abstractor);
+                    refined_wts
+                }
+                None => {
+                    info!(
+                        "cegar {} abstraction cannot be refined, checking the concrete model",
+                        abstractor.name()
+                    );
+                    abstractor.concrete_wts()
+                }
+            };
+            self.model = Self::build_model(&self.cfg, wts, &self.ctrl, self.start);
         }
     }
 
@@ -85,7 +115,7 @@ impl Engine for Cegar {
     }
 
     fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
-        self.model.ic3.get_ctrl()
+        self.ctrl.clone()
     }
 }
 
@@ -93,7 +123,10 @@ impl WlEngine for Cegar {
     fn proof(&mut self) -> WlProof {
         let proof = self.model.ic3.proof();
         let proof = self.model.bb_map.restore_proof(&self.model.wts, &proof);
-        self.abstractor.as_mut().unwrap().proof(proof)
+        match self.abstractor.as_ref() {
+            Some(abstractor) => abstractor.proof(proof),
+            None => proof,
+        }
     }
 
     fn cex(&mut self) -> WlCex {
@@ -108,7 +141,12 @@ pub trait CegarAbstractor: Send {
 
     fn abstract_wts(&mut self) -> WlTransys;
 
+    /// Refines the abstraction to exclude `cex`; `None` when the abstraction has no
+    /// refinement for it, in which case the engine continues on the concrete model.
     fn refine(&mut self, cex: &WlCex) -> Option<WlTransys>;
+
+    /// The transition system the abstraction was built from.
+    fn concrete_wts(self: Box<Self>) -> WlTransys;
 
     fn proof(&self, proof: WlProof) -> WlProof;
 }
