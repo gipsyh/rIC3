@@ -6,9 +6,30 @@ use crate::{
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
 use clap::Args;
-use giputils::hash::GHashMap;
+use giputils::{TerminateCtrl, hash::GHashMap};
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+/// Terminate control of the word-level engines: bitwuzla has no terminate hook in `smtif-bitwuzla`, so the flag is
+/// polled between bounds (as `Kind`/`BMC` do before every solve) and `check` returns the last completed bound.
+#[derive(Default)]
+pub(crate) struct WlCtrl {
+    terminated: AtomicBool,
+}
+
+impl TerminateCtrl for WlCtrl {
+    fn terminate(&self) {
+        self.terminated.store(true, Ordering::Relaxed);
+    }
+
+    fn is_terminated(&self) -> bool {
+        self.terminated.load(Ordering::Relaxed)
+    }
+}
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct WlBMCConfig {
@@ -26,6 +47,7 @@ pub struct WlBMC {
     solver: bitwuzla::Bitwuzla,
     solver_k: usize,
     tracer: Tracer,
+    ctrl: Arc<WlCtrl>,
 }
 
 impl WlBMC {
@@ -44,6 +66,7 @@ impl WlBMC {
             solver,
             solver_k: 0,
             tracer: Tracer::new(),
+            ctrl: Arc::new(WlCtrl::default()),
         }
     }
 
@@ -60,6 +83,9 @@ impl WlBMC {
 impl Engine for WlBMC {
     fn check(&mut self) -> McResult {
         for k in (self.cfg.start..=self.cfg.end).step_by(self.cfg.step as usize) {
+            if self.ctrl.is_terminated() {
+                return McResult::Unknown(k.checked_sub(1));
+            }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             let assump = self.uts.next(&self.uts.ts.bad[0], k);
@@ -76,6 +102,10 @@ impl Engine for WlBMC {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
+        self.ctrl.clone()
     }
 }
 
