@@ -6,10 +6,13 @@ use crate::{
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
 use clap::Args;
-use giputils::hash::GHashMap;
+use giputils::{TerminateCtrl, hash::GHashMap};
 use log::{error, info};
 use logicrs::fol::{FolOp, Sort, Term};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+use crate::wlbmc::WlCtrl;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize)]
 pub struct WlKindConfig {
@@ -27,6 +30,7 @@ pub struct WlKind {
     solver_bad_k: usize,
     owts: WlTransys,
     tracer: Tracer,
+    ctrl: Arc<WlCtrl>,
 }
 
 impl WlKind {
@@ -43,6 +47,7 @@ impl WlKind {
             solver_bad_k: 0,
             owts,
             tracer: Tracer::new(),
+            ctrl: Arc::new(WlCtrl::default()),
         }
     }
 
@@ -78,6 +83,9 @@ impl Engine for WlKind {
             panic!();
         }
         for k in 0..=self.cfg.end {
+            if self.ctrl.is_terminated() {
+                return McResult::Unknown(k.checked_sub(1));
+            }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
             if k > 0 {
@@ -109,6 +117,10 @@ impl Engine for WlKind {
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
         self.tracer.add_tracer(tracer);
+    }
+
+    fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {
+        self.ctrl.clone()
     }
 }
 
