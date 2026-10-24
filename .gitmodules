@@ -7,6 +7,3 @@
 [submodule "deps/bitwuzla-rs/bitwuzla"]
 	path = deps/bitwuzla-rs/bitwuzla
 	url = https://github.com/gipsyh/bitwuzla.git
-[submodule "examples/fvbench"]
-	path = examples/fvbench
-	url = https://github.com/gipsyh/fvbench.git

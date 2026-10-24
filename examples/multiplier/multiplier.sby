@@ -1,0 +1,12 @@
+[options]
+mode prove
+
+[engines]
+btor rIC3
+
+[script]
+read_verilog -sv -formal multiplier.sv
+prep -top multiplier
+
+[files]
+multiplier.sv

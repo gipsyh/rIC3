@@ -1,0 +1,7 @@
+[dut]
+top = "frame_proc"
+files = ["frame_proc.sv", "../fifo/fifo.sv"]
+reset = "!rst_n"
+
+[formal]
+invariants = "invariants.sv"

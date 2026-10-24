@@ -1,0 +1,12 @@
+[options]
+mode prove
+
+[engines]
+btor rIC3
+
+[script]
+read -formal -sv counter.sv
+prep -top counter
+
+[files]
+counter.sv

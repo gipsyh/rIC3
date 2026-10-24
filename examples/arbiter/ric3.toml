@@ -1,0 +1,4 @@
+[dut]
+top = "arbiter"
+files = ["arbiter.sv"]
+reset = "!rst_n"

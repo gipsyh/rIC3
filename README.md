@@ -39,12 +39,6 @@ rIC3 can be compiled on both Linux and macOS.
 - Install `cargo install --path .`
 
 ### Development
-
-The Cargo workspace contains rIC3 and all seven Rust dependency crates,
-including the CaDiCaL, Kissat, and Bitwuzla wrappers. Only the native solver
-sources and the `fvbench` benchmarks remain Git submodules.
-See [deps/README.md](deps/README.md) for the layout and import origins.
-
 Run checks for all workspace members with:
 
 ```sh

@@ -1,0 +1,7 @@
+[dut]
+top = "gray_counter"
+files = ["gray_counter.sv"]
+reset = "!rst_n"
+
+[modeling]
+parser = "yosys"
