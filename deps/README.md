@@ -30,11 +30,11 @@ The native solver sources remain submodules, registered directly in the root
 
 Initialize them with `git submodule update --init --recursive`. A wrapper's
 build script also initializes its own missing solver submodule when needed,
-without fetching other solvers or benchmarks. Bitwuzla uses the system library
+without fetching other solvers. Bitwuzla uses the system library
 by default and only builds its native submodule with the `vendor` feature.
 Its native solver tests run when the library is available; otherwise a test
-checks the diagnostic from the stub implementation. The benchmark repository
-at `examples/fvbench` also remains a submodule.
+checks the diagnostic from the stub implementation. Benchmarks are tracked
+directly in `examples/` as ordinary directories in the rIC3 repository.
 
 Each local crate can still be published separately. Workspace inheritance is
 resolved when Cargo packages a crate; registry consumers use the declared

@@ -1,0 +1,4 @@
+[dut]
+top = "xor_flip"
+files = ["xor_flip.sv"]
+reset = "!rst_n"

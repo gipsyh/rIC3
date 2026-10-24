@@ -1,0 +1,12 @@
+[options]
+mode prove
+
+[engines]
+btor rIC3
+
+[script]
+read -formal -sv fifo.sv
+prep -top fifo
+
+[files]
+fifo.sv

@@ -1,0 +1,4 @@
+[dut]
+top = "priority_enc"
+files = ["priority_enc.sv"]
+reset = "!rst_n"

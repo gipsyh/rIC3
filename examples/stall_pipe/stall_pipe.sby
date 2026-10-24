@@ -1,0 +1,12 @@
+[options]
+mode prove
+
+[engines]
+btor rIC3
+
+[script]
+read_verilog -formal -sv stall_pipe.sv
+prep -top stall_pipe
+
+[files]
+stall_pipe.sv

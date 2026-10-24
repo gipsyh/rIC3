@@ -1,0 +1,4 @@
+[dut]
+top = "pipe"
+files = ["stall_pipe.sv"]
+reset = "!rst_n"

@@ -1,0 +1,4 @@
+[dut]
+top = "onehot_fsm"
+files = ["onehot_fsm.sv"]
+reset = "!rst_n"
