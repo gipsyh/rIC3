@@ -1,0 +1,20 @@
+[package]
+name = "smtif-bitwuzla"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Rust wrapper for the Bitwuzla SMT solver"
+repository = "https://github.com/gipsyh/rIC3"
+authors = ["Yuheng Su <gipsyh.icu@gmail.com>"]
+
+
+[dependencies]
+logicrs.workspace = true
+giputils.workspace = true
+
+[build-dependencies]
+giputils.workspace = true
+pkg-config = "0.3.32"
+
+[features]
+vendor = []

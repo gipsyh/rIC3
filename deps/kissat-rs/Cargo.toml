@@ -1,0 +1,15 @@
+[package]
+name = "satif-kissat"
+version = "0.5.2"
+edition = "2024"
+license = "MIT"
+description = "Rust wrapper for the kissat SAT solver"
+repository = "https://github.com/gipsyh/rIC3"
+authors = ["Yuheng Su <gipsyh.icu@gmail.com>"]
+
+[dependencies]
+logicrs.workspace = true
+giputils.workspace = true
+
+[build-dependencies]
+giputils.workspace = true

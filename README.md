@@ -38,6 +38,25 @@ rIC3 can be compiled on both Linux and macOS.
 - Run `cargo r --release -- check <AIGER/BTOR> portfolio`
 - Install `cargo install --path .`
 
+### Development
+
+The Cargo workspace contains rIC3 and all seven Rust dependency crates,
+including the CaDiCaL, Kissat, and Bitwuzla wrappers. Only the native solver
+sources and the `fvbench` benchmarks remain Git submodules.
+See [deps/README.md](deps/README.md) for the layout and import origins.
+
+Run checks for all workspace members with:
+
+```sh
+cargo fmt --all --check
+cargo build --workspace --locked
+cargo test --workspace --locked
+```
+
+Plain `cargo build`, `cargo test`, and `cargo run` at the repository root
+continue to select rIC3. Use `cargo test -p logicrs` (or another package name)
+to test an individual workspace member.
+
 ### Usage
 - Project-based RTL flow: if your design directory contains a `ric3.toml`, run verification directly from that directory with `ric3 run`.
 

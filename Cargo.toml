@@ -8,18 +8,40 @@ description = "hardware model checker"
 keywords = ["formal-method", "model-checking", "IC3"]
 license = "GPL-3.0"
 
+[workspace]
+resolver = "3"
+members = [
+    "deps/aig-rs",
+    "deps/bitwuzla-rs",
+    "deps/btor-rs",
+    "deps/cadical-rs",
+    "deps/giputils",
+    "deps/kissat-rs",
+    "deps/logicrs",
+]
+default-members = ["."]
+
+[workspace.dependencies]
+aig = { path = "deps/aig-rs", version = "0.4.6" }
+bitwuzla = { package = "smtif-bitwuzla", path = "deps/bitwuzla-rs", version = "0.1.0" }
+btor = { path = "deps/btor-rs", version = "0.2.2" }
+cadical = { package = "satif-cadical", path = "deps/cadical-rs", version = "0.2.2" }
+giputils = { path = "deps/giputils", version = "0.3.6" }
+kissat = { package = "satif-kissat", path = "deps/kissat-rs", version = "0.5.2" }
+logicrs = { path = "deps/logicrs", version = "0.6.1" }
+
 [[bin]]
 name = "ric3"
 path = "src/main.rs"
 
 [dependencies]
-aig = { path = "./deps/aig-rs", version = "0.4.6" }
-cadical = { package = "satif-cadical", path = "./deps/cadical-rs", version = "0.2.2" }
-kissat = { package = "satif-kissat", path = "./deps/kissat-rs", version = "0.5.2" }
-bitwuzla = { package = "smtif-bitwuzla", path = "./deps/bitwuzla-rs", version = "0.1.0" }
-logicrs = { path = "./deps/logicrs", version = "0.6.1" }
-giputils = { path = "./deps/giputils", version = "0.3.6" }
-btor = { path = "./deps/btor-rs", version = "0.2.2" }
+aig.workspace = true
+cadical.workspace = true
+kissat.workspace = true
+bitwuzla.workspace = true
+logicrs.workspace = true
+giputils.workspace = true
+btor.workspace = true
 clap = { version = "4.5.60", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.10.1"

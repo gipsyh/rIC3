@@ -27,11 +27,11 @@ jobs:
       - name: Pull submodules
         run: git submodule update --init --recursive
       - name: Format check
-        run: cargo fmt --check
+        run: cargo fmt --all --check
       - name: Build
-        run: cargo build
+        run: cargo build --workspace --locked
       - name: Run test
-        run: cargo test
+        run: cargo test --workspace --locked
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
