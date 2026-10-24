@@ -1,24 +1,12 @@
-[submodule "deps/aig-rs"]
-	path = deps/aig-rs
-	url = https://github.com/gipsyh/aig-rs.git
-[submodule "deps/giputils"]
-	path = deps/giputils
-	url = https://github.com/gipsyh/giputils.git
-[submodule "deps/cadical-rs"]
-	path = deps/cadical-rs
-	url = https://github.com/gipsyh/cadical-rs.git
-[submodule "deps/kissat-rs"]
-	path = deps/kissat-rs
-	url = https://github.com/gipsyh/kissat-rs.git
-[submodule "deps/logicrs"]
-	path = deps/logicrs
-	url = https://github.com/gipsyh/logicrs
-[submodule "deps/btor-rs"]
-	path = deps/btor-rs
-	url = https://github.com/gipsyh/btor-rs.git
-[submodule "deps/bitwuzla-rs"]
-	path = deps/bitwuzla-rs
-	url = https://github.com/gipsyh/bitwuzla-rs
+[submodule "deps/cadical-rs/cadical"]
+	path = deps/cadical-rs/cadical
+	url = https://github.com/arminbiere/cadical.git
+[submodule "deps/kissat-rs/kissat"]
+	path = deps/kissat-rs/kissat
+	url = https://github.com/arminbiere/kissat
+[submodule "deps/bitwuzla-rs/bitwuzla"]
+	path = deps/bitwuzla-rs/bitwuzla
+	url = https://github.com/gipsyh/bitwuzla.git
 [submodule "examples/fvbench"]
 	path = examples/fvbench
 	url = https://github.com/gipsyh/fvbench.git
