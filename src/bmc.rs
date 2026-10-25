@@ -235,11 +235,7 @@ impl Engine for BMC {
 
 impl BlEngine for BMC {
     fn cex(&mut self) -> BlCex {
-        let mut cex = self.uts.cex(self.solver.as_ref());
-        cex = cex.map(|l| self.rst.restore(l));
-        for s in cex.state.iter_mut() {
-            *s = self.rst.restore_eq_state(s);
-        }
-        cex
+        let cex = self.uts.cex(self.solver.as_ref());
+        self.rst.restore_cex(&cex)
     }
 }
