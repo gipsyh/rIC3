@@ -50,40 +50,58 @@ impl Deparser {
         if let Some(id) = self.terms.get(term) {
             return *id;
         }
-        let sid = self.get_sort_id(term.sort());
-        let mut line = match term.deref() {
-            TermType::Const(c) => {
-                let mut line = format!("const {sid} ");
-                line.extend(c.iter().map(|b| if b { '1' } else { '0' }).rev());
-                line
+        // Visit operands before emitting their parent without using the call stack.
+        let mut stack = vec![(term, false)];
+        while let Some((term, visited)) = stack.pop() {
+            if self.terms.contains_key(term) {
+                continue;
             }
-            TermType::Op(op) => {
+            let sid = self.get_sort_id(term.sort());
+            if !visited && let TermType::Op(op) = term.deref() {
                 assert!(op.op.is_core());
-                let args: Vec<_> = if op.op == FolOp::Sext || op.op == FolOp::Uext {
-                    vec![self.get_term_id(&op.terms[0]), op.terms[1].bv_len()]
-                } else if op.op == FolOp::Slice {
-                    let arg = self.get_term_id(&op.terms[0]);
-                    let h = op.terms[1].bv_len();
-                    let l = op.terms[2].bv_len();
-                    vec![arg, h, l]
+                stack.push((term, true));
+                // Extension widths and slice bounds are immediate values, not nodes.
+                let operands = if matches!(op.op, FolOp::Sext | FolOp::Uext | FolOp::Slice) {
+                    &op.terms[..1]
                 } else {
-                    op.terms.iter().map(|arg| self.get_term_id(arg)).collect()
+                    &op.terms[..]
                 };
-                format!(
-                    "{} {sid} {}",
-                    format!("{}", op.op).to_lowercase(),
-                    args.iter()
-                        .map(|id| id.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                )
+                stack.extend(operands.iter().rev().map(|arg| (arg, false)));
+                continue;
             }
-            TermType::Var(_) => panic!(),
-        };
-        line.push_str(&self.symbol_suffix(term));
-        self.content.push(line);
-        self.terms.insert(term.clone(), self.content.len());
-        self.content.len()
+            let mut line = match term.deref() {
+                TermType::Const(c) => {
+                    let mut line = format!("const {sid} ");
+                    line.extend(c.iter().map(|b| if b { '1' } else { '0' }).rev());
+                    line
+                }
+                TermType::Op(op) => {
+                    let args: Vec<_> = if op.op == FolOp::Sext || op.op == FolOp::Uext {
+                        vec![self.terms[&op.terms[0]], op.terms[1].bv_len()]
+                    } else if op.op == FolOp::Slice {
+                        let arg = self.terms[&op.terms[0]];
+                        let h = op.terms[1].bv_len();
+                        let l = op.terms[2].bv_len();
+                        vec![arg, h, l]
+                    } else {
+                        op.terms.iter().map(|arg| self.terms[arg]).collect()
+                    };
+                    format!(
+                        "{} {sid} {}",
+                        format!("{}", op.op).to_lowercase(),
+                        args.iter()
+                            .map(|id| id.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    )
+                }
+                TermType::Var(_) => panic!(),
+            };
+            line.push_str(&self.symbol_suffix(term));
+            self.content.push(line);
+            self.terms.insert(term.clone(), self.content.len());
+        }
+        self.terms[term]
     }
 
     pub fn deparse(&mut self, btor: &Btor) -> String {
