@@ -338,7 +338,12 @@ impl BlEngine for Kind {
     }
 
     fn cex(&mut self) -> BlCex {
-        let cex = self.uts.cex(self.solver.as_ref());
-        self.rst.restore_cex(&cex)
+        let mut cex = self.uts.cex(self.solver.as_ref());
+        cex = self.rst.restore_cex(&cex);
+        cex.exact_state(&self.ots, true);
+        if let Some(prop) = self.cfg.prop {
+            cex.bad_id = prop;
+        }
+        cex
     }
 }
