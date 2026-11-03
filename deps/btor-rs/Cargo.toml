@@ -1,7 +1,6 @@
 [package]
 name = "btor"
 version = "0.2.2"
-license = "MIT"
 description = "Rust library for parsing and deparsing BTOR files"
 edition = "2024"
 repository = "https://github.com/gipsyh/rIC3"
@@ -15,6 +14,6 @@ giputils.workspace = true
 logicrs.workspace = true
 num-bigint = "0.4.5"
 num-traits = "0.2.19"
-serde = { version = "1.0.228", features = ["derive"] }
+serde.workspace = true
 serde_json = "1.0.145"
 strum = { version = "0.28", features = ["derive"] }

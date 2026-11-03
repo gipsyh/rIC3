@@ -1,7 +1,6 @@
 [package]
 name = "aig"
 version = "0.4.6"
-license = "MIT"
 description = "Aig library in Rust"
 edition = "2024"
 repository = "https://github.com/gipsyh/rIC3"
@@ -13,4 +12,4 @@ keywords = ["aig", "hardware", "model_checking"]
 [dependencies]
 logicrs.workspace = true
 giputils.workspace = true
-serde = "1.0.219"
+serde.workspace = true

@@ -1,7 +1,6 @@
 [package]
 name = "logicrs"
 version = "0.6.1"
-license = "MIT"
 description = "Rust library for logic expression"
 edition = "2024"
 repository = "https://github.com/gipsyh/rIC3"
@@ -12,12 +11,12 @@ keywords = ["logic"]
 
 [dependencies]
 giputils.workspace = true
-ahash = "0.8.11"
-rand = "0.10"
-log = "0.4.27"
+ahash.workspace = true
+rand.workspace = true
+log.workspace = true
 lazy_static = "1.5.0"
 inventory = "0.3.20"
 enum-as-inner = "0.6.1"
-serde = { version = "1.0.228", features = ["derive"] }
+serde.workspace = true
 enumflags2 = "0.7"
-libc = "0.2"
+libc.workspace = true

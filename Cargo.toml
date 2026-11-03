@@ -6,7 +6,7 @@ authors = ["Yuheng Su <gipsyh.icu@gmail.com>"]
 repository = "https://github.com/gipsyh/rIC3"
 description = "hardware model checker"
 keywords = ["formal-method", "model-checking", "IC3"]
-license = "GPL-3.0"
+license = "BSD-3-Clause"
 
 [workspace]
 resolver = "3"
@@ -29,6 +29,11 @@ cadical = { package = "satif-cadical", path = "deps/cadical-rs", version = "0.2.
 giputils = { path = "deps/giputils", version = "0.3.6" }
 kissat = { package = "satif-kissat", path = "deps/kissat-rs", version = "0.5.2" }
 logicrs = { path = "deps/logicrs", version = "0.6.1" }
+ahash = "0.8.11"
+libc = "0.2.155"
+log = "0.4.32"
+rand = "0.10.1"
+serde = { version = "1.0.228", features = ["derive"] }
 
 [[bin]]
 name = "ric3"
@@ -44,16 +49,16 @@ giputils.workspace = true
 btor.workspace = true
 clap = { version = "4.5.60", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-rand = "0.10.1"
+rand.workspace = true
 ctrlc = { version = "3.4.1" }
 bitfield-struct = "0.13.0"
 tempfile = "3.25.0"
 nix = { version = "0.31.1", features = ["signal", "term"] }
 env_logger = "0.11.10"
-log = "0.4.32"
+log.workspace = true
 time = { version = "0.3.46", features = ["formatting", "macros"] }
 toml = "1.1.2"
-serde = { version = "1.0.228", features = ["derive"] }
+serde.workspace = true
 serde_json = "1.0.149"
 sha2 = "0.11"
 ratatui = "0.30.0"
