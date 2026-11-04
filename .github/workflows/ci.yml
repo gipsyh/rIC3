@@ -29,9 +29,9 @@ jobs:
       - name: Format check
         run: cargo fmt --all --check
       - name: Build
-        run: cargo build --workspace --locked
+        run: cargo build --workspace
       - name: Run test
-        run: cargo test --workspace --locked
+        run: cargo test --workspace
       - name: Pull certifaiger
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
