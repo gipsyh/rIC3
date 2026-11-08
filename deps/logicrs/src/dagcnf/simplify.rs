@@ -10,6 +10,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+// CaDiCaL's default elimocclim and elimclslim, respectively.
+const BVE_OCCURRENCE_LIMIT: usize = 100;
+const BVE_RESOLVENT_SIZE_LIMIT: usize = 100;
+
 /// Cost bounded by each variable elimination, before resolvent subsumption.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BveObjective {
@@ -218,6 +222,9 @@ impl DagCnfSimplify {
         for &pcls in pcnf {
             for &ncls in ncnf {
                 if let Some(resolvent) = self.cdb[pcls].ordered_resolvent(&self.cdb[ncls], pivot) {
+                    if resolvent.len() > BVE_RESOLVENT_SIZE_LIMIT {
+                        return None;
+                    }
                     let cost = match objective {
                         BveObjective::Clauses => 1,
                         BveObjective::Literals => resolvent.len(),
@@ -236,9 +243,11 @@ impl DagCnfSimplify {
         }
         let lv = v.lit();
         let occur = self.occur.as_mut().unwrap();
-        let ocost =
-            occur.num_occur(lv) + occur.num_occur(!lv) + self.cnf[lv].len() + self.cnf[!lv].len();
-        if ocost == 0 || ocost > 2000 {
+        let pocc = occur.num_occur(lv) + self.cnf[lv].len();
+        let nocc = occur.num_occur(!lv) + self.cnf[!lv].len();
+        let ocost = pocc + nocc;
+        // Pure literals generate no resolvents and are exempt from this limit.
+        if ocost == 0 || (pocc.min(nocc) > 0 && pocc.max(nocc) > BVE_OCCURRENCE_LIMIT) {
             return;
         }
         let (pos, neg) = (&self.cnf[lv], &self.cnf[!lv]);
