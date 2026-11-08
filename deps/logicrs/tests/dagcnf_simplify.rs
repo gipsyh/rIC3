@@ -157,6 +157,96 @@ fn bve_objectives_choose_differently_when_only_literals_grow() {
 }
 
 #[test]
+fn bve_bounds_each_polarity() {
+    for (uses, eliminated) in [(99, true), (100, false)] {
+        let mut dag = DagCnf::new();
+        let input = dag.new_var().lit();
+        let pivot = dag.new_var().lit();
+        dag.add_rel(
+            pivot.var(),
+            &[LitVec::from([!input, pivot]), LitVec::from([input, !pivot])],
+        );
+        let mut frozen = vec![input.var()];
+        for _ in 0..uses {
+            let output = dag.new_var().lit();
+            dag.add_rel(output.var(), &[LitVec::from([!pivot, output])]);
+            frozen.push(output.var());
+        }
+        let mut simp = DagCnfSimplify::from_owned(dag);
+        for &v in &frozen {
+            simp.froze(v);
+        }
+        simp.bve_simplify();
+        let result = simp.finalize();
+        // Both cases are below 200 total occurrences. Only the second has
+        // more than 100 occurrences of one polarity, including its definition.
+        assert_eq!(result[pivot.var()].is_empty(), eliminated, "uses={uses}");
+        for &output in &frozen[1..] {
+            let source = if eliminated { input } else { pivot };
+            assert_eq!(
+                result[output][0].as_slice(),
+                [!source, output.lit()],
+                "uses={uses}"
+            );
+        }
+    }
+}
+
+#[test]
+fn bve_eliminates_pure_literals_above_the_occurrence_limit() {
+    let mut dag = DagCnf::new();
+    let pivot = dag.new_var().lit();
+    let mut frozen = Vec::new();
+    for _ in 0..201 {
+        let output = dag.new_var().lit();
+        dag.add_rel(output.var(), &[LitVec::from([pivot, output])]);
+        frozen.push(output.var());
+    }
+    let mut simp = DagCnfSimplify::from_owned(dag);
+    for v in frozen {
+        simp.froze(v);
+    }
+    simp.bve_simplify();
+    let result = simp.finalize();
+    // Choosing pivot=true satisfies every clause, regardless of the outputs.
+    assert!(result.clause().all(|c| c.as_slice() == [Lit::TRUE]));
+}
+
+#[test]
+fn bve_bounds_resolvent_length_without_committing_partial_elimination() {
+    for (width, eliminated) in [(97, true), (98, false)] {
+        let mut dag = DagCnf::new();
+        let inputs: Vec<_> = (0..width + 2).map(|_| dag.new_var().lit()).collect();
+        let shared = dag.new_or(inputs[..width].iter().copied());
+        let root = dag.new_or([shared, inputs[width], inputs[width + 1]]);
+        let original = dag.clone();
+        let frozen: Vec<_> = inputs.iter().map(|l| l.var()).chain([root.var()]).collect();
+        for objective in [BveObjective::Clauses, BveObjective::Literals] {
+            let mut simp = DagCnfSimplify::new(&dag);
+            for &v in &frozen {
+                simp.froze(v);
+            }
+            simp.bve_simplify_with_objective(objective);
+            let result = simp.finalize();
+            assert_eq!(result[shared.var()].is_empty(), eliminated, "width={width}");
+            if eliminated {
+                assert_eq!(result.clause().map(|c| c.len()).max(), Some(100));
+            } else {
+                // The first polarity produces short resolvents; the second
+                // produces a 101-literal clause. Reject the entire attempt.
+                assert_eq!(result.num_clause(), original.num_clause());
+                for v in original.var_iter() {
+                    let clauses = |cnf: &DagCnf| -> BTreeSet<Vec<Lit>> {
+                        cnf[v].iter().map(|c| c.to_vec()).collect()
+                    };
+                    assert_eq!(clauses(&result), clauses(&original));
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn bve_preserves_projected_models_on_generated_gate_networks() {
     use rand::{RngExt, SeedableRng, rngs::StdRng};
     let mut rng = StdRng::seed_from_u64(0xb0e_u64);

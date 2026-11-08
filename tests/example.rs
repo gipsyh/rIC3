@@ -9,7 +9,7 @@ fn counter_is_sat() {
     for file in ["counter.aig", "counter.btor"] {
         let model = root.join("examples/counter").join(file);
         for engine in ["ic3", "bmc"] {
-            check(&model, &[engine], "SAT");
+            check(&model, &[engine], "SAT", true);
         }
     }
 }
