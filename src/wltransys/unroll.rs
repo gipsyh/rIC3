@@ -49,7 +49,7 @@ impl WlTransysUnroll {
         for i in self.ts.input.iter() {
             let ni = Term::new_var(i.sort());
             self.next_map.get_mut(i).unwrap().push(ni.clone());
-            ilmap.insert(self.next(i, self.num_unroll), ni);
+            ilmap.insert(i.clone(), ni);
         }
         let mut connect = Term::bool_const(true);
         for l in self.ts.latch.iter() {
@@ -61,18 +61,20 @@ impl WlTransysUnroll {
                 nl = nv;
             }
             self.next_map.get_mut(l).unwrap().push(nl.clone());
-            ilmap.insert(self.next(l, self.num_unroll), nl);
+            ilmap.insert(l.clone(), nl);
         }
         if let Some(c) = &mut self.new_next_latch {
             c.push(connect);
         }
         let mut cache = GHashMap::new();
-        for (_, n) in self.next_map.iter_mut() {
+        for (t, n) in self.next_map.iter_mut() {
             if n.len() == self.num_unroll + 2 {
                 continue;
             }
-            let nt = &n[self.num_unroll];
-            n.push(nt.cached_apply(&|t| ilmap.get(t).cloned(), &mut cache));
+            // Instantiate the original term at the new frame. Rewriting an
+            // already unrolled term is unsound: simplification can erase its
+            // current-state subterms (e.g. !!x becomes x for a toggling latch).
+            n.push(t.cached_apply(&|t| ilmap.get(t).cloned(), &mut cache));
         }
         self.num_unroll += 1;
     }
