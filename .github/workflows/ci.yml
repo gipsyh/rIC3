@@ -30,18 +30,12 @@ jobs:
         run: cargo fmt --all --check
       - name: Build
         run: cargo build --workspace
-      - name: Run test
-        run: cargo test --workspace
-      - name: Pull certifaiger
+      - name: Pull certificate checkers
         run: |
           docker pull ghcr.io/gipsyh/certifaiger:latest
           docker pull ghcr.io/gipsyh/cerbtora:latest
-      - name: Test examples
-        run: |
-          cargo r -- check ./examples/counter/counter.btor --certify portfolio
-          cargo r -- check ./examples/counter/counter.btor --certify ic3
-          cargo r -- check ./examples/counter/counter.btor --certify bmc
-          # cargo r -- check ./examples/fifo/fifo.btor --certify portfolio
+      - name: Run test
+        run: cargo test --workspace
 
   deploy:
     needs: build-and-test
