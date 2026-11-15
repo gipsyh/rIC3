@@ -25,7 +25,7 @@ impl Scheduler {
         self.config_counter[prop] += 1;
         let num_configs = self.configs.len();
         assert!(num_configs > 0, "polynexus worker configs cannot be empty");
-        let (name, cfg) = self.configs.iter(true).nth(idx).unwrap();
+        let (name, cfg) = self.configs.iter(true).nth(idx % num_configs).unwrap();
         let mut cfg = cfg
             .into_ic3()
             .unwrap_or_else(|_| panic!("polynexus worker config `{name}` is not ic3"));
