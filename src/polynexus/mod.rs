@@ -8,13 +8,13 @@ use crate::{
     polynexus::schd::Scheduler,
     tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
-    utils::{EngineCtrl, StateIpcTx},
+    utils::{EngineCtrl, StateIpcRx, StateIpcTx},
 };
 use clap::Args;
 use giputils::{TerminateCtrl, hash::GHashMap};
 use ipc_channel::{
     TrySelectError,
-    ipc::{self, IpcReceiverSet, IpcSelectionResult, IpcSender},
+    ipc::{self, IpcOneShotServer, IpcReceiver, IpcReceiverSet, IpcSelectionResult, IpcSender},
 };
 use log::{LevelFilter, info, set_max_level};
 use logicrs::VarSymbols;
@@ -50,6 +50,7 @@ pub struct PolyNexusConfig {
 impl_config_deref!(PolyNexusConfig);
 
 type WorkerDoneTx = IpcSender<WorkerDone>;
+type WorkerReceivers = (StateIpcRx, IpcReceiver<WorkerDone>);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct WorkerDone {
@@ -112,11 +113,13 @@ impl PolyNexus {
         state_ids: &mut GHashMap<u64, Pid>,
         done_ids: &mut GHashMap<u64, Pid>,
     ) {
-        let (state_tx, state_rx) = ipc::channel().unwrap();
-        let (done_tx, done_rx) = ipc::channel().unwrap();
+        // Mach port rights are not inherited across fork on macOS. Create
+        // the channels in the child and transfer their receivers explicitly.
+        let (server, name) = IpcOneShotServer::<WorkerReceivers>::new().unwrap();
         match fork::fork().unwrap() {
             fork::Fork::Parent(child) => {
                 let pid = Pid::from_raw(child);
+                let (_, (state_rx, done_rx)) = server.accept().unwrap();
                 let state_id = state_recv.add(state_rx).unwrap();
                 let done_id = done_recv.add(done_rx).unwrap();
                 running.insert(pid, RunningWorker { prop });
@@ -124,7 +127,13 @@ impl PolyNexus {
                 done_ids.insert(done_id, pid);
                 info!("start polynexus worker p{prop}");
             }
-            fork::Fork::Child => Self::run_worker(prop, cfg, ts, state_tx, done_tx),
+            fork::Fork::Child => {
+                let bootstrap = IpcSender::connect(name).unwrap();
+                let (state_tx, state_rx) = ipc::channel().unwrap();
+                let (done_tx, done_rx) = ipc::channel().unwrap();
+                bootstrap.send((state_rx, done_rx)).unwrap();
+                Self::run_worker(prop, cfg, ts, state_tx, done_tx)
+            }
         }
     }
 
