@@ -25,6 +25,7 @@ use ipc_channel::{
 use log::{LevelFilter, info, set_max_level};
 use logicrs::VarSymbols;
 use nix::errno::Errno;
+use nix::sys::resource::{Resource, getrlimit, setrlimit};
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -46,6 +47,10 @@ pub struct PortfolioConfig {
     /// worker configuration
     #[arg(long = "config")]
     pub config: Option<String>,
+
+    /// Address space limit per worker in GiB
+    #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u64).range(1..=u64::MAX / (1 << 30)))]
+    pub worker_mem_limit: u64,
 
     /// share lemma
     #[arg(long = "share-lemma")]
@@ -341,6 +346,11 @@ impl Engine for Portfolio {
                     self.stid_to_wid.insert(state_trace_id, worker_idx);
                 }
                 fork::Fork::Child => {
+                    let (_, hard_limit) = getrlimit(Resource::RLIMIT_AS)
+                        .expect("failed to get portfolio worker memory limit");
+                    let limit = (self.cfg.worker_mem_limit * (1 << 30)).min(hard_limit);
+                    setrlimit(Resource::RLIMIT_AS, limit, limit)
+                        .expect("failed to set portfolio worker memory limit");
                     worker.run(
                         &self.ts, &self.ots, &self.rst, &self.sym, state_tx, lemma_recv,
                     );
