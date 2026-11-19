@@ -61,8 +61,9 @@ impl<T: Copy + Clone> Gvec<T> {
 }
 
 impl<T: Default> Gvec<T> {
+    /// Extends to at least `size` elements, filling new entries with defaults.
     #[inline]
-    pub fn reserve(&mut self, size: usize) {
+    pub fn extend_to(&mut self, size: usize) {
         if self.len() <= size {
             self.data.resize_with(size, Default::default);
         }

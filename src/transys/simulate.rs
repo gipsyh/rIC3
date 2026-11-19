@@ -53,7 +53,7 @@ impl Transys {
         }
         self.load_init(&mut slv);
         let mut sim = VarBitVec::new();
-        sim.reserve(self.max_var());
+        sim.extend_to(self.max_var());
         while sim.bv_len() < num_word * BitVec::WORD_SIZE {
             if !slv.solve(&[]) {
                 break;
@@ -79,7 +79,7 @@ impl Transys {
     // pub fn rt_simulation(&self, init: &VarBitVec, num_word: usize) -> VarBitVec {
     //     assert!(init.bv_len() > 0);
     //     let mut sim = VarBitVec::new();
-    //     sim.reserve(self.max_var());
+    //     sim.extend_to(self.max_var());
     //     let mut slv = DagCnfSolver::new(&self.rel);
     //     for cls in self.constraint() {
     //         slv.add_clause(&cls.cube());
@@ -144,7 +144,7 @@ impl Transys {
         assert!(init.bv_len() > 0);
         let mut sim = VarBitVec::new();
         let consider: Vec<_> = self.latch().filter(|v| !init[*v].is_empty()).collect();
-        sim.reserve(self.max_var());
+        sim.extend_to(self.max_var());
         let mut slv = DagCnfSolver::new(&self.rel);
         for cls in self.constraint() {
             slv.add_clause(&cls.cube());

@@ -25,8 +25,8 @@ pub struct Watchers {
 
 impl Watchers {
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.wtrs.reserve(var)
+    pub fn extend_to(&mut self, var: Var) {
+        self.wtrs.extend_to(var)
     }
 
     #[inline]

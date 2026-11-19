@@ -90,7 +90,7 @@ pub struct Frames {
 impl Frames {
     pub fn new(ts: &Grc<TransysCtx>) -> Self {
         let mut tmp_lit_set = LitSet::new();
-        tmp_lit_set.reserve(ts.max_latch);
+        tmp_lit_set.extend_to(ts.max_latch);
         Self {
             frames: Default::default(),
             inf: Default::default(),
@@ -111,8 +111,8 @@ impl Frames {
         self.frames.push(Frame::new());
     }
 
-    pub fn reserve(&mut self, var: Var) {
-        self.tmp_lit_set.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.tmp_lit_set.extend_to(var);
     }
 
     /// Check whether `lemma` is already syntactically subsumed by an existing lemma.

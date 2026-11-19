@@ -12,8 +12,8 @@ pub struct BinaryHeap {
 
 impl BinaryHeap {
     #[inline]
-    fn reserve(&mut self, var: Var) {
-        self.pos.reserve(var);
+    fn extend_to(&mut self, var: Var) {
+        self.pos.extend_to(var);
     }
 
     #[inline]
@@ -117,9 +117,9 @@ impl Index<Var> for Activity {
 
 impl Activity {
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.activity.reserve(var);
-        self.bucket_heap.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.activity.extend_to(var);
+        self.bucket_heap.extend_to(var);
     }
 
     #[inline]
@@ -195,10 +195,10 @@ pub struct Vsids {
 
 impl Vsids {
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.heap.reserve(var);
-        self.activity.reserve(var);
-        self.bucket.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.heap.extend_to(var);
+        self.activity.extend_to(var);
+        self.bucket.extend_to(var);
     }
 
     #[inline]
@@ -223,9 +223,9 @@ impl Vsids {
         if !self.enable_bucket {
             self.heap.up(var, &self.activity);
         }
-        self.bucket
-            .buckets
-            .reserve(self.activity.bucket_table[self.activity.bucket_table.len() - 1] as usize + 1);
+        self.bucket.buckets.extend_to(
+            self.activity.bucket_table[self.activity.bucket_table.len() - 1] as usize + 1,
+        );
     }
 
     #[inline]
@@ -256,7 +256,7 @@ impl Bucket {
     #[inline]
     pub fn new() -> Self {
         let mut buckets: Gvec<_> = Gvec::new();
-        buckets.reserve(10);
+        buckets.extend_to(10);
         Self {
             buckets,
             in_bucket: Default::default(),
@@ -265,8 +265,8 @@ impl Bucket {
     }
 
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.in_bucket.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.in_bucket.extend_to(var);
     }
 
     #[inline]

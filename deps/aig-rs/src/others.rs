@@ -134,7 +134,7 @@ impl Aig {
     pub fn reencode(&self) -> Self {
         let mut res = Self::new();
         let mut encode_map = Gvec::new();
-        encode_map.reserve(self.nodes.len());
+        encode_map.extend_to(self.nodes.len());
         encode_map[*Var::CONST] = Var::CONST;
         let mut max_id = 0;
         for &l in self.inputs.iter() {

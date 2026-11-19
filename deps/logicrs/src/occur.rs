@@ -74,8 +74,8 @@ impl<T> Occurs<T> {
 
     #[inline]
     #[allow(unused)]
-    pub fn reserve(&mut self, var: Var) {
-        self.occurs.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.occurs.extend_to(var);
     }
 
     #[inline]

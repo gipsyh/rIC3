@@ -29,8 +29,8 @@ impl DagCnf {
     #[inline]
     pub fn new_var(&mut self) -> Var {
         self.max_var += 1;
-        self.dep.reserve(self.max_var);
-        self.cnf.reserve(self.max_var);
+        self.dep.extend_to(self.max_var);
+        self.cnf.extend_to(self.max_var);
         self.max_var
     }
 
@@ -38,8 +38,8 @@ impl DagCnf {
     pub fn new_var_to(&mut self, n: Var) {
         if self.max_var < n {
             self.max_var = n;
-            self.dep.reserve(n);
-            self.cnf.reserve(n);
+            self.dep.extend_to(n);
+            self.cnf.extend_to(n);
         }
     }
 

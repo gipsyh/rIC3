@@ -9,10 +9,10 @@ pub struct Eqc {
 }
 
 impl Eqc {
-    pub fn reserve(&mut self, var: Var) {
+    pub fn extend_to(&mut self, var: Var) {
         while self.eq.max_index() < var {
             let x = Var(Into::<u32>::into(self.eq.max_index()) + 1);
-            self.eq.reserve(x);
+            self.eq.extend_to(x);
             let x = x.lit();
             self.eq[x] = x;
             self.eq[!x] = !x;
@@ -45,7 +45,7 @@ impl Eqc {
 impl Default for Eqc {
     fn default() -> Self {
         let mut eq = LitMap::new();
-        eq.reserve(Var::CONST);
+        eq.extend_to(Var::CONST);
         eq[Lit::TRUE] = Lit::TRUE;
         eq[Lit::FALSE] = Lit::FALSE;
         Self { eq }

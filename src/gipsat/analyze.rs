@@ -21,8 +21,8 @@ pub struct Analyze {
 }
 
 impl Analyze {
-    pub fn reserve(&mut self, var: Var) {
-        self.mark.reserve(var)
+    pub fn extend_to(&mut self, var: Var) {
+        self.mark.extend_to(var)
     }
 
     #[inline]

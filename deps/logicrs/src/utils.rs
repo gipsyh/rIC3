@@ -22,7 +22,7 @@ impl<T: Default> VarMap<T> {
     #[inline]
     pub fn new_with(var: Var) -> Self {
         let mut res = Self::new();
-        res.reserve(var);
+        res.extend_to(var);
         res
     }
 
@@ -32,8 +32,9 @@ impl<T: Default> VarMap<T> {
         Var((self.len() as u32) - 1)
     }
 
+    /// Extends through `var` (inclusive), filling new entries with defaults.
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
+    pub fn extend_to(&mut self, var: Var) {
         let len = Into::<usize>::into(var) + 1;
         if self.len() < len {
             self.map.resize_with(len, Default::default)
@@ -118,12 +119,13 @@ impl<T: Default> LitMap<T> {
     #[inline]
     pub fn new_with(var: Var) -> Self {
         let mut res = Self::new();
-        res.reserve(var);
+        res.extend_to(var);
         res
     }
 
+    /// Extends through both literals of `var`, filling new entries with defaults.
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
+    pub fn extend_to(&mut self, var: Var) {
         let len = (Into::<usize>::into(var) + 1) * 2;
         if self.len() < len {
             self.map.resize_with(len, Default::default)
@@ -202,7 +204,7 @@ impl VarSet {
     #[inline]
     pub fn new_with(var: Var) -> Self {
         let mut res = Self::new();
-        res.reserve(var);
+        res.extend_to(var);
         res
     }
 
@@ -213,8 +215,8 @@ impl VarSet {
     }
 
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.has.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.has.extend_to(var);
     }
 
     #[inline]
@@ -284,13 +286,13 @@ impl LitSet {
     #[inline]
     pub fn new_with(var: Var) -> Self {
         let mut res = Self::new();
-        res.reserve(var);
+        res.extend_to(var);
         res
     }
 
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.has.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.has.extend_to(var);
     }
 
     #[inline]
@@ -339,9 +341,9 @@ impl VarRef {
     }
 
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.refs.reserve(var);
-        self.dirty.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.refs.extend_to(var);
+        self.dirty.extend_to(var);
     }
 
     #[inline]

@@ -28,7 +28,7 @@ impl<T: TransysIf> Deref for TransysUnroll<T> {
 impl<T: TransysIf> TransysUnroll<T> {
     pub fn new(ts: &T) -> Self {
         let mut next_map: LitMap<Vec<_>> = LitMap::new();
-        next_map.reserve(ts.max_var());
+        next_map.extend_to(ts.max_var());
         for v in VarRange::new_inclusive(Var::CONST, ts.max_var()) {
             let l = v.lit();
             next_map[l].push(l);

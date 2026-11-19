@@ -11,7 +11,7 @@ pub struct Activity {
 impl Activity {
     pub fn new(ts: &TransysCtx) -> Self {
         let mut activity = VarMap::new();
-        activity.reserve(ts.max_latch);
+        activity.extend_to(ts.max_latch);
         Self {
             activity,
             max_act: 0.0,
@@ -21,8 +21,8 @@ impl Activity {
 
     #[inline]
     #[allow(unused)]
-    pub fn reserve(&mut self, var: Var) {
-        self.activity.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.activity.extend_to(var);
     }
 
     #[inline]

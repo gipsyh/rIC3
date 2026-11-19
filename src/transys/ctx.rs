@@ -24,9 +24,9 @@ impl TransysIf for TransysCtx {
     #[inline]
     fn new_var(&mut self) -> Var {
         let max_var = self.rel.new_var();
-        self.init_map.reserve(max_var);
-        self.next_map.reserve(max_var);
-        self.is_latch.reserve(max_var);
+        self.init_map.extend_to(max_var);
+        self.next_map.extend_to(max_var);
+        self.is_latch.extend_to(max_var);
         max_var
     }
 

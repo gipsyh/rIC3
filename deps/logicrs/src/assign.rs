@@ -16,13 +16,13 @@ impl VarAssign {
     #[inline]
     pub fn new_with(var: Var) -> Self {
         let mut v = VarAssign::new();
-        v.reserve(var);
+        v.extend_to(var);
         v
     }
 
     #[inline]
-    pub fn reserve(&mut self, var: Var) {
-        self.v.reserve(var)
+    pub fn extend_to(&mut self, var: Var) {
+        self.v.extend_to(var)
     }
 
     #[inline]
@@ -56,7 +56,7 @@ impl Default for VarAssign {
     fn default() -> Self {
         let v = VarMap::new();
         let mut res = Self { v };
-        res.reserve(Var::CONST);
+        res.extend_to(Var::CONST);
         res.set(Lit::TRUE);
         res
     }

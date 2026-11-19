@@ -19,7 +19,7 @@ impl BVA {
         let mut lit_count_adjust: LitMap<usize> = LitMap::new();
         let mut dc = DagCnf::new();
         dc.new_var_to(cnf.max_var());
-        lit_count_adjust.reserve(cnf.max_var());
+        lit_count_adjust.extend_to(cnf.max_var());
         let mut res = Self {
             cdb,
             occur,
@@ -32,17 +32,17 @@ impl BVA {
         res
     }
 
-    fn reserve(&mut self, var: Var) {
+    fn extend_to(&mut self, var: Var) {
         assert!(self.dc.max_var() >= var);
-        self.occur.reserve(var);
-        self.lit_count_adjust.reserve(var);
+        self.occur.extend_to(var);
+        self.lit_count_adjust.extend_to(var);
     }
 
     fn add_clause(&mut self, rel: &[Lit]) {
         let rel = LitOrdVec::from(rel);
         let relid = self.cdb.alloc(rel);
         for l in self.cdb[relid].clone() {
-            self.reserve(l.var());
+            self.extend_to(l.var());
             self.occur.add(l, relid);
         }
     }

@@ -41,7 +41,7 @@ impl<T: Into<u32> + Copy + PartialEq, CMP: BinaryHeapCmp<T>> BinaryHeap<T, CMP> 
 
     #[inline]
     pub fn up(&mut self, v: T) {
-        self.pos.reserve(v.into() as usize + 1);
+        self.pos.extend_to(v.into() as usize + 1);
         let mut idx = match self.pos[v.into()] {
             OptionU32::NONE => return,
             idx => *idx,
@@ -63,7 +63,7 @@ impl<T: Into<u32> + Copy + PartialEq, CMP: BinaryHeapCmp<T>> BinaryHeap<T, CMP> 
 
     #[inline]
     pub fn down(&mut self, v: T) {
-        self.pos.reserve(v.into() as usize + 1);
+        self.pos.extend_to(v.into() as usize + 1);
         let mut idx = match self.pos[v.into()] {
             OptionU32::NONE => return,
             idx => *idx,
@@ -96,7 +96,7 @@ impl<T: Into<u32> + Copy + PartialEq, CMP: BinaryHeapCmp<T>> BinaryHeap<T, CMP> 
 
     #[inline]
     pub fn push(&mut self, v: T) {
-        self.pos.reserve(v.into() as usize + 1);
+        self.pos.extend_to(v.into() as usize + 1);
         if self.pos[v.into()].is_some() {
             return;
         }

@@ -15,8 +15,8 @@ impl Domain {
         Self { domain, fixed: 1 }
     }
 
-    pub fn reserve(&mut self, var: Var) {
-        self.domain.reserve(var);
+    pub fn extend_to(&mut self, var: Var) {
+        self.domain.extend_to(var);
     }
 
     #[inline]

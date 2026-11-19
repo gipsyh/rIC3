@@ -348,17 +348,17 @@ impl Satif for DagCnfSolver {
         self.reset();
         let v = self.constrain_act;
         let var = Var::new(self.num_var() + 1);
-        self.value.reserve(var);
-        self.level.reserve(var);
-        self.reason.reserve(var);
-        self.watchers.reserve(var);
-        self.vsids.reserve(var);
-        self.phase_saving.reserve(var);
-        self.eqc.reserve(var);
-        self.analyze.reserve(var);
-        self.unsat_core.reserve(var);
-        self.domain.reserve(var);
-        self.mark.reserve(var);
+        self.value.extend_to(var);
+        self.level.extend_to(var);
+        self.reason.extend_to(var);
+        self.watchers.extend_to(var);
+        self.vsids.extend_to(var);
+        self.phase_saving.extend_to(var);
+        self.eqc.extend_to(var);
+        self.analyze.extend_to(var);
+        self.unsat_core.extend_to(var);
+        self.domain.extend_to(var);
+        self.mark.extend_to(var);
         self.constrain_act = var;
         v
     }
