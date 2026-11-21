@@ -1,11 +1,9 @@
 use crate::{Lit, LitOrdVec, LitVec, lemmas_subsume_simplify};
+use derive_more::{Deref, DerefMut, From, IntoIterator};
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Deref, DerefMut},
-    slice, vec,
-};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref, DerefMut, IntoIterator, From)]
+#[into_iterator(owned, ref)]
 pub struct LitVvec {
     vec: Vec<LitVec>,
 }
@@ -99,53 +97,11 @@ impl LitVvec {
     }
 }
 
-impl Deref for LitVvec {
-    type Target = Vec<LitVec>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.vec
-    }
-}
-
-impl DerefMut for LitVvec {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.vec
-    }
-}
-
-impl IntoIterator for LitVvec {
-    type Item = LitVec;
-    type IntoIter = vec::IntoIter<LitVec>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.vec.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a LitVvec {
-    type Item = &'a LitVec;
-    type IntoIter = slice::Iter<'a, LitVec>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.vec.iter()
-    }
-}
-
 impl FromIterator<LitVec> for LitVvec {
     #[inline]
     fn from_iter<I: IntoIterator<Item = LitVec>>(iter: I) -> Self {
         Self {
             vec: Vec::from_iter(iter),
         }
-    }
-}
-
-impl From<Vec<LitVec>> for LitVvec {
-    fn from(vec: Vec<LitVec>) -> Self {
-        Self { vec }
     }
 }

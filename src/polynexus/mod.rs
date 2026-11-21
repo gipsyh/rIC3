@@ -4,13 +4,13 @@ use crate::{
     BlCex, BlEngine, BlProof, Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig, WorkerConfigs},
     ic3::{IC3, IC3Config},
-    impl_config_deref,
     polynexus::schd::Scheduler,
     tracer::{StateTracerIf, Tracer, TracerIf},
     transys::{Transys, certify::Restore},
     utils::{EngineCtrl, StateIpcRx, StateIpcTx},
 };
 use clap::Args;
+use derive_more::{Deref, DerefMut};
 use giputils::{TerminateCtrl, hash::GHashMap};
 use ipc_channel::{
     TrySelectError,
@@ -34,8 +34,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Default, Deref, DerefMut)]
 pub struct PolyNexusConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
@@ -46,8 +48,6 @@ pub struct PolyNexusConfig {
     #[arg(long = "workers")]
     pub workers: Option<usize>,
 }
-
-impl_config_deref!(PolyNexusConfig);
 
 type WorkerDoneTx = IpcSender<WorkerDone>;
 type WorkerReceivers = (StateIpcRx, IpcReceiver<WorkerDone>);

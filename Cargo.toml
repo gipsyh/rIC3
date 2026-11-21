@@ -22,6 +22,7 @@ members = [
 default-members = ["."]
 
 [workspace.dependencies]
+derive_more = { version = "2.1.1", default-features = false }
 aig = { path = "deps/aig-rs", version = "0.4.6" }
 bitwuzla = { package = "smtif-bitwuzla", path = "deps/bitwuzla-rs", version = "0.1.0" }
 btor = { path = "deps/btor-rs", version = "0.2.2" }
@@ -40,6 +41,7 @@ name = "ric3"
 path = "src/main.rs"
 
 [dependencies]
+derive_more = { workspace = true, features = ["deref", "deref_mut", "into_iterator"] }
 aig.workspace = true
 cadical.workspace = true
 kissat.workspace = true

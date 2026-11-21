@@ -5,25 +5,23 @@ use crate::{
     BlEngine, Engine, McResult, WlCex, WlEngine, WlProof,
     config::EngineConfigBase,
     ic3::{IC3, IC3Config},
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     utils::EngineCtrl,
     wltransys::{WlTransys, bitblast::BitblastMap},
 };
 use clap::Args;
+use derive_more::{Deref, DerefMut};
 use giputils::TerminateCtrl;
 use log::info;
 use logicrs::VarSymbols;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Instant};
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct CegarConfig {
     #[command(flatten)]
     pub base: EngineConfigBase,
 }
-
-impl_config_deref!(CegarConfig);
 
 pub struct Cegar {
     cfg: CegarConfig,

@@ -3,7 +3,6 @@ use crate::{
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{
         Transys, TransysCtx, TransysIf, certify::Restore, lift::TsLift, unroll::TransysUnroll,
@@ -13,6 +12,7 @@ use crate::{
 };
 use activity::Activity;
 use clap::{ArgAction, Args, Parser};
+use derive_more::{Deref, DerefMut};
 use frame::Frames;
 use giputils::{TerminateCtrl, logger::IntervalLogger, ptr::Grc};
 use log::{Level, debug, error, info, trace};
@@ -40,8 +40,10 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct IC3Config {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
@@ -119,8 +121,6 @@ pub struct IC3Config {
     #[arg(skip)]
     pub local_proof: bool,
 }
-
-impl_config_deref!(IC3Config);
 
 impl Default for IC3Config {
     fn default() -> Self {

@@ -1,9 +1,11 @@
 use super::DagCnfSolver;
+use derive_more::{Deref, DerefMut};
 use logicrs::{DagCnf, Lit, Var, VarAssign, VarSet};
-use std::ops::{Deref, DerefMut};
 
-#[derive(Clone)]
+#[derive(Clone, Deref, DerefMut)]
 pub struct Domain {
+    #[deref]
+    #[deref_mut]
     domain: VarSet,
     pub fixed: u32,
 }
@@ -59,22 +61,6 @@ impl Domain {
     #[inline]
     pub fn len(&self) -> u32 {
         self.domain.len()
-    }
-}
-
-impl Deref for Domain {
-    type Target = VarSet;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.domain
-    }
-}
-
-impl DerefMut for Domain {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.domain
     }
 }
 

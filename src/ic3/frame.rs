@@ -1,16 +1,15 @@
 use super::{IC3, proofoblig::ProofObligation};
 use crate::transys::TransysCtx;
+use derive_more::{Deref, DerefMut, IntoIterator};
 use giputils::hash::GHashSet;
 use giputils::ptr::Grc;
 use logicrs::{Lit, LitOrdVec, LitSet, LitVec, Var, satif::Satif};
-use std::{
-    fmt::Write,
-    ops::{Deref, DerefMut, Index},
-    vec,
-};
+use std::{fmt::Write, ops::Index};
 
-#[derive(Clone)]
+#[derive(Clone, Deref, DerefMut)]
 pub struct FrameLemma {
+    #[deref]
+    #[deref_mut]
     lemma: LitOrdVec,
     pub po: Option<ProofObligation>,
     pub _ctp: Option<LitVec>,
@@ -27,23 +26,7 @@ impl FrameLemma {
     }
 }
 
-impl Deref for FrameLemma {
-    type Target = LitOrdVec;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.lemma
-    }
-}
-
-impl DerefMut for FrameLemma {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.lemma
-    }
-}
-
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Deref, DerefMut, IntoIterator)]
 pub struct Frame {
     lemmas: Vec<FrameLemma>,
 }
@@ -51,32 +34,6 @@ pub struct Frame {
 impl Frame {
     pub fn new() -> Self {
         Self { lemmas: Vec::new() }
-    }
-}
-
-impl Deref for Frame {
-    type Target = Vec<FrameLemma>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.lemmas
-    }
-}
-
-impl DerefMut for Frame {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.lemmas
-    }
-}
-
-impl IntoIterator for Frame {
-    type Item = FrameLemma;
-    type IntoIter = vec::IntoIter<FrameLemma>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.lemmas.into_iter()
     }
 }
 

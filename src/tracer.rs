@@ -2,14 +2,12 @@ use crate::{
     McBlCertificate, McResult,
     utils::{LemmaIpcRx, LemmaIpcTx, StateIpcTx},
 };
+use derive_more::Deref;
 use intertrait::{CastFrom, cast::CastBox};
 use ipc_channel::TryRecvError;
 use log::info;
 use logicrs::LitVec;
-use std::{
-    ops::Deref,
-    sync::mpsc::{self, Receiver, Sender},
-};
+use std::sync::mpsc::{self, Receiver, Sender};
 
 pub trait TracerIf: Sync + Send + CastFrom {}
 
@@ -41,14 +39,8 @@ impl StateTracerIf for StateChannelTracerSx {
 }
 
 /// Receiver part of state channel tracer
+#[derive(Deref)]
 pub struct StateChannelTracerRx(Receiver<(Option<usize>, McResult)>);
-
-impl Deref for StateChannelTracerRx {
-    type Target = Receiver<(Option<usize>, McResult)>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 /// Create a state channel tracer pair (sender, receiver)
 pub fn state_channel_tracer() -> (StateChannelTracerSx, StateChannelTracerRx) {
@@ -69,14 +61,8 @@ impl CertTracerIf for WitnessChannelTracerSx {
 }
 
 /// Receiver part of witness channel tracer
+#[derive(Deref)]
 pub struct WitnessChannelTracerRx(Receiver<McBlCertificate>);
-
-impl Deref for WitnessChannelTracerRx {
-    type Target = Receiver<McBlCertificate>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 /// Create a witness channel tracer pair (sender, receiver)
 pub fn witness_channel_tracer() -> (WitnessChannelTracerSx, WitnessChannelTracerRx) {

@@ -1,11 +1,11 @@
 use crate::{
     Engine, McResult, WlCex, WlEngine, WlProof,
     config::EngineConfigBase,
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
 use clap::Args;
+use derive_more::{Deref, DerefMut};
 use giputils::{TerminateCtrl, hash::GHashMap};
 use log::{error, info};
 use logicrs::fol::{FolOp, Sort, Term};
@@ -14,13 +14,11 @@ use std::sync::Arc;
 
 use crate::wlbmc::WlCtrl;
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct WlKindConfig {
     #[command(flatten)]
     pub base: EngineConfigBase,
 }
-
-impl_config_deref!(WlKindConfig);
 
 pub struct WlKind {
     uts: WlTransysUnroll,

@@ -10,26 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::{iter, time::Instant};
 use strum::AsRefStr;
 
-/// Macro to implement Deref and DerefMut for config structs that wrap EngineConfigBase
-#[macro_export]
-macro_rules! impl_config_deref {
-    ($config_type:ty) => {
-        impl std::ops::Deref for $config_type {
-            type Target = $crate::config::EngineConfigBase;
-
-            fn deref(&self) -> &Self::Target {
-                &self.base
-            }
-        }
-
-        impl std::ops::DerefMut for $config_type {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.base
-            }
-        }
-    };
-}
-
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfigBase {
     /// Property ID. If not specified, all properties are checked.

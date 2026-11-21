@@ -1,8 +1,8 @@
 use crate::wltransys::WlTransys;
+use derive_more::{Deref, DerefMut};
 use giputils::hash::{GHashMap, GHashSet};
 use logicrs::fol::{Term, TermValue, Value};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WlCex {
@@ -82,25 +82,9 @@ impl WlCex {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deref, DerefMut)]
 pub struct WlProof {
     pub proof: WlTransys,
-}
-
-impl Deref for WlProof {
-    type Target = WlTransys;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.proof
-    }
-}
-
-impl DerefMut for WlProof {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.proof
-    }
 }
 
 #[derive(Clone, Default)]

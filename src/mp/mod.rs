@@ -4,7 +4,6 @@ use crate::{
     BlEngine, Engine, McResult, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{
         Transys,
@@ -13,14 +12,17 @@ use crate::{
     utils::EngineCtrl,
 };
 use clap::{ArgAction, Args};
+use derive_more::{Deref, DerefMut};
 use giputils::logger::with_log_level;
 use log::{LevelFilter, error};
 use logicrs::VarSymbols;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct MultiPropConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     base: EngineConfigBase,
 
@@ -31,8 +33,6 @@ pub struct MultiPropConfig {
     #[arg(long = "no-parallel", action = ArgAction::SetFalse, default_value_t = true)]
     parallel: bool,
 }
-
-impl_config_deref!(MultiPropConfig);
 
 impl MultiPropConfig {
     pub fn validate(&self) {

@@ -1,6 +1,6 @@
-use std::ops::{Deref, DerefMut};
+use derive_more::{Deref, DerefMut};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deref, DerefMut)]
 pub struct OptionU8(u8);
 
 impl OptionU8 {
@@ -29,23 +29,7 @@ impl Default for OptionU8 {
     }
 }
 
-impl Deref for OptionU8 {
-    type Target = u8;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for OptionU8 {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deref, DerefMut)]
 pub struct OptionU32(u32);
 
 impl OptionU32 {
@@ -71,22 +55,6 @@ impl Default for OptionU32 {
     #[inline]
     fn default() -> Self {
         Self::NONE
-    }
-}
-
-impl Deref for OptionU32 {
-    type Target = u32;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for OptionU32 {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 

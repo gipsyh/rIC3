@@ -1,12 +1,12 @@
 use crate::{
     BlCex, BlEngine, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
-    impl_config_deref,
     tracer::{ExtractorIf, Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
+use derive_more::{Deref, DerefMut};
 use giputils::TerminateCtrl;
 use log::info;
 use logicrs::{LitVec, satif::Satif};
@@ -18,8 +18,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct BMCConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
@@ -39,8 +41,6 @@ pub struct BMCConfig {
     #[arg(long = "dyn-step", default_value_t = false)]
     pub dyn_step: bool,
 }
-
-impl_config_deref!(BMCConfig);
 
 impl Default for BMCConfig {
     fn default() -> Self {

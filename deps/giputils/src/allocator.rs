@@ -1,28 +1,16 @@
 use crate::{gvec::Gvec, hash::GHashMap};
+use derive_more::{Deref, DerefMut};
 use std::{
     mem::swap,
-    ops::{Deref, DerefMut, Index, IndexMut},
+    ops::{Index, IndexMut},
 };
 
+#[derive(Deref, DerefMut)]
 pub struct GallocElem<T> {
+    #[deref]
+    #[deref_mut]
     e: T,
     removed: bool,
-}
-
-impl<T> Deref for GallocElem<T> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.e
-    }
-}
-
-impl<T> DerefMut for GallocElem<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.e
-    }
 }
 
 impl<T> GallocElem<T> {

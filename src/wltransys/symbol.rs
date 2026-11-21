@@ -1,32 +1,16 @@
 use crate::wltransys::WlTransys;
+use derive_more::{Deref, DerefMut};
 use giputils::hash::GHashMap;
 use logicrs::fol::{Term, TermSymbol};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeSet,
-    ops::{Deref, DerefMut},
-};
+use std::collections::BTreeSet;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut)]
 pub struct WlTsSymbol {
+    #[deref]
+    #[deref_mut]
     pub signal: TermSymbol,
     pub prop: Vec<String>,
-}
-
-impl Deref for WlTsSymbol {
-    type Target = TermSymbol;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.signal
-    }
-}
-
-impl DerefMut for WlTsSymbol {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.signal
-    }
 }
 
 impl WlTsSymbol {

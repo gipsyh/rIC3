@@ -1,16 +1,16 @@
-use std::{
-    ops::{Deref, DerefMut, Index, IndexMut},
-    ptr, vec,
-};
-
+use derive_more::{Deref, DerefMut, From, IntoIterator};
 use rand::{
     RngExt,
     distr::{Distribution, StandardUniform},
     rngs::StdRng,
 };
 use serde::{Deserialize, Serialize};
+use std::{
+    ops::{Index, IndexMut},
+    ptr,
+};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Deref, DerefMut, IntoIterator, From)]
 pub struct Gvec<T> {
     data: Vec<T>,
 }
@@ -148,17 +148,6 @@ impl<T> IndexMut<usize> for Gvec<T> {
     }
 }
 
-impl<T> IntoIterator for Gvec<T> {
-    type Item = T;
-
-    type IntoIter = vec::IntoIter<T>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
-    }
-}
-
 impl<A> FromIterator<A> for Gvec<A> {
     #[inline]
     fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
@@ -174,13 +163,6 @@ impl<T, const N: usize> From<[T; N]> for Gvec<T> {
         Self {
             data: Vec::from(data),
         }
-    }
-}
-
-impl<T> From<Vec<T>> for Gvec<T> {
-    #[inline]
-    fn from(data: Vec<T>) -> Self {
-        Self { data }
     }
 }
 
@@ -201,21 +183,5 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Gvec<T> {
         D: serde::Deserializer<'de>,
     {
         Vec::<T>::deserialize(deserializer).map(Self::from)
-    }
-}
-
-impl<T> Deref for Gvec<T> {
-    type Target = Vec<T>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<T> DerefMut for Gvec<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
     }
 }

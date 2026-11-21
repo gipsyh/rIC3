@@ -1,11 +1,11 @@
 use crate::{
     Engine, McResult, WlCex, WlEngine,
     config::EngineConfigBase,
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, unroll::WlTransysUnroll},
 };
 use clap::Args;
+use derive_more::{Deref, DerefMut};
 use giputils::{TerminateCtrl, hash::GHashMap};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -31,13 +31,11 @@ impl TerminateCtrl for WlCtrl {
     }
 }
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct WlBMCConfig {
     #[command(flatten)]
     pub base: EngineConfigBase,
 }
-
-impl_config_deref!(WlBMCConfig);
 
 pub struct WlBMC {
     cfg: WlBMCConfig,

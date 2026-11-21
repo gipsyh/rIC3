@@ -11,9 +11,10 @@ use crate::ui::UiRenderer;
 use crate::utils::{
     CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx, install_interrupt_handler,
 };
-use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine, impl_config_deref};
+use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine};
 use anyhow::Context;
 use clap::{Args, Parser};
+use derive_more::{Deref, DerefMut};
 use giputils::TerminateCtrl;
 use giputils::hash::GHashMap;
 use giputils::logger::with_log_level;
@@ -36,8 +37,10 @@ use std::time::{Duration, Instant};
 use std::{process::exit, sync::mpsc, thread::spawn};
 use tempfile::TempDir;
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct PortfolioConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
@@ -56,8 +59,6 @@ pub struct PortfolioConfig {
     #[arg(long = "share-lemma")]
     pub share_lemma: bool,
 }
-
-impl_config_deref!(PortfolioConfig);
 
 impl Default for PortfolioConfig {
     fn default() -> Self {

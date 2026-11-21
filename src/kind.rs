@@ -1,12 +1,12 @@
 use crate::{
     BlCex, BlEngine, BlProof, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
-    impl_config_deref,
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
     utils::EngineCtrl,
 };
 use clap::{Args, Parser};
+use derive_more::{Deref, DerefMut};
 use giputils::TerminateCtrl;
 use log::{error, info};
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
@@ -16,8 +16,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct KindConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
@@ -36,8 +38,6 @@ pub struct KindConfig {
     #[arg(skip)]
     pub local_proof: bool,
 }
-
-impl_config_deref!(KindConfig);
 
 impl Default for KindConfig {
     fn default() -> Self {

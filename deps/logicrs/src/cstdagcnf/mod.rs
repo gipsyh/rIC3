@@ -2,19 +2,11 @@ mod bva;
 
 use crate::{Cnf, DagCnf};
 pub use bva::*;
-use std::ops::Deref;
+use derive_more::Deref;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deref)]
 pub struct CstDagCnf {
+    #[deref]
     pub dag: DagCnf,
     pub cst: Cnf,
-}
-
-impl Deref for CstDagCnf {
-    type Target = DagCnf;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.dag
-    }
 }

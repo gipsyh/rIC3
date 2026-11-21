@@ -1017,6 +1017,7 @@ name = "giputils"
 version = "0.3.6"
 dependencies = [
  "ahash",
+ "derive_more",
  "libc",
  "log",
  "rand 0.10.3",
@@ -1360,6 +1361,7 @@ name = "logicrs"
 version = "0.6.1"
 dependencies = [
  "ahash",
+ "derive_more",
  "enum-as-inner 0.6.1",
  "enumflags2",
  "giputils",
@@ -1901,6 +1903,7 @@ dependencies = [
  "chrono",
  "clap",
  "ctrlc",
+ "derive_more",
  "enum-as-inner 0.7.0",
  "env_logger",
  "fork",

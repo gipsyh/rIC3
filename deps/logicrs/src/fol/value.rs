@@ -2,31 +2,17 @@ use crate::{
     Lbool, LboolVec,
     fol::{Sort, Term},
 };
+use derive_more::{Deref, DerefMut};
 use enum_as_inner::EnumAsInner;
 use giputils::hash::GHashMap;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct ArrayValue {
+    #[deref]
+    #[deref_mut]
     value: GHashMap<usize, LboolVec>,
     sort: Sort,
-}
-
-impl Deref for ArrayValue {
-    type Target = GHashMap<usize, LboolVec>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl DerefMut for ArrayValue {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
-    }
 }
 
 impl ArrayValue {

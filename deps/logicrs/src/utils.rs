@@ -1,14 +1,15 @@
 use crate::{LboolVec, Lit, Var, VarRange};
+use derive_more::{Deref, DerefMut};
 use giputils::hash::GHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Display},
     mem::take,
-    ops::{Deref, DerefMut, Index, IndexMut},
+    ops::{Index, IndexMut},
     ptr, slice,
 };
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Deref, DerefMut)]
 pub struct VarMap<T> {
     map: Vec<T>,
 }
@@ -87,23 +88,7 @@ where
     }
 }
 
-impl<T> Deref for VarMap<T> {
-    type Target = Vec<T>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl<T> DerefMut for VarMap<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
-    }
-}
-
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Deref, DerefMut)]
 pub struct LitMap<T> {
     map: Vec<T>,
 }
@@ -170,22 +155,6 @@ impl<T> IndexMut<Lit> for LitMap<T> {
         }
         #[cfg(debug_assertions)]
         &mut self.map[index.0 as usize]
-    }
-}
-
-impl<T> Deref for LitMap<T> {
-    type Target = Vec<T>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl<T> DerefMut for LitMap<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
     }
 }
 
@@ -399,25 +368,9 @@ impl Iterator for VarRefIter {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deref, DerefMut)]
 pub struct VarVMap {
     map: GHashMap<Var, Var>,
-}
-
-impl Deref for VarVMap {
-    type Target = GHashMap<Var, Var>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl DerefMut for VarVMap {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
-    }
 }
 
 impl Index<Var> for VarVMap {
@@ -506,25 +459,9 @@ impl VarVMap {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deref, DerefMut)]
 pub struct VarLMap {
     map: GHashMap<Var, Lit>,
-}
-
-impl Deref for VarLMap {
-    type Target = GHashMap<Var, Lit>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl DerefMut for VarLMap {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
-    }
 }
 
 impl VarLMap {

@@ -1,6 +1,7 @@
 use crate::{Lbool, Lit, LitVec, Var, VarMap, VarRange};
+use derive_more::{Deref, DerefMut};
 use giputils::bitvec::BitVec;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::ops::{Index, IndexMut};
 
 #[derive(Clone)]
 pub struct VarAssign {
@@ -62,7 +63,7 @@ impl Default for VarAssign {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Deref, DerefMut)]
 pub struct VarBitVec {
     vbv: VarMap<BitVec>,
 }
@@ -80,22 +81,6 @@ impl IndexMut<Var> for VarBitVec {
     #[inline]
     fn index_mut(&mut self, var: Var) -> &mut Self::Output {
         &mut self.vbv[var]
-    }
-}
-
-impl Deref for VarBitVec {
-    type Target = VarMap<BitVec>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.vbv
-    }
-}
-
-impl DerefMut for VarBitVec {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.vbv
     }
 }
 

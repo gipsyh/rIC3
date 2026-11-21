@@ -13,6 +13,7 @@ name = "giputils"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+derive_more = { workspace = true, features = ["deref", "deref_mut", "from", "into_iterator"] }
 ahash.workspace = true
 libc.workspace = true
 log.workspace = true

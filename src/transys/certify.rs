@@ -2,10 +2,10 @@ use crate::{
     gipsat::DagCnfSolver,
     transys::{Transys, TransysIf, unroll::TransysUnroll},
 };
+use derive_more::{Deref, DerefMut};
 use giputils::hash::GHashMap;
 use logicrs::{Lit, LitVec, LitVvec, Var, VarVMap, satif::Satif};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BlCex {
@@ -158,25 +158,9 @@ impl BlCex {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Deref, DerefMut)]
 pub struct BlProof {
     pub proof: Transys,
-}
-
-impl Deref for BlProof {
-    type Target = Transys;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.proof
-    }
-}
-
-impl DerefMut for BlProof {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.proof
-    }
 }
 
 impl BlProof {

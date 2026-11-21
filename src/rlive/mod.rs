@@ -2,10 +2,10 @@ use crate::{
     BlCex, BlEngine, Engine, McResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
-    impl_config_deref,
     transys::{Transys, TransysIf, certify::Restore},
 };
 use clap::{Args, Parser};
+use derive_more::{Deref, DerefMut};
 use log::{LevelFilter, debug, error, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
 use serde::{Deserialize, Serialize};
@@ -24,16 +24,16 @@ pub struct Rlive {
     rst: Restore,
 }
 
-#[derive(Args, Clone, Debug, Serialize, Deserialize)]
+#[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct RliveConfig {
+    #[deref]
+    #[deref_mut]
     #[command(flatten)]
     pub base: EngineConfigBase,
 
     #[command(flatten)]
     pub preproc: PreprocConfig,
 }
-
-impl_config_deref!(RliveConfig);
 
 impl Rlive {
     #[inline]

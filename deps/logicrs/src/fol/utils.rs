@@ -1,10 +1,9 @@
 use super::{Term, op::FolOp};
-use std::{
-    ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFrom, RangeInclusive, RangeTo},
-    slice, vec,
-};
+use derive_more::{Deref, DerefMut, From, IntoIterator};
+use std::ops::{Index, IndexMut, Range, RangeFrom, RangeInclusive, RangeTo};
 
-#[derive(Clone, Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug, Deref, DerefMut, IntoIterator, From)]
+#[into_iterator(owned, ref)]
 pub struct TermVec {
     data: Vec<Term>,
 }
@@ -43,22 +42,6 @@ impl TermVec {
     //     }
     //     true
     // }
-}
-
-impl Deref for TermVec {
-    type Target = Vec<Term>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl DerefMut for TermVec {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
 }
 
 impl Index<usize> for TermVec {
@@ -121,26 +104,6 @@ impl FromIterator<Term> for TermVec {
     }
 }
 
-impl IntoIterator for TermVec {
-    type Item = Term;
-    type IntoIter = vec::IntoIter<Term>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a TermVec {
-    type Item = &'a Term;
-    type IntoIter = slice::Iter<'a, Term>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.iter()
-    }
-}
-
 impl From<&[Term]> for TermVec {
     #[inline]
     fn from(value: &[Term]) -> Self {
@@ -156,13 +119,6 @@ impl<const N: usize> From<[Term; N]> for TermVec {
         Self {
             data: Vec::from(value),
         }
-    }
-}
-
-impl From<Vec<Term>> for TermVec {
-    #[inline]
-    fn from(value: Vec<Term>) -> Self {
-        Self { data: value }
     }
 }
 

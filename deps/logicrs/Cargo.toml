@@ -10,6 +10,7 @@ keywords = ["logic"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+derive_more = { workspace = true, features = ["deref", "deref_mut", "from", "into_iterator"] }
 giputils.workspace = true
 ahash.workspace = true
 rand.workspace = true

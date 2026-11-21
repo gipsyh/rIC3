@@ -2,8 +2,8 @@ use super::{
     DagCnfSolver,
     cdb::{CREF_NONE, CRef},
 };
+use derive_more::{Deref, DerefMut};
 use logicrs::{Lit, LitVec, Var, VarMap};
-use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum Mark {
@@ -14,8 +14,10 @@ pub enum Mark {
     Failed,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Deref, DerefMut)]
 pub struct Analyze {
+    #[deref]
+    #[deref_mut]
     mark: VarMap<Mark>,
     clear: Vec<Lit>,
 }
@@ -47,21 +49,6 @@ impl Analyze {
             self.mark[*c] = Mark::Unseen;
         }
         self.clear.clear();
-    }
-}
-
-impl Deref for Analyze {
-    type Target = VarMap<Mark>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.mark
-    }
-}
-
-impl DerefMut for Analyze {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.mark
     }
 }
 
