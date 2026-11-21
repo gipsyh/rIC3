@@ -6,7 +6,7 @@ use crate::{
 };
 use clap::{Args, Parser};
 use derive_more::{Deref, DerefMut};
-use log::{LevelFilter, debug, error, warn};
+use log::{LevelFilter, debug, warn};
 use logicrs::{Lit, LitOrdVec, LitVec, Var, VarSymbols};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
@@ -129,10 +129,7 @@ impl Rlive {
 impl Rlive {
     pub fn new(cfg: RliveConfig, mut ts: Transys) -> Self {
         warn!("rlive is unstable, use with caution");
-        if ts.justice.is_empty() {
-            error!("rlive requires justice property");
-            panic!();
-        }
+        assert!(!ts.justice.is_empty(), "rlive requires justice property");
         let mut rst = Restore::new(&ts);
         ts.normalize_justice();
         if cfg.preproc.preproc {

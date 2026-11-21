@@ -8,7 +8,7 @@ use crate::{
 use clap::{Args, Parser};
 use derive_more::{Deref, DerefMut};
 use giputils::TerminateCtrl;
-use log::{error, info};
+use log::info;
 use logicrs::{Lit, LitVec, Var, VarRange, satif::Satif};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -48,18 +48,20 @@ impl Default for KindConfig {
 
 impl KindConfig {
     fn validate(&self) {
-        if self.step != 1 {
-            error!("k-induction step should be 1, got {}", self.step);
-            panic!();
-        }
-        if self.start != 0 {
-            error!("k-induction start should be 0, got {}", self.start);
-            panic!();
-        }
-        if self.local_proof && self.prop.is_none() {
-            error!("A property ID must be specified for local proof.");
-            panic!();
-        }
+        assert!(
+            self.step == 1,
+            "k-induction step should be 1, got {}",
+            self.step
+        );
+        assert!(
+            self.start == 0,
+            "k-induction start should be 0, got {}",
+            self.start
+        );
+        assert!(
+            !self.local_proof || self.prop.is_some(),
+            "A property ID must be specified for local proof."
+        );
     }
 }
 
@@ -217,11 +219,11 @@ impl Engine for Kind {
 
 impl BlEngine for Kind {
     fn proof(&mut self) -> BlProof {
-        if self.cfg.simple_path {
-            //TODO: support certifaiger with simple path constraint
-            error!("k-induction with simple path constraint not support certifaiger");
-            panic!();
-        }
+        //TODO: support certifaiger with simple path constraint
+        assert!(
+            !self.cfg.simple_path,
+            "k-induction with simple path constraint not support certifaiger"
+        );
         let mut ts = self.ots.clone();
         let eqi = self.rst.eq_invariant();
         let mut certifaiger_dnf = vec![];

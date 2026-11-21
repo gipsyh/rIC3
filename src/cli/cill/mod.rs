@@ -23,7 +23,7 @@ use rIC3::{
     wltransys::{WlTransys, bitblast::BitblastMap, symbol::WlTsSymbol},
 };
 use ratatui::crossterm::style::Stylize;
-use std::{collections::HashSet, env, fs};
+use std::{collections::HashSet, fs};
 use utils::CIllStat;
 
 #[derive(Subcommand, Debug, Clone)]
@@ -122,10 +122,7 @@ impl CIll {
 }
 
 pub fn cill(cmd: CIllCommands) -> anyhow::Result<()> {
-    if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", "info") };
-    }
-    logger_init();
+    logger_init(None);
     let rcfg = Ric3Config::from_file("ric3.toml")?;
     let rp = Ric3Proj::new()?;
     match cmd {

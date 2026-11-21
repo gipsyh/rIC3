@@ -14,7 +14,7 @@ use crate::{
 use clap::{ArgAction, Args};
 use derive_more::{Deref, DerefMut};
 use giputils::logger::with_log_level;
-use log::{LevelFilter, error};
+use log::LevelFilter;
 use logicrs::VarSymbols;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -36,10 +36,10 @@ pub struct MultiPropConfig {
 
 impl MultiPropConfig {
     pub fn validate(&self) {
-        if self.prop.is_some() {
-            error!("Cannot specify prop in a multi-prop engine.");
-            panic!();
-        }
+        assert!(
+            self.prop.is_none(),
+            "Cannot specify prop in a multi-prop engine."
+        );
     }
 }
 

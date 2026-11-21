@@ -2,15 +2,22 @@ mod cli;
 
 use crate::cli::cli_main;
 use env_logger::Target;
-use std::{fs, io::Write};
+use log::{Level, error};
+use std::{env, io::Write, panic};
 
 fn main() -> anyhow::Result<()> {
-    fs::create_dir_all("/tmp/rIC3")?;
     cli_main()
 }
 
-fn logger_init() {
-    env_logger::Builder::from_default_env()
+fn logger_init(level: Option<Level>) {
+    let mut builder = env_logger::Builder::new();
+    if let Some(level) = level {
+        builder.filter_level(level.to_level_filter());
+    } else {
+        builder.parse_filters(&env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()));
+    }
+    builder
+        .parse_write_style(&env::var("RUST_LOG_STYLE").unwrap_or_default())
         .format(|buf, record| {
             let now = time::OffsetDateTime::now_utc();
             let ts = now
@@ -31,4 +38,10 @@ fn logger_init() {
         .format_target(false)
         .target(Target::Stdout)
         .init();
+
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        error!("{info}");
+        default_hook(info);
+    }));
 }

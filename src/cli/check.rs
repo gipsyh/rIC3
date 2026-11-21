@@ -1,7 +1,7 @@
 use crate::logger_init;
 use anyhow::{Context, bail};
 use clap::{ArgAction, Parser};
-use log::info;
+use log::{Level, info};
 use rIC3::{
     BlEngine, Engine, McResult,
     config::EngineConfig,
@@ -13,7 +13,7 @@ use rIC3::{
     ui::UiRenderer,
     utils::install_interrupt_handler,
 };
-use std::{env, fs, path::PathBuf, process::exit};
+use std::{fs, path::PathBuf, process::exit};
 
 #[derive(Parser, Debug, Clone)]
 pub struct CheckConfig {
@@ -68,10 +68,7 @@ fn report_res(chk: &CheckConfig, res: McResult) {
 }
 
 pub fn check(mut chk: CheckConfig, cfg: EngineConfig) -> anyhow::Result<()> {
-    if env::var("RUST_LOG").is_err() {
-        unsafe { env::set_var("RUST_LOG", if chk.ui { "warn" } else { "info" }) };
-    }
-    logger_init();
+    logger_init(chk.ui.then_some(Level::Warn));
     if !chk.model.exists() {
         bail!("{} not found", chk.model.display());
     }

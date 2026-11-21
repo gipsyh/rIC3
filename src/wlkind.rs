@@ -7,7 +7,7 @@ use crate::{
 use clap::Args;
 use derive_more::{Deref, DerefMut};
 use giputils::{TerminateCtrl, hash::GHashMap};
-use log::{error, info};
+use log::info;
 use logicrs::fol::{FolOp, Sort, Term};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -72,14 +72,12 @@ impl WlKind {
 impl Engine for WlKind {
     fn check(&mut self) -> McResult {
         let step = self.cfg.step as usize;
-        if step != 1 {
-            error!("k-induction step should be 1, got {step}");
-            panic!();
-        }
-        if self.cfg.start != 0 {
-            error!("k-induction start should be 0, got {}", self.cfg.start);
-            panic!();
-        }
+        assert!(step == 1, "k-induction step should be 1, got {step}");
+        assert!(
+            self.cfg.start == 0,
+            "k-induction start should be 0, got {}",
+            self.cfg.start
+        );
         for k in 0..=self.cfg.end {
             if self.ctrl.is_terminated() {
                 return McResult::Unknown(k.checked_sub(1));

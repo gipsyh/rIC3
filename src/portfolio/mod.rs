@@ -35,7 +35,6 @@ use std::iter;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{process::exit, sync::mpsc, thread::spawn};
-use tempfile::TempDir;
 
 #[derive(Args, Clone, Debug, Serialize, Deserialize, Deref, DerefMut)]
 pub struct PortfolioConfig {
@@ -81,8 +80,6 @@ pub struct Portfolio {
     ctrl: Arc<EngineCtrl>,
     tracer: Tracer,
     ui: Option<PortfolioUi>,
-    #[allow(unused)]
-    temp_dir: TempDir,
     st_recv: IpcReceiverSet,
     // state tracer id to worker id
     stid_to_wid: GHashMap<u64, usize>,
@@ -144,7 +141,6 @@ impl Portfolio {
         let rst = Restore::new(&ts);
         let ots = ts.clone();
         let (ts, rst) = ts.preproc(&cfg.preproc, rst);
-        let temp_dir = tempfile::TempDir::new_in("/tmp/rIC3/").unwrap();
         let mut engines = Vec::new();
         let mut new_engine = |name, args: &str| {
             let argv: Vec<_> = iter::once("").chain(args.split_whitespace()).collect();
@@ -183,7 +179,6 @@ impl Portfolio {
             engines,
             running: GHashMap::new(),
             winner_idx: None,
-            temp_dir,
             ctrl: Arc::new(EngineCtrl::new()),
             tracer: Tracer::new(),
             ui: None,

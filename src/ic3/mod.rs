@@ -15,7 +15,7 @@ use clap::{ArgAction, Args, Parser};
 use derive_more::{Deref, DerefMut};
 use frame::Frames;
 use giputils::{TerminateCtrl, logger::IntervalLogger, ptr::Grc};
-use log::{Level, debug, error, info, trace};
+use log::{Level, debug, info, trace};
 use logicrs::{Lit, LitOrdVec, LitVec, LitVvec, Var, VarMap, VarSymbols, satif::Satif};
 use proofoblig::{ProofObligation, ProofObligationQueue};
 use rand::{SeedableRng, rngs::StdRng};
@@ -131,38 +131,29 @@ impl Default for IC3Config {
 
 impl IC3Config {
     fn validate(&self) {
-        if self.dynamic && self.drop_po {
-            error!("cannot enable both dynamic and drop-po");
-            panic!();
-        }
-        if self.mab && self.drop_po {
-            error!("cannot enable both mab and drop-po");
-            panic!();
-        }
+        assert!(
+            !(self.dynamic && self.drop_po),
+            "cannot enable both dynamic and drop-po"
+        );
+        assert!(
+            !(self.mab && self.drop_po),
+            "cannot enable both mab and drop-po"
+        );
         if self.inn {
             let pre = "cannot enable both inn and";
-            if self.abs_cst || self.abs_trans {
-                error!("{pre} (abs_cst or abs_trans)");
-                panic!();
-            }
-            if self.pred_prop {
-                error!("{pre} pred-prop");
-                panic!();
-            }
+            assert!(
+                !(self.abs_cst || self.abs_trans),
+                "{pre} (abs_cst or abs_trans)"
+            );
+            assert!(!self.pred_prop, "{pre} pred-prop");
         }
-        if self.full_bad {
-            error!("full-bad can't be used now");
-            panic!();
-        }
+        assert!(!self.full_bad, "full-bad can't be used now");
         if self.local_proof {
-            if !self.pred_prop {
-                error!("local-proof should used with pred-prop");
-                panic!();
-            }
-            if self.prop.is_none() {
-                error!("A property ID must be specified for local proof.");
-                panic!();
-            }
+            assert!(self.pred_prop, "local-proof should used with pred-prop");
+            assert!(
+                self.prop.is_some(),
+                "A property ID must be specified for local proof."
+            );
         }
     }
 }

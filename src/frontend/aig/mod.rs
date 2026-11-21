@@ -166,12 +166,10 @@ impl AigFrontend {
             aig.bads.push(Lit::constant(false));
         }
         if !aig.justice.is_empty() {
-            if !aig.bads.is_empty() {
-                error!(
-                    "rIC3 does not support solving both safety and liveness properties simultaneously"
-                );
-                panic!();
-            }
+            assert!(
+                aig.bads.is_empty(),
+                "rIC3 does not support solving both safety and liveness properties simultaneously"
+            );
         } else if !aig.fairness.is_empty() {
             warn!("fairness constraints are ignored when solving the safety property");
             aig.fairness.clear();
@@ -215,12 +213,10 @@ impl Frontend for AigFrontend {
         let leaf: GHashSet<Var> = self.ts.input().chain(self.ts.latch()).collect();
         match cert {
             McBlCertificate::UNSAT(proof) => {
-                if !self.is_safety() {
-                    error!(
-                        "rIC3 does not support certificate generation for safe liveness properties"
-                    );
-                    panic!();
-                }
+                assert!(
+                    self.is_safety(),
+                    "rIC3 does not support certificate generation for safe liveness properties"
+                );
                 let mut certifaiger = Aig::from(&proof.proof);
                 certifaiger = certifaiger.reencode();
                 certifaiger.symbols.clear();
