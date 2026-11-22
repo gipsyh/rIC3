@@ -92,7 +92,7 @@ fn preprocess(
                     let mut cfg = cfg.clone();
                     cfg.prop = Some(i);
                     let mut ic3 = IC3::new(cfg.clone(), ts.clone(), VarSymbols::default());
-                    ic3.check()
+                    ic3.check()[0]
                 })
                 .collect()
         })

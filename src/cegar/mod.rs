@@ -2,7 +2,7 @@ mod uf;
 
 use self::uf::Uf;
 use crate::{
-    BlEngine, Engine, McResult, WlCex, WlEngine, WlProof,
+    BlEngine, Engine, MpMcResult, WlCex, WlEngine, WlProof,
     config::EngineConfigBase,
     ic3::{IC3, IC3Config},
     tracer::{Tracer, TracerIf},
@@ -77,12 +77,12 @@ impl Cegar {
 }
 
 impl Engine for Cegar {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         loop {
-            let res = self.model.ic3.check();
+            let res = self.model.ic3.check()[0];
             if !res.is_sat() || self.abstractor.is_none() {
                 self.tracer.trace_state(None, res);
-                return res;
+                return res.into();
             }
             let bl_cex = self.model.ic3.cex();
             let cex = self.model.bb_map.restore_cex(&bl_cex);

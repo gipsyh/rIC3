@@ -51,7 +51,7 @@ impl CIll {
                                 cfg.prop = Some(i);
                                 let mut ic3 =
                                     IC3::new(cfg.clone(), self.ts.clone(), VarSymbols::default());
-                                let res = ic3.check();
+                                let res = ic3.check()[0];
                                 let inv = ic3.invariant();
                                 let res = matches!(res, McResult::UNSAT);
                                 (res, inv, res as u32 * (lp as u32 + 1))
@@ -92,7 +92,7 @@ impl CIll {
                 .map(|b| {
                     let mut kind = CIllKind::new(b, self.ts.clone(), invariants.clone(), None);
                     let mut cex = None;
-                    if !kind.check().is_unsat() {
+                    if !kind.check()[0].is_unsat() {
                         cex = Some(kind.cex());
                     }
                     (b, cex, kind)

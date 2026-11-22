@@ -29,7 +29,7 @@ impl CIll {
                         cfg.step = step;
                     }
                     let mut bmc = BMC::new(cfg, self.ts.clone());
-                    let res = bmc.check();
+                    let res = bmc.check()[0];
                     (res, bmc)
                 })
                 .collect()

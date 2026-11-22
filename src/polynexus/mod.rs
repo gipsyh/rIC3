@@ -1,7 +1,7 @@
 mod schd;
 
 use crate::{
-    BlCex, BlEngine, BlProof, Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
+    BlEngine, Engine, McBlCertificate, McResult, MpMcResult,
     config::{EngineConfigBase, PreprocConfig, WorkerConfigs},
     ic3::{IC3, IC3Config},
     polynexus::schd::Scheduler,
@@ -66,7 +66,7 @@ struct RunningWorker {
 pub struct PolyNexus {
     #[allow(unused)]
     cfg: PolyNexusConfig,
-    ots: Transys,
+    // ots: Transys,
     ts: Transys,
     rst: Restore,
     tracer: Tracer,
@@ -77,7 +77,7 @@ pub struct PolyNexus {
 
 impl PolyNexus {
     pub fn new(cfg: PolyNexusConfig, ts: Transys, results: MpMcResult) -> Self {
-        let ots = ts.clone();
+        // let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         let mut ts = ts;
@@ -85,7 +85,7 @@ impl PolyNexus {
         let num_props = ts.bad.len();
         Self {
             cfg,
-            ots,
+            // ots,
             ts,
             rst,
             tracer: Tracer::new(),
@@ -150,7 +150,7 @@ impl PolyNexus {
         let ts = unsafe { std::ptr::read(ts) };
         let mut ic3 = IC3::new(cfg, ts, VarSymbols::default());
         ic3.add_tracer(Box::new(PropTracerBridge { prop, tx: state_tx }));
-        let result = ic3.check();
+        let result = ic3.check()[0];
         let cert = match result {
             McResult::UNSAT => Some(McBlCertificate::UNSAT(ic3.proof())),
             McResult::SAT(_) => Some(McBlCertificate::SAT(ic3.cex())),
@@ -432,8 +432,8 @@ impl StateTracerIf for PropTracerBridge {
 }
 
 impl Engine for PolyNexus {
-    fn check(&mut self) -> McResult {
-        panic!();
+    fn check(&mut self) -> MpMcResult {
+        self.run()
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
@@ -445,22 +445,18 @@ impl Engine for PolyNexus {
     }
 }
 
-impl MpEngine for PolyNexus {
-    fn check(&mut self) -> MpMcResult {
-        self.run()
-    }
-
-    fn proof(&mut self, prop: usize) -> BlProof {
-        let Some(McBlCertificate::UNSAT(proof)) = self.certs[prop].as_ref() else {
-            panic!("no proof available for this property");
-        };
-        self.rst.restore_proof(proof.clone(), &self.ots)
-    }
-
-    fn cex(&mut self, prop: usize) -> BlCex {
-        let Some(McBlCertificate::SAT(cex)) = self.certs[prop].as_ref() else {
-            panic!("no cex available for this property");
-        };
-        self.rst.restore_cex(cex)
-    }
+impl BlEngine for PolyNexus {
+    // fn proof(&mut self, prop: usize) -> BlProof {
+    //     let Some(McBlCertificate::UNSAT(proof)) = self.certs[prop].as_ref() else {
+    //         panic!("no proof available for this property");
+    //     };
+    //     self.rst.restore_proof(proof.clone(), &self.ots)
+    // }
+    //
+    // fn cex(&mut self, prop: usize) -> BlCex {
+    //     let Some(McBlCertificate::SAT(cex)) = self.certs[prop].as_ref() else {
+    //         panic!("no cex available for this property");
+    //     };
+    //     self.rst.restore_cex(cex)
+    // }
 }

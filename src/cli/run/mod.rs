@@ -6,7 +6,7 @@ use btor::Btor;
 use clap::{Args, ValueEnum};
 use giputils::file::recreate_dir;
 use rIC3::{
-    Engine, McBlCertificate, McResult, MpEngine, MpMcResult,
+    Engine, McBlCertificate, McResult, MpMcResult,
     frontend::{Frontend, btor::BtorFrontend},
     polynexus::{PolyNexus, PolyNexusConfig},
     tracer::{
@@ -214,7 +214,7 @@ impl Run {
         }
 
         let join = spawn(move || {
-            let res = MpEngine::check(&mut engine);
+            let res = engine.check();
             (res, engine)
         });
 

@@ -11,7 +11,7 @@ use crate::ui::UiRenderer;
 use crate::utils::{
     CertIpcRx, CertIpcTx, EngineCtrl, LemmaIpcRx, StateIpcTx, install_interrupt_handler,
 };
-use crate::{BlEngine, Engine, McBlCertificate, McResult, create_bl_engine};
+use crate::{BlEngine, Engine, McBlCertificate, McResult, MpMcResult, create_bl_engine};
 use anyhow::Context;
 use clap::{Args, Parser};
 use derive_more::{Deref, DerefMut};
@@ -112,7 +112,7 @@ impl Worker {
         let mut engine = create_bl_engine(self.cfg.clone(), ts, sym);
         engine.add_tracer(Box::new(tracer));
         extractor.map(|e| engine.set_extractor(Box::new(e)));
-        let res = engine.check();
+        let res = engine.check()[0];
         if let Some(cert_tx) = self.cert_tx.as_ref() {
             let certificate = match res {
                 McResult::UNSAT => {
@@ -314,7 +314,7 @@ impl Portfolio {
 }
 
 impl Engine for Portfolio {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         let mut lemma_mgr = self.cfg.share_lemma.then(LemmaMgr::new);
         for (worker_idx, worker) in self.engines.iter_mut().enumerate() {
             let (state_tx, state_rx) = ipc::channel().unwrap();
@@ -367,7 +367,7 @@ impl Engine for Portfolio {
                 if interrupt.is_interrupted() {
                     exit(130);
                 }
-                return McResult::Unknown(None);
+                return McResult::Unknown(None).into();
             }
 
             if self.running.is_empty() {
@@ -379,7 +379,7 @@ impl Engine for Portfolio {
                 if let Some(ui) = self.ui.as_ref() {
                     ui.finish(res);
                 }
-                return res;
+                return res.into();
             }
 
             self.poll_state_traces();
@@ -390,7 +390,7 @@ impl Engine for Portfolio {
                 if let Some(ui) = self.ui.as_ref() {
                     ui.finish(res);
                 }
-                return res;
+                return res.into();
             }
         }
     }
@@ -460,7 +460,7 @@ impl LightPortfolio {
 }
 
 impl Engine for LightPortfolio {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         let engines: Vec<_> = self
             .ecfgs
             .clone()
@@ -476,7 +476,7 @@ impl Engine for LightPortfolio {
             for mut e in engines {
                 let tx = tx.clone();
                 let join = spawn(move || {
-                    let res = e.check();
+                    let res = e.check()[0];
                     let _ = tx.send(res);
                     (e, res)
                 });
@@ -518,6 +518,7 @@ impl Engine for LightPortfolio {
             }
             res
         })
+        .into()
     }
 
     fn get_ctrl(&self) -> Arc<dyn TerminateCtrl> {

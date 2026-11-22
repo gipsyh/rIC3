@@ -95,6 +95,12 @@ impl std::ops::IndexMut<usize> for MpMcResult {
     }
 }
 
+impl From<McResult> for MpMcResult {
+    fn from(result: McResult) -> Self {
+        Self(vec![result])
+    }
+}
+
 impl FromIterator<McResult> for MpMcResult {
     fn from_iter<I: IntoIterator<Item = McResult>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
@@ -114,7 +120,7 @@ pub enum McWlCertificate {
 }
 
 pub trait Engine: Send {
-    fn check(&mut self) -> McResult;
+    fn check(&mut self) -> MpMcResult;
 
     fn add_tracer(&mut self, _tracer: Box<dyn TracerIf>) {
         panic!("unsupport add tracer");
@@ -164,18 +170,6 @@ pub trait WlEngine: Engine {
             McResult::SAT(_) => McWlCertificate::SAT(self.cex()),
             McResult::Unknown(_) => panic!(),
         }
-    }
-}
-
-pub trait MpEngine: Engine {
-    fn check(&mut self) -> MpMcResult;
-
-    fn cex(&mut self, _prop: usize) -> BlCex {
-        panic!("unsupport counterexample");
-    }
-
-    fn proof(&mut self, _prop: usize) -> BlProof {
-        panic!("unsupport proof");
     }
 }
 

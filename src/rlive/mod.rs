@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlEngine, Engine, McResult,
+    BlCex, BlEngine, Engine, McResult, MpMcResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     transys::{Transys, TransysIf, certify::Restore},
@@ -92,7 +92,7 @@ impl Rlive {
         let mut ic3 = IC3::new(self.rcfg.clone(), rts, VarSymbols::new());
         let prev_level = log::max_level();
         log::set_max_level(LevelFilter::Warn);
-        let res = ic3.check();
+        let res = ic3.check()[0];
         log::set_max_level(prev_level);
         if let McResult::UNSAT = res {
             return Ok(ic3.invariant());
@@ -163,23 +163,23 @@ impl Rlive {
 }
 
 impl Engine for Rlive {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         loop {
             let mut ts = self.ts.clone();
             ts.bad = take(&mut ts.justice);
             let mut ic3 = IC3::new(self.rcfg.clone(), ts, VarSymbols::new());
             let prev_level = log::max_level();
             log::set_max_level(LevelFilter::Warn);
-            let res = ic3.check();
+            let res = ic3.check()[0];
             log::set_max_level(prev_level);
             if let McResult::UNSAT = res {
-                return McResult::UNSAT;
+                return McResult::UNSAT.into();
             }
             let cex = ic3.cex();
             assert!(self.level() == 0);
             self.add_trace(cex);
             if !self.block() {
-                return McResult::SAT(0);
+                return McResult::SAT(0).into();
             }
         }
     }

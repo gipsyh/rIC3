@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    BlEngine, Engine, McResult, MpMcResult,
+    BlEngine, Engine, MpMcResult,
     config::{EngineConfigBase, PreprocConfig},
     ic3::{IC3, IC3Config},
     tracer::{Tracer, TracerIf},
-    transys::{
-        Transys,
-        certify::{BlCex, BlProof, Restore},
-    },
+    transys::{Transys, certify::Restore},
     utils::EngineCtrl,
 };
 use clap::{ArgAction, Args};
@@ -44,9 +41,9 @@ impl MultiPropConfig {
 }
 
 pub struct MultiProp {
-    ots: Transys,
+    // ots: Transys,
     ts: Transys,
-    rst: Restore,
+    // rst: Restore,
     ic3: Vec<IC3>,
     ic3_cfg: IC3Config,
     tracer: Tracer,
@@ -58,7 +55,7 @@ pub struct MultiProp {
 impl MultiProp {
     pub fn new(cfg: MultiPropConfig, ts: Transys) -> Self {
         cfg.validate();
-        let ots = ts.clone();
+        // let ots = ts.clone();
         let rst = Restore::new(&ts);
         let (mut ts, mut rst) = ts.preproc(&cfg.preproc, rst);
         ts.remove_gate_init(&mut rst);
@@ -70,10 +67,10 @@ impl MultiProp {
         ic3_cfg.preproc.scorr = false;
         let parallel = cfg.parallel;
         Self {
-            ots,
+            // ots,
             results: MpMcResult::new(ts.bad.len()),
             ts,
-            rst,
+            // rst,
             ic3: Vec::new(),
             ic3_cfg,
             tracer: Tracer::new(),
@@ -84,7 +81,7 @@ impl MultiProp {
 }
 
 impl Engine for MultiProp {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         if self.parallel {
             let results: Vec<_> = with_log_level(LevelFilter::Warn, || {
                 (0..self.ts.bad.len())
@@ -93,7 +90,7 @@ impl Engine for MultiProp {
                         let mut cfg = self.ic3_cfg.clone();
                         cfg.prop = Some(i);
                         let mut ic3 = IC3::new(cfg, self.ts.clone(), VarSymbols::default());
-                        let result = ic3.check();
+                        let result = ic3.check()[0];
                         (ic3, result)
                     })
                     .collect()
@@ -101,28 +98,18 @@ impl Engine for MultiProp {
             for (bad, (ic3, result)) in results.into_iter().enumerate() {
                 self.ic3.push(ic3);
                 self.results[bad] = result;
-                match result {
-                    McResult::UNSAT => (),
-                    McResult::SAT(_) => return result,
-                    McResult::Unknown(_) => unreachable!(),
-                }
             }
         } else {
             for i in 0..self.ts.bad.len() {
                 let mut cfg = self.ic3_cfg.clone();
                 cfg.prop = Some(i);
                 let mut ic3 = IC3::new(cfg, self.ts.clone(), VarSymbols::default());
-                let result = ic3.check();
+                let result = ic3.check()[0];
                 self.ic3.push(ic3);
                 self.results[i] = result;
-                match result {
-                    McResult::UNSAT => (),
-                    McResult::SAT(_) => return result,
-                    McResult::Unknown(_) => unreachable!(),
-                }
             }
         }
-        McResult::UNSAT
+        self.results.clone()
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
@@ -135,20 +122,20 @@ impl Engine for MultiProp {
 }
 
 impl BlEngine for MultiProp {
-    fn proof(&mut self) -> BlProof {
-        let mut proof = BlProof {
-            proof: self.ts.clone(),
-        };
-        for ic3 in self.ic3.iter_mut() {
-            let subp = ic3.proof();
-            proof.merge(&subp, &self.ts);
-        }
-        self.rst.restore_proof(proof, &self.ots)
-    }
-
-    fn cex(&mut self) -> BlCex {
-        let bid = self.results.iter().position(|r| r.is_sat()).unwrap();
-        let cex = self.ic3[bid].cex();
-        self.rst.restore_cex(&cex)
-    }
+    // fn proof(&mut self) -> BlProof {
+    //     let mut proof = BlProof {
+    //         proof: self.ts.clone(),
+    //     };
+    //     for ic3 in self.ic3.iter_mut() {
+    //         let subp = ic3.proof();
+    //         proof.merge(&subp, &self.ts);
+    //     }
+    //     self.rst.restore_proof(proof, &self.ots)
+    // }
+    //
+    // fn cex(&mut self) -> BlCex {
+    //     let bid = self.results.iter().position(|r| r.is_sat()).unwrap();
+    //     let cex = self.ic3[bid].cex();
+    //     self.rst.restore_cex(&cex)
+    // }
 }

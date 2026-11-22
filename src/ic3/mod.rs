@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlEngine, BlProof, Engine, McResult,
+    BlCex, BlEngine, BlProof, Engine, McResult, MpMcResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     gipsat::{SolverStatistic, TransysSolver},
     ic3::{block::BlockResult, localabs::LocalAbs, predprop::PredProp},
@@ -331,16 +331,16 @@ impl IC3 {
 }
 
 impl Engine for IC3 {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         if !self.prep_prop_base() {
-            return self.finish_progress(McResult::SAT(0));
+            return self.finish_progress(McResult::SAT(0)).into();
         }
         // With a predicate property the base check covers depth 0, and level k
         // then covers depth k + 1.
         if self.predprop.is_some()
             && let Some(result) = self.complete_depth(0)
         {
-            return result;
+            return result.into();
         }
         self.extend();
         self.render_progress();
@@ -358,7 +358,7 @@ impl Engine for IC3 {
                 };
                 if let Some(result) = terminal {
                     self.statistic.block.overall_time += start.elapsed();
-                    return self.finish_progress(result);
+                    return self.finish_progress(result).into();
                 }
                 if let Some((bad, inputs)) = self.get_bad() {
                     debug!("bad state found in frame {}", self.level());
@@ -381,7 +381,7 @@ impl Engine for IC3 {
             self.filog.log(Level::Info, self.frame.statistic(true));
             let depth = self.level() + usize::from(self.predprop.is_some());
             if let Some(result) = self.complete_depth(depth) {
-                return result;
+                return result.into();
             }
             self.extend();
             self.render_progress();
@@ -389,7 +389,7 @@ impl Engine for IC3 {
             let propagate = self.propagate(None);
             self.statistic.propagate.overall_time += start.elapsed();
             if propagate {
-                return self.finish_progress(McResult::UNSAT);
+                return self.finish_progress(McResult::UNSAT).into();
             }
             self.propagate_to_inf();
             self.render_progress();

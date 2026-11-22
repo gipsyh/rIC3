@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlEngine, Engine, McResult,
+    BlCex, BlEngine, Engine, McResult, MpMcResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     tracer::{ExtractorIf, Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
@@ -169,17 +169,17 @@ impl BMC {
 }
 
 impl Engine for BMC {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         let start = Instant::now();
         for k in (self.cfg.start..=self.cfg.end).step_by(self.step) {
             if self.ctrl.is_terminated() {
-                return McResult::Unknown(k.checked_sub(1));
+                return McResult::Unknown(k.checked_sub(1)).into();
             }
             let mut time_limit = self.cfg.step_time_limit;
             if let Some(limit) = self.cfg.time_limit {
                 let time = start.elapsed().as_secs();
                 if start.elapsed().as_secs() >= limit {
-                    return McResult::Unknown(k.checked_sub(1));
+                    return McResult::Unknown(k.checked_sub(1)).into();
                 }
                 let remain = limit - time;
                 time_limit = Some(time_limit.map_or(remain, |tl| tl.min(remain)));
@@ -202,13 +202,13 @@ impl Engine for BMC {
             };
             let Some(r) = r else {
                 if self.ctrl.is_terminated() {
-                    return McResult::Unknown(k.checked_sub(1));
+                    return McResult::Unknown(k.checked_sub(1)).into();
                 }
                 continue;
             };
             if r {
                 self.tracer.trace_state(None, crate::McResult::SAT(k));
-                return McResult::SAT(k);
+                return McResult::SAT(k).into();
             }
             self.tracer
                 .trace_state(None, crate::McResult::Unknown(Some(k)));
@@ -217,7 +217,7 @@ impl Engine for BMC {
             }
         }
         info!("bmc reached bound {}, stopping search", self.cfg.end);
-        McResult::Unknown(Some(self.cfg.end))
+        McResult::Unknown(Some(self.cfg.end)).into()
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

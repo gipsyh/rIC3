@@ -1,5 +1,5 @@
 use crate::{
-    Engine, McResult, WlCex, WlEngine, WlProof,
+    Engine, McResult, MpMcResult, WlCex, WlEngine, WlProof,
     config::EngineConfigBase,
     tracer::{Tracer, TracerIf},
     wltransys::{WlTransys, unroll::WlTransysUnroll},
@@ -70,7 +70,7 @@ impl WlKind {
 }
 
 impl Engine for WlKind {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         let step = self.cfg.step as usize;
         assert!(step == 1, "k-induction step should be 1, got {step}");
         assert!(
@@ -80,7 +80,7 @@ impl Engine for WlKind {
         );
         for k in 0..=self.cfg.end {
             if self.ctrl.is_terminated() {
-                return McResult::Unknown(k.checked_sub(1));
+                return McResult::Unknown(k.checked_sub(1)).into();
             }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
@@ -89,7 +89,7 @@ impl Engine for WlKind {
                 let bad_at_k = self.uts.next(&self.uts.ts.bad[0], k);
                 if !self.solver.solve(&[bad_at_k]) {
                     self.tracer.trace_state(None, crate::McResult::UNSAT);
-                    return McResult::UNSAT;
+                    return McResult::UNSAT.into();
                 }
             }
 
@@ -102,13 +102,13 @@ impl Engine for WlKind {
 
             if self.solver.solve(&assump) {
                 self.tracer.trace_state(None, crate::McResult::SAT(k));
-                return McResult::SAT(k);
+                return McResult::SAT(k).into();
             }
             self.tracer
                 .trace_state(None, crate::McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
-        McResult::Unknown(Some(self.cfg.end))
+        McResult::Unknown(Some(self.cfg.end)).into()
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {

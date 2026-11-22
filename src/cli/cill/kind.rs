@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use logicrs::{Lit, LitVec, LitVvec, Var, VarRange, satif::Satif};
 use rIC3::{
-    BlEngine, Engine, McResult,
+    BlEngine, Engine, McResult, MpMcResult,
     transys::{
         Transys, TransysIf,
         certify::{BlCex, BlProof, Restore},
@@ -85,7 +85,7 @@ impl CIllKind {
 }
 
 impl Engine for CIllKind {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         let k = 3;
         self.uts.unroll_to(k);
         self.load_trans_to(k);
@@ -95,9 +95,9 @@ impl Engine for CIllKind {
         self.solver.add_clause(&[bad]);
         let res = self.solver.solve(&[]);
         if !res {
-            return McResult::UNSAT;
+            return McResult::UNSAT.into();
         }
-        McResult::Unknown(Some(k))
+        McResult::Unknown(Some(k)).into()
     }
 }
 

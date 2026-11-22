@@ -40,7 +40,7 @@ fn ic3(end: usize, pred_prop: bool, ts: Transys) -> IC3 {
 fn run(mut engine: impl Engine) -> (McResult, Vec<McResult>) {
     let (tx, rx) = state_channel_tracer();
     engine.add_tracer(Box::new(tx));
-    let result = engine.check();
+    let result = engine.check()[0];
     let events = rx.try_iter().map(|(_, result)| result).collect();
     (result, events)
 }

@@ -1,5 +1,5 @@
 use crate::{
-    BlCex, BlEngine, BlProof, Engine, McResult,
+    BlCex, BlEngine, BlProof, Engine, McResult, MpMcResult,
     config::{EngineConfig, EngineConfigBase, PreprocConfig},
     tracer::{Tracer, TracerIf},
     transys::{Transys, TransysIf, certify::Restore, nodep::NoDepTransys, unroll::TransysUnroll},
@@ -167,10 +167,10 @@ impl Kind {
 }
 
 impl Engine for Kind {
-    fn check(&mut self) -> McResult {
+    fn check(&mut self) -> MpMcResult {
         for k in self.cfg.start..=self.cfg.end {
             if self.ctrl.is_terminated() {
-                return McResult::Unknown(k.checked_sub(1));
+                return McResult::Unknown(k.checked_sub(1)).into();
             }
             self.uts.unroll_to(k);
             self.load_trans_to(k);
@@ -179,13 +179,13 @@ impl Engine for Kind {
                 let bad = self.get_bad(k);
                 let Some(res) = self.solver.try_solve(&[bad], vec![]) else {
                     if self.ctrl.is_terminated() {
-                        return McResult::Unknown(k.checked_sub(1));
+                        return McResult::Unknown(k.checked_sub(1)).into();
                     }
                     continue;
                 };
                 if !res {
                     self.tracer.trace_state(None, McResult::UNSAT);
-                    return McResult::UNSAT;
+                    return McResult::UNSAT.into();
                 }
             }
             if !self.cfg.skip_bmc {
@@ -193,19 +193,19 @@ impl Engine for Kind {
                 assump.push(self.get_bad(k));
                 let Some(res) = self.solver.try_solve(&assump, vec![]) else {
                     if self.ctrl.is_terminated() {
-                        return McResult::Unknown(k.checked_sub(1));
+                        return McResult::Unknown(k.checked_sub(1)).into();
                     }
                     continue;
                 };
                 if res {
                     self.tracer.trace_state(None, McResult::SAT(k));
-                    return McResult::SAT(k);
+                    return McResult::SAT(k).into();
                 }
             }
             self.tracer.trace_state(None, McResult::Unknown(Some(k)));
         }
         info!("kind reached bound {}, stopping search", self.cfg.end);
-        McResult::Unknown(Some(self.cfg.end))
+        McResult::Unknown(Some(self.cfg.end)).into()
     }
 
     fn add_tracer(&mut self, tracer: Box<dyn TracerIf>) {
